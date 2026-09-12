@@ -19,15 +19,20 @@
       </div>
     </div>
     <div class="tools">
-      <button id="btnMeasure" class="tool" title="点击地图打点，测量两点间游戏距离（米）"><span class="ico">📏</span>测量</button>
-      <button id="btnPin" class="tool" title="在地图上添加自定义标记"><span class="ico">📍</span>标记</button>
-      <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接"><span class="ico">🔗</span>分享</button>
-      <button id="btnReset" class="tool" title="重置到全图视图"><span class="ico">🏠</span>全图</button>
+      <button id="btnSidebar" class="tool" title="显示 / 隐藏图层面板"><span class="ico">☰</span><span class="label">图层</span></button>
+      <button id="btnMeasure" class="tool" title="点击地图打点，测量两点间游戏距离（米）"><span class="ico">📏</span><span class="label">测量</span></button>
+      <button id="btnPin" class="tool" title="在地图上添加自定义标记"><span class="ico">📍</span><span class="label">标记</span></button>
+      <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接"><span class="ico">🔗</span><span class="label">分享</span></button>
+      <button id="btnReset" class="tool" title="重置到全图视图"><span class="ico">🏠</span><span class="label">全图</span></button>
     </div>
   </header>
 
   <!-- 侧栏 -->
   <aside id="sidebar">
+    <div class="side-head">
+      <span>图层与搜索</span>
+      <button id="sideClose" class="card-close" title="收起面板">×</button>
+    </div>
     <div class="search-wrap">
       <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off">
       <div id="searchResults" class="hidden"></div>
@@ -52,6 +57,8 @@
   <!-- 地图 -->
   <main id="mapArea">
     <canvas id="mapCanvas"></canvas>
+
+    <div id="sideMask" class="hidden"></div>
 
     <div id="zoomControls">
       <button id="zoomIn">＋</button>

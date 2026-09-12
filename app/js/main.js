@@ -24,6 +24,24 @@
     resizeTimer = setTimeout(() => map._resize(), 120);
   });
 
+  // 手机版侧栏抽屉：☰ 打开，× / 遮罩 / Esc 收起
+  const sidebar = document.getElementById('sidebar');
+  const sideMask = document.getElementById('sideMask');
+  function setSidebar(open) {
+    sidebar.classList.toggle('open', open);
+    sideMask.classList.toggle('hidden', !open);
+  }
+  document.getElementById('btnSidebar').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
+  document.getElementById('sideClose').addEventListener('click', () => setSidebar(false));
+  sideMask.addEventListener('click', () => setSidebar(false));
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) setSidebar(false);
+  });
+  // 桌面端（>760px）侧栏始终可见，收起态不生效
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 760) setSidebar(false);
+  });
+
   // 提示
   setTimeout(() => {
     UI.toast('点击标注查看详情 · 勾选图层可多选同显 · 完成度自动保存');
