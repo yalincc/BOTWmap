@@ -210,7 +210,7 @@ class BotwMap {
     if (!this.w) return;
     const s = Math.min(this.w / this.MW, this.h / this.MH);
     this.minScale = s * 0.85;
-    this.maxScale = Math.max(1, this.dpr); // 物理像素 1:1 封顶：电脑(dpr1)=1 与之前一致；手机高分屏可放大到瓦片精度极限
+    this.maxScale = 1 / Math.max(1, this.dpr); // 物理像素密度对齐：任何设备放大到最大时，清晰度与电脑(dpr=1,maxScale=1)一致；避免高dpr手机超分放大导致模糊
     this.view.scale = Math.min(Math.max(s, this.minScale), this.maxScale);
     this.view.x = (this.w - this.MW * this.view.scale) / 2;
     this.view.y = (this.h - this.MH * this.view.scale) / 2;
