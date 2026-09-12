@@ -59,6 +59,8 @@ class BotwMap {
     this.dpr = window.devicePixelRatio || 1;
     this.loaded = false;
     this._viewApplied = false; // 是否已应用外部（分享链接）视图
+    this.regions = (typeof BOTW_REGIONS !== 'undefined') ? BOTW_REGIONS : []; // 主要地形/区域名
+    this._regionScale = 0.05;  // 全图适配 scale（fit 时更新），用于地名分级切换
     this.tileCache = new Map();   // 瓦片 LRU 缓存：key -> HTMLImageElement
     this.tilePending = new Set(); // 正在加载的瓦片 key
     this._tileDrawPending = false;
@@ -211,6 +213,7 @@ class BotwMap {
     const s = Math.min(this.w / this.MW, this.h / this.MH);
     this.minScale = s * 0.85;
     this.maxScale = 1 / Math.max(1, this.dpr); // 物理像素密度对齐：任何设备放大到最大时，清晰度与电脑(dpr=1,maxScale=1)一致；避免高dpr手机超分放大导致模糊
+    this._regionScale = s;   // 全图适配 scale（地名分级切换基准）
     this.view.scale = Math.min(Math.max(s, this.minScale), this.maxScale);
     this.view.x = (this.w - this.MW * this.view.scale) / 2;
     this.view.y = (this.h - this.MH * this.view.scale) / 2;
@@ -273,9 +276,48 @@ class BotwMap {
 
     this._drawTiles(ctx);
 
+    this._drawRegions(ctx);   // 地形/区域名（瓦片之上、标记之下）
+
     this._drawMeasure(ctx);
     this._drawMarkers(ctx);
     this._drawCustom(ctx);
+  }
+
+  /* ---------- 地形/区域名（模仿游戏内地图：半透明白底深字，随缩放分级切换） ---------- */
+  _drawRegions(ctx) {
+    if (!this.regions.length) return;
+    const { w, h, view } = this;
+    const T1 = this._regionScale * 2;   // 全图→放大 2 倍后，8 大区名切换为细分地形名
+    const showAreas = view.scale >= T1;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const rg of this.regions) {
+      const isRegion = rg.lv === 'region';
+      if (isRegion === showAreas) continue;   // region 缩小态显示 / area 放大态显示
+      const [sx, sy] = this.m2s(rg.px);
+      if (sx < -90 || sy < -90 || sx > w + 90 || sy > h + 90) continue;
+      const fs = isRegion ? 13.5 : 11.5;
+      ctx.font = (isRegion ? '700 ' : '600 ') + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+      const tw = ctx.measureText(rg.n).width;
+      const padX = fs * 0.55, padY = fs * 0.28;
+      const bw = tw + padX * 2, bh = fs + padY * 2;
+      const x = sx - bw / 2, y = sy - bh / 2;
+      ctx.fillStyle = 'rgba(255,255,255,0.58)';
+      this._roundRect(ctx, x, y, bw, bh, 4);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(24,32,26,0.92)';
+      ctx.fillText(rg.n, sx, sy + 0.5);
+    }
+  }
+
+  _roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
   }
 
   _markerScreenSize(mk) {
