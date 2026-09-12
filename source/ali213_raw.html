@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>塞尔达地图_塞尔达传说荒野之息全要素中文标识互动地图_游侠网</title>
+
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge"/>
+    <meta name="keywords" content="塞尔达地图,塞尔达中文地图,塞尔达传说荒野之息地图,互动地图">
+    <meta name="description" content="游侠网塞尔达传说荒野之息全要素中文标识互动地图，包含了全部120个坐标神庙、支线任务地点、回忆点、塔、克洛洛yahaha位置、驿站、城镇等全要素高清地图标注。">
+
+    <link rel="stylesheet" href="leaflet/base.css"/>
+    <link rel="stylesheet" href="leaflet/leaflet.css"/>
+    <!-- <link rel="stylesheet" href="leaflet/leaflet-search.min.css"/> -->
+    <script src="//static.ali213.net/js/lib/jquery/jquery-1.12.4.min.js"></script>
+    <script src="leaflet/leaflet.js"></script>
+    <!-- <script src="leaflet/leaflet-search.min.js"></script> -->
+</head>
+<style>
+    html, body {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        margin: 0;
+        padding: 0;
+        background: #000000;
+    }
+
+    .zelda-div-icon {
+        white-space: nowrap;
+        color: #ffffff;
+        font-size: 14px;
+    }
+
+    /*//9.27新加样式*/
+    .leaflet-control-layers-expanded {
+        padding: 0;
+        background: rgb(44, 44, 44);
+        border: 0;
+    }
+
+    .leaflet-control-layers-selector {
+        display: none;
+    }
+
+    .leaflet-control-layers-base {
+        width: 110px;
+    }
+
+    .leaflet-control-layers-base span a {
+        color: white;
+        height: 30px;
+        line-height: 30px;
+        font-size: 14px;
+        width: 100%;
+        text-align: left;
+        display: inline-block;
+        cursor: pointer;
+        box-sizing:border-box;
+        padding: 0 15px;
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .leaflet-control-layers-base span a.checked {
+        background: rgb(0, 120, 168);
+    }
+
+    .leaflet-control-layers-base span a:hover {
+        background: rgba(22, 22, 22, 0.5);
+    }
+
+    .leaflet-control-layers-base span .checked:hover {
+        background: rgb(0, 120, 168);
+    }
+
+    .leaflet-control-layers-base .assortType {
+        color: #bbb;
+        height: 24px;
+        line-height: 26px;
+        font-size: 12px;
+        width: 100%;
+        text-align: left;
+        display: inline-block;
+        cursor: pointer;
+        padding: 0 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-top: 1px solid black;
+        box-sizing: border-box;
+    }
+    .leaflet-control-layers-scrollbar{
+        padding-right:0;
+    }
+    /*滚动条样式*/
+    form.leaflet-control-layers-list.leaflet-control-layers-scrollbar::-webkit-scrollbar { /*滚动条整体样式*/
+        width: 6px; /*高宽分别对应横竖滚动条的尺寸*/
+        height: 6px;
+    }
+
+    form.leaflet-control-layers-list.leaflet-control-layers-scrollbar::-webkit-scrollbar-thumb { /*滚动条里面小方块*/
+        border-radius: 5px;
+        -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.8);
+        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.8);
+        background: rgba(0, 0, 0, 0.2);
+    }
+
+    form.leaflet-control-layers-list.leaflet-control-layers-scrollbar::-webkit-scrollbar-track { /*滚动条里面轨道*/
+        -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+        border-radius: 0;
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    /*form.leaflet-control-layers-list.leaflet-control-layers-scrollbar{*/
+    /*scrollbar-3dlight-color:transparent;*/
+    /*scrollbar-highlight-color:transparent;*/
+    /*scrollbar-face-color:transparent;*/
+    /*scrollbar-arrow-color:transparent;*/
+    /*scrollbar-shadow-color:transparent;*/
+    /*scrollbar-dark-shadow-color:rgba(0, 0, 0, 0.1);*/
+    /*scrollbar-base-color:rgba(0, 0, 0, 0.8);*/
+    /*scrollbar-track-color:rgba(0, 0, 0, 0.8);*/
+    /*}*/
+    /*@-moz-document url-prefix(http://), url-prefix(https://) {*/
+    /*!* 滚动条颜色 *!*/
+    /*scrollbar {*/
+    /*-moz-appearance: none !important;*/
+    /*background: rgb(0, 255, 0) !important;*/
+    /*}*/
+    /*!* 滚动条按钮颜色 *!*/
+    /*thumb, scrollbarbutton {*/
+    /*-moz-appearance: none !important;*/
+    /*background-color: rgb(0, 0, 255) !important;*/
+    /*}*/
+    /*!* 鼠标悬停时按钮颜色 *!*/
+
+    /*thumb:hover, scrollbarbutton:hover {*/
+    /*-moz-appearance: none !important;*/
+    /*background-color: rgb(255, 0, 0) !important;*/
+    /*}*/
+    /*!* 隐藏上下箭头 *!*/
+    /*scrollbarbutton {*/
+    /*display: none !important;*/
+    /*}*/
+    /*!* 纵向滚动条宽度 *!*/
+    /*scrollbar[orient="vertical"] {*/
+    /*min-width: 15px !important;*/
+    /*}*/
+    /*}*/
+    /*20-8-21新加样式*/
+    .leaflet-top.leaflet-left{
+        right:10px;
+        left:auto;
+        top:50px;
+    }
+    .right-code{
+        display: none;
+    }
+    @media (min-width: 767.98px){
+        .right-code{
+            display: block;
+            position: absolute;
+            top: 263px;
+            right: 12px;
+            z-index: 500;
+            width: 30px;
+            background-color: #ffffff;
+            border-radius: 2px;
+            color: #171717;
+            font-size: 14px;
+            padding: 9px 5px;
+            box-sizing: border-box;
+            writing-mode: vertical-lr;
+            /* text-align: center; */
+            /* line-height: 2; */
+            letter-spacing: 1px;
+            text-decoration: none !important;
+        }
+        .right-code:hover{
+            color: #171717;
+        }
+
+        .right-code .code{
+            width:107px;
+            height:107px;
+            position: absolute;
+            left:-110px;
+            top:15px;
+            display: none;
+        }
+        .right-code:hover .code{
+            display: block;
+        }
+        .right-code .code img{
+            width:107px;
+            height:107px;
+            position: absolute;
+            left:0;
+            top:0;
+        }
+    }
+    @media (max-width:767px) {
+        .leaflet-top.leaflet-right{
+            top: auto;
+            bottom: 30px;
+            right: 0;
+        }
+        .leaflet-top.leaflet-left{
+            top: auto;
+            bottom: 80px;
+            right: 10px;
+        }
+    }
+</style>
+<a class="right-code" href="https://www.ali213.net/app/" target="_blank">
+    <span>下载APP随时查看</span>
+    <div class="code">
+        <img src="https://data.ali213.net/images/ali213-APP_tool.png" alt="">
+    </div>
+</a>
+<body>
+<script>var activeterm = 'sed';</script>
+<script src="//data.ali213.net/js/all_top_include.js"></script>
+<div id="map" style="width: 100%; height: 100%; background:#000000;"></div>
+<script>
+    !function(e){var o={};function a(r){if(o[r])return o[r].exports;var n=o[r]={i:r,l:!1,exports:{}};return e[r].call(n.exports,n,n.exports,a),n.l=!0,n.exports}a.m=e,a.c=o,a.d=function(e,o,r){a.o(e,o)||Object.defineProperty(e,o,{enumerable:!0,get:r})},a.r=function(e){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(e,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(e,"__esModule",{value:!0})},a.t=function(e,o){if(1&o&&(e=a(e)),8&o)return e;if(4&o&&"object"==typeof e&&e&&e.__esModule)return e;var r=Object.create(null);if(a.r(r),Object.defineProperty(r,"default",{enumerable:!0,value:e}),2&o&&"string"!=typeof e)for(var n in e)a.d(r,n,function(o){return e[o]}.bind(null,n));return r},a.n=function(e){var o=e&&e.__esModule?function(){return e.default}:function(){return e};return a.d(o,"a",o),o},a.o=function(e,o){return Object.prototype.hasOwnProperty.call(e,o)},a.p="//localhost:1717/",a(a.s=0)}([function(e,o,a){"use strict";var r={},n=L.map("map",{crs:L.CRS.Simple}).setView([16384,16384],2),t=new L.LatLngBounds([-206.5,34.75],[-50.5,221.5]);n.setMaxBounds(t),L.tileLayer("tiles/{z}_{x}_{y}.png",{minZoom:1,maxZoom:7,bounds:t,noWrap:!0,attribution:''}).addTo(n),L.control.scale({imperial:!1}).addTo(n);L.popup();n.on("zoomend",function(){var e=n.getZoom();for(var o in console.log(e),r){var a=","+r[o].zoom+",";r[o].iconurl||(-1!=a.indexOf(","+e)?n.addLayer(window[r[o].name.replace(" ","_")+"_group"]):n.removeLayer(window[r[o].name.replace(" ","_")+"_group"]))}});var l={},c={},i=0;$.getJSON("data/ajax_category.php?mapid=1",function(e){for(var o in r=e,e){e[o].iconurl&&(l['<a class="type_'+e[o].id+'">'+e[o].name+"</a>"]={});var a=e[o].iconsize.split(","),t=e[o].iconanchor.split(","),p=e[o].popupanchor.split(",");e[o].iconurl?window[e[o].name.replace(" ","_")+"_imgicon"]=L.icon({iconUrl:e[o].iconurl,iconSize:[parseFloat(a[0]),parseFloat(a[1])],iconAnchor:[parseFloat(t[0]),parseFloat(t[1])],popupAnchor:[parseFloat(p[0]),parseFloat(p[1])]}):window[e[o].name.replace(" ","_")+"_divicon"]=[],window[e[o].name.replace(" ","_")+"_group"]=L.layerGroup(),function(o){$.getJSON("data/ajax_coords.php?mapid=1&categoryid="+e[o].id,function(a){for(var r in a)e[o].iconurl?L.marker(n.unproject([parseFloat(a[r].y)+16384,16384-parseFloat(a[r].x)],7),{icon:window[e[o].name.replace(" ","_")+"_imgicon"]}).addTo(window[e[o].name.replace(" ","_")+"_group"]).bindPopup("<b>"+a[r].ctitle+"</b><br />"+(a[r].ccontent?a[r].ccontent:"")).openPopup():(window[e[o].name.replace(" ","_")+"_divicon"].push=L.divIcon({className:"zelda-div-icon",html:a[r].ctitle}),L.marker(n.unproject([parseFloat(a[r].y)+16384,16384-parseFloat(a[r].x)],7),{icon:new L.divIcon({className:"zelda-div-icon",html:a[r].ctitle})}).addTo(window[e[o].name.replace(" ","_")+"_group"]));e[o].iconurl?l['<a class="type_'+e[o].id+'">'+e[o].name+"</a>"]=window[e[o].name.replace(" ","_")+"_group"]:c[e[o].name]=window[e[o].name.replace(" ","_")+"_group"],i++,1==e[o].id?n.addLayer(window["塔_group"]):19==e[o].id&&n.addLayer(window["地区_group"])})}(o)}}),function e(){i>=30?(L.control.layers(l,{}).addTo(n),$(".leaflet-control-layers-base .type_1").addClass("checked"),$(".leaflet-control-layers-base a").click(function(){$(this).hasClass("checked")||($(".leaflet-control-layers-base a").removeClass("checked"),$(this).addClass("checked"))}),$(".leaflet-control-layers-base label").eq(0).before('<p class="assortType">任务</p>'),$(".leaflet-control-layers-base label").eq(4).before('<p class="assortType">位置</p>'),$(".leaflet-control-layers-base label").eq(7).before('<p class="assortType">项目</p>'),$(".leaflet-control-layers-base label").eq(10).before('<p class="assortType">商店</p>'),$(".leaflet-control-layers-base label").eq(14).before('<p class="assortType">区域</p>'),$(".leaflet-control-layers-base label").eq(21).before('<p class="assortType">怪物</p>')):setTimeout(e,100)}()}]);
+</script>
+<style>
+	footer {position: relative;z-index: 2;padding: 40px 0;background: #161616;}
+    footer .foot-cont-item a {font-size:12px;color:#6a6767;display:block;padding-left:15px;margin-bottom:5px}
+    footer .foot-cont-item .about a {display:inline-block;font-size:12px;padding:0 5px}
+    footer .statement p {font-size:12px;text-align:center;color:#6a6767}
+    footer .foot-cont-item p a {width:auto;display:inline-block;padding:0;margin:0}
+</style>
+<footer>
+<div class="fn-wrap">
+    <ul class="list-unstyled">
+        <li class="statement">
+            <div class="foot-cont-item">
+                <p>
+                    <a href="//www.ali213.net/about/" target="_blank" rel="nofollow">关于游侠</a>
+                    |
+                    <a href="//www.ali213.net/about/as.html" target="_blank" rel="nofollow">广告合作</a>
+                    |
+                    <a href="//www.ali213.net/about/job.html" target="_blank" rel="nofollow">人才招聘</a>
+                    |
+                    <a href="//www.ali213.net/about/yj.html" target="_blank" rel="nofollow">意见建议</a>
+                    |
+                    <a href="//www.ali213.net/about/contact.html" target="_blank" rel="nofollow">联系我们</a>
+                    |
+                    <a href="//www.ali213.net/about/SiteMap.html" target="_blank" rel="nofollow">网站地图</a>
+                    |
+                    <a href="//www.ali213.net/news/questionreback.asp" target="_blank" rel="nofollow"><span>建议版</span></a>
+                    |
+                    <a href="//www.ali213.net/about/copyright.html" target="_blank" rel="nofollow">版权保护投诉指引</a>
+                </p>
+                <p>Copyright © 1999-2018 ALi213.Net All Right Reserved</p>
+                <p>游侠网 版权所有</p>
+            </div>
+        </li>
+    </ul>
+</div>
+</footer>
+<div style="display: none">
+    <script>
+    var _hmt = _hmt || [];
+    (function() {
+    var hm = document.createElement("script");
+    hm.src = "//hm.baidu.com/hm.js?636e63a3769f693658f6090909c55776";
+    var s = document.getElementsByTagName("script")[0]; 
+    s.parentNode.insertBefore(hm, s);
+    })();
+    </script>
+</div>
+
+
+</body>
+</html>
+
+<div style="display: none">
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?636e63a3769f693658f6090909c55776";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</div>

@@ -1,0 +1,10 @@
+# 第三方参考克隆（MrCheeze/botw-waypoint-map，仅本地参考，不入库）
+waypoint-data/
+
+# source 下 git 残留（非本项目数据）
+source/botw-all-hoes/
+source/object-map/
+
+# 系统/编辑器
+Thumbs.db
+Desktop.ini

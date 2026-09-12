@@ -1,0 +1,735 @@
+/* ============ 旷野之息互动地图 · 地图引擎（Canvas） ============ */
+'use strict';
+
+/* 类别视觉配置：颜色 / 形状 / 绘制优先级 / 标签显示缩放阈值 / 游戏内图标 / 固定屏幕尺寸 */
+const CAT_CFG = {
+  tower:      { color:'#3d8bff', shape:'tower',     order:3, lz:0.5,  icon:'icons_01.png', isz:[28,39] },
+  shrine:     { color:'#2ec4b6', shape:'shrine',    order:4, lz:0.55, icon:'icons_03.png', isz:[26,28] },
+  beast:      { color:'#b18cff', shape:'beast',     order:5, lz:0.5,  icon:'icons_31.png', isz:[50,30] },
+  lab:        { color:'#7fd4ff', shape:'lab',       order:3, lz:0.5,  icon:'icons_05.png', isz:[31,28] },
+  seed:       { color:'#9adc5c', shape:'dot',       order:0, lz:0.85, icon:'icons_04.png', isz:[30,28] },
+  memory:     { color:'#ffd166', shape:'memory',    order:4, lz:0.6,  icon:'icons_28.png', isz:[30,28] },
+  treasure:   { color:'#f4b942', shape:'dot',       order:0, lz:2.2,  icon:'icons_14.png', isz:[29,30] },
+  stable:     { color:'#c68b5c', shape:'house',     order:3, lz:0.55, icon:'icons_10.png', isz:[30,30] },
+  village:    { color:'#ff8f6b', shape:'house',     order:3, lz:0.55, icon:'icons_08.png', isz:[30,30] },
+  inn:        { color:'#9ad1ff', shape:'house',     order:3, lz:0.7,  icon:'icons_07.png', isz:[30,30] },
+  store:      { color:'#f7a8c4', shape:'shop',      order:3, lz:0.7,  icon:'icons_06.png', isz:[30,30] },
+  armor:      { color:'#8fb8ff', shape:'shield',    order:3, lz:0.8,  icon:'icons_09.png', isz:[30,30] },
+  dye:        { color:'#ff8fd0', shape:'dye',       order:3, lz:0.9,  icon:'icons_11.png', isz:[30,30] },
+  jewelry:    { color:'#c9a2ff', shape:'gem',       order:3, lz:0.9,  icon:'icons_33.png', isz:[30,30] },
+  settlement: { color:'#9aa3ad', shape:'fort',      order:3, lz:0.6,  icon:'icons_34.png', isz:[30,30] },
+  fountain:   { color:'#ff9ad5', shape:'fountain',  order:3, lz:0.6,  icon:'icons_19.png', isz:[29,30] },
+  statue:     { color:'#b8e0ff', shape:'statue',    order:2, lz:0.8,  icon:'icons_22.png', isz:[25,30] },
+  pot:        { color:'#7d6a5a', shape:'dot',       order:0, lz:0.9,  icon:'icons_16.png', isz:[29,30] },
+  raft:       { color:'#a98f6e', shape:'raft',      order:0, lz:0.9,  icon:'icons_26.png', isz:[27,30] },
+  talus:      { color:'#8d99a6', shape:'talus',     order:1, lz:0.8,  icon:'icons_20.png', isz:[26,30] },
+  hinox:      { color:'#7ac97a', shape:'hinox',     order:1, lz:0.8,  icon:'icons_12.png', isz:[29,30] },
+  lynel:      { color:'#ff6b5e', shape:'lynel',     order:1, lz:0.7,  icon:'icons_24.png', isz:[26,30] },
+  molduga:    { color:'#f2d45c', shape:'molduga',   order:1, lz:0.8,  icon:'icons_17.png', isz:[29,30] },
+  guardian:   { color:'#e05e5e', shape:'guardian',  order:1, lz:0.8,  icon:'icons_35.png', isz:[32,26] },
+  mainquest:  { color:'#ffd166', shape:'star',      order:4, lz:0.6,  icon:'icons_31.png', isz:[50,30] },
+  shrinequest:{ color:'#ffb347', shape:'qmark',     order:4, lz:0.6,  icon:'icons_30.png', isz:[30,30] },
+  sidequest:  { color:'#6fc7ff', shape:'star',      order:3, lz:0.7,  icon:'icons_05.png', isz:[28,39] },
+  objective:  { color:'#ffe066', shape:'excl',      order:3, lz:0.7,  icon:'icons_32.png', isz:[20,20] },
+};
+const CAT_GROUP = {
+  '探索收集': ['shrine','tower','beast','seed','memory','treasure'],
+  '设施地点': ['village','stable','inn','store','armor','dye','jewelry','lab','fountain','statue','pot','raft','settlement'],
+  '敌人':     ['lynel','hinox','talus','molduga','guardian'],
+  '任务':     ['mainquest','shrinequest','sidequest','objective'],
+};
+
+class BotwMap {
+  constructor(canvas, data) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.data = data;
+    this.MW = data.meta.mapW;   // 6000
+    this.MH = data.meta.mapH;   // 5000
+
+    this.enabled = new Set();   // 启用的类别 key
+    this.doneSet = new Set();   // 已完成标记 id
+    this.customMarkers = [];    // 自定义标记 {id,name,color,px,note}
+    this.measurePoints = [];    // 测量点 (map px)
+    this.mode = 'browse';       // browse | measure | pin
+    this.hover = null;          // hover 标记
+    this.selected = null;       // 选中标记
+
+    this.view = { x: 0, y: 0, scale: 0.3 };
+    this.dpr = window.devicePixelRatio || 1;
+    this.loaded = false;
+    this._viewApplied = false; // 是否已应用外部（分享链接）视图
+    this.tileCache = new Map();   // 瓦片 LRU 缓存：key -> HTMLImageElement
+    this.tilePending = new Set(); // 正在加载的瓦片 key
+    this._tileDrawPending = false;
+
+    this._buildIndex();
+    this._loadIcons();
+    this._bindEvents();
+    this._resize();
+  }
+
+  /* ---------- 空间索引：256px 网格 ---------- */
+  _buildIndex() {
+    const CELL = 256;
+    const cols = Math.ceil(this.MW / CELL), rows = Math.ceil(this.MH / CELL);
+    this.grid = new Array(cols * rows).fill(null);
+    this.byId = new Map();
+    this.markers = this.data.markers;
+    for (let i = 0; i < this.markers.length; i++) {
+      const mk = this.markers[i];
+      this.byId.set(mk.id, i);
+      const cx = Math.floor(mk.px[0] / CELL), cy = Math.floor(mk.px[1] / CELL);
+      const gi = cy * cols + cx;
+      if (gi >= 0 && gi < this.grid.length) {
+        (this.grid[gi] = this.grid[gi] || []).push(i);
+      }
+    }
+  }
+
+  /* 预加载游戏内图标（ali213） */
+  _loadIcons() {
+    this.icons = {};
+    const seen = new Set();
+    for (const key in CAT_CFG) {
+      const ic = CAT_CFG[key].icon;
+      if (!ic || seen.has(ic)) continue;
+      seen.add(ic);
+      const img = new Image();
+      img.onload = () => this.draw();
+      img.src = 'assets/icons/' + ic;
+      this.icons[ic] = img;
+    }
+  }
+
+  /* ---------- 瓦片（ali213 同款动态加载） ---------- */
+  // 逻辑坐标(24000×20000) ↔ zoom7 瓦片像素偏移：tpx = px + (4384, 6384)
+  // zoom z 的分辨率 = zoom7 的 2^(z-7)；scale=1 时为 1:1（对应 zoom7）
+  _zoomForScale(scale) {
+    const z = Math.round(Math.log2(scale)) + 7;
+    return Math.min(7, Math.max(1, z));
+  }
+
+  _drawTiles(ctx) {
+    const { w, h, view } = this;
+    const z = this._zoomForScale(view.scale);
+    const k = Math.pow(2, 7 - z);   // zoom7 像素 → 当前 zoom 像素的缩放因子
+    const pad = 64;
+    const x0 = Math.max(0, (-pad - view.x) / view.scale);
+    const y0 = Math.max(0, (-pad - view.y) / view.scale);
+    const x1 = Math.min(this.MW, (w + pad - view.x) / view.scale);
+    const y1 = Math.min(this.MH, (h + pad - view.y) / view.scale);
+    if (x0 >= x1 || y0 >= y1) return;
+    const tx0 = Math.floor(((x0 + 4384) / k) / 256);
+    const ty0 = Math.floor(((y0 + 6384) / k) / 256);
+    const tx1 = Math.floor(((x1 + 4384) / k) / 256);
+    const ty1 = Math.floor(((y1 + 6384) / k) / 256);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    let requested = 0;
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        const key = z + '_' + tx + '_' + ty;
+        const img = this.tileCache.get(key);
+        if (img && img.complete && img.naturalWidth > 0) {
+          const lx = tx * 256 * k - 4384;              // 瓦片逻辑左上角
+          const ly = ty * 256 * k - 6384;
+          const sw = 256 * k * view.scale;             // 瓦片屏幕边长
+          ctx.drawImage(img, view.x + lx * view.scale, view.y + ly * view.scale, sw + 0.6, sw + 0.6);
+        } else if (requested < 24 && !this.tilePending.has(key)) {
+          requested++;
+          this._loadTile(z, key);
+        }
+      }
+    }
+  }
+
+  _loadTile(z, key) {
+    if (this.tileCache.has(key) || this.tilePending.has(key)) return;
+    this.tilePending.add(key);
+    const img = new Image();
+    img.onload = () => {
+      this.tilePending.delete(key);
+      if (this.tileCache.size >= 400) {
+        const first = this.tileCache.keys().next().value;
+        this.tileCache.delete(first);
+      }
+      this.tileCache.set(key, img);
+      // 合并重绘（瓦片批量到达时避免频繁重绘）
+      if (!this._tileDrawPending) {
+        this._tileDrawPending = true;
+        requestAnimationFrame(() => { this._tileDrawPending = false; this.draw(); });
+      }
+    };
+    img.onerror = () => this.tilePending.delete(key);
+    img.src = 'assets/tiles/' + key + '.webp';
+  }
+
+  /* ---------- 视口 ---------- */
+  _resize() {
+    const r = this.canvas.getBoundingClientRect();
+    this.w = r.width; this.h = r.height;
+    this.canvas.width = Math.round(r.width * this.dpr);
+    this.canvas.height = Math.round(r.height * this.dpr);
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.fit();
+    this.draw();
+  }
+
+  fit() {
+    if (!this.w) return;
+    const s = Math.min(this.w / this.MW, this.h / this.MH);
+    this.minScale = s * 0.85;
+    this.maxScale = 1; // 瓦片地图 1:1 像素上限（与 ali213 maxZoom7 一致，不无限放大）
+    this.view.scale = Math.min(Math.max(s, this.minScale), this.maxScale);
+    this.view.x = (this.w - this.MW * this.view.scale) / 2;
+    this.view.y = (this.h - this.MH * this.view.scale) / 2;
+  }
+
+  /* 地图坐标 -> 屏幕坐标 */
+  m2s(px) { return [this.view.x + px[0] * this.view.scale, this.view.y + px[1] * this.view.scale]; }
+  s2m(sx, sy) { return [(sx - this.view.x) / this.view.scale, (sy - this.view.y) / this.view.scale]; }
+  gameCoord(px) {
+    // 24000×20000 高清底图：gameX = (pxX - 12000) / 2, gameZ = (pxY - 10000) / 2
+    const gx = Math.round((px[0] - 12000) / 2);
+    const gz = Math.round((px[1] - 10000) / 2);
+    return [gx, gz];
+  }
+
+  setView(x, y, scale, animate) {
+    scale = Math.min(Math.max(scale, this.minScale), this.maxScale);
+    this.view.x = x; this.view.y = y; this.view.scale = scale;
+    this.draw();
+  }
+
+  zoomAt(sx, sy, factor) {
+    const ns = Math.min(Math.max(this.view.scale * factor, this.minScale), this.maxScale);
+    const k = ns / this.view.scale;
+    this.view.x = sx - (sx - this.view.x) * k;
+    this.view.y = sy - (sy - this.view.y) * k;
+    this.view.scale = ns;
+    this.draw();
+  }
+
+  /* ---------- 视口内标记收集 ---------- */
+  _visibleMarkers(pad = 40) {
+    const CELL = 256, cols = Math.ceil(this.MW / CELL);
+    const x0 = Math.max(0, (-pad - this.view.x) / this.view.scale);
+    const y0 = Math.max(0, (-pad - this.view.y) / this.view.scale);
+    const x1 = Math.min(this.MW, (this.w + pad - this.view.x) / this.view.scale);
+    const y1 = Math.min(this.MH, (this.h + pad - this.view.y) / this.view.scale);
+    const c0x = Math.floor(x0 / CELL), c0y = Math.floor(y0 / CELL);
+    const c1x = Math.min(Math.floor(x1 / CELL), cols - 1), c1y = Math.min(Math.floor(y1 / CELL), Math.ceil(this.MH / CELL) - 1);
+    const out = [];
+    for (let cy = c0y; cy <= c1y; cy++) {
+      for (let cx = c0x; cx <= c1x; cx++) {
+        const cell = this.grid[cy * cols + cx];
+        if (cell) for (const idx of cell) {
+          const mk = this.markers[idx];
+          if (this.enabled.has(mk.cat)) out.push(mk);
+        }
+      }
+    }
+    return out;
+  }
+
+  /* ---------- 绘制 ---------- */
+  draw() {
+    const ctx = this.ctx;
+    const { w, h, view } = this;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#10150f';
+    ctx.fillRect(0, 0, w, h);
+
+    this._drawTiles(ctx);
+
+    this._drawMeasure(ctx);
+    this._drawMarkers(ctx);
+    this._drawCustom(ctx);
+  }
+
+  _markerScreenSize(mk) {
+    const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
+    // 游戏内图标：固定屏幕尺寸（不随地图缩放变化）
+    if (cfg.isz) return Math.max(cfg.isz[0], cfg.isz[1]);
+    // fallback（未配置图标时）：随缩放的矢量尺寸
+    const s = cfg.base * this.view.scale;
+    const isDot = cfg.shape === 'dot';
+    const min = isDot ? 2 : (mk.cat === 'beast' ? 12 : 7);
+    const max = mk.cat === 'beast' ? 34 : (isDot ? 9 : 22);
+    return Math.min(Math.max(s, min), max);
+  }
+
+  _drawMarkers(ctx) {
+    const vis = this._visibleMarkers();
+    // 按绘制优先级排序，保证重要标记画在最上层
+    vis.sort((a, b) => (CAT_CFG[a.cat]?.order || 0) - (CAT_CFG[b.cat]?.order || 0));
+
+    const labelList = [];
+    const scale = this.view.scale;
+    let drawn = 0;
+    for (const mk of vis) {
+      const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
+      const [sx, sy] = this.m2s(mk.px);
+      if (sx < -60 || sy < -60 || sx > this.w + 60 || sy > this.h + 60) continue;
+      const size = this._markerScreenSize(mk);
+      const done = this.doneSet.has(mk.id);
+      this._glyph(ctx, mk, sx, sy, size, done);
+      drawn++;
+      // 标签
+      if (scale >= cfg.lz && mk.cat !== 'treasure') {
+        labelList.push({ mk, sx, sy, size });
+      }
+    }
+    this.lastStats = { drawn, labels: labelList.length, visible: vis.length };
+    // 标签绘制
+    for (const { mk, sx, sy, size } of labelList) {
+      const done = this.doneSet.has(mk.id);
+      const label = mk.cat === 'seed' ? 'No.' + (mk.extra?.korok_no || mk.id.replace(/\D/g, '')) : mk.name;
+      if (!label) continue;
+      const fs = Math.min(Math.max(9, 11 * scale), 15);
+      ctx.font = `600 ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      const ly = sy - size / 2 - 3;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(8,12,8,.85)';
+      ctx.strokeText(label, sx, ly);
+      ctx.fillStyle = done ? 'rgba(180,195,180,.75)' : (mk.cat === 'shrine' ? '#eafffb' : '#ffffff');
+      ctx.fillText(label, sx, ly);
+    }
+
+    // 悬停高亮
+    if (this.hover) {
+      const [hsx, hsy] = this.m2s(this.hover.px);
+      ctx.beginPath();
+      ctx.arc(hsx, hsy, this._markerScreenSize(this.hover) / 2 + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  /* 标记图形：优先绘制游戏内图标，缺失时回退矢量 */
+  _glyph(ctx, mk, x, y, size, done) {
+    const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
+    const img = cfg.icon ? this.icons[cfg.icon] : null;
+    ctx.save();
+    if (done) ctx.globalAlpha = .45;
+    if (img && img.complete && img.naturalWidth > 0) {
+      const iw = cfg.isz ? cfg.isz[0] : size;
+      const ih = cfg.isz ? cfg.isz[1] : size;
+      ctx.drawImage(img, x - iw / 2, y - ih / 2, iw, ih);
+      ctx.restore();
+      if (done) {
+        // 完成标记：绿色小对勾
+        ctx.strokeStyle = '#7dffa0';
+        ctx.lineWidth = Math.max(1.5, size * .16);
+        ctx.beginPath();
+        ctx.moveTo(x - size * .22, y); ctx.lineTo(x - size * .05, y + size * .18); ctx.lineTo(x + size * .26, y - size * .16);
+        ctx.stroke();
+      }
+      return;
+    }
+    const color = cfg.color, shape = cfg.shape;
+    const r = size / 2;
+    if (done) {
+      ctx.fillStyle = '#7a8a7a';
+      ctx.strokeStyle = '#9fb09f';
+    } else {
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#fff';
+    }
+    ctx.lineWidth = Math.max(1, size * .12);
+    ctx.beginPath();
+    switch (shape) {
+      case 'shrine': { // 菱形
+        ctx.moveTo(x, y - r); ctx.lineTo(x + r * .85, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * .85, y);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        if (!done) { // 内部小菱形
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath(); ctx.moveTo(x, y - r * .42); ctx.lineTo(x + r * .36, y); ctx.lineTo(x, y + r * .42); ctx.lineTo(x - r * .36, y);
+          ctx.closePath(); ctx.fill();
+        }
+        break;
+      }
+      case 'tower': { // 塔：三角顶 + 方身
+        ctx.moveTo(x, y - r); ctx.lineTo(x + r * .62, y - r * .15); ctx.lineTo(x + r * .38, y + r); ctx.lineTo(x - r * .38, y + r); ctx.lineTo(x - r * .62, y - r * .15);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'beast': { // 神兽：圆 + 外环
+        ctx.arc(x, y, r * .72, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r * .34, 0, Math.PI * 2);
+        ctx.fillStyle = done ? '#7a8a7a' : '#ffffff'; ctx.fill();
+        break;
+      }
+      case 'lab': { // 研究所：烧瓶
+        ctx.moveTo(x - r * .45, y - r); ctx.lineTo(x + r * .45, y - r); ctx.lineTo(x + r * .15, y - r * .1);
+        ctx.lineTo(x + r * .15, y + r * .55); ctx.lineTo(x + r * .55, y + r * .95); ctx.lineTo(x - r * .55, y + r * .95); ctx.lineTo(x - r * .15, y + r * .55); ctx.lineTo(x - r * .15, y - r * .1);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'memory': { // 回忆：圆内小方
+        ctx.arc(x, y, r * .8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = done ? '#7a8a7a' : '#26302a';
+        ctx.fillRect(x - r * .3, y - r * .3, r * .6, r * .6);
+        ctx.strokeRect(x - r * .3, y - r * .3, r * .6, r * .6);
+        break;
+      }
+      case 'house': {
+        ctx.moveTo(x, y - r); ctx.lineTo(x + r, y - r * .1); ctx.lineTo(x + r, y + r); ctx.lineTo(x - r, y + r); ctx.lineTo(x - r, y - r * .1);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = done ? '#7a8a7a' : '#fff';
+        ctx.fillRect(x - r * .3, y - r * .2, r * .6, r * .55);
+        break;
+      }
+      case 'shop': {
+        ctx.rect(x - r * .85, y - r * .6, r * 1.7, r * 1.6); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = done ? '#7a8a7a' : '#fff';
+        ctx.fillRect(x - r * .35, y - r * .45, r * .7, r * 1.3);
+        break;
+      }
+      case 'shield': {
+        ctx.moveTo(x - r * .8, y - r); ctx.lineTo(x + r * .8, y - r); ctx.lineTo(x + r * .55, y + r * .5); ctx.lineTo(x, y + r); ctx.lineTo(x - r * .55, y + r * .5);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'dye': {
+        ctx.arc(x, y, r * .72, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r * .3, 0, Math.PI * 2); ctx.fillStyle = done ? '#7a8a7a' : '#fff'; ctx.fill();
+        break;
+      }
+      case 'gem': {
+        ctx.moveTo(x, y - r); ctx.lineTo(x + r * .9, y - r * .25); ctx.lineTo(x + r * .5, y + r); ctx.lineTo(x - r * .5, y + r); ctx.lineTo(x - r * .9, y - r * .25);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'fort': {
+        ctx.rect(x - r * .85, y - r * .55, r * 1.7, r * 1.55); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = done ? '#7a8a7a' : '#fff';
+        ctx.fillRect(x - r * .5, y - r * .35, r * .3, r * .5);
+        ctx.fillRect(x + r * .2, y - r * .35, r * .3, r * .5);
+        break;
+      }
+      case 'fountain': {
+        ctx.arc(x, y - r * .3, r * .55, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y - r * .3, r * .22, 0, Math.PI * 2); ctx.fillStyle = done ? '#7a8a7a' : '#fff'; ctx.fill();
+        ctx.strokeRect(x - r * .3, y + r * .25, r * .6, r * .45);
+        break;
+      }
+      case 'statue': {
+        ctx.arc(x, y - r * .35, r * .35, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillRect(x - r * .3, y - r * .05, r * .6, r * .75);
+        ctx.strokeRect(x - r * .3, y - r * .05, r * .6, r * .75);
+        break;
+      }
+      case 'raft': {
+        ctx.fillRect(x - r, y - r * .35, r * 2, r * .5);
+        ctx.strokeRect(x - r, y - r * .35, r * 2, r * .5);
+        ctx.fillRect(x - r * .1, y - r, r * .2, r * .8);
+        break;
+      }
+      case 'talus': {
+        ctx.arc(x, y, r * .8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r * .3, 0, Math.PI * 2); ctx.fillStyle = done ? '#7a8a7a' : '#fff'; ctx.fill();
+        break;
+      }
+      case 'hinox': {
+        ctx.beginPath(); ctx.arc(x, y, r * .75, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y, r * .28, 0, Math.PI * 2); ctx.fillStyle = done ? '#7a8a7a' : '#fff'; ctx.fill();
+        break;
+      }
+      case 'lynel': {
+        ctx.moveTo(x, y - r); ctx.lineTo(x + r, y - r * .4); ctx.lineTo(x + r * .6, y + r); ctx.lineTo(x - r * .6, y + r); ctx.lineTo(x - r, y - r * .4);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = done ? '#7a8a7a' : '#fff';
+        ctx.fillRect(x - r * .25, y - r * .5, r * .5, r * .4);
+        break;
+      }
+      case 'molduga': {
+        ctx.moveTo(x - r, y); ctx.quadraticCurveTo(x - r * .3, y - r, x, y); ctx.quadraticCurveTo(x + r * .3, y + r, x + r, y);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'guardian': {
+        ctx.arc(x, y, r * .62, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = done ? '#9fb09f' : '#fff';
+        ctx.lineWidth = Math.max(1, size * .09);
+        for (let i = 0; i < 4; i++) {
+          const a = i * Math.PI / 2;
+          ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r * .62, y + Math.sin(a) * r * .62);
+          ctx.lineTo(x + Math.cos(a) * r * .95, y + Math.sin(a) * r * .95); ctx.stroke();
+        }
+        ctx.beginPath(); ctx.arc(x, y, r * .22, 0, Math.PI * 2); ctx.fillStyle = done ? '#7a8a7a' : '#fff'; ctx.fill();
+        break;
+      }
+      case 'star': {
+        ctx.moveTo(x, y - r);
+        for (let i = 0; i < 10; i++) {
+          const ang = -Math.PI / 2 + i * Math.PI / 5;
+          const rr = i % 2 === 0 ? r : r * .45;
+          ctx.lineTo(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        break;
+      }
+      case 'qmark': {
+        ctx.arc(x, y - r * .2, r * .72, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = done ? '#7a8a7a' : '#26302a';
+        ctx.font = `800 ${size * .9}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('?', x, y - r * .15);
+        break;
+      }
+      case 'excl': {
+        ctx.arc(x, y, r * .8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = done ? '#9fb09f' : '#fff';
+        ctx.lineWidth = Math.max(1, size * .14);
+        ctx.beginPath(); ctx.moveTo(x, y - r * .4); ctx.lineTo(x, y + r * .15); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, y + r * .45, Math.max(1.2, size * .1), 0, Math.PI * 2); ctx.stroke();
+        break;
+      }
+      default: { // dot
+        ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+    }
+    ctx.restore();
+    if (done) {
+      // 完成标记：绿色小对勾
+      ctx.strokeStyle = '#7dffa0';
+      ctx.lineWidth = Math.max(1.5, size * .16);
+      ctx.beginPath();
+      ctx.moveTo(x - size * .22, y); ctx.lineTo(x - size * .05, y + size * .18); ctx.lineTo(x + size * .26, y - size * .16);
+      ctx.stroke();
+    }
+  }
+
+  /* ---------- 测量 ---------- */
+  _drawMeasure(ctx) {
+    if (!this.measurePoints.length) return;
+    const pts = this.measurePoints;
+    ctx.save();
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const [sx, sy] = this.m2s(pts[i]);
+      if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ffd166';
+    for (const p of pts) {
+      const [sx, sy] = this.m2s(p);
+      ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    // 分段距离标注
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    let total = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const dx = (pts[i][0] - pts[i-1][0]) * 0.5, dy = (pts[i][1] - pts[i-1][1]) * 0.5;
+      const seg = Math.sqrt(dx * dx + dy * dy);
+      total += seg;
+      const mx = (pts[i-1][0] + pts[i][0]) / 2, my = (pts[i-1][1] + pts[i][1]) / 2;
+      const [sx, sy] = this.m2s([mx, my]);
+      ctx.fillStyle = 'rgba(8,12,8,.8)';
+      ctx.strokeStyle = 'rgba(8,12,8,.8)';
+      ctx.lineWidth = 3;
+      const txt = (seg >= 1000 ? (seg / 1000).toFixed(1) + ' km' : Math.round(seg) + ' m');
+      ctx.strokeText(txt, sx, sy - 6);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(txt, sx, sy - 6);
+    }
+    const [lsx, lsy] = this.m2s(pts[pts.length - 1]);
+    const totTxt = '合计 ' + (total >= 1000 ? (total / 1000).toFixed(2) + ' km' : Math.round(total) + ' m');
+    ctx.strokeText(totTxt, lsx + 10, lsy - 14);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(totTxt, lsx + 10, lsy - 14);
+    ctx.restore();
+  }
+
+  _drawCustom(ctx) {
+    for (const mk of this.customMarkers) {
+      const [sx, sy] = this.m2s(mk.px);
+      ctx.save();
+      ctx.fillStyle = mk.color;
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      const r = 9;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy + r + 4);
+      ctx.arc(sx, sy - r * .2, r, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.strokeStyle = 'rgba(8,12,8,.85)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(mk.name, sx, sy - r - 4);
+      ctx.fillText(mk.name, sx, sy - r - 4);
+      ctx.restore();
+    }
+  }
+
+  /* ---------- 命中测试 ---------- */
+  hitTest(sx, sy) {
+    const mx = (sx - this.view.x) / this.view.scale, my = (sy - this.view.y) / this.view.scale;
+    // 自定义标记优先
+    for (let i = this.customMarkers.length - 1; i >= 0; i--) {
+      const c = this.customMarkers[i];
+      if (Math.abs(c.px[0] - mx) < 12 / this.view.scale && Math.abs(c.px[1] - my) < 12 / this.view.scale) {
+        return { custom: c };
+      }
+    }
+    const vis = this._visibleMarkers(50);
+    // 屏幕距离优先，同屏距离内选优先级最高的类别
+    let best = null, bestOrder = -1, bestDist = 1e18;
+    for (const mk of vis) {
+      if (!this.enabled.has(mk.cat)) continue;
+      const dx = mk.px[0] - mx, dy = mk.px[1] - my;
+      const scrD = Math.hypot(dx, dy) * this.view.scale;
+      const size = this._markerScreenSize(mk);
+      if (scrD <= 15 + size / 2) {
+        const order = CAT_CFG[mk.cat]?.order || 0;
+        if (order > bestOrder || (order === bestOrder && scrD < bestDist)) {
+          bestOrder = order; bestDist = scrD; best = mk;
+        }
+      }
+    }
+    return best ? { marker: best } : null;
+  }
+
+  /* ---------- 事件 ---------- */
+  _bindEvents() {
+    const cv = this.canvas;
+    let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0, moved = 0;
+
+    cv.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      const r = cv.getBoundingClientRect();
+      const sx = e.clientX - r.left, sy = e.clientY - r.top;
+      if (this.mode === 'measure') {
+        const m = this.s2m(sx, sy);
+        this.measurePoints.push([Math.max(0, Math.min(this.MW, m[0])), Math.max(0, Math.min(this.MH, m[1]))]);
+        this.draw();
+        return;
+      }
+      if (this.mode === 'pin') {
+        const m = this.s2m(sx, sy);
+        if (m[0] >= 0 && m[1] >= 0 && m[0] <= this.MW && m[1] <= this.MH) {
+          if (this._onPinClick) this._onPinClick(sx, sy, [Math.round(m[0]), Math.round(m[1])]);
+        }
+        return;
+      }
+      dragging = true; moved = 0;
+      downX = e.clientX; downY = e.clientY;
+      lastX = e.clientX; lastY = e.clientY;
+      cv.classList.add('dragging');
+    });
+
+    window.addEventListener('mousemove', e => {
+      const r = cv.getBoundingClientRect();
+      const sx = e.clientX - r.left, sy = e.clientY - r.top;
+      if (dragging) {
+        moved += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY);
+        this.view.x += (e.clientX - lastX);
+        this.view.y += (e.clientY - lastY);
+        lastX = e.clientX; lastY = e.clientY;
+        this.draw();
+      } else {
+        // 悬停 + 坐标读数
+        const m = this.s2m(sx, sy);
+        if (this._onCoord) this._onCoord(this.gameCoord(m), m);
+        const hit = this.mode === 'browse' ? this.hitTest(sx, sy) : null;
+        this.hover = hit && hit.marker ? hit.marker : null;
+        if (this._onHover) this._onHover(this.hover);
+        if (this.mode === 'browse') this.draw();
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      cv.classList.remove('dragging');
+      this._onViewChange && this._onViewChange();
+    });
+
+    cv.addEventListener('click', e => {
+      if (this.mode !== 'browse') return;
+      if (moved > 6) return; // 拖拽后不触发点击
+      const r = cv.getBoundingClientRect();
+      const hit = this.hitTest(e.clientX - r.left, e.clientY - r.top);
+      if (hit) {
+        if (hit.custom) this._selectCustom(hit.custom);
+        else this._selectMarker(hit.marker);
+      } else {
+        this._selectMarker(null);
+      }
+    });
+
+    cv.addEventListener('wheel', e => {
+      e.preventDefault();
+      const r = cv.getBoundingClientRect();
+      const sx = e.clientX - r.left, sy = e.clientY - r.top;
+      const factor = e.deltaY < 0 ? 1.22 : 1 / 1.22;
+      this.zoomAt(sx, sy, factor);
+      this._onViewChange && this._onViewChange();
+    }, { passive: false });
+
+    cv.addEventListener('dblclick', e => {
+      if (this.mode === 'measure') {
+        if (this.measurePoints.length >= 2) {
+          // 结束测量：保留折线展示，切回浏览模式
+          this.mode = 'browse';
+          this.canvas.classList.remove('measuring');
+          this._onModeChange && this._onModeChange('browse');
+          this.draw();
+        }
+        return;
+      }
+      const r = cv.getBoundingClientRect();
+      this.zoomAt(e.clientX - r.left, e.clientY - r.top, 1.8);
+      this._onViewChange && this._onViewChange();
+    });
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        if (this.mode === 'measure' && this.measurePoints.length) { this.measurePoints = []; this.draw(); }
+        else if (this.mode !== 'browse') { this.setMode('browse'); }
+        else if (this.measurePoints.length) { this.measurePoints = []; this.draw(); }
+      }
+    });
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    this.canvas.classList.toggle('measuring', mode === 'measure');
+    this.canvas.classList.toggle('pinning', mode === 'pin');
+    if (mode === 'measure') this.measurePoints = []; // 进入测量时清空旧折线
+    this.draw();
+    this._onModeChange && this._onModeChange(mode);
+  }
+
+  addCustomMarker(name, color, px) {
+    const mk = { id: 'custom_' + Date.now(), name: name || '标记', color: color || '#ff5252', px: [Math.round(px[0]), Math.round(px[1])] };
+    this.customMarkers.push(mk);
+    this._onCustomChange();
+    this.draw();
+    return mk;
+  }
+
+  _selectMarker(mk) {
+    this.selected = mk || null;
+    this._onSelect && this._onSelect(mk ? { marker: mk } : null);
+    if (mk) this.draw();
+  }
+  _selectCustom(mk) {
+    this._onSelect && this._onSelect({ custom: mk });
+  }
+
+  _onCustomChange() { /* ui 覆盖 */ }
+}

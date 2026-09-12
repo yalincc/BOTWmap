@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>旷野之息 互动地图 · 简体中文多图层版</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 顶栏 -->
+  <header id="topbar">
+    <div class="brand">
+      <span class="logo">🗺️</span>
+      <div class="brand-text">
+        <h1>旷野之息 <em>互动地图</em></h1>
+        <p class="sub">简体中文 · 多图层同显 · 收集进度追踪 · 自定义标记</p>
+      </div>
+    </div>
+    <div class="tools">
+      <button id="btnMeasure" class="tool" title="点击地图打点，测量两点间游戏距离（米）"><span class="ico">📏</span>测量</button>
+      <button id="btnPin" class="tool" title="在地图上添加自定义标记"><span class="ico">📍</span>标记</button>
+      <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接"><span class="ico">🔗</span>分享</button>
+      <button id="btnReset" class="tool" title="重置到全图视图"><span class="ico">🏠</span>全图</button>
+    </div>
+  </header>
+
+  <!-- 侧栏 -->
+  <aside id="sidebar">
+    <div class="search-wrap">
+      <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off">
+      <div id="searchResults" class="hidden"></div>
+    </div>
+
+    <div class="layer-actions">
+      <button id="checkAll" class="mini">全选图层</button>
+      <button id="uncheckAll" class="mini">清空图层</button>
+      <span id="layerCount" class="hint"></span>
+    </div>
+
+    <div id="layerList" class="layer-list"></div>
+
+    <div id="statsPanel" class="stats"></div>
+
+    <footer class="side-foot">
+      <p>数据整理自 gamertw.com 与 MrCheeze/botw-waypoint-map（已换算为游戏坐标）。</p>
+      <p>完成进度自动保存在本机浏览器中。</p>
+    </footer>
+  </aside>
+
+  <!-- 地图 -->
+  <main id="mapArea">
+    <canvas id="mapCanvas"></canvas>
+
+    <div id="zoomControls">
+      <button id="zoomIn">＋</button>
+      <button id="zoomOut">－</button>
+      <button id="zoomFit" title="重置视图">⌂</button>
+    </div>
+
+    <div id="coordReadout">X: --  Z: --</div>
+    <div id="modeHint" class="hidden"></div>
+    <div id="toast"></div>
+
+    <!-- 自定义标记表单 -->
+    <div id="pinForm" class="hidden">
+      <div class="pf-head">添加自定义标记</div>
+      <input id="pinName" type="text" placeholder="标记名称" maxlength="30">
+      <div id="pinColors" class="pf-colors">
+        <button class="sw" data-c="#ff5252" style="background:#ff5252"></button>
+        <button class="sw" data-c="#ffd166" style="background:#ffd166"></button>
+        <button class="sw" data-c="#7dffa0" style="background:#7dffa0"></button>
+        <button class="sw" data-c="#6fb9ff" style="background:#6fb9ff"></button>
+        <button class="sw" data-c="#b18cff" style="background:#b18cff"></button>
+        <button class="sw" data-c="#ff9ad5" style="background:#ff9ad5"></button>
+      </div>
+      <div class="pf-actions">
+        <button id="pinOk" class="primary">确定</button>
+        <button id="pinCancel" class="ghost">取消</button>
+      </div>
+    </div>
+
+    <!-- 分享弹层 -->
+    <div id="shareBox" class="hidden">
+      <div class="sb-head">分享当前地图视图
+        <button id="sbClose" class="card-close">×</button>
+      </div>
+      <p class="sb-tip">链接包含当前图层与视图位置，打开即可看到同一画面。</p>
+      <input id="shareUrl" type="text" readonly onclick="this.select()">
+      <button id="sbCopy" class="primary">复制链接</button>
+    </div>
+
+    <!-- 信息卡片 -->
+    <div id="infoCard" class="hidden">
+      <div class="card-head">
+        <span id="cardCat" class="chip"></span>
+        <button id="cardClose" class="card-close">×</button>
+      </div>
+      <h3 id="cardName"></h3>
+      <div id="cardEn" class="card-en"></div>
+      <div class="card-body">
+        <div id="cardRegion" class="row"></div>
+        <div id="cardTower" class="row"></div>
+        <div id="cardCoord" class="row"></div>
+        <div id="cardExtra" class="row"></div>
+      </div>
+      <div class="card-actions">
+        <button id="cardDone" class="primary">✓ 标记为已完成</button>
+        <button id="cardUndone" class="ghost hidden">标记为未完成</button>
+        <button id="cardDelPin" class="danger hidden">删除标记</button>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/map.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
