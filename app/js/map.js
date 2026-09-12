@@ -127,6 +127,7 @@ class BotwMap {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     let requested = 0;
+    const drawnFb = new Set();   // 本帧已绘制的降级瓦片（同一低阶瓦片只画一次，避免 2×2 重复绘制）
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
         const key = z + '_' + tx + '_' + ty;
@@ -136,12 +137,41 @@ class BotwMap {
           const ly = ty * 256 * k - 6384;
           const sw = 256 * k * view.scale;             // 瓦片屏幕边长
           ctx.drawImage(img, view.x + lx * view.scale, view.y + ly * view.scale, sw + 0.6, sw + 0.6);
-        } else if (requested < 24 && !this.tilePending.has(key)) {
-          requested++;
-          this._loadTile(z, key);
+        } else {
+          // 降级兜底：目标瓦片未就绪 → 用已缓存的低级别瓦片放大铺底，画面不空白
+          const fb = this._findCachedFallback(z, tx, ty);
+          if (fb) {
+            const fk = fb.lz + '_' + fb.a + '_' + fb.b;
+            if (!drawnFb.has(fk)) {
+              drawnFb.add(fk);
+              const tileLog = 256 * k * Math.pow(2, fb.d);   // 低阶瓦片覆盖的逻辑边长
+              const lx = fb.a * tileLog - 4384;
+              const ly = fb.b * tileLog - 6384;
+              const sw = tileLog * view.scale;
+              ctx.drawImage(fb.img, view.x + lx * view.scale, view.y + ly * view.scale, sw + 0.6, sw + 0.6);
+            }
+          }
+          // 无论是否兜底，都继续请求目标瓦片（到达后自动替换为清晰图）
+          if (requested < 48 && !this.tilePending.has(key)) {
+            requested++;
+            this._loadTile(z, key);
+          }
         }
       }
     }
+  }
+
+  /* 查找已缓存的低级别瓦片：zoom z 的 (tx,ty) 缺失时，逐级向上找已缓存的低阶瓦片 */
+  _findCachedFallback(z, tx, ty, maxLevels = 4) {
+    for (let d = 1; d <= maxLevels; d++) {
+      const lz = z - d;
+      if (lz < 1) break;
+      const c = Math.pow(2, d);
+      const a = Math.floor(tx / c), b = Math.floor(ty / c);
+      const img = this.tileCache.get(lz + '_' + a + '_' + b);
+      if (img && img.complete && img.naturalWidth > 0) return { img, lz, a, b, d };
+    }
+    return null;
   }
 
   _loadTile(z, key) {
