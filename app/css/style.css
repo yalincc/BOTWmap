@@ -55,7 +55,7 @@ body {
   height: calc(100vh - 58px); z-index: 5;
 }
 #mapArea { flex: 1; position: relative; height: calc(100vh - 58px); overflow: hidden; }
-#mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+#mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 #mapCanvas.measuring, #mapCanvas.pinning { cursor: crosshair; }
 #mapCanvas.dragging { cursor: grabbing; }
 
@@ -239,5 +239,7 @@ body {
   #modeHint { font-size: 11.5px; padding: 5px 12px; }
   #toast { font-size: 12px; width: 86vw; text-align: center; }
 }
+
+
 
 

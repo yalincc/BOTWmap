@@ -180,7 +180,7 @@ class BotwMap {
     if (!this.w) return;
     const s = Math.min(this.w / this.MW, this.h / this.MH);
     this.minScale = s * 0.85;
-    this.maxScale = 1; // 瓦片地图 1:1 像素上限（与 ali213 maxZoom7 一致，不无限放大）
+    this.maxScale = Math.max(1, this.dpr); // 物理像素 1:1 封顶：电脑(dpr1)=1 与之前一致；手机高分屏可放大到瓦片精度极限
     this.view.scale = Math.min(Math.max(s, this.minScale), this.maxScale);
     this.view.x = (this.w - this.MW * this.view.scale) / 2;
     this.view.y = (this.h - this.MH * this.view.scale) / 2;
@@ -606,7 +606,118 @@ class BotwMap {
   /* ---------- 事件 ---------- */
   _bindEvents() {
     const cv = this.canvas;
+    const self = this;
     let dragging = false, lastX = 0, lastY = 0, downX = 0, downY = 0, moved = 0;
+
+    /* ---------- 触摸：单指拖拽 / 双指捏合缩放 / 双击放大 ---------- */
+    const touches = new Map();        // identifier -> {x, y}
+    let pinchDist = 0, pinchMid = [0, 0], tDragging = false;
+    let tLast = [0, 0], tMoved = 0, tTapAt = 0, tTapX = 0, tTapY = 0;
+
+    function tapSelect(sx, sy) {
+      // 轻点 = 与 click 相同的选中逻辑（pin/measure 模式另行处理）
+      if (self.mode === 'pin' || self.mode === 'measure') return;
+      const hit = self.hitTest(sx, sy);
+      if (hit) {
+        if (hit.custom) self._selectCustom(hit.custom);
+        else self._selectMarker(hit.marker);
+      } else {
+        self._selectMarker(null);
+      }
+    }
+
+    cv.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const r = cv.getBoundingClientRect();
+      for (const t of e.changedTouches) {
+        touches.set(t.identifier, { x: t.clientX - r.left, y: t.clientY - r.top });
+      }
+      if (touches.size === 1) {
+        const pt = [...touches.values()][0];
+        tLast = [pt.x, pt.y]; tMoved = 0;
+        if (this.mode === 'pin') {
+          // 手指落点即放置标记
+          const m = this.s2m(pt.x, pt.y);
+          if (m[0] >= 0 && m[1] >= 0 && m[0] <= this.MW && m[1] <= this.MH) {
+            if (this._onPinClick) this._onPinClick(pt.x, pt.y, [Math.round(m[0]), Math.round(m[1])]);
+          }
+        } else if (this.mode === 'measure') {
+          const m = this.s2m(pt.x, pt.y);
+          this.measurePoints.push([Math.max(0, Math.min(this.MW, m[0])), Math.max(0, Math.min(this.MH, m[1]))]);
+          this.draw();
+        } else {
+          tDragging = true;
+        }
+      } else if (touches.size === 2) {
+        tDragging = false;
+        const [a, b] = [...touches.values()];
+        pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+        pinchMid = [(a.x + b.x) / 2, (a.y + b.y) / 2];
+      }
+    }, { passive: false });
+
+    cv.addEventListener('touchmove', e => {
+      e.preventDefault();
+      const r = cv.getBoundingClientRect();
+      for (const t of e.changedTouches) {
+        if (touches.has(t.identifier)) {
+          touches.set(t.identifier, { x: t.clientX - r.left, y: t.clientY - r.top });
+        }
+      }
+      if (touches.size >= 2) {
+        const [a, b] = [...touches.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const mid = [(a.x + b.x) / 2, (a.y + b.y) / 2];
+        if (pinchDist > 0 && d > 0) this.zoomAt(mid[0], mid[1], d / pinchDist);
+        this.view.x += (mid[0] - pinchMid[0]);
+        this.view.y += (mid[1] - pinchMid[1]);
+        pinchDist = d; pinchMid = mid;
+        this._onViewChange && this._onViewChange();
+        this.draw();
+      } else if (touches.size === 1 && tDragging) {
+        const pt = [...touches.values()][0];
+        const dx = pt.x - tLast[0], dy = pt.y - tLast[1];
+        tMoved += Math.abs(dx) + Math.abs(dy);
+        this.view.x += dx; this.view.y += dy;
+        tLast = [pt.x, pt.y];
+        this._onViewChange && this._onViewChange();
+        this.draw();
+      }
+    }, { passive: false });
+
+    cv.addEventListener('touchend', e => {
+      e.preventDefault();
+      const now = Date.now();
+      const r = cv.getBoundingClientRect();
+      let tapPt = null;
+      for (const t of e.changedTouches) {
+        if (touches.has(t.identifier)) tapPt = touches.get(t.identifier);
+        touches.delete(t.identifier);
+      }
+      if (touches.size === 0) {
+        if (tDragging && tMoved < 8 && tapPt) {
+          // 未拖动 = 轻点：双击放大 or 单击选中
+          if (now - tTapAt < 320 && Math.hypot(tapPt.x - tTapX, tapPt.y - tTapY) < 24) {
+            this.zoomAt(tapPt.x, tapPt.y, 1.8);
+            this._onViewChange && this._onViewChange();
+            tTapAt = 0;
+          } else {
+            tTapAt = now; tTapX = tapPt.x; tTapY = tapPt.y;
+            setTimeout(() => { tTapAt = 0; }, 340);
+            tapSelect(tapPt.x, tapPt.y);
+          }
+        }
+        if (tDragging) {
+          tDragging = false;
+          if (tMoved > 8) this._onViewChange && this._onViewChange();
+        }
+        pinchDist = 0;
+      }
+    }, { passive: false });
+
+    cv.addEventListener('touchcancel', () => {
+      touches.clear(); tDragging = false; pinchDist = 0;
+    }, { passive: true });
 
     cv.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
