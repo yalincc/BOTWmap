@@ -53,7 +53,7 @@ with open(SOURCE + r'\简体中文地名表.csv', encoding='utf-8-sig') as f:
 
 # ---------- 4. ID 别名桥接（官方坐标在别的 label 名下） ----------
 ALIAS = {
-    'CastleTownMark': 'Location_HyruleCastleTown',
+    'CastleTownMark': 'HyruleCastleTown',  # Static.xml SaveFlag 剥离 Location_ 前缀后 key 即 HyruleCastleTown
     'WiseFountain': 'Location_WisdomFountain',
     'TamurulHatago_02': 'Location_TamourHatago2',
     'MapRegion_HyrulePrairie': 'MapRegion_HyrulePrairie ',  # 尾随空格
@@ -112,8 +112,15 @@ for r in regions:
     # 策略 A：中文名匹配（唯一）
     label = None
     if n in zh_to_labels and len(zh_to_labels[n]) == 1:
-        label = zh_to_labels[n][0]
-    match_type = '名字' if label else None
+        # 同名多条目时（如 4 个大精灵之泉）不能仅靠名字定 label：
+        # 校验最近官方坐标距离，>15 游戏单位视为名字匹配失败，回退策略 B
+        cand = zh_to_labels[n][0]
+        c, d = nearest_coord(cand, gx, gz)
+        if c is not None and d < 15:
+            label = cand
+            match_type = '名字'
+    if not label:
+        match_type = None
 
     # 策略 B：坐标近邻（<15 游戏单位 ≈ 7.5px，兼容取整/不同源误差）
     if not label:
@@ -134,6 +141,11 @@ for r in regions:
     matched += 1
     # 坐标：取该 label 所有标记中离项目点最近的一条（多坐标时）
     c, _ = nearest_coord(label, gx, gz)
+    if c is None:
+        # label 无坐标（理论不会发生：策略 A/B 都已校验过坐标）
+        untracked.append({'lv': lv, 'n': n, 'px_x': px[0], 'px_y': px[1],
+                          'note': 'label 无官方坐标: ' + label})
+        continue
     ox, oz = c[0], c[1]
     opx = to_px(ox, oz)
     dist_px = math.hypot(opx[0] - px[0], opx[1] - px[1])

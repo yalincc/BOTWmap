@@ -25,7 +25,7 @@ r2,MapArea_LanayruWaterSources,拉聂尔大水源,拉聂尔大水源,19396,10523
 r2,MapArea_LanayruWetlands,拉聂尔湿地,拉聂尔湿地,15493,9768,15493,9768,0.3,名字,无需改,Location
 r2,MapArea_LiveMountain,拉聂尔山,拉聂尔山,19796,12836,19796,12836,0.6,名字,无需改,Location
 r2,MapArea_TabantaFrontier,塔邦挞边境,塔邦挞边境,5049,7642,5049,7642,0.6,名字,无需改,Location
-r2,TabantaSnow,塔邦达冻原,,8376,4415,8376,4415,0.3,坐标,名字待定,Location
+r2,TabantaSnow,塔邦挞大雪原,,8376,4415,8376,4415,0.3,坐标,名字待定,Location
 r2,MapArea_TamulOutback,深远阿卡莱,深远阿卡莱,19204,3628,19204,3628,0.4,名字,无需改,Location
 r2,MapArea_TamulPlateau,阿卡莱高原,阿卡莱高原,19308,5553,19308,5553,0.3,名字,无需改,Location
 r2,MapArea_TamulSea,阿卡莱海,阿卡莱海,21623,3143,21623,3143,0.1,名字,无需改,Location
@@ -88,14 +88,14 @@ r3,DotiBeach,林芭海滩,林芭海滩,18334,17442,18334,17442,0.3,名字,无需
 r3,DragonsFar,龙之流放地,龙之流放地,2677,17253,2677,17253,0.4,名字,无需改,Location
 r3,EagleBridge,莫里桥,莫里桥,5766,7425,5766,7425,0.4,名字,无需改,Location
 r3,EastEunpoHighlands,东埃文坡高地,东埃文坡高地,14252,2653,14252,2653,0.3,名字,无需改,Location
-r3,EastGerudo,东部荒漠,,6925,17079,6925,17079,0.5,坐标,名字待定,Location
+r3,EastGerudo,东格鲁德,,6925,17079,6925,17079,0.5,坐标,名字待定,Location
 r3,EastGerudoPlateau,东格鲁德高地,东格鲁德高地,8846,15975,8846,15975,0.3,名字,无需改,Location
 r3,EastShrine,东部神殿遗迹,东部神殿遗迹,11003,13862,11003,13862,0.1,名字,无需改,Location
 r3,ElegLake,纳比湖,纳比湖,14197,12326,14197,12326,0.2,名字,无需改,Location
 r3,EnRiver,爱恩河,爱恩河,11970,16504,11970,16504,0.4,名字,无需改,Location
 r3,EquePlateau,安吉尔台地,安吉尔台地,15431,15239,15431,15239,0.3,名字,无需改,Location
 r3,ErumedaPlateau,艾美拉尔台地,艾美拉尔台地,3799,12593,3799,12593,0.3,名字,无需改,Location
-r3,EunpoHighlands,迪普兰荒地,,12671,2614,12671,2614,0.6,坐标,名字待定,Location
+r3,EunpoHighlands,埃文坡高地,,12671,2614,12671,2614,0.6,坐标,名字待定,Location
 r3,ExpaTrees,艾奇斯帕森林,艾奇斯帕森林,19706,14023,19706,14023,0.2,名字,无需改,Location
 r3,FairyForest,精灵森林,精灵森林,10074,13411,10074,13411,0.6,名字,无需改,Location
 r3,FenaMt,娜波露山,娜波露山,8214,13885,8214,13885,0.5,名字,无需改,Location
@@ -354,7 +354,7 @@ r3,TomiyoPlateau,洛塔托台地,洛塔托台地,18179,11660,18179,11660,0.5,名
 r3,TompoPlain,罗玛尼平原,罗玛尼平原,12677,9284,12677,9284,0.4,名字,无需改,Location
 r3,TorumaDesert,卢玛琳沙丘,卢玛琳沙丘,2474,15462,2474,15462,0.4,名字,无需改,Location
 r3,TotenLake,拉纳湖,拉纳湖,16926,14199,16926,14199,0.5,名字,无需改,Location
-r3,TrakaIsland,莱恩贝克岛,,15492,10181,15492,10181,0.5,坐标,名字待定,Location
+r3,TrakaIsland,杜艾斯岛,,15492,10181,15492,10181,0.5,坐标,名字待定,Location
 r3,TrakaIsland_Big,迈尔卡岛,迈尔卡岛,15425,9738,15425,9738,0.4,名字,无需改,Location
 r3,TrakaIsland_Center,科彭嘉岛,科彭嘉岛,15106,10678,15106,10678,0.4,名字,无需改,Location
 r3,TrakaIsland_East,米奥乌岛,米奥乌岛,16049,10292,16049,10292,0.4,名字,无需改,Location
@@ -443,7 +443,7 @@ r4,HeburaFossil,海布拉大化石,海布拉大化石,3967,2631,3967,2631,0.4,�
 r4,HeburaLodge,海布拉山脉登山口小屋,海布拉山脉登山口小屋,4855,5449,4855,5449,0.4,名字,无需改,LocationPointer
 r4,HopesPlateau,初始台地,初始台地,10140,13819,10139,13819,1.0,名字,无需改,LocationPointer
 r4,HyralBridge,海利亚大桥,海利亚大桥,11919,15017,11919,15017,0.4,名字,无需改,LocationPointer
-r4,HyruleCastleTown,海拉鲁城堡城镇遗址,,11490,9388,11490,9388,0.0,坐标,名字待定,LocationPointer
+r4,CastleTownMark,海拉鲁城邑遗迹,海拉鲁城邑遗迹,11490,9388,11490,9388,0.0,名字,无需改,LocationPointer
 r4,HyruleCastle_Hall_0,主殿,主殿,11492,7874,11492,7874,0.1,名字,无需改,LocationPointer
 r4,HyruleCastle_Hall_1,二殿,二殿,11660,8300,11660,8300,0.5,名字,无需改,LocationPointer
 r4,HyruleCastle_Hall_2,三殿,三殿,11274,8373,11274,8373,0.5,名字,无需改,LocationPointer
@@ -483,6 +483,6 @@ r4,TotsugeBridge,卡洛克桥,卡洛克桥,9825,9051,9824,9051,0.6,名字,无需
 r4,TurasuBridge,马神桥,马神桥,13179,17478,13180,17478,1.2,名字,无需改,LocationPointer
 r4,YashinoLegacy,雅西诺遗迹,雅西诺遗迹,18894,16678,18894,16678,0.0,名字,无需改,LocationPointer
 r4,WeaponCureSpring,大精灵之泉,大精灵之泉,15952,11692,15952,11692,0.3,名字,无需改,LocationPointer
-r4,WeaponCureSpring_02,大妖精泉,,20224,7243,20224,7243,0.5,坐标,名字待定,LocationPointer
-r4,WeaponCureSpring_03,大妖精泉,,4921,8505,4921,8505,0.6,坐标,名字待定,LocationPointer
-r4,WeaponCureSpring_04,大妖精泉,,2259,17649,2259,17649,0.0,坐标,名字待定,LocationPointer
+r4,WeaponCureSpring_02,大精灵之泉,,20224,7243,20224,7243,0.5,坐标,名字待定,LocationPointer
+r4,WeaponCureSpring_03,大精灵之泉,,4921,8505,4921,8505,0.6,坐标,名字待定,LocationPointer
+r4,WeaponCureSpring_04,大精灵之泉,,2259,17649,2259,17649,0.0,坐标,名字待定,LocationPointer
