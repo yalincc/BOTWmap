@@ -297,9 +297,10 @@ class BotwMap {
     const showR2 = view.scale >= g1;
     const showR3 = view.scale >= g2;                 // r3：4x 起显（弱化保留）
     const showR4 = view.scale >= g3 && z >= 6;       // r4：8x 且瓦片至少 z6（确保最细地名在清晰瓦片上）
+    const showR5 = view.scale >= this.maxScale * 0.95 && z >= 7; // r5（城堡内部房间）：缩放到最大且最高清瓦片才显示
     const st = this.regionStyle || { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
     const fsz = st.fsz || 1;
-    const kMax = { r1: 1.5, r2: 1.7, r3: 1.7, r4: 2.0 }; // 各层字号上限：低层封顶弱化，r4 细节可继续放大
+    const kMax = { r1: 1.5, r2: 1.7, r3: 1.7, r4: 2.0, r5: 2.2 }; // 各层字号上限：低层封顶弱化，r4/r5 细节可继续放大
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const rg of this.regions) {
@@ -308,14 +309,16 @@ class BotwMap {
       if (lv === 'r2' && (!showR2 || showR3)) continue;             // 地形区：2x~4x，r3 出现后隐藏
       if (lv === 'r3' && !showR3) continue;                         // 细地名：4x 起显，之后弱化保留
       if (lv === 'r4' && !showR4) continue;                         // 更细地名：8x 之后
+      if (lv === 'r5' && !showR5) continue;                         // 城堡内部房间：最大缩放才显示
       const [sx, sy] = this.m2s(rg.px);
       if (sx < -140 || sy < -140 || sx > w + 140 || sy > h + 140) continue;
-      const base = lv === 'r1' ? 13 : lv === 'r2' ? 11 : lv === 'r3' ? 9.5 : 8;  // 层级字号：r1 大区 > r2 地形区 > r3 细地名 > r4 更细
+      const base = lv === 'r1' ? 13 : lv === 'r2' ? 11 : lv === 'r3' ? 9.5 : lv === 'r4' ? 8 : 7;  // 层级字号：r1 大区 > r2 地形区 > r3 细地名 > r4 更细 > r5 房间
       const k = Math.min(view.scale / f, kMax[lv] || 2.2);
       const fs = base * k * fsz;
-      // 弱化保留：r3 在 r4 出现后文字与底色透明度降低
+      // 弱化保留：r3 在 r4 出现后、r4 在 r5 出现后透明度降低，聚焦更细层级
       let alpha = 1;
       if (lv === 'r3' && showR4) alpha = 0.8;
+      if (lv === 'r4' && showR5) alpha = 0.75;
       ctx.font = (lv === 'r1' ? '700 ' : '600 ') + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
       const tw = ctx.measureText(rg.n).width;
       const padX = fs * 0.55, padY = fs * 0.28;
