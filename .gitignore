@@ -8,3 +8,9 @@ source/object-map/
 # 系统/编辑器
 Thumbs.db
 Desktop.ini
+
+# 工具工作目录（记忆/配置，不入库）
+.workbuddy/
+
+# source 下临时截图（调试产物，不入库）
+source/*.png
