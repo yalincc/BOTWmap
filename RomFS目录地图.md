@@ -157,9 +157,7 @@ J-1 ... J-8          + _DistanceView/（远景）
 
 现成工具（hactool / NSCB / SAK / sarc_tool）能解到 romfs 或解一层 SARC，**但读不了 msbt**。
 
-已解出的成果留在这里：
-- `Pack/Bootup_CNzh/`（1092 个文件，本机已解一层）
-- `source/cnzh/`（含 1091 个 msbt + 官方地名 TSV）
+本项目实际用到并保留的解包产物见 **《游戏文件数据记录.md》**（`source/LocationMarker.xmsbt`、`source/简体中文地名表.csv` 等）；早前解包残留目录（`Pack/Bootup_CNzh/`、`source/cnzh/`、`extracted/`）已完成清理，仅保留数据文件。
 
 ---
 
