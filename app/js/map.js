@@ -61,6 +61,8 @@ class BotwMap {
     this._viewApplied = false; // 是否已应用外部（分享链接）视图
     this.regions = (typeof BOTW_REGIONS !== 'undefined') ? BOTW_REGIONS : []; // 主要地形/区域名
     this._regionScale = 0.05;  // 全图适配 scale（fit 时更新），用于地名分级切换
+    // 地名标签样式（可由用户在“设置”面板调整，默认：米色半透明底 + 深褐色字，仿游戏内地图）
+    this.regionStyle = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
     this.tileCache = new Map();   // 瓦片 LRU 缓存：key -> HTMLImageElement
     this.tilePending = new Set(); // 正在加载的瓦片 key
     this._tileDrawPending = false;
@@ -68,7 +70,8 @@ class BotwMap {
     this._buildIndex();
     this._loadIcons();
     this._bindEvents();
-    this._resize();
+    // 等首帧布局完成后再初始化视口（避免 canvas 布局未就绪时 getBoundingClientRect 为 0）
+    requestAnimationFrame(() => this._resize());
   }
 
   /* ---------- 空间索引：256px 网格 ---------- */
@@ -212,7 +215,7 @@ class BotwMap {
     if (!this.w) return;
     const s = Math.min(this.w / this.MW, this.h / this.MH);
     this.minScale = s * 0.85;
-    this.maxScale = 1 / Math.max(1, this.dpr); // 物理像素密度对齐：任何设备放大到最大时，清晰度与电脑(dpr=1,maxScale=1)一致；避免高dpr手机超分放大导致模糊
+    this.maxScale = 1; // 统一最大缩放：手机与电脑都能放到最高清瓦片(z7)，缩放级数一致
     this._regionScale = s;   // 全图适配 scale（地名分级切换基准）
     this.view.scale = Math.min(Math.max(s, this.minScale), this.maxScale);
     this.view.x = (this.w - this.MW * this.view.scale) / 2;
@@ -276,36 +279,60 @@ class BotwMap {
 
     this._drawTiles(ctx);
 
-    this._drawRegions(ctx);   // 地形/区域名（瓦片之上、标记之下）
+    this._drawRegions(ctx);   // 地形/区域名（瓦片之上、标记之下，作为背景标注）
 
     this._drawMeasure(ctx);
     this._drawMarkers(ctx);
     this._drawCustom(ctx);
   }
 
-  /* ---------- 地形/区域名（模仿游戏内地图：半透明白底深字，随缩放分级切换） ---------- */
+  /* ---------- 地形/区域名（模仿游戏内地图：半透明底深字；字号随缩放放大，随缩放分级切换；高层出现后低层弱化保留） ---------- */
   _drawRegions(ctx) {
     if (!this.regions.length) return;
     const { w, h, view } = this;
-    const T1 = this._regionScale * 2;   // 全图→放大 2 倍后，8 大区名切换为细分地形名
-    const showAreas = view.scale >= T1;
+    const f = this._regionScale || 0.02;      // 全图适配 scale
+    const z = this._zoomForScale(view.scale); // 瓦片 zoom，用于清晰度兜底
+    const g1 = f * 2, g2 = f * 4, g3 = f * 8; // 分级阈值（整数倍）：地形区(2x)→细地名(4x)→更细地名(8x)
+    const showR2 = view.scale >= g1;
+    const showR3 = view.scale >= g2;                 // r3：4x 起显（弱化保留）
+    const showR4 = view.scale >= g3 && z >= 6;       // r4：8x 且瓦片至少 z6（确保最细地名在清晰瓦片上）
+    const st = this.regionStyle || { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
+    const fsz = st.fsz || 1;
+    const kMax = { r1: 1.5, r2: 1.7, r3: 1.7, r4: 2.0 }; // 各层字号上限：低层封顶弱化，r4 细节可继续放大
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const rg of this.regions) {
-      const isRegion = rg.lv === 'region';
-      if (isRegion === showAreas) continue;   // region 缩小态显示 / area 放大态显示
+      const lv = rg.lv;
+      if (lv === 'r1' && showR2) continue;                          // 大区：全图~放大2x
+      if (lv === 'r2' && (!showR2 || showR3)) continue;             // 地形区：2x~4x，r3 出现后隐藏
+      if (lv === 'r3' && !showR3) continue;                         // 细地名：4x 起显，之后弱化保留
+      if (lv === 'r4' && !showR4) continue;                         // 更细地名：8x 之后
       const [sx, sy] = this.m2s(rg.px);
-      if (sx < -90 || sy < -90 || sx > w + 90 || sy > h + 90) continue;
-      const fs = isRegion ? 13.5 : 11.5;
-      ctx.font = (isRegion ? '700 ' : '600 ') + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
+      if (sx < -140 || sy < -140 || sx > w + 140 || sy > h + 140) continue;
+      const base = lv === 'r1' ? 13 : lv === 'r2' ? 11 : lv === 'r3' ? 9.5 : 8;  // 层级字号：r1 大区 > r2 地形区 > r3 细地名 > r4 更细
+      const k = Math.min(view.scale / f, kMax[lv] || 2.2);
+      const fs = base * k * fsz;
+      // 弱化保留：r3 在 r4 出现后文字与底色透明度降低
+      let alpha = 1;
+      if (lv === 'r3' && showR4) alpha = 0.8;
+      ctx.font = (lv === 'r1' ? '700 ' : '600 ') + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
       const tw = ctx.measureText(rg.n).width;
       const padX = fs * 0.55, padY = fs * 0.28;
       const bw = tw + padX * 2, bh = fs + padY * 2;
       const x = sx - bw / 2, y = sy - bh / 2;
-      ctx.fillStyle = 'rgba(255,255,255,0.58)';
-      this._roundRect(ctx, x, y, bw, bh, 4);
-      ctx.fill();
-      ctx.fillStyle = 'rgba(24,32,26,0.92)';
+      if (st.bgA > 0) {
+        ctx.fillStyle = `rgba(${st.bg[0]},${st.bg[1]},${st.bg[2]},${st.bgA * alpha})`;
+        this._roundRect(ctx, x, y, bw, bh, 4);
+        ctx.fill();
+      }
+      const sw = st.sw || 0;
+      if (sw > 0 && st.sc) {
+        ctx.strokeStyle = `rgba(${st.sc[0]},${st.sc[1]},${st.sc[2]},${st.txA * alpha})`;
+        ctx.lineWidth = sw;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(rg.n, sx, sy + 0.5);
+      }
+      ctx.fillStyle = `rgba(${st.tx[0]},${st.tx[1]},${st.tx[2]},${st.txA * alpha})`;
       ctx.fillText(rg.n, sx, sy + 0.5);
     }
   }

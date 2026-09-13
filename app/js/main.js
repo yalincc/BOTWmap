@@ -47,5 +47,39 @@
     UI.toast('点击标注查看详情 · 勾选图层可多选同显 · 完成度自动保存');
   }, 600);
 
+  // URL 调试参数：?z=<放大倍数>&cx=<地图X归一化0-1>&cy=<地图Y归一化0-1>（仅带 z 时生效，便于分级验证）
+  const sp = new URLSearchParams(location.search);
+  const dz = parseFloat(sp.get('z'));
+  if (dz && dz > 0) {
+    setTimeout(() => {
+      const f = map._regionScale || 0.05;
+      const s = Math.min(Math.max(f * dz, map.minScale), map.maxScale);
+      const cx = (sp.get('cx') ? parseFloat(sp.get('cx')) : 0.5) * map.MW;
+      const cy = (sp.get('cy') ? parseFloat(sp.get('cy')) : 0.5) * map.MH;
+      map.setView(map.w / 2 - cx * s, map.h / 2 - cy * s, s);
+    }, 400);
+  }
+
+  // URL 调试参数：?dbg=1 显示右上角调试浮层（当前缩放级别 + 可见地名列表，供截图验证）
+  if (sp.get('dbg')) {
+    const el = document.createElement('div');
+    el.id = 'dbgOut';
+    el.style.cssText = 'position:fixed;right:8px;top:120px;z-index:999;background:rgba(0,0,0,.78);color:#0f0;font:11px/1.4 Consolas,monospace;padding:6px 8px;border-radius:6px;max-height:60vh;overflow:auto;pointer-events:none;white-space:pre;';
+    document.body.appendChild(el);
+    setInterval(() => {
+      const m = window.__botwMap; if (!m) return;
+      const f = m._regionScale || 0.02, g1 = f * 2, g2 = f * 4;
+      const vis = m.regions.filter(r => {
+        const lv = r.lv;
+        if (lv === 'r1' && m.view.scale >= g1) return false;
+        if (lv === 'r2' && (m.view.scale < g1 || m.view.scale >= g2)) return false;
+        if (lv === 'r3' && m.view.scale < g2) return false;
+        return true;
+      });
+      el.textContent = 'scale=' + m.view.scale.toFixed(3) + ' f=' + f.toFixed(4) + ' regs=' + m.regions.length + ' vis=' + vis.length + '\n' +
+        vis.slice(0, 40).map(r => r.lv + ':' + r.n).join('\n');
+    }, 800);
+  }
+
   window.__botwMap = map; // 便于调试
 })();

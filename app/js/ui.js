@@ -12,6 +12,7 @@ const UI = (() => {
     buildLayerList();
     buildSearchIndex();
     wireTools();
+    initStyle();
     map._onSelect = onSelect;
     map._onCoord = onCoord;
     map._onModeChange = onModeChange;
@@ -431,7 +432,7 @@ const UI = (() => {
   }
 
   /* ---------- 持久化 ---------- */
-  const K_DONE = 'botwmap.done.v1', K_CUSTOM = 'botwmap.custom.v1', K_LAYERS = 'botwmap.layers.v1';
+  const K_DONE = 'botwmap.done.v1', K_CUSTOM = 'botwmap.custom.v1', K_LAYERS = 'botwmap.layers.v2';
   function loadState() {
     try {
       const d = JSON.parse(localStorage.getItem(K_DONE) || '[]');
@@ -440,7 +441,7 @@ const UI = (() => {
     try {
       map.customMarkers = JSON.parse(localStorage.getItem(K_CUSTOM) || '[]');
     } catch (e) { map.customMarkers = []; }
-    const def = ['shrine', 'tower', 'beast', 'seed', 'memory', 'stable', 'village', 'lab', 'fountain'];
+    const def = ['shrine', 'tower'];
     try {
       const l = JSON.parse(localStorage.getItem(K_LAYERS) || 'null');
       if (Array.isArray(l) && l.length) l.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
@@ -459,6 +460,117 @@ const UI = (() => {
   }
   function saveLayers() {
     try { localStorage.setItem(K_LAYERS, JSON.stringify([...map.enabled])); } catch (e) {}
+  }
+
+  /* ---------- 地名样式（顶栏⚙️设置弹层） ---------- */
+  const K_STYLE = 'botwmap.style.v2'; // v2：新默认（米色底深褐字）+ 字号档位
+  const DEFAULT_STYLE = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
+  const FONT_SIZES = { small: 0.85, medium: 1, large: 1.15 };
+  function loadStyle() {
+    try {
+      const s = JSON.parse(localStorage.getItem(K_STYLE) || 'null');
+      if (s && Array.isArray(s.bg) && Array.isArray(s.tx)) {
+        map.regionStyle = Object.assign({}, DEFAULT_STYLE, s);
+      }
+    } catch (e) {}
+  }
+  function saveStyle() {
+    try { localStorage.setItem(K_STYLE, JSON.stringify(map.regionStyle)); } catch (e) {}
+  }
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgbToHex(rgb) {
+    return '#' + rgb.map(v => (v & 255).toString(16).padStart(2, '0')).join('');
+  }
+  function initStyle() {
+    loadStyle();
+    const box = $('settingsBox');
+    const openBox = () => { box.classList.remove('hidden'); syncStyle(); };
+    const closeBox = () => box.classList.add('hidden');
+    $('btnSettings').addEventListener('click', openBox);
+    $('stClose').addEventListener('click', closeBox);
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !box.classList.contains('hidden')) closeBox();
+    });
+
+    const syncStyle = () => {
+      const st = map.regionStyle;
+      const setOpt = (sel, v) => {
+        document.querySelectorAll(`#${sel} .st-opt`).forEach(b => b.classList.toggle('sel', b.dataset.v === v));
+      };
+      // 文字颜色
+      const txHex = rgbToHex(st.tx);
+      if (txHex === rgbToHex(DEFAULT_STYLE.tx)) setOpt('stTxOptions', 'default');
+      else if (txHex === '#000000') setOpt('stTxOptions', '#000000');
+      else if (txHex === '#ffffff') setOpt('stTxOptions', '#ffffff');
+      else { setOpt('stTxOptions', '__custom'); $('stTxColor').value = txHex; }
+      // 底色
+      const bgHex = rgbToHex(st.bg);
+      if (bgHex === rgbToHex(DEFAULT_STYLE.bg)) setOpt('stBgOptions', 'default');
+      else if (bgHex === '#000000') setOpt('stBgOptions', '#000000');
+      else if (bgHex === '#ffffff') setOpt('stBgOptions', '#ffffff');
+      else { setOpt('stBgOptions', '__custom'); $('stBgColor').value = bgHex; }
+      // 大小
+      let sz = 'medium';
+      for (const k in FONT_SIZES) if (Math.abs(FONT_SIZES[k] - (st.fsz || 1)) < 0.01) sz = k;
+      setOpt('stSizeOptions', sz);
+      // 透明度
+      $('stTxAlpha').value = Math.round(st.txA * 100);
+      $('stTxAlphaV').textContent = Math.round(st.txA * 100) + '%';
+      $('stBgAlpha').value = Math.round(st.bgA * 100);
+      $('stBgAlphaV').textContent = Math.round(st.bgA * 100) + '%';
+      // 描边
+      const scHex = st.sc ? rgbToHex(st.sc) : '';
+      if (!st.sw || st.sw <= 0 || !scHex) setOpt('stStrokeOptions', 'none');
+      else if (scHex === '#000000') setOpt('stStrokeOptions', '#000000');
+      else if (scHex === '#ffffff') setOpt('stStrokeOptions', '#ffffff');
+      else { setOpt('stStrokeOptions', '__custom'); $('stStrokeColor').value = scHex; }
+      $('stStrokeWidth').value = st.sw || 0;
+      $('stStrokeWidthV').textContent = (st.sw || 0) % 1 === 0 ? (st.sw || 0) : (st.sw || 0).toFixed(1);
+    };
+    function applyStyle(fn) {
+      fn(map.regionStyle);
+      saveStyle();
+      map.draw();
+      syncStyle();
+    }
+    // 文字颜色
+    document.querySelectorAll('#stTxOptions .st-opt[data-v]').forEach(b => {
+      if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.tx = DEFAULT_STYLE.tx.slice(); }));
+      else b.addEventListener('click', () => applyStyle(st => { const c = hexToRgb(b.dataset.v); if (c) st.tx = c; }));
+    });
+    $('stTxColor').addEventListener('input', e => applyStyle(st => { const c = hexToRgb(e.target.value); if (c) st.tx = c; }));
+    // 文字大小
+    document.querySelectorAll('#stSizeOptions .st-opt').forEach(b => {
+      b.addEventListener('click', () => applyStyle(st => { st.fsz = FONT_SIZES[b.dataset.v] || 1; }));
+    });
+    // 底色
+    document.querySelectorAll('#stBgOptions .st-opt[data-v]').forEach(b => {
+      if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.bg = DEFAULT_STYLE.bg.slice(); }));
+      else b.addEventListener('click', () => applyStyle(st => { const c = hexToRgb(b.dataset.v); if (c) st.bg = c; }));
+    });
+    $('stBgColor').addEventListener('input', e => applyStyle(st => { const c = hexToRgb(e.target.value); if (c) st.bg = c; }));
+    // 文字/底色透明度
+    $('stTxAlpha').addEventListener('input', e => applyStyle(st => { st.txA = Math.min(1, Math.max(0, e.target.value / 100)); }));
+    $('stBgAlpha').addEventListener('input', e => applyStyle(st => { st.bgA = Math.min(1, Math.max(0, e.target.value / 100)); }));
+    // 描边颜色
+    document.querySelectorAll('#stStrokeOptions .st-opt[data-v]').forEach(b => {
+      if (b.dataset.v === 'none') b.addEventListener('click', () => applyStyle(st => { st.sw = 0; }));
+      else b.addEventListener('click', () => applyStyle(st => { const c = hexToRgb(b.dataset.v); if (c) { st.sc = c; st.sw = st.sw || 2; } }));
+    });
+    $('stStrokeColor').addEventListener('input', e => applyStyle(st => { const c = hexToRgb(e.target.value); if (c) { st.sc = c; st.sw = st.sw || 2; } }));
+    // 描边粗细
+    $('stStrokeWidth').addEventListener('input', e => applyStyle(st => { st.sw = Math.max(0, Math.min(6, parseFloat(e.target.value) || 0)); }));
+    // 恢复默认
+    $('stReset').addEventListener('click', () => {
+      map.regionStyle = Object.assign({}, DEFAULT_STYLE);
+      saveStyle(); map.draw(); syncStyle();
+      toast('地名样式已恢复默认');
+    });
   }
 
   /* ---------- toast ---------- */

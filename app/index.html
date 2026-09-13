@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -24,6 +25,7 @@
       <button id="btnPin" class="tool" title="在地图上添加自定义标记"><span class="ico">📍</span><span class="label">标记</span></button>
       <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接"><span class="ico">🔗</span><span class="label">分享</span></button>
       <button id="btnReset" class="tool" title="重置到全图视图"><span class="ico">🏠</span><span class="label">全图</span></button>
+      <button id="btnSettings" class="tool" title="地图设置（地名样式等）"><span class="ico">⚙️</span><span class="label">设置</span></button>
     </div>
   </header>
 
@@ -98,6 +100,66 @@
       <button id="sbCopy" class="primary">复制链接</button>
     </div>
 
+    <!-- 设置弹层（地名样式） -->
+    <div id="settingsBox" class="hidden">
+      <div class="sb-head">地图设置
+        <button id="stClose" class="card-close">×</button>
+      </div>
+      <div class="st-group">
+        <div class="st-label">地名文字颜色</div>
+        <div class="st-options" id="stTxOptions">
+          <button class="st-opt" data-v="default">默认（深褐）</button>
+          <button class="st-opt" data-v="#000000">黑</button>
+          <button class="st-opt" data-v="#ffffff">白</button>
+          <label class="st-opt st-picker">自定义<input type="color" id="stTxColor"></label>
+        </div>
+        <div class="st-row">
+          <span class="st-slabel">文字透明度</span>
+          <input type="range" id="stTxAlpha" min="0" max="100" value="92">
+          <span id="stTxAlphaV" class="st-sval">92%</span>
+        </div>
+      </div>
+      <div class="st-group">
+        <div class="st-label">地名文字大小</div>
+        <div class="st-options" id="stSizeOptions">
+          <button class="st-opt" data-v="small">小</button>
+          <button class="st-opt" data-v="medium">中</button>
+          <button class="st-opt" data-v="large">大</button>
+        </div>
+      </div>
+      <div class="st-group">
+        <div class="st-label">地名文字描边</div>
+        <div class="st-options" id="stStrokeOptions">
+          <button class="st-opt" data-v="none">无</button>
+          <button class="st-opt" data-v="#000000">黑</button>
+          <button class="st-opt" data-v="#ffffff">白</button>
+          <label class="st-opt st-picker">自定义<input type="color" id="stStrokeColor"></label>
+        </div>
+        <div class="st-row">
+          <span class="st-slabel">描边粗细</span>
+          <input type="range" id="stStrokeWidth" min="0" max="6" step="0.5" value="2">
+          <span id="stStrokeWidthV" class="st-sval">2</span>
+        </div>
+      </div>
+      <div class="st-group">
+        <div class="st-label">地名底色</div>
+        <div class="st-options" id="stBgOptions">
+          <button class="st-opt" data-v="default">默认（米色）</button>
+          <button class="st-opt" data-v="#000000">黑</button>
+          <button class="st-opt" data-v="#ffffff">白</button>
+          <label class="st-opt st-picker">自定义<input type="color" id="stBgColor"></label>
+        </div>
+        <div class="st-row">
+          <span class="st-slabel">底色透明度</span>
+          <input type="range" id="stBgAlpha" min="0" max="100" value="60">
+          <span id="stBgAlphaV" class="st-sval">60%</span>
+        </div>
+      </div>
+      <div class="st-foot">
+        <button id="stReset" class="mini">恢复默认</button>
+      </div>
+    </div>
+
     <!-- 信息卡片 -->
     <div id="infoCard" class="hidden">
       <div class="card-head">
@@ -122,10 +184,10 @@
 
 </div>
 
-<script src="js/data.js"></script>
-<script src="js/regions.js"></script>
-<script src="js/map.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/main.js"></script>
+<script src="js/data.js?v=2"></script>
+<script src="js/regions.js?v=rn3"></script>
+<script src="js/map.js?v=2"></script>
+<script src="js/ui.js?v=2"></script>
+<script src="js/main.js?v=4"></script>
 </body>
 </html>
