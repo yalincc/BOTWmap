@@ -313,6 +313,7 @@ const UI = (() => {
     });
     $('btnShare').addEventListener('click', share);
     wireShare();
+    wireCombos();
     $('cardClose').addEventListener('click', hideInfo);
     $('searchInput').addEventListener('keydown', e => {
       if (e.key === 'Escape') { hideResults(); $('searchInput').blur(); }
@@ -412,6 +413,81 @@ const UI = (() => {
     $('shareUrl').addEventListener('keydown', e => { if (e.key === 'Escape') $('sbClose').click(); });
   }
 
+  /* ---------- 图层组合（保存当前勾选，一键切换） ---------- */
+  const K_COMBOS = 'botwmap.combos.v1';
+  let combos = [];
+  function wireCombos() {
+    $('comboSave').addEventListener('click', () => {
+      $('comboInputWrap').classList.remove('hidden');
+      $('comboName').value = '';
+      $('comboName').focus();
+    });
+    $('comboOk').addEventListener('click', saveCombo);
+    $('comboCancel').addEventListener('click', () => $('comboInputWrap').classList.add('hidden'));
+    $('comboName').addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveCombo();
+      if (e.key === 'Escape') $('comboCancel').click();
+    });
+  }
+  function saveCombo() {
+    const name = $('comboName').value.trim();
+    if (!name) { toast('请输入组合名称'); $('comboName').focus(); return; }
+    const keys = [...map.enabled];
+    const idx = combos.findIndex(c => c.name === name);
+    if (idx >= 0) combos[idx] = { name, keys };
+    else combos.push({ name, keys });
+    saveCombos();
+    renderCombos();
+    $('comboInputWrap').classList.add('hidden');
+    toast('已保存组合：' + name + '（' + keys.length + ' 个图层）');
+  }
+  function saveCombos() {
+    try { localStorage.setItem(K_COMBOS, JSON.stringify(combos)); } catch (e) {}
+  }
+  function loadCombos() {
+    try {
+      const c = JSON.parse(localStorage.getItem(K_COMBOS) || '[]');
+      combos = Array.isArray(c) ? c : [];
+    } catch (e) { combos = []; }
+  }
+  function renderCombos() {
+    const box = $('comboList');
+    if (!box) return;
+    if (!combos.length) {
+      box.innerHTML = '<div class="combo-empty">还没有组合，勾选图层后点「保存当前组合」</div>';
+      return;
+    }
+    box.innerHTML = combos.map(c =>
+      `<div class="combo-item" data-name="${esc(c.name)}">
+         <span class="combo-name">${esc(c.name)}</span>
+         <span class="combo-count">${c.keys.length} 图层</span>
+         <button class="combo-del" title="删除组合">×</button>
+       </div>`).join('');
+    box.querySelectorAll('.combo-item').forEach(row => {
+      row.addEventListener('click', e => {
+        if (e.target.closest('.combo-del')) return;
+        applyCombo(row.dataset.name);
+      });
+      row.querySelector('.combo-del').addEventListener('click', e => {
+        e.stopPropagation();
+        const n = row.dataset.name;
+        combos = combos.filter(c => c.name !== n);
+        saveCombos();
+        renderCombos();
+        toast('已删除组合：' + n);
+      });
+    });
+  }
+  function applyCombo(name) {
+    const c = combos.find(x => x.name === name);
+    if (!c) return;
+    map.enabled.clear();
+    c.keys.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
+    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
+    saveLayers(); updateLayerList(); map.draw(); renderStats();
+    toast('已应用组合：' + name);
+  }
+
   function applyHash() {
     if (!location.hash) return;
     const params = new URLSearchParams(location.hash.slice(1));
@@ -447,9 +523,13 @@ const UI = (() => {
       if (Array.isArray(l) && l.length) l.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
       else def.forEach(k => map.enabled.add(k));
     } catch (e) { def.forEach(k => map.enabled.add(k)); }
+    // 图层组合 + 地名显示开关
+    loadCombos();
+    map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
     // 同步复选框与图层计数
     document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
     updateLayerList();
+    renderCombos();
     renderStats();
   }
   function saveDone() {
@@ -464,6 +544,7 @@ const UI = (() => {
 
   /* ---------- 地名样式（顶栏⚙️设置弹层） ---------- */
   const K_STYLE = 'botwmap.style.v2'; // v2：新默认（米色底深褐字）+ 字号档位
+  const K_REGION_SHOW = 'botwmap.regionShow.v1'; // 地名显示开关
   const DEFAULT_STYLE = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
   const FONT_SIZES = { small: 0.85, medium: 1, large: 1.15 };
   function loadStyle() {
@@ -502,6 +583,8 @@ const UI = (() => {
       const setOpt = (sel, v) => {
         document.querySelectorAll(`#${sel} .st-opt`).forEach(b => b.classList.toggle('sel', b.dataset.v === v));
       };
+      // 地名显示
+      setOpt('stShowOptions', map.showRegions ? 'show' : 'hide');
       // 文字颜色
       const txHex = rgbToHex(st.tx);
       if (txHex === rgbToHex(DEFAULT_STYLE.tx)) setOpt('stTxOptions', 'default');
@@ -538,6 +621,15 @@ const UI = (() => {
       map.draw();
       syncStyle();
     }
+    // 地名显示开关
+    document.querySelectorAll('#stShowOptions .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        map.showRegions = b.dataset.v === 'show';
+        try { localStorage.setItem(K_REGION_SHOW, map.showRegions ? '1' : '0'); } catch (e) {}
+        map.draw();
+        syncStyle();
+      });
+    });
     // 文字颜色
     document.querySelectorAll('#stTxOptions .st-opt[data-v]').forEach(b => {
       if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.tx = DEFAULT_STYLE.tx.slice(); }));
@@ -568,6 +660,8 @@ const UI = (() => {
     // 恢复默认
     $('stReset').addEventListener('click', () => {
       map.regionStyle = Object.assign({}, DEFAULT_STYLE);
+      map.showRegions = true;
+      try { localStorage.setItem(K_REGION_SHOW, '1'); } catch (e) {}
       saveStyle(); map.draw(); syncStyle();
       toast('地名样式已恢复默认');
     });

@@ -63,6 +63,7 @@ class BotwMap {
     this._regionScale = 0.05;  // 全图适配 scale（fit 时更新），用于地名分级切换
     // 地名标签样式（可由用户在“设置”面板调整，默认：米色半透明底 + 深褐色字，仿游戏内地图）
     this.regionStyle = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
+    this.showRegions = true;   // 地名显示开关（设置弹层可切换，持久化到 localStorage）
     this.tileCache = new Map();   // 瓦片 LRU 缓存：key -> HTMLImageElement
     this.tilePending = new Set(); // 正在加载的瓦片 key
     this._tileDrawPending = false;
@@ -288,7 +289,7 @@ class BotwMap {
 
   /* ---------- 地形/区域名（模仿游戏内地图：半透明底深字；字号随缩放放大，随缩放分级切换；高层出现后低层弱化保留） ---------- */
   _drawRegions(ctx) {
-    if (!this.regions.length) return;
+    if (!this.regions.length || !this.showRegions) return;
     const { w, h, view } = this;
     const f = this._regionScale || 0.02;      // 全图适配 scale
     const z = this._zoomForScale(view.scale); // 瓦片 zoom，用于清晰度兜底

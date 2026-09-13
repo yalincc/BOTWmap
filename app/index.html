@@ -46,6 +46,20 @@
       <span id="layerCount" class="hint"></span>
     </div>
 
+    <!-- 图层组合：保存当前勾选为自定义组合，一键切换 -->
+    <div class="combo-area">
+      <div class="combo-head">
+        <span>图层组合</span>
+        <button id="comboSave" class="mini" title="把当前勾选的图层保存为组合">保存当前组合</button>
+      </div>
+      <div id="comboInputWrap" class="hidden">
+        <input id="comboName" type="text" placeholder="组合名称，如：神庙+塔" maxlength="20" autocomplete="off">
+        <button id="comboOk" class="mini">保存</button>
+        <button id="comboCancel" class="mini">取消</button>
+      </div>
+      <div id="comboList"></div>
+    </div>
+
     <div id="layerList" class="layer-list"></div>
 
     <div id="statsPanel" class="stats"></div>
@@ -104,6 +118,13 @@
     <div id="settingsBox" class="hidden">
       <div class="sb-head">地图设置
         <button id="stClose" class="card-close">×</button>
+      </div>
+      <div class="st-group">
+        <div class="st-label">地名显示</div>
+        <div class="st-options" id="stShowOptions">
+          <button class="st-opt" data-v="show">显示</button>
+          <button class="st-opt" data-v="hide">隐藏</button>
+        </div>
       </div>
       <div class="st-group">
         <div class="st-label">地名文字颜色</div>
@@ -186,8 +207,8 @@
 
 <script src="js/data.js?v=2"></script>
 <script src="js/regions.js?v=rn3"></script>
-<script src="js/map.js?v=2"></script>
-<script src="js/ui.js?v=2"></script>
+<script src="js/map.js?v=3"></script>
+<script src="js/ui.js?v=3"></script>
 <script src="js/main.js?v=4"></script>
 </body>
 </html>

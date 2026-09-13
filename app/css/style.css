@@ -263,6 +263,26 @@ body {
   #toast { font-size: 12px; width: 86vw; text-align: center; }
 }
 
+/* ---------- 图层组合 ---------- */
+.combo-area { padding: 2px 12px 6px; }
+.combo-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 0 4px; font-size: 11.5px; color: var(--accent2); letter-spacing: 1px; font-weight: 600; }
+.combo-head .mini { letter-spacing: 0; }
+#comboInputWrap { display: flex; gap: 6px; margin: 4px 0 6px; }
+#comboInputWrap input { flex: 1; min-width: 0; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: #0f1a12; color: var(--text); font-size: 12px; outline: none; }
+#comboInputWrap input:focus { border-color: var(--accent); }
+#comboList { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+.combo-empty { font-size: 11px; color: var(--text-dim); padding: 2px 0 4px; }
+.combo-item {
+  display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: rgba(255,255,255,.03);
+  cursor: pointer; font-size: 12.5px; user-select: none;
+}
+.combo-item:hover { border-color: var(--accent2); }
+.combo-item .combo-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-item .combo-count { font-size: 10.5px; color: var(--text-dim); flex-shrink: 0; }
+.combo-del { background: none; border: none; color: var(--text-dim); font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+.combo-del:hover { color: var(--danger); }
+
 
 
 
