@@ -1,4 +1,4 @@
-"""Transparent always-on-top mini-map overlay for the BOTW live tracker.
+﻿"""Transparent always-on-top mini-map overlay for the BOTW live tracker.
 
 Port of ZeldaTOTKmap/live/overlay.py to Breath of the Wild.  Differences:
 
@@ -53,9 +53,13 @@ LOG_FILE = os.path.join(ROOT, ".workbuddy", "overlay.log")
 PERF_FILE = os.path.join(ROOT, ".workbuddy", "overlay_perf.log")
 
 TILES = os.path.join(ROOT, "app", "assets", "tiles")
-MAP = 320                       # map viewport, pixels
+MAP = 320                       # default map viewport, pixels (resizable)
 BAR = 22                        # draggable title bar
 INFO = 64                       # strip: coords / nearby / target / progress
+MIN_MW, MAX_MW = 160, 600       # resizable map viewport bounds
+RES_EDGE = 8                    # px from a window edge that starts a resize
+VK_F8 = 0x77                    # hotkey to toggle click-through / interact
+WS_EX_TRANSPARENT = 0x00000020  # mouse clicks pass through the window
 TILE = 256
 MAX_NATIVE = 7                  # local tiles stop at z=7
 ZOOM_MIN, ZOOM_MAX = 4, 9       # ...but we keep going by upscaling those tiles
@@ -192,6 +196,12 @@ class Overlay:
         self.sample = None
         self.sample_lock = threading.Lock()
 
+        self.mw = self.saved_mw()            # map viewport size (resizable)
+        self.transparent = False             # transparent + click-through mode
+        self.interact = True                 # False = click-through (F8 toggles)
+        self._resize = None                  # active resize edge, or None
+        self._f8_last = False
+
         self.root = tk.Tk()
         self.root.title("BOTW mini-map")
         self.root.overrideredirect(True)
@@ -199,7 +209,7 @@ class Overlay:
         self.root.attributes("-alpha", self.alpha)
         self.root.configure(bg="#0e141c")
 
-        w, h = MAP, BAR + MAP + INFO
+        w, h = self.mw, BAR + self.mw + INFO
         x, y = self.default_pos(w, h)
         self.root.geometry("%dx%d+%d+%d" % (w, h, x, y))
 
@@ -209,6 +219,9 @@ class Overlay:
         self.title = tk.Label(self.bar, text="BOTW", bg="#182430",
                               fg="#8fc7e8", font=("Microsoft YaHei UI", 9, "bold"))
         self.title.pack(side="left", padx=8)
+        self.tstate = tk.Label(self.bar, text="", bg="#182430", fg="#c9d8e4",
+                               font=("Microsoft YaHei UI", 8))
+        self.tstate.pack(side="left", padx=(6, 0))
         self.weblnk = tk.Label(self.bar, text="网页 ↗", bg="#182430", fg="#5fa8d3",
                                font=("Microsoft YaHei UI", 9), cursor="hand2")
         self.weblnk.pack(side="right", padx=(0, 6))
@@ -221,7 +234,7 @@ class Overlay:
         self.close.pack(side="right", padx=8)
         self.close.bind("<Button-1>", lambda e: self.quit())
 
-        self.canvas = tk.Canvas(self.root, width=MAP, height=MAP,
+        self.canvas = tk.Canvas(self.root, width=self.mw, height=self.mw,
                                 bg="#0e141c", highlightthickness=0)
         self.canvas.pack()
 
@@ -233,6 +246,9 @@ class Overlay:
         for wdg in (self.bar, self.title, self.canvas):
             wdg.bind("<Button-1>", self.drag_start)
             wdg.bind("<B1-Motion>", self.drag_move)
+        self.root.bind("<Motion>", self.on_edge)
+        self.root.bind("<B1-Motion>", self.on_resize, add="+")
+        self.root.bind("<ButtonRelease-1>", self.end_resize)
         self.root.bind("<MouseWheel>", self.on_wheel)
         self.root.bind("<Escape>", lambda e: self.quit())
         self.canvas.bind("<Button-3>", self.menu)
@@ -241,19 +257,31 @@ class Overlay:
         self.root.update_idletasks()
         self.make_noactivate()
         threading.Thread(target=self.poller, daemon=True).start()
+        self._poll_f8()
         self.tick()
 
     # -- window plumbing ---------------------------------------------------
-    def default_pos(self, w, h):
-        """Left of the Ryujinx window, vertically centred; else screen-left."""
-        saved = None
+    def saved_geom(self):
         try:
             with open(POS_FILE, encoding="utf-8") as f:
-                saved = json.load(f)
+                d = json.load(f)
+            if isinstance(d.get("x"), int) and isinstance(d.get("y"), int):
+                return d
         except Exception:
             pass
-        if saved and isinstance(saved.get("x"), int):
-            return saved["x"], saved["y"]
+        return None
+
+    def saved_mw(self):
+        d = self.saved_geom()
+        if d and isinstance(d.get("mw"), int):
+            return max(MIN_MW, min(MAX_MW, d["mw"]))
+        return MAP
+
+    def default_pos(self, w, h):
+        """Saved position, else left of the Ryujinx window, vertically centred."""
+        d = self.saved_geom()
+        if d:
+            return d["x"], d["y"]
         rx, ry, rw, rh = self.ryujinx_rect()
         if rw:
             return max(8, rx - w - 24), ry + max(0, (rh - h) // 2)
@@ -296,13 +324,149 @@ class Overlay:
             log("noactivate failed: %r" % (e,))
 
     def drag_start(self, e):
+        edge = self._edge_at(e)
+        if edge:                      # near an edge -> this press is a resize
+            self._resize = edge
+            self._rs = (e.x_root, e.y_root, self.root.winfo_x(),
+                        self.root.winfo_y(), self.mw)
+            return
         self._dx, self._dy = e.x, e.y
 
     def drag_move(self, e):
+        if self._resize:
+            return
         """Coalesce motion events: at most ~60 moves/s reach the window manager."""
         self._pending_xy = (e.x_root - self._dx, e.y_root - self._dy)
         if self._move_job is None:
             self._move_job = self.root.after(16, self._apply_move)
+
+    def on_edge(self, e):
+        """Cursor feedback + remember which edge the pointer is on."""
+        if self._resize:
+            return
+        edge = self._edge_at(e)
+        self._edge = edge
+        curs = {None: "", "n": "sb_v_double_arrow", "s": "sb_v_double_arrow",
+                "e": "sb_h_double_arrow", "w": "sb_h_double_arrow",
+                "ne": "size_ne_sw_cursor", "sw": "size_ne_sw_cursor",
+                "nw": "size_nw_se_cursor", "se": "size_nw_se_cursor"}
+        try:
+            self.root.config(cursor=curs.get(edge, ""))
+        except tk.TclError:
+            pass
+
+    def _edge_at(self, e):
+        if not self.interact:
+            return None
+        w = self.root.winfo_width()
+        h = self.root.winfo_height()
+        if w < 20 or h < 20:
+            return None
+        x, y = e.x, e.y
+        top = y <= RES_EDGE
+        bot = y >= h - RES_EDGE - 1
+        left = x <= RES_EDGE
+        right = x >= w - RES_EDGE - 1
+        if left and top: return "nw"
+        if right and top: return "ne"
+        if left and bot: return "sw"
+        if right and bot: return "se"
+        if top: return "n"
+        if bot: return "s"
+        if left: return "w"
+        if right: return "e"
+        return None
+
+    def on_resize(self, e):
+        if not self._resize or not self._rs:
+            return
+        edge, x0, y0, wx0, wy0, mw0 = self._rs
+        dx = e.x_root - x0
+        dy = e.y_root - y0
+        mw = mw0
+        nx, ny = wx0, wy0
+        if "e" in edge:
+            mw = max(MIN_MW, min(MAX_MW, mw0 + dx))
+        if "s" in edge:
+            mw = max(MIN_MW, min(MAX_MW, mw0 + dy))
+        if "w" in edge:
+            mw = max(MIN_MW, min(MAX_MW, mw0 - dx))
+            nx = wx0 + dx
+        if "n" in edge:
+            mw = max(MIN_MW, min(MAX_MW, mw0 - dy))
+            ny = wy0 + dy
+        if mw != self.mw:
+            self.mw = mw
+            self.canvas.config(width=mw, height=mw)
+            self.root.geometry("%dx%d+%d+%d" % (mw, BAR + mw + INFO, nx, ny))
+            self.last_key = None      # force redraw at new size
+
+    def end_resize(self, _e):
+        if self._resize:
+            self._resize = None
+            self.save_pos()
+
+    def set_transparent(self, on):
+        """True: background is fully transparent + mouse clicks pass through.
+        The hotkey F8 then toggles interact (drag/resize/menu) vs pass-through."""
+        self.transparent = bool(on)
+        try:
+            if on:
+                self.root.attributes("-transparentcolor", "#0e141c")
+            else:
+                self.root.attributes("-transparentcolor", "")
+            self.interact = not on       # pass-through by default when on
+            self._click_through(not on and self.interact)
+            self.last_key = None
+            self._update_tstate()
+        except Exception as e:
+            log("transparent failed: %r" % (e,))
+
+    def toggle_interact(self):
+        if not self.transparent:
+            self.interact = True
+            return
+        self.interact = not self.interact
+        self._click_through(not self.interact)
+        self._update_tstate()
+
+    def _click_through(self, thru):
+        try:
+            hwnd = u32.GetParent(self.root.winfo_id()) or self.root.winfo_id()
+            ex = u32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            u32.SetWindowLongW(hwnd, GWL_EXSTYLE,
+                               (ex | WS_EX_TRANSPARENT) if thru
+                               else (ex & ~WS_EX_TRANSPARENT))
+        except Exception as e:
+            log("click-through failed: %r" % (e,))
+
+    def _update_tstate(self):
+        if self.transparent:
+            self.tstate.config(
+                text="穿透 F8" if not self.interact else "交互 F8",
+                fg="#9fd3f0" if self.interact else "#e8b04a")
+        else:
+            self.tstate.config(text="", fg="#c9d8e4")
+
+    def _poll_f8(self):
+        """GetAsyncKeyState poll: no global hotkey registration needed and it
+        does not steal input from the game."""
+        try:
+            down = bool(u32.GetAsyncKeyState(VK_F8) & 1)
+            if down and not self._f8_last:
+                self.toggle_interact()
+            self._f8_last = down
+        except Exception:
+            pass
+        self.root.after(180, self._poll_f8)
+
+    def save_pos(self):
+        try:
+            with open(POS_FILE, "w", encoding="utf-8") as f:
+                json.dump({"x": self.root.winfo_x(), "y": self.root.winfo_y(),
+                           "mw": self.mw}, f)
+        except Exception:
+            pass
 
     def _apply_move(self):
         self._move_job = None
@@ -329,6 +493,9 @@ class Overlay:
         self.top_var = tk.BooleanVar(value=self.topmost)
         m.add_checkbutton(label="总在最前", variable=self.top_var,
                           command=self.toggle_top)
+        self.tr_var = tk.BooleanVar(value=self.transparent)
+        m.add_checkbutton(label="透明穿透模式（F8 切换交互）",
+                          variable=self.tr_var, command=self.toggle_trans)
         m.add_separator()
         m.add_command(label="打开网页地图", command=self.open_web)
         m.add_command(label="清除导航目标", command=self.clear_target)
@@ -376,15 +543,11 @@ class Overlay:
         self.topmost = bool(self.top_var.get())
         self.root.attributes("-topmost", self.topmost)
 
-    def reset_pos(self):
-        self.root.geometry("+%d+%d" % self.default_pos(MAP, BAR + MAP + INFO))
+    def toggle_trans(self):
+        self.set_transparent(bool(self.tr_var.get()))
 
-    def save_pos(self):
-        try:
-            with open(POS_FILE, "w", encoding="utf-8") as f:
-                json.dump({"x": self.root.winfo_x(), "y": self.root.winfo_y()}, f)
-        except Exception:
-            pass
+    def reset_pos(self):
+        self.root.geometry("+%d+%d" % self.default_pos(self.mw, BAR + self.mw + INFO))
 
     def quit(self):
         self.save_pos()
@@ -515,12 +678,12 @@ class Overlay:
         zn = 1.0 / (1 << (7 - native))          # native px per map px (<=1)
         zs = float(1 << (self.zoom - 7)) if self.zoom >= 7 \
             else 1.0 / (1 << (7 - self.zoom))   # window px per map px
-        sub = MAP // over                       # base-map canvas, native px
+        sub = self.mw // over                       # base-map canvas, native px
         tspan = 256 * (1 << (7 - native))       # map px per tile at native zoom
 
         def to_px(x, y):
             """map px (x east, y south) -> window px."""
-            return ((x - mx) * zs + MAP / 2.0, (y - my) * zs + MAP / 2.0)
+            return ((x - mx) * zs + self.mw / 2.0, (y - my) * zs + self.mw / 2.0)
 
         view = Image.new("RGBA", (sub, sub), (14, 20, 28, 255))
         # tile grid coords covering the viewport
@@ -541,7 +704,7 @@ class Overlay:
                     view.paste((10, 14, 20, 255),
                                (ox, oy, ox + int(tspan * zn), oy + int(tspan * zn)))
         if over > 1:
-            view = view.resize((MAP, MAP), Image.LANCZOS)
+            view = view.resize((self.mw, self.mw), Image.LANCZOS)
 
         d = ImageDraw.Draw(view)
         # every pin of an enabled category; done-filter comes from the web page
@@ -550,7 +713,7 @@ class Overlay:
                 continue
             for x, y, _n in pins:
                 sx, sy = to_px(x, y)
-                if not (-8 <= sx <= MAP + 8 and -8 <= sy <= MAP + 8):
+                if not (-8 <= sx <= self.mw + 8 and -8 <= sy <= self.mw + 8):
                     continue
                 done = self.is_done(x, y) if cat in DONE_CATS else False
                 if self.done_filter == "done" and not done:
@@ -574,7 +737,7 @@ class Overlay:
         pts = [to_px(x, y) for x, y in self.trail]
         if len(pts) > 1:
             d.line(pts, fill=(231, 76, 60, 150), width=2)
-        c = MAP / 2.0
+        c = self.mw / 2.0
         if self.target:                       # guide line to the next target
             _nm, _metres, _arrow, tx, ty = self.target
             sx, sy = to_px(tx, ty)
@@ -583,7 +746,7 @@ class Overlay:
                       outline=(255, 183, 3, 255), width=2)
         d.ellipse([c - 6, c - 6, c + 6, c + 6], fill=(231, 76, 60, 255),
                   outline=(255, 255, 255, 240), width=2)
-        d.rectangle([0, 0, MAP - 1, MAP - 1], outline=(90, 110, 130, 200))
+        d.rectangle([0, 0, self.mw - 1, self.mw - 1], outline=(90, 110, 130, 200))
         dt = time.time() - t0
         if dt > SLOW_FRAME:
             log("slow render: %.3fs  z=%d cache=%d"
@@ -657,7 +820,7 @@ class Overlay:
                 self._msg = "offline"
                 self.canvas.delete("all")
                 self.canvas.create_text(
-                    MAP // 2, MAP // 2, fill="#8fa8bd",
+                    self.mw // 2, self.mw // 2, fill="#8fa8bd",
                     font=("Microsoft YaHei UI", 9), justify="center",
                     text="等待 start.py 服务…\n\n先运行：\npython live/start.py")
                 self.info.config(text="未连接 http://127.0.0.1:%d/pos" % PORT)
@@ -761,3 +924,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
