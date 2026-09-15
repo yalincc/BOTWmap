@@ -207,19 +207,19 @@ def main():
         n_ko += 1
 
     # ---- memories: IsGet_MemoryPhoto_000..012 = 主线照片1~13 ----
-    # 地图标记名带「(照片N)」;flag 索引 i ↔ 照片(i+1)。(memory_no 是游戏回忆
-    # 编号 1~18,跨主线+英杰+大师之剑,不是照片编号,不能用作映射键。)
-    mem_mk = [x for x in markers if x["cat"] == "memory"]
-    by_photo = {}
-    for mk in mem_mk:
-        m = re.search(r"照片(\d+)", mk.get("name") or "")
-        if m:
-            by_photo[int(m.group(1))] = mk
+    # 地图标记名只保留「回忆#N」(游戏内连续编号)，不再带「(照片N)」后缀。
+    # 照片N ↔ 回忆#N 是固定映射(Impa 相册顺序 ≠ 游戏内回忆连续编号):
+    #   照片1→#1  照片2→#3  照片3→#5  照片4→#7  照片5→#8  照片6→#9  照片7→#11
+    #   照片8→#12 照片9→#13 照片10→#14 照片11→#15 照片12→#16 照片13→#17
+    PHOTO_TO_MEMNO = {1:1, 2:3, 3:5, 4:7, 5:8, 6:9, 7:11, 8:12, 9:13, 10:14, 11:15, 12:16, 13:17}
+    mem_mk = {int(re.search(r"#(\d+)", x.get("name") or "").group(1)): x
+              for x in markers if x["cat"] == "memory" and re.search(r"#(\d+)", x.get("name") or "")}
     n_mem = 0
     for i in range(13):
-        mk = by_photo.get(i + 1)
+        photo = i + 1
+        mk = mem_mk.get(PHOTO_TO_MEMNO[photo])
         if mk is None:
-            print("  [memory] no marker for photo", i + 1, file=sys.stderr)
+            print("  [memory] no marker for photo", photo, "(mem#%d)" % PHOTO_TO_MEMNO[photo], file=sys.stderr)
             continue
         h = crc32("IsGet_MemoryPhoto_%03d" % i)
         points.append({
