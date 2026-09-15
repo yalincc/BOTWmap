@@ -1,4 +1,4 @@
-# 灵墟地图追踪助手（BOTW Live · Go 版）
+# BotwNavi（BOTW Live · Go 版）
 
 为《旷野之息》互动地图 [https://botw.yalin.site/](https://botw.yalin.site/) 提供**实时角色追踪**的本地小工具（单 exe，约 7MB，零依赖）。
 
@@ -11,7 +11,7 @@
 ## 使用方法（三步）
 
 1. 启动 Ryujinx 并进入游戏（进到可操作角色）；
-2. 双击 `灵墟地图追踪助手.exe`；
+2. 双击 `BotwNavi.exe`；
 3. 等窗口显示 `serving` 后，打开（或自动打开）https://botw.yalin.site/ —— 地图左上角状态胶囊从「离线」变为「◐ 定位中」再变为绿色坐标即已连接。
 
 > 第一次运行会花几秒扫描内存定位（窗口里有日志），之后秒连（记忆了偏移）。
@@ -28,7 +28,7 @@
 ## 命令行参数
 
 ```
-灵墟地图追踪助手.exe [端口] [--no-open] [--no-save]
+BotwNavi.exe [端口] [--no-open] [--no-save]
 ```
 
 | 参数 | 说明 |
@@ -55,7 +55,7 @@
 需要 Go 1.21+（Windows amd64）：
 
 ```bat
-:: 一键构建（产出 灵墟地图追踪助手.exe）
+:: 一键构建（产出 BotwNavi.exe）
 build.bat
 ```
 

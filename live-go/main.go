@@ -1,4 +1,4 @@
-// 灵墟地图追踪助手（BOTW live 追踪服务，Go 版）
+// BotwNavi（BOTW live 追踪服务，Go 版）
 //
 // 用途：在本地为在线互动地图 https://botw.yalin.site/ 提供实时角色追踪。
 // 原理：读 Ryujinx 模拟器进程内存定位玩家坐标 → HTTP API（127.0.0.1:8766）
@@ -23,7 +23,7 @@ import (
 const mapURL = "https://botw.yalin.site/"
 
 func main() {
-	setConsoleTitle("灵墟地图追踪助手 · BOTW Live")
+	setConsoleTitle("BotwNavi · BOTW Live")
 
 	port := 8766
 	autoOpen := true
@@ -44,7 +44,7 @@ func main() {
 	}
 
 	fmt.Println("=" + strings.Repeat("=", 61))
-	fmt.Println(" 灵墟地图追踪助手 · BOTW live - auto locating player position")
+	fmt.Println(" BotwNavi · BOTW live - auto locating player position")
 	fmt.Println("=" + strings.Repeat("=", 61))
 
 	pid := findPid("ryujinx")

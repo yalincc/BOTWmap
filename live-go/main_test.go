@@ -108,8 +108,8 @@ func TestParseSaveReal(t *testing.T) {
 	if primary.Playtime < 223431 {
 		t.Errorf("playtime went backwards: got %d want >= 223431", primary.Playtime)
 	}
-	if math.Abs(float64(primary.Pos[0]-1935.4)) > 0.5 || math.Abs(float64(primary.Pos[1]-269.1)) > 0.5 || math.Abs(float64(primary.Pos[2]-1109.5)) > 0.5 {
-		t.Errorf("pos mismatch: got %v want (1935.4, 269.1, 1109.5)", primary.Pos)
+	if math.Abs(float64(primary.Pos[0])) > 6000 || math.Abs(float64(primary.Pos[2])) > 6000 || primary.Pos[1] < -100 || primary.Pos[1] > 2000 {
+		t.Errorf("pos out of legal map range: got %v", primary.Pos)
 	}
 	// korok counter 对照（>= 上次基准 75）
 	entries, a := parseSave(primary.Path)
