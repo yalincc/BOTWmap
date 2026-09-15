@@ -133,6 +133,8 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		} else {
 			writeJSON(w, map[string]any{"ok": false})
 		}
+	case "/progress":
+		s.handleProgress(w, r)
 	default:
 		writeJSON(w, map[string]any{"ok": false, "error": "unknown endpoint"})
 	}
@@ -160,7 +162,31 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 	configMu.Lock()
 	payload["config"] = cfg
 	configMu.Unlock()
+	if progress != nil {
+		_, _, gen := progress.snapshot()
+		payload["progressGen"] = gen
+	}
 	writeJSON(w, payload)
+}
+
+// handleProgress 返回最新收集进度（与 Python progress_points.json 同构）。
+// 参考表缺失或尚无存档时返回 503，前端据此降级到本地/静态路径。
+func (s *server) handleProgress(w http.ResponseWriter, r *http.Request) {
+	if progress == nil {
+		writeJSON(w, map[string]any{"ok": false})
+		return
+	}
+	ok, body, _ := progress.snapshot()
+	if !ok || len(body) == 0 {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		corsHeaders(w)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte(`{"ok":false}`))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	corsHeaders(w)
+	w.Write(body)
 }
 
 func (s *server) handleTargetPost(w http.ResponseWriter, r *http.Request) {

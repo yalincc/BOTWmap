@@ -22,7 +22,7 @@ const LIVE = (() => {
   let lastPosKey = null;      // 玩家位置指纹（防无效重绘）
   let lastDrawKey = null;
   let cfgSent = null;         // 已同步给服务的类别签名
-  let progLoading = false;
+  let progLoading = false, lastProgFetch = 0;
   const K_FOLLOW = 'botwmap.follow.v1';
   let follow = false;
   try { follow = localStorage.getItem(K_FOLLOW) !== '0'; } catch (e) {}
@@ -84,6 +84,11 @@ const LIVE = (() => {
         if (follow) { centerOnPlayer(); }
       }
       syncConfig();
+      // 进度代次变化（游戏内保存 → 存档更新）→ 立即重新拉取收集进度
+      if (typeof p.progressGen === 'string' && p.progressGen && p.progressGen !== map.live.progGen) {
+        const now = Date.now();
+        if (now - lastProgFetch > 3000) { lastProgFetch = now; loadProgress(); }
+      }
     } else {
       lastPosKey = null;
     }
@@ -131,55 +136,63 @@ const LIVE = (() => {
   }
 
   /* ---------- 存档进度加载（标点就近匹配 + 计数） ---------- */
+  // 优先从本地追踪服务 /progress 实时拉取（游戏内保存后自动更新）；
+  // 服务不可用时降级到静态文件（旧 Python 版/本地构建产物）。
   async function loadProgress() {
     if (progLoading) return;
     progLoading = true;
     try {
-      const r = await fetch('../data/progress_points.json?t=' + Date.now(), { cache: 'no-store' });
-      if (!r.ok) return;
-      const j = await r.json();
-      const points = j.points || [];
-      // 已完成点的空间网格（128px 格）
-      const CELL = 128;
-      const grid = new Map();
-      for (const p of points) {
-        if (!p.done) continue;
-        const gk = Math.floor(p.x / CELL) + '_' + Math.floor(p.y / CELL);
-        if (!grid.has(gk)) grid.set(gk, []);
-        grid.get(gk).push(p);
+      const r = await fetch(LIVE_API + '/progress?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) { applyProgress(await r.json()); }
+      else {
+        const r2 = await fetch('../data/progress_points.json?t=' + Date.now(), { cache: 'no-store' });
+        if (r2.ok) applyProgress(await r2.json());
       }
-      // 每个可收集标注：附近 8px 内存在同类型存档点 → 存档已完成
-      const done = new Set();
-      for (const mk of map.markers) {
-        const t = DONE_TYPES[mk.cat];
-        if (!t) continue;
-        const cx = Math.floor(mk.px[0] / CELL), cy = Math.floor(mk.px[1] / CELL);
-        let hit = false;
-        for (let dx = -1; dx <= 1 && !hit; dx++) {
-          for (let dy = -1; dy <= 1 && !hit; dy++) {
-            const arr = grid.get((cx + dx) + '_' + (cy + dy));
-            if (!arr) continue;
-            for (const p of arr) {
-              if (p.t === t && Math.hypot(p.x - mk.px[0], p.y - mk.px[1]) <= 8) {
-                hit = true; break;
-              }
+    } catch (e) { /* 离线时静默 */ } finally { progLoading = false; }
+  }
+
+  function applyProgress(j) {
+    const points = j.points || [];
+    // 已完成点的空间网格（128px 格）
+    const CELL = 128;
+    const grid = new Map();
+    for (const p of points) {
+      if (!p.done) continue;
+      const gk = Math.floor(p.x / CELL) + '_' + Math.floor(p.y / CELL);
+      if (!grid.has(gk)) grid.set(gk, []);
+      grid.get(gk).push(p);
+    }
+    // 每个可收集标注：附近 8px 内存在同类型存档点 → 存档已完成
+    const done = new Set();
+    for (const mk of map.markers) {
+      const t = DONE_TYPES[mk.cat];
+      if (!t) continue;
+      const cx = Math.floor(mk.px[0] / CELL), cy = Math.floor(mk.px[1] / CELL);
+      let hit = false;
+      for (let dx = -1; dx <= 1 && !hit; dx++) {
+        for (let dy = -1; dy <= 1 && !hit; dy++) {
+          const arr = grid.get((cx + dx) + '_' + (cy + dy));
+          if (!arr) continue;
+          for (const p of arr) {
+            if (p.t === t && Math.hypot(p.x - mk.px[0], p.y - mk.px[1]) <= 8) {
+              hit = true; break;
             }
           }
         }
-        if (hit) done.add(mk.id);
       }
-      const changed = map.liveDone.size !== done.size;
-      map.liveDone = done;
-      // 吸收式合并：存档已收集 → 写回本地完成集合（持久化，离线打开也保留；以存档为准）
-      let grew = false;
-      for (const id of done) {
-        if (!map.doneSet.has(id)) { map.doneSet.add(id); grew = true; }
-      }
-      if (grew) UI.persistDone();
-      map.live.counts = j.counts || null;
-      map.live.progGen = j.generated || '';
-      if (changed || grew) { map.draw(); UI.renderStats(); UI.updateLayerList(); }
-    } catch (e) { /* 离线时静默 */ } finally { progLoading = false; }
+      if (hit) done.add(mk.id);
+    }
+    const changed = map.liveDone.size !== done.size;
+    map.liveDone = done;
+    // 吸收式合并：存档已收集 → 写回本地完成集合（持久化，离线打开也保留；以存档为准）
+    let grew = false;
+    for (const id of done) {
+      if (!map.doneSet.has(id)) { map.doneSet.add(id); grew = true; }
+    }
+    if (grew) UI.persistDone();
+    map.live.counts = j.counts || null;
+    map.live.progGen = j.generated || '';
+    if (changed || grew) { map.draw(); UI.renderStats(); UI.updateLayerList(); }
   }
 
   /* ---------- 视图跟随玩家 ---------- */

@@ -61,6 +61,8 @@ func main() {
 	}
 
 	loadConfig()
+	progress = newProgressWatcher("")
+	go progress.loop()
 
 	fmt.Println("  stage 0: remembered offsets (no scan needed) ...")
 	if a, v, ok := tryOffsets(); ok {
