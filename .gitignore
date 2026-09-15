@@ -19,8 +19,9 @@ data/map_config.json
 # 本地生成/个人进度（live 服务热重建；部署版不需要个人快照）
 data/progress_points.json
 
-# live-go 运行时数据与分发物（不入库）
-live-go/data/
+# live-go 运行时配置不入库；分发物不入库；收集进度参考表入库（/progress 必需）
+live-go/data/*
+!live-go/data/progress_points.json
 live-go/dist/
 
 # 编辑器/构建备份

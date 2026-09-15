@@ -16,6 +16,15 @@
 
 > 第一次运行会花几秒扫描内存定位（窗口里有日志），之后秒连（记忆了偏移）。
 
+## 收集进度自动同步（v2）
+
+除了角色位置，本工具还会**自动同步存档收集进度**（神庙 / 希卡塔 / 克洛格 / 回忆 / 神兽 已收集项在地图上自动变灰、统计面板实时计数）：
+
+- 每 2 秒检查 Ryujinx 存档目录，**游戏内保存后约 1~2 秒**地图自动更新，无需重启、无需重读档；
+- 注意游戏机制：BOTW 拿到果实 / 神庙后**不会立即写存档文件**，需要游戏内触发一次保存（菜单存档、传送、睡觉、自动存档等），保存后即自动同步；
+- 原理：服务端解析存档 flag 表（对照随包分发的 `data/progress_points.json` 参考表，1068 条），通过 `/progress` 接口实时输出；前端检测到进度代次变化立即刷新；
+- 随包文件：`data/progress_points.json`（参考表，**必须与 exe 放在同一目录结构下**，缺失时进度同步自动停用并提示）。
+
 ## 命令行参数
 
 ```
@@ -63,10 +72,12 @@ live-go/
   winapi.go          Windows API（进程/内存）
   locate.go          内存扫描定位
   savefile.go        存档解析（锚点）
+  progress.go        收集进度同步（存档监听 + /progress）
   known.go           known_addrs.json 快路径
   watch.go           状态机（轮询/看门狗/校验）
-  server.go          HTTP API（CORS/PNA）
+  server.go          HTTP API（CORS/PNA + /progress）
   main_test.go       单元测试
   build.bat          构建脚本
   known_addrs.json   已记忆偏移（随包分发，首次也能快连）
+  data/progress_points.json  收集进度参考表（随包分发，必须保留）
 ```
