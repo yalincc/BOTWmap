@@ -126,18 +126,13 @@ const UI = (() => {
     return [d, t];
   }
   function renderStats() {
-    const total = map.data.markers.length;
-    const done = map.doneSet.size;
     const focus = ['shrine', 'tower', 'beast', 'seed', 'memory', 'treasure'];
     let html = `<h4>收集进度</h4>`;
-    // 存档同步状态行（存档 flag 类别的真实进度，来自 live 服务；离线时不显示）
+    // 存档同步状态行：live 服务已载入存档进度 或 本会话上传过存档（离线且未上传时不显示）
     const lc = map.live && map.live.counts;
-    if (lc) {
-      const s = lc.shrine || [0, 0], t = lc.tower || [0, 0], k = lc.korok || [0, 0];
-      html += `<div class="stat-sync">存档已同步 ✓ 神庙 ${s[0]}/${s[1]} · 希卡塔 ${t[0]}/${t[1]} · 克洛格 ${k[0]}/${k[1]}</div>`;
+    if (lc || window.__saveUploaded) {
+      html += `<div class="stat-sync">存档已同步 ✓</div>`;
     }
-    html += `<div class="stat-row"><span class="k">全部标注</span><span class="v">${done} / ${total}</span></div>
-      <div class="stat-bar"><i style="width:${pct(done, total)}"></i></div>`;
     for (const key of focus) {
       const cat = map.data.categories.find(c => c.key === key);
       if (!cat) continue;
@@ -259,8 +254,8 @@ const UI = (() => {
     if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row">任务<b>' + esc(ex.quest_en) + '</b></div>';
     if (mk.cat === 'objective' && ex.sub) extra += '<div class="row">目标<b>' + esc(ex.sub) + '</b></div>';
     if (mk.cat === 'beast') extra += '<div class="row">类型<b>神兽·讨伐</b></div>';
-    // 存档同步状态（神庙 / 塔 / 克洛格有存档 flag）
-    if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed') {
+    // 存档同步状态（神庙 / 塔 / 克洛格 / 主线回忆 / 神兽 有存档 flag）
+    if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed' || mk.cat === 'memory' || mk.cat === 'beast') {
       if (liveDone) extra += '<div class="row">存档<b style="color:#7dffa0">游戏内已收集 ✓</b></div>';
       else if (map.live && map.live.counts) extra += '<div class="row">存档<b style="color:#e8b04a">游戏内未收集</b></div>';
     }

@@ -64,6 +64,11 @@
 
     <div id="statsPanel" class="stats"></div>
 
+    <div class="save-upload">
+      <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）">📂 从存档加载进度…</button>
+      <input type="file" id="saveFile" accept=".sav" hidden>
+    </div>
+
     <footer class="side-foot">
       <p>数据整理自 gamertw.com 与 MrCheeze/botw-waypoint-map（已换算为游戏坐标）。</p>
       <p>完成进度自动保存在本机浏览器中。</p>
@@ -211,10 +216,13 @@
 <script src="js/data.js?v=2"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=6"></script>
-<script src="js/ui.js?v=5"></script>
+<script src="js/ui.js?v=7"></script>
 <script src="js/main.js?v=5"></script>
-<script src="js/live.js?v=3"></script>
+<script src="js/live.js?v=4"></script>
+<script src="js/save_upload.js?v=2"></script>
 </body>
 </html>
+
+
 
 

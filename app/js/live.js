@@ -26,7 +26,7 @@ const LIVE = (() => {
   try { follow = localStorage.getItem(K_FOLLOW) !== '0'; } catch (e) {}
 
   const CAT_CN = {};                        // 类别 key -> 中文名
-  const DONE_TYPES = { shrine: 'shrine', tower: 'tower', seed: 'korok' };
+  const DONE_TYPES = { shrine: 'shrine', tower: 'tower', seed: 'korok', memory: 'memory', beast: 'beast' };
 
   function init(m) {
     map = m;

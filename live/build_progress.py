@@ -157,7 +157,7 @@ def main():
         done = ch is not None and entries.get(ch, 0) != 0
         entered = entries.get(s["hash"], 0) != 0
         points.append({
-            "t": "shrine", "hash": s["hash"],
+            "t": "shrine", "hash": s["hash"], "done_hash": ch,
             "en": s["name"], "cn": mk.get("name") or mk.get("en") or "",
             "x": round(mk["px"][0], 3), "y": round(mk["px"][1], 3),
             "done": done, "entered": entered, "dlc": s["dlc"],
@@ -206,10 +206,59 @@ def main():
         })
         n_ko += 1
 
+    # ---- memories: IsGet_MemoryPhoto_000..012 = 主线照片1~13 ----
+    # 地图标记名带「(照片N)」;flag 索引 i ↔ 照片(i+1)。(memory_no 是游戏回忆
+    # 编号 1~18,跨主线+英杰+大师之剑,不是照片编号,不能用作映射键。)
+    mem_mk = [x for x in markers if x["cat"] == "memory"]
+    by_photo = {}
+    for mk in mem_mk:
+        m = re.search(r"照片(\d+)", mk.get("name") or "")
+        if m:
+            by_photo[int(m.group(1))] = mk
+    n_mem = 0
+    for i in range(13):
+        mk = by_photo.get(i + 1)
+        if mk is None:
+            print("  [memory] no marker for photo", i + 1, file=sys.stderr)
+            continue
+        h = crc32("IsGet_MemoryPhoto_%03d" % i)
+        points.append({
+            "t": "memory", "hash": h,
+            "en": mk.get("en") or "", "cn": mk.get("name") or "",
+            "x": round(mk["px"][0], 3), "y": round(mk["px"][1], 3),
+            "done": entries.get(h, 0) != 0,
+        })
+        n_mem += 1
+
+    # ---- beasts: Clear_Remains*（神兽内部名 Remains） ----
+    beast_mk = {x.get("en"): x for x in markers if x["cat"] == "beast"}
+    beast_flags = [
+        ("Divine Beast Vah Ruta", "Clear_RemainsWater"),
+        ("Divine Beast Vah Medoh", "Clear_RemainsWind"),
+        ("Divine Beast Vah Rudania", "Clear_RemainsFire"),
+        ("Divine Beast Vah Naboris", "Clear_RemainsElectric"),
+    ]
+    n_beast = 0
+    for en, fl in beast_flags:
+        mk = beast_mk.get(en)
+        if mk is None:
+            print("  [beast] no marker:", en, file=sys.stderr)
+            continue
+        h = crc32(fl)
+        points.append({
+            "t": "beast", "hash": h,
+            "en": en, "cn": mk.get("name") or en,
+            "x": round(mk["px"][0], 3), "y": round(mk["px"][1], 3),
+            "done": entries.get(h, 0) != 0,
+        })
+        n_beast += 1
+
     # ---- summary ----
     n_sh_list = [p for p in points if p["t"] == "shrine"]
     n_tw_list = [p for p in points if p["t"] == "tower"]
     n_ko_list = [p for p in points if p["t"] == "korok"]
+    n_mem_list = [p for p in points if p["t"] == "memory"]
+    n_beast_list = [p for p in points if p["t"] == "beast"]
     obj = {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
         "save": path,
@@ -219,6 +268,8 @@ def main():
             "shrine": [sum(1 for p in n_sh_list if p["done"]), len(n_sh_list)],
             "tower": [sum(1 for p in n_tw_list if p["done"]), len(n_tw_list)],
             "korok": [sum(1 for p in n_ko_list if p["done"]), len(n_ko_list)],
+            "memory": [sum(1 for p in n_mem_list if p["done"]), len(n_mem_list)],
+            "beast": [sum(1 for p in n_beast_list if p["done"]), len(n_beast_list)],
         },
         "points": points,
     }
@@ -228,13 +279,16 @@ def main():
     print("wrote %s" % OUT)
     print("  save   : %s  playtime=%d  korokCounter=%d"
           % (path, meta["playtime"], meta["korok_counter"]))
-    print("  points : %d  (shrine %d, tower %d, korok %d)"
-          % (len(points), len(n_sh_list), len(n_tw_list), len(n_ko_list)))
+    print("  points : %d  (shrine %d, tower %d, korok %d, memory %d, beast %d)"
+          % (len(points), len(n_sh_list), len(n_tw_list), len(n_ko_list),
+             len(n_mem_list), len(n_beast_list)))
     print("  shrine name match: %d/%d" % (name_hits, len(shrine_objs)))
-    print("  done   : shrines %d/%d, towers %d/%d, koroks %d/%d (flags)"
+    print("  done   : shrines %d/%d, towers %d/%d, koroks %d/%d, memories %d/%d, beasts %d/%d (flags)"
           % (obj["counts"]["shrine"][0], obj["counts"]["shrine"][1],
              obj["counts"]["tower"][0], obj["counts"]["tower"][1],
-             obj["counts"]["korok"][0], obj["counts"]["korok"][1]))
+             obj["counts"]["korok"][0], obj["counts"]["korok"][1],
+             obj["counts"]["memory"][0], obj["counts"]["memory"][1],
+             obj["counts"]["beast"][0], obj["counts"]["beast"][1]))
     entered = sum(1 for p in n_sh_list if p["entered"])
     print("  entered: shrines %d/%d" % (entered, len(n_sh_list)))
     return 0

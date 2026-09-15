@@ -69,7 +69,7 @@ ARROWS = ("↑", "↗", "→", "↘", "↓", "↙", "←", "↖")
 # The overlay is a PURE DISPLAY: every setting lives on the web page and is
 # polled from /pos -> config.  Categories are matched by their Chinese name
 # (the `cn` field in app/js/data.js).
-DONE_CATS = {"神庙", "希卡塔", "克洛格果实"}   # have a save-file flag
+DONE_CATS = {"神庙", "希卡塔", "克洛格果实", "回忆影片", "神兽"}   # have a save-file flag
 DEF_CATS = ["神庙", "希卡塔", "克洛格果实"]    # if /config is empty
 CAT_COLOUR = {                                   # per-category dot colour
     "神庙": (255, 183, 3), "希卡塔": (255, 209, 102),

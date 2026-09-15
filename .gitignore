@@ -15,3 +15,6 @@ Desktop.ini
 # source 下临时截图（调试产物，不入库）
 source/*.png
 data/map_config.json
+
+# 本地生成/个人进度（live 服务热重建；部署版不需要个人快照）
+data/progress_points.json
