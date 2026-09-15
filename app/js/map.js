@@ -71,8 +71,9 @@ class BotwMap {
     this._buildIndex();
     this._loadIcons();
     this._bindEvents();
-    // 等首帧布局完成后再初始化视口（避免 canvas 布局未就绪时 getBoundingClientRect 为 0）
-    requestAnimationFrame(() => this._resize());
+    // 等两帧确保 CSS 布局完成；再监听 load 事件兜底（rAF 时 flex 布局可能尚未算高）
+    requestAnimationFrame(() => requestAnimationFrame(() => this._resize()));
+    window.addEventListener('load', () => this._resize(), { once: true });
   }
 
   /* ---------- 空间索引：256px 网格 ---------- */

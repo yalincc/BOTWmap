@@ -12,6 +12,7 @@
   try { sideCollapsed = localStorage.getItem(K_SIDE_COLLAPSE) === '1'; } catch (e) {}
   function applySideCollapsed(c) {
     sidebar.classList.toggle('collapsed', c);
+    document.body.classList.toggle('sidebar-collapsed', c);
     sideCollapseBtn.textContent = c ? '展开 ›' : '‹ 收起';
     sideCollapseBtn.title = c ? '展开侧栏' : '收起侧栏';
   }
@@ -79,9 +80,7 @@
     sideCollapsed = !sideCollapsed;
     try { localStorage.setItem(K_SIDE_COLLAPSE, sideCollapsed ? '1' : '0'); } catch (e) {}
     applySideCollapsed(sideCollapsed);
-    // 同步 resize：class 切换后 getBoundingClientRect 会强制 reflow，立即修正 canvas backing store，避免旧画面被拉伸一帧
-    clearTimeout(sideCollapseTimer);
-    resizeCanvasKeepView();
+    // 窗帘模式：侧栏 absolute 浮层滑出/盖入，地图容器宽度不变，无需 resize canvas
   });
 
   // 提示

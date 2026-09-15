@@ -46,29 +46,31 @@ body {
 .tool.active { background: #1f4a2a; border-color: var(--accent); color: #d8ffe2; }
 .tool .ico { font-size: 15px; }
 
-/* ---------- 甯冨眬 ---------- */
-#app { flex-direction: row; flex-wrap: wrap; }
-#topbar { width: 100%; }
+/* ---------- 布局 ---------- */
+/* 侧栏 absolute 浮层后，#app 保持 column：顶栏在上，地图区占满剩余高度 */
+#app { flex-direction: column; }
+#topbar { width: 100%; flex: none; }
 #sidebar {
-  width: 300px; flex: 0 0 300px; background: var(--panel);
+  width: 300px; flex: none; background: var(--panel);
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
-  height: calc(100vh - 58px); z-index: 5;
-  position: relative;
+  position: absolute; top: 58px; left: 0; bottom: 0; z-index: 10;
 }
-#sidebar.collapsed { width: 0; flex-basis: 0; border-right-color: transparent; overflow: hidden; }
-/* 桌面端侧栏折叠把手：贴在地图区左缘、搜索行高度，文字按钮 */
+/* 窗帘模式：收起时整条侧栏滑出屏幕左侧，地图容器始终全宽、零 resize，开关不影响地图视图 */
+#sidebar.collapsed { transform: translateX(-100%); border-right-color: transparent; }
+/* 桌面端侧栏折叠把手：贴在地图区左缘、搜索行高度，文字按钮；展开时贴侧栏右缘，收起时贴屏幕左缘 */
 #sideCollapse {
   display: none;
-  position: absolute; left: 0; top: 28px;
+  position: absolute; left: 300px; top: 28px;
   padding: 5px 9px; height: auto; width: auto;
   align-items: center; justify-content: center;
   background: var(--panel); border: 1px solid var(--border); border-left: none;
-  border-radius: 0 8px 8px 0; color: var(--text-dim); cursor: pointer; z-index: 6;
+  border-radius: 0 8px 8px 0; color: var(--text-dim); cursor: pointer; z-index: 11;
   font-size: 12px; line-height: 1; white-space: nowrap;
 }
 @media (min-width: 761px) {
   #sideCollapse { display: flex; }
 }
+body.sidebar-collapsed #sideCollapse { left: 0; }
 #sideCollapse:hover { color: var(--accent2); }
 /* 侧栏图层分组：探索收集单列；设施/敌人/任务两列 */
 .lg-group .lrows { display: block; }
