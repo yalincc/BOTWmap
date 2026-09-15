@@ -54,22 +54,29 @@ body {
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
   height: calc(100vh - 58px); z-index: 5;
   position: relative;
-  transition: width .22s ease, flex-basis .22s ease;
 }
 #sidebar.collapsed { width: 0; flex-basis: 0; border-right-color: transparent; overflow: hidden; }
-/* 桌面端侧栏折叠把手：贴在地图区左缘竖条，点击收起/展开侧栏 */
+/* 桌面端侧栏折叠把手：贴在地图区左缘、搜索行高度，文字按钮 */
 #sideCollapse {
   display: none;
-  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-  width: 14px; height: 64px; align-items: center; justify-content: center;
+  position: absolute; left: 0; top: 28px;
+  padding: 5px 9px; height: auto; width: auto;
+  align-items: center; justify-content: center;
   background: var(--panel); border: 1px solid var(--border); border-left: none;
   border-radius: 0 8px 8px 0; color: var(--text-dim); cursor: pointer; z-index: 6;
-  font-size: 15px; line-height: 1; padding: 0;
+  font-size: 12px; line-height: 1; white-space: nowrap;
 }
 @media (min-width: 761px) {
   #sideCollapse { display: flex; }
 }
 #sideCollapse:hover { color: var(--accent2); }
+/* 侧栏图层分组：探索收集单列；设施/敌人/任务两列 */
+.lg-group .lrows { display: block; }
+.lg-group[data-group="设施地点"] .lrows,
+.lg-group[data-group="敌人"] .lrows,
+.lg-group[data-group="任务"] .lrows {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px;
+}
 #mapArea { flex: 1; position: relative; height: calc(100vh - 58px); overflow: hidden; }
 #mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 #mapCanvas.measuring, #mapCanvas.pinning { cursor: crosshair; }
@@ -176,7 +183,7 @@ body {
 .side-foot { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--text-dim); line-height: 1.5; }
 
 /* ---------- 鍦板浘鎺т欢 ---------- */
-#zoomControls { position: absolute; right: 14px; bottom: 44px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+#zoomControls { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
 #zoomControls button {
   width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
   background: var(--panel); color: var(--text); font-size: 17px; cursor: pointer;
@@ -184,7 +191,7 @@ body {
 }
 #zoomControls button:hover { border-color: var(--accent); }
 #coordReadout {
-  position: absolute; right: 14px; bottom: 10px; z-index: 5;
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 36px; z-index: 5;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 10px; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums;
 }
@@ -195,7 +202,7 @@ body {
   box-shadow: 0 0 8px rgba(255, 209, 102, .35);
 }
 #liveStatus {
-  position: absolute; right: 14px; bottom: 44px; z-index: 5;
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; z-index: 5;
   background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 10px; font-size: 11.5px; font-variant-numeric: tabular-nums;
   max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -335,9 +342,9 @@ body {
   #infoCard { width: 240px; max-width: calc(100vw - 24px); }
   #shareBox { width: calc(100vw - 40px); max-width: 320px; }
   #pinForm { width: 190px; }
-  #zoomControls { right: 10px; bottom: 40px; }
-  #coordReadout { right: 10px; bottom: 8px; font-size: 11px; }
-  #liveStatus { right: 10px; bottom: 118px; font-size: 10.5px; max-width: 56vw; }
+  #zoomControls { right: 10px; bottom: 14px; }
+  #coordReadout { left: 50%; transform: translateX(-50%); bottom: 34px; font-size: 11px; }
+  #liveStatus { left: 50%; transform: translateX(-50%); bottom: 8px; font-size: 10.5px; max-width: 56vw; }
   #modeHint { font-size: 11.5px; padding: 5px 12px; }
   #toast { font-size: 12px; width: 86vw; text-align: center; }
 }

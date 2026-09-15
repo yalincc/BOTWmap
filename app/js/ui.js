@@ -26,6 +26,9 @@ const UI = (() => {
     const byKey = {};
     map.data.categories.forEach(c => byKey[c.key] = c);
     for (const [group, keys] of Object.entries(CAT_GROUP)) {
+      const grp = document.createElement('div');
+      grp.className = 'lg-group';
+      grp.dataset.group = group;
       const g = document.createElement('div');
       g.className = 'lg';
       const gLabel = document.createElement('span');
@@ -37,7 +40,11 @@ const UI = (() => {
       gBtn.title = '一键勾选 / 取消本组全部图层';
       g.appendChild(gLabel);
       g.appendChild(gBtn);
-      wrap.appendChild(g);
+      grp.appendChild(g);
+      const lrows = document.createElement('div');
+      lrows.className = 'lrows';
+      grp.appendChild(lrows);
+      wrap.appendChild(grp);
       for (const key of keys) {
         const cat = byKey[key];
         if (!cat) continue;
@@ -59,7 +66,7 @@ const UI = (() => {
           map.draw();
           renderStats();
         });
-        wrap.appendChild(row);
+        lrows.appendChild(row);
       }
     }
     // 分组一键勾选 / 清空

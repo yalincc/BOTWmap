@@ -12,7 +12,7 @@
   try { sideCollapsed = localStorage.getItem(K_SIDE_COLLAPSE) === '1'; } catch (e) {}
   function applySideCollapsed(c) {
     sidebar.classList.toggle('collapsed', c);
-    sideCollapseBtn.textContent = c ? '›' : '‹';
+    sideCollapseBtn.textContent = c ? '展开 ›' : '‹ 收起';
     sideCollapseBtn.title = c ? '展开侧栏' : '收起侧栏';
   }
   applySideCollapsed(sideCollapsed);
