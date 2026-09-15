@@ -79,8 +79,9 @@
     sideCollapsed = !sideCollapsed;
     try { localStorage.setItem(K_SIDE_COLLAPSE, sideCollapsed ? '1' : '0'); } catch (e) {}
     applySideCollapsed(sideCollapsed);
+    // 同步 resize：class 切换后 getBoundingClientRect 会强制 reflow，立即修正 canvas backing store，避免旧画面被拉伸一帧
     clearTimeout(sideCollapseTimer);
-    sideCollapseTimer = setTimeout(resizeCanvasKeepView, 240);
+    resizeCanvasKeepView();
   });
 
   // 提示

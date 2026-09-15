@@ -77,6 +77,22 @@ body {
 .lg-group[data-group="任务"] .lrows {
   display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px;
 }
+/* 两列分组：lrow 纵向两行——勾选框+名字一行，进度数字换行到下一行靠右（避免名字被挤成竖排） */
+.lg-group[data-group="设施地点"] .lrow,
+.lg-group[data-group="敌人"] .lrow,
+.lg-group[data-group="任务"] .lrow {
+  flex-wrap: wrap; column-gap: 6px; row-gap: 0; padding: 4px 6px; align-items: center;
+}
+.lg-group[data-group="设施地点"] .lrow .lname,
+.lg-group[data-group="敌人"] .lrow .lname,
+.lg-group[data-group="任务"] .lrow .lname {
+  flex: 1; white-space: nowrap; min-width: 0; overflow: hidden;
+}
+.lg-group[data-group="设施地点"] .lrow .lprog,
+.lg-group[data-group="敌人"] .lrow .lprog,
+.lg-group[data-group="任务"] .lrow .lprog {
+  flex-basis: 100%; min-width: 0; text-align: right; font-size: 10px;
+}
 #mapArea { flex: 1; position: relative; height: calc(100vh - 58px); overflow: hidden; }
 #mapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 #mapCanvas.measuring, #mapCanvas.pinning { cursor: crosshair; }
