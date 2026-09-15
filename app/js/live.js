@@ -102,7 +102,7 @@ const LIVE = (() => {
     const L = map.live;
     let txt, cls;
     if (!L.online) {
-      txt = '● 未连接 · 运行 live/start.py'; cls = 'off';
+      txt = '● 离线 · 可上传存档同步进度'; cls = 'off';
     } else if (!L.verified) {
       txt = '◐ 定位中… 请移动角色'; cls = 'warn';
     } else {
