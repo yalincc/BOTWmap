@@ -80,9 +80,11 @@
       <button id="zoomIn">＋</button>
       <button id="zoomOut">－</button>
       <button id="zoomFit" title="重置视图">⌂</button>
+      <button id="btnFollow" class="live-follow" title="开启后视图跟随玩家位置">🎯</button>
     </div>
 
     <div id="coordReadout">X: --  Z: --</div>
+    <div id="liveStatus" class="live-status off">● 未连接</div>
     <div id="modeHint" class="hidden"></div>
     <div id="toast"></div>
 
@@ -196,6 +198,7 @@
         <div id="cardExtra" class="row"></div>
       </div>
       <div class="card-actions">
+        <button id="cardNav" class="primary nav hidden">🧭 导航到这里</button>
         <button id="cardDone" class="primary">✓ 标记为已完成</button>
         <button id="cardUndone" class="ghost hidden">标记为未完成</button>
         <button id="cardDelPin" class="danger hidden">删除标记</button>
@@ -207,8 +210,9 @@
 
 <script src="js/data.js?v=2"></script>
 <script src="js/regions.js?v=rn4"></script>
-<script src="js/map.js?v=4"></script>
-<script src="js/ui.js?v=3"></script>
-<script src="js/main.js?v=4"></script>
+<script src="js/map.js?v=5"></script>
+<script src="js/ui.js?v=4"></script>
+<script src="js/main.js?v=5"></script>
+<script src="js/live.js?v=1"></script>
 </body>
 </html>

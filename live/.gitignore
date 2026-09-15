@@ -1,0 +1,14 @@
+# 大体积/可再生的研究素材与日志不入库
+_research/botw-unexplored-master/
+_research/*.log
+_research/*_capture.png
+_research/test_render_*.png
+__pycache__/
+
+# 机器相关的运行时状态（Ryujinx 内存偏移 / 浮窗位置 / 服务配置）
+known_addrs.json
+overlay_pos.json
+
+# 服务运行日志
+.workbuddy/
+live/_research/botw-unexplored.tar.gz

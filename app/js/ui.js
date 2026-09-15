@@ -126,6 +126,16 @@ const UI = (() => {
       html += `<div class="stat-row"><span class="k">${cat.cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
     }
+    // 存档进度（游戏内真实收集，来自 live 服务）
+    const lc = map.live && map.live.counts;
+    if (lc) {
+      html += `<h4>存档进度 · 游戏内</h4>`;
+      for (const [cn, k] of [['神庙', 'shrine'], ['希卡塔', 'tower'], ['克洛格', 'korok']]) {
+        const [d, t] = lc[k] || [0, 0];
+        html += `<div class="stat-row"><span class="k">${cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
+        html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
+      }
+    }
     $('statsPanel').innerHTML = html;
   }
   function pct(a, b, short) {
@@ -215,7 +225,8 @@ const UI = (() => {
     const cat = map.data.categories.find(c => c.key === mk.cat) || {};
     const cfg = CAT_CFG[mk.cat] || {};
     const [gx, gz] = map.gameCoord(mk.px);
-    const done = map.doneSet.has(mk.id);
+    const done = map.doneSet.has(mk.id) || (map.liveDone && map.liveDone.has(mk.id));
+    const liveDone = map.liveDone && map.liveDone.has(mk.id);
     $('cardCat').textContent = cat.cn || mk.cat;
     $('cardCat').style.borderColor = cfg.color;
     $('cardCat').style.color = cfg.color;
@@ -238,10 +249,18 @@ const UI = (() => {
     if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row">任务<b>' + esc(ex.quest_en) + '</b></div>';
     if (mk.cat === 'objective' && ex.sub) extra += '<div class="row">目标<b>' + esc(ex.sub) + '</b></div>';
     if (mk.cat === 'beast') extra += '<div class="row">类型<b>神兽·讨伐</b></div>';
+    // 存档同步状态（神庙 / 塔 / 克洛格有存档 flag）
+    if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed') {
+      if (liveDone) extra += '<div class="row">存档<b style="color:#7dffa0">游戏内已收集 ✓</b></div>';
+      else if (map.live && map.live.counts) extra += '<div class="row">存档<b style="color:#e8b04a">游戏内未收集</b></div>';
+    }
     $('cardExtra').innerHTML = extra;
     $('cardDone').classList.toggle('hidden', done);
     $('cardUndone').classList.toggle('hidden', !done);
     $('cardDelPin').classList.add('hidden');
+    // 导航按钮（live 层；离线时给出提示）
+    $('cardNav').classList.remove('hidden');
+    $('cardNav').onclick = () => LIVE.navigate(mk);
     $('cardDone').onclick = () => { map.doneSet.add(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name); };
     $('cardUndone').onclick = () => { map.doneSet.delete(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name); };
     positionCard();
@@ -262,6 +281,7 @@ const UI = (() => {
     $('cardDone').classList.add('hidden');
     $('cardUndone').classList.add('hidden');
     $('cardDelPin').classList.remove('hidden');
+    $('cardNav').classList.add('hidden');
     $('cardDelPin').onclick = () => {
       map.customMarkers = map.customMarkers.filter(x => x.id !== c.id);
       saveCustom(); hideInfo(); map.draw();

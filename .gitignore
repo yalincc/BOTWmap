@@ -14,3 +14,4 @@ Desktop.ini
 
 # source 下临时截图（调试产物，不入库）
 source/*.png
+data/map_config.json

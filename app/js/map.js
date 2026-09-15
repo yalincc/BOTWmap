@@ -285,6 +285,7 @@ class BotwMap {
     this._drawMeasure(ctx);
     this._drawMarkers(ctx);
     this._drawCustom(ctx);
+    this._drawLive(ctx);        // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入）
   }
 
   /* ---------- 地形/区域名（模仿游戏内地图：半透明底深字；字号随缩放放大，随缩放分级切换；高层出现后低层弱化保留） ---------- */
@@ -363,6 +364,12 @@ class BotwMap {
     return Math.min(Math.max(s, min), max);
   }
 
+  /* 是否已完成：本地标记完成 或 存档进度（live.js 注入的 liveDone） */
+  _mkDone(mk) {
+    return this.doneSet.has(mk.id) ||
+           (!!this.liveDone && this.liveDone.has(mk.id));
+  }
+
   _drawMarkers(ctx) {
     const vis = this._visibleMarkers();
     // 按绘制优先级排序，保证重要标记画在最上层
@@ -376,7 +383,7 @@ class BotwMap {
       const [sx, sy] = this.m2s(mk.px);
       if (sx < -60 || sy < -60 || sx > this.w + 60 || sy > this.h + 60) continue;
       const size = this._markerScreenSize(mk);
-      const done = this.doneSet.has(mk.id);
+      const done = this._mkDone(mk);
       this._glyph(ctx, mk, sx, sy, size, done);
       drawn++;
       // 标签
@@ -387,7 +394,7 @@ class BotwMap {
     this.lastStats = { drawn, labels: labelList.length, visible: vis.length };
     // 标签绘制
     for (const { mk, sx, sy, size } of labelList) {
-      const done = this.doneSet.has(mk.id);
+      const done = this._mkDone(mk);
       const label = mk.cat === 'seed' ? 'No.' + (mk.extra?.korok_no || mk.id.replace(/\D/g, '')) : mk.name;
       if (!label) continue;
       const fs = Math.min(Math.max(9, 11 * scale), 15);
