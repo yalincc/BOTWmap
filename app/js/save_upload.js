@@ -32,6 +32,25 @@ const SAVE_UPLOAD = (() => {
     });
     btn.addEventListener('click', () => input.click());
 
+    // 存档位置提示（? 问号）：悬停显示 / 点击切换（触屏友好）
+    const help = document.getElementById('suHelp');
+    const tip = document.getElementById('suTip');
+    if (help && tip) {
+      const show = () => tip.classList.remove('hidden');
+      const hide = () => tip.classList.add('hidden');
+      help.addEventListener('mouseenter', show);
+      help.addEventListener('mouseleave', hide);
+      help.addEventListener('focus', show);
+      help.addEventListener('blur', hide);
+      help.addEventListener('click', e => {
+        e.stopPropagation();
+        tip.classList.toggle('hidden');
+      });
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.save-upload')) hide();
+      });
+    }
+
     // 拖拽：整个侧栏都可以放存档文件
     const zone = document.getElementById('sidebar') || document;
     zone.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });

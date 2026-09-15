@@ -65,7 +65,17 @@
     <div id="statsPanel" class="stats"></div>
 
     <div class="save-upload">
-      <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）">📂 从存档加载进度…</button>
+      <div class="su-row">
+        <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）">📂 从存档加载进度…</button>
+        <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里">?</span>
+      </div>
+      <div class="su-tip hidden" id="suTip">
+        <b>存档文件：game_data.sav</b>
+        <div>Ryujinx（Switch 模拟器）：<br><code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code></div>
+        <div class="su-tip-sub">找不到时：Win+R 输入 <code>%APPDATA%\Ryujinx\bis\user\save</code>，进入游戏对应的 ID 目录找 <code>game_data.sav</code>。</div>
+        <div>Cemu（Wii U）：<br><code>mlc01\usr\save\00050000\101c9400\user\80000001\game_data.sav</code></div>
+        <div class="su-tip-sub">把文件拖进左侧面板，或点「从存档加载进度…」选择文件即可，文件不会上传。</div>
+      </div>
       <input type="file" id="saveFile" accept=".sav" hidden>
     </div>
 
@@ -219,9 +229,10 @@
 <script src="js/ui.js?v=7"></script>
 <script src="js/main.js?v=5"></script>
 <script src="js/live.js?v=5"></script>
-<script src="js/save_upload.js?v=2"></script>
+<script src="js/save_upload.js?v=3"></script>
 </body>
 </html>
+
 
 
 

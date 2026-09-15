@@ -138,10 +138,23 @@ body {
 .stat-row .v { color: var(--text); font-weight: 600; }
 .stat-sync { font-size: 10.5px; color: #7dffa0; margin: 2px 0 6px; letter-spacing: .3px; }
 /* 存档上传入口 */
-.save-upload { flex: 0 0 auto; padding: 0 14px 8px; border-top: 1px solid var(--border); }
-.save-upload button { width: 100%; padding: 6px 8px; font-size: 11.5px; color: var(--accent2);
+.save-upload { position: relative; flex: 0 0 auto; padding: 0 14px 8px; border-top: 1px solid var(--border); }
+.save-upload .su-row { display: flex; gap: 6px; align-items: center; }
+.save-upload button { flex: 1; padding: 6px 8px; font-size: 11.5px; color: var(--accent2);
   background: rgba(61,106,60,.18); border: 1px dashed rgba(125,255,160,.35); border-radius: 6px; cursor: pointer; }
 .save-upload button:hover { background: rgba(61,106,60,.32); }
+.su-help { flex: 0 0 auto; width: 18px; height: 18px; line-height: 16px; text-align: center;
+  font-size: 11px; font-weight: 700; color: var(--accent2); border: 1px solid rgba(125,255,160,.4);
+  border-radius: 50%; cursor: help; user-select: none; }
+.su-help:hover, .su-help:focus { background: rgba(61,106,60,.32); outline: none; }
+.su-tip { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 30;
+  background: #14200f; border: 1px solid rgba(125,255,160,.35); border-radius: 8px;
+  padding: 10px 12px; font-size: 11px; line-height: 1.65; color: var(--text);
+  box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.su-tip b { color: var(--accent2); }
+.su-tip code { font-family: Consolas, "Courier New", monospace; font-size: 10.5px;
+  color: #ffd166; background: rgba(0,0,0,.25); padding: 1px 4px; border-radius: 3px; word-break: break-all; }
+.su-tip .su-tip-sub { color: var(--text-dim); margin-top: 4px; }
 .stat-bar { height: 4px; background: #20301f; border-radius: 2px; margin: 2px 0 8px; overflow: hidden; }
 .stat-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; transition: width .3s; }
 .side-foot { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--text-dim); line-height: 1.5; }
