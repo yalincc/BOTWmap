@@ -106,7 +106,7 @@ const LIVE = (() => {
     } else if (!L.verified) {
       txt = '◐ 定位中… 请移动角色'; cls = 'warn';
     } else {
-      txt = '● ' + Math.round(L.gx) + ',' + Math.round(L.gz) +
+      txt = '● ' + Math.round(L.gx) + ',' + Math.round(L.gy) +
             (L.tdist != null ? ' · 目标 ' + Math.round(L.tdist) + 'm' : '');
       cls = 'on';
     }
