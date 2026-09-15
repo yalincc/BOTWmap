@@ -22,3 +22,6 @@ data/progress_points.json
 # live-go 运行时数据与分发物（不入库）
 live-go/data/
 live-go/dist/
+
+# 编辑器/构建备份
+*.exe~
