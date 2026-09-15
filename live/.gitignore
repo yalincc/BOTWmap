@@ -1,4 +1,4 @@
-# 大体积/可再生的研究素材与日志不入库
+﻿# 大体积/可再生的研究素材与日志不入库
 _research/botw-unexplored-master/
 _research/*.log
 _research/*_capture.png
@@ -11,4 +11,4 @@ overlay_pos.json
 
 # 服务运行日志
 .workbuddy/
-live/_research/botw-unexplored.tar.gz
+_research/botw-unexplored.tar.gz
