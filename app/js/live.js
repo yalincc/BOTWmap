@@ -1,10 +1,10 @@
 /* ============ 旷野之息互动地图 · Live 实时层 ============
  *
- * 对接 live/start.py 服务（同源：本页即由该服务托管）：
+ * 对接本地追踪服务（跨域模式，页面可在在线部署站 https://botw.yalin.site/ 打开）：
  *   GET  /pos     玩家位置 + 目标 + 配置（600ms 轮询）
  *   POST /target  设置 / 清除导航目标
- *   POST /config  把当前图层勾选同步给服务（悬浮窗读取同一配置）
- *   data/progress_points.json  存档收集进度（保存变更后由服务重建）
+ *   POST /config  把当前图层勾选同步给服务
+ *   data/progress_points.json  存档收集进度（本地 Python 版服务重建；在线版走上传存档）
  *
  * 能力：
  *   1. 玩家位置红点 + 移动轨迹
@@ -14,6 +14,8 @@
  *   5. 服务离线时全站静默降级，普通地图功能不受影响
  */
 'use strict';
+
+const LIVE_API = 'http://127.0.0.1:8766';   // 本地追踪服务（Go 版"灵墟地图追踪助手"）
 
 const LIVE = (() => {
   let map = null;
@@ -62,7 +64,7 @@ const LIVE = (() => {
   async function poll() {
     let p = null;
     try {
-      const r = await fetch('/pos?who=web&t=' + Date.now(), { cache: 'no-store' });
+      const r = await fetch(LIVE_API + '/pos?who=web&t=' + Date.now(), { cache: 'no-store' });
       if (r.ok) p = await r.json();
     } catch (e) { p = null; }
 
@@ -122,7 +124,7 @@ const LIVE = (() => {
     const sig = cats.slice().sort().join(',');
     if (sig === cfgSent) return;
     cfgSent = sig;
-    fetch('/config', {
+    fetch(LIVE_API + '/config', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cats }),
     }).catch(() => { cfgSent = null; });
@@ -193,7 +195,7 @@ const LIVE = (() => {
   /* ---------- 导航目标 ---------- */
   function navigate(mk) {
     if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
-    fetch('/target', {
+    fetch(LIVE_API + '/target', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: mk.name || mk.en || '', x: mk.px[0], y: mk.px[1], type: mk.cat }),
     }).then(r => r.json()).then(() => {
@@ -202,7 +204,7 @@ const LIVE = (() => {
   }
 
   function clearNav() {
-    fetch('/target', {
+    fetch(LIVE_API + '/target', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clear: true }),
     }).catch(() => {});

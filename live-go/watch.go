@@ -1,0 +1,571 @@
+// 运行状态机：坐标轮询、看门狗、校验、短名单监听、运动扫描兜底。
+// 完全对应 Python start.py 的 poll / watchdog / verify_known /
+// watch_shortlist / relocalize / locate_by_motion。
+
+package main
+
+import (
+	"fmt"
+	"math"
+	"sort"
+	"sync"
+	"time"
+)
+
+var (
+	procMu     sync.Mutex
+	procHandle uintptr
+	procPID    uint32
+	guestBase  uintptr
+)
+
+type lockT struct {
+	mu       sync.RWMutex
+	addr     uintptr
+	verified bool
+	copies   int
+	source   string
+}
+
+var lock = lockT{}
+
+type stateT struct {
+	mu       sync.RWMutex
+	ok       bool
+	gx, gy, gz float32 // gx=X, gy=alt, gz=Z
+	mx, my   float32   // 地图像素
+	layer    int
+	age      float64
+	verified bool
+	copies   int
+	source   string
+}
+
+var state = stateT{}
+
+func reopenProcess() bool {
+	procMu.Lock()
+	defer procMu.Unlock()
+	pid := findPid("ryujinx")
+	if pid == 0 {
+		return false
+	}
+	if pid == procPID && procHandle != 0 {
+		return true
+	}
+	h, err := openProcess(pid)
+	if err != nil || h == 0 {
+		return false
+	}
+	if procHandle != 0 {
+		closeHandle(procHandle)
+	}
+	procHandle, procPID = h, pid
+	fmt.Printf("  [proc] re-attached to Ryujinx pid=%d\n", pid)
+	return true
+}
+
+// guestRamBase 返回最大 guest DRAM 块（known fast path 用）。
+func guestRamBase() uintptr {
+	procMu.Lock()
+	h := procHandle
+	procMu.Unlock()
+	if h == 0 {
+		return 0
+	}
+	base, _ := largestGuestBlock(h, 1024.0)
+	return base
+}
+
+// tryOffsets known fast path：把记住的偏移 rebase 到当前块并读取。
+func tryOffsets() (uintptr, [3]float32, bool) {
+	if !reopenProcess() {
+		return 0, [3]float32{}, false
+	}
+	procMu.Lock()
+	h := procHandle
+	procMu.Unlock()
+	base := guestRamBase()
+	if base == 0 {
+		return 0, [3]float32{}, false
+	}
+	guestBase = base
+	offs := loadOffsets()
+	type val struct {
+		addr uintptr
+		pos  [3]float32
+	}
+	var vals []val
+	for _, o := range offs {
+		if v := decodePos(readMem(h, base+o, 12)); v != nil {
+			vals = append(vals, val{base + o, [3]float32{v[0], v[1], v[2]}})
+		}
+	}
+	if len(vals) == 0 {
+		return 0, [3]float32{}, false
+	}
+	best, bestN := val{}, -1
+	for _, a := range vals {
+		n := 0
+		for _, b := range vals {
+			if abs32(a.pos[0]-b.pos[0]) < 2 && abs32(a.pos[1]-b.pos[1]) < 2 && abs32(a.pos[2]-b.pos[2]) < 2 {
+				n++
+			}
+		}
+		if n > bestN {
+			best, bestN = a, n
+		}
+	}
+	if bestN < 2 && len(offs) > 1 {
+		return 0, [3]float32{}, false
+	}
+	return best.addr, best.pos, true
+}
+
+// poll 10Hz 把锁定的地址镜像到 STATE。
+func poll() {
+	for {
+		lock.mu.RLock()
+		a := lock.addr
+		verified := lock.verified
+		copies := lock.copies
+		src := lock.source
+		lock.mu.RUnlock()
+
+		var v []float32
+		if a != 0 {
+			procMu.Lock()
+			h := procHandle
+			procMu.Unlock()
+			if h != 0 {
+				v = decodePos(readMem(h, a, 12))
+			}
+		}
+		state.mu.Lock()
+		if v != nil {
+			gx, gz, alt := v[0], v[1], v[2]
+			state.ok = true
+			state.gx, state.gy, state.gz = gx, alt, gz
+			state.mx, state.my = 2*gx+12000, 2*gz+10000
+			state.layer = 0
+			state.age = float64(time.Now().UnixNano()) / 1e9
+			state.verified = verified
+			state.copies = copies
+			state.source = src
+		} else {
+			state.ok = false
+			if a != 0 {
+				state.source = "address lost"
+			} else {
+				state.source = "locating..."
+			}
+		}
+		state.mu.Unlock()
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+// watchShortlist 锁定真正在动的候选组。
+func watchShortlist(sl []ShortlistEntry) {
+	procMu.Lock()
+	h := procHandle
+	procMu.Unlock()
+	if h == 0 {
+		return
+	}
+	base := map[uintptr][3]float32{}
+	for _, g := range sl {
+		for _, a := range g.Addrs {
+			if d := readMem(h, a, 12); d != nil && len(d) >= 12 {
+				f := floats(d[:12])
+				base[a] = [3]float32{f[0], f[1], f[2]}
+			}
+		}
+	}
+	moved := make([]int, len(sl))
+	confirmed := -1
+	for {
+		time.Sleep(600 * time.Millisecond)
+		procMu.Lock()
+		h = procHandle
+		procMu.Unlock()
+		if h == 0 {
+			continue
+		}
+		for gi, g := range sl {
+			for _, a := range g.Addrs {
+				d := readMem(h, a, 12)
+				if d == nil || len(d) < 12 {
+					continue
+				}
+				f := floats(d[:12])
+				v := [3]float32{f[0], f[1], f[2]}
+				b, ok := base[a]
+				base[a] = v
+				if !ok {
+					continue
+				}
+				if abs32(v[0]-b[0]) > 0.5 || abs32(v[1]-b[1]) > 0.5 || abs32(v[2]-b[2]) > 0.5 {
+					moved[gi]++
+				}
+			}
+		}
+		top := 0
+		for i := 1; i < len(moved); i++ {
+			if moved[i] > moved[top] {
+				top = i
+			}
+		}
+		if moved[top] >= 3 && top != confirmed {
+			confirmed = top
+			a := sl[top].Addrs[0]
+			lock.mu.Lock()
+			lock.addr = a
+			lock.verified = true
+			lock.copies = sl[top].Copies
+			lock.source = "scan"
+			lock.mu.Unlock()
+			addrs := loadKnownAddrs()
+			addrs = append(addrs, a)
+			saveKnown(addrs, guestBase)
+			fmt.Printf("  [watch] locked onto group %d: copies=%d struct=%d mem=%v\n",
+				top, sl[top].Copies, sl[top].Struct, sl[top].Hud)
+		}
+	}
+}
+
+func loadKnownAddrs() []uintptr {
+	// 已知偏移转绝对地址（当前块）
+	base := guestBase
+	if base == 0 {
+		return nil
+	}
+	var out []uintptr
+	for _, o := range loadOffsets() {
+		out = append(out, base+o)
+	}
+	return out
+}
+
+// verifyKnown 后台校验锁定的地址，读不到时重新定位。
+func verifyKnown(addr uintptr) {
+	procMu.Lock()
+	h := procHandle
+	procMu.Unlock()
+	if h == 0 {
+		return
+	}
+	prev := decodePos(readMem(h, addr, 12))
+	bad := 0
+	for {
+		time.Sleep(300 * time.Millisecond)
+		lock.mu.RLock()
+		curAddr := lock.addr
+		lock.mu.RUnlock()
+		if curAddr != addr {
+			return
+		}
+		procMu.Lock()
+		h = procHandle
+		procMu.Unlock()
+		if h == 0 {
+			return
+		}
+		cur := decodePos(readMem(h, addr, 12))
+		if cur == nil {
+			bad++
+			if bad == 2 {
+				reopenProcess()
+			}
+			if bad >= 4 {
+				if a, v, ok := tryOffsets(); ok {
+					fmt.Printf("  [verify] re-based offset onto new block -> 0x%X mem=(%.1f, %.1f, %.1f)\n", a, v[0], v[1], v[2])
+					lock.mu.Lock()
+					lock.addr = a
+					lock.verified = false
+					lock.copies = 0
+					lock.source = "known"
+					lock.mu.Unlock()
+					prev, bad = []float32{v[0], v[1], v[2]}, 0
+					continue
+				}
+			}
+			if bad >= 10 {
+				fmt.Println("  [verify] address went bad - re-locating")
+				lock.mu.Lock()
+				lock.addr = 0
+				lock.verified = false
+				lock.mu.Unlock()
+				relocalize("remembered address became unreadable")
+				return
+			}
+			continue
+		}
+		bad = 0
+		if prev != nil && (abs32(cur[0]-prev[0]) > 0.2 || abs32(cur[1]-prev[1]) > 0.2 || abs32(cur[2]-prev[2]) > 0.2) {
+			lock.mu.Lock()
+			if !lock.verified {
+				fmt.Printf("  [verify] address 0x%X is live (moved) -> verified\n", addr)
+				lock.verified = true
+			}
+			lock.mu.Unlock()
+		}
+		prev = cur
+	}
+}
+
+// relocalize 方案 B：save anchor 扫描 + shortlist 监听。
+func relocalize(reason string) bool {
+	if !reopenProcess() {
+		fmt.Printf("  [relocate] %s -> Ryujinx not running\n", reason)
+		return false
+	}
+	fmt.Printf("  [relocate] %s -> running save-anchor scan\n", reason)
+	res := locate(procPID, 60.0, func(s string) { fmt.Println("    " + s) })
+	if res == nil {
+		fmt.Println("  [relocate] scan found nothing")
+		return false
+	}
+	lock.mu.Lock()
+	lock.addr = res.Addr
+	lock.verified = false
+	lock.copies = res.Copies
+	lock.source = "scan"
+	lock.mu.Unlock()
+	if len(res.Shortlist) > 0 {
+		go watchShortlist(res.Shortlist)
+	} else {
+		lock.mu.Lock()
+		lock.verified = true
+		lock.mu.Unlock()
+	}
+	saveKnown(append([]uintptr{res.Addr}, loadKnownAddrs()...), guestBase)
+	fmt.Printf("  [relocate] candidate 0x%X mem=(%.1f, %.1f, %.1f) - being watched\n",
+		res.Addr, res.Hud[0], res.Hud[1], res.Hud[2])
+	return true
+}
+
+var lastScanAt = time.Now().Add(-time.Hour)
+
+// watchdog 无需用户操作持续保持锁定。
+func watchdog() {
+	for {
+		time.Sleep(3 * time.Second)
+		lock.mu.RLock()
+		hasAddr := lock.addr != 0
+		state.mu.RLock()
+		ok := state.ok
+		state.mu.RUnlock()
+		lock.mu.RUnlock()
+		if hasAddr && ok {
+			continue
+		}
+		if a, v, ok := tryOffsets(); ok {
+			first := !hasAddr
+			lock.mu.Lock()
+			lock.addr = a
+			lock.verified = false
+			lock.copies = 0
+			lock.source = "known"
+			lock.mu.Unlock()
+			fmt.Printf("  [watchdog] recovered 0x%X mem=(%.1f, %.1f, %.1f)\n", a, v[0], v[1], v[2])
+			if first {
+				go verifyKnown(a)
+			}
+			continue
+		}
+		if time.Since(lastScanAt) > 180*time.Second {
+			lastScanAt = time.Now()
+			relocalize("watchdog: no remembered offset works")
+		}
+	}
+}
+
+// ---- motion scan（结构性 fallback）----
+
+const (
+	motionChunk = 32 << 20
+	motionWorkers = 8
+	rotTol = 0.2
+	motionCountdown = 5
+)
+
+type motionJob struct{ base, size uintptr }
+
+func scanChunkMotion(h uintptr, base, size uintptr) []Hit {
+	buf := readMem(h, base, int(size)+64)
+	if len(buf) < 256 {
+		return nil
+	}
+	a := floats(buf)
+	N := len(a) - 12
+	var out []Hit
+	for s := 0; s < N; s++ {
+		x, y, z := a[s], a[s+1], a[s+2]
+		if !(abs32(x) > 5 && abs32(x) < 7000 && y > -600 && y < 5000 && abs32(z) > 5 && abs32(z) < 7000) {
+			continue
+		}
+		r0x, r0y, r0z := a[s+3], a[s+4], a[s+5]
+		r1x, r1y, r1z := a[s+6], a[s+7], a[s+8]
+		r2x, r2y, r2z := a[s+9], a[s+10], a[s+11]
+		n0 := r0x*r0x + r0y*r0y + r0z*r0z
+		n1 := r1x*r1x + r1y*r1y + r1z*r1z
+		n2 := r2x*r2x + r2y*r2y + r2z*r2z
+		if abs32(n0-1) >= rotTol || abs32(n1-1) >= rotTol || abs32(n2-1) >= rotTol {
+			continue
+		}
+		d01 := r0x*r1x + r0y*r1y + r0z*r1z
+		d02 := r0x*r2x + r0y*r2y + r0z*r2z
+		d12 := r1x*r2x + r1y*r2y + r1z*r2z
+		if abs32(d01) >= rotTol || abs32(d02) >= rotTol || abs32(d12) >= rotTol {
+			continue
+		}
+		out = append(out, Hit{base + uintptr(s)*4, x, y, z, 0, 0})
+	}
+	return out
+}
+
+func beep(times int) {
+	for i := 0; i < times; i++ {
+		fmt.Print("\a")
+		time.Sleep(120 * time.Millisecond)
+	}
+}
+
+// locateByMotion 结构性候选 + 走几步差分（save anchor 失效时的兜底）。
+func locateByMotion() uintptr {
+	procMu.Lock()
+	h := procHandle
+	procMu.Unlock()
+	if h == 0 {
+		return 0
+	}
+	blocks := guestBlocks(h, minBlockMB)
+	if len(blocks) == 0 {
+		fmt.Println("  guest RAM blocks not found")
+		return 0
+	}
+	var jobs []motionJob
+	for _, b := range blocks {
+		off := uintptr(0)
+		for off < b.Size {
+			n := uintptr(motionChunk)
+			if b.Size-off < n {
+				n = b.Size - off
+			}
+			jobs = append(jobs, motionJob{b.Base + off, n})
+			off += n
+		}
+	}
+	t0 := time.Now()
+	var mu sync.Mutex
+	var hits []Hit
+	wg := sync.WaitGroup{}
+	ch := make(chan motionJob)
+	for w := 0; w < motionWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range ch {
+				local := scanChunkMotion(h, j.base, j.size)
+				if len(local) > 0 {
+					mu.Lock()
+					hits = append(hits, local...)
+					mu.Unlock()
+				}
+			}
+		}()
+	}
+	for _, j := range jobs {
+		ch <- j
+	}
+	close(ch)
+	wg.Wait()
+	fmt.Printf("  scan: %d structural candidates in %.0fs\n", len(hits), time.Since(t0).Seconds())
+	if len(hits) == 0 {
+		return 0
+	}
+	baseline := map[uintptr][3]float32{}
+	for _, hit := range hits {
+		baseline[hit.Addr] = [3]float32{hit.X, hit.Y, hit.Z}
+	}
+
+	fmt.Println("")
+	fmt.Println("  >>> WALK A FEW STEPS IN THE GAME NOW <<<")
+	fmt.Println("      (do NOT open the in-game map - it pauses the world)")
+	beep(3)
+	for i := motionCountdown; i > 0; i-- {
+		fmt.Printf("      sampling in %d ...\n", i)
+		time.Sleep(1 * time.Second)
+	}
+
+	type changedT struct {
+		addr uintptr
+		pos  [3]float32
+	}
+	var changed []changedT
+	for a, b := range baseline {
+		d := readMem(h, a, 12)
+		if d == nil || len(d) < 12 {
+			continue
+		}
+		f := floats(d[:12])
+		x, y, z := f[0], f[1], f[2]
+		if abs32(x-b[0]) < 0.5 && abs32(y-b[1]) < 0.5 && abs32(z-b[2]) < 0.5 {
+			continue
+		}
+		if !(abs32(x) < 7000 && abs32(z) < 7000 && y > -600 && y < 5000 && (abs32(x) > 5 || abs32(z) > 5)) {
+			continue
+		}
+		changed = append(changed, changedT{a, [3]float32{x, y, z}})
+	}
+	fmt.Printf("  %d of %d addresses moved\n", len(changed), len(baseline))
+	if len(changed) == 0 {
+		fmt.Println("  nothing moved. Re-run and walk during the countdown.")
+		return 0
+	}
+	counts := map[[3]int32]int{}
+	sample := map[[3]int32]uintptr{}
+	for _, c := range changed {
+		k := [3]int32{int32(math.Round(float64(c.pos[0]) * 10)), int32(math.Round(float64(c.pos[1]) * 10)), int32(math.Round(float64(c.pos[2]) * 10))}
+		counts[k]++
+		if _, ok := sample[k]; !ok {
+			sample[k] = c.addr
+		}
+	}
+	type kv struct {
+		k [3]int32
+		n int
+	}
+	var sorted []kv
+	for k, n := range counts {
+		sorted = append(sorted, kv{k, n})
+	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].n > sorted[j].n })
+	fmt.Println("  top moved-value clusters:")
+	for i := 0; i < len(sorted) && i < 8; i++ {
+		fmt.Printf("     %5d copies   mem=(%9.1f, %9.1f, %9.1f)\n",
+			sorted[i].n, float32(sorted[i].k[0])/10, float32(sorted[i].k[1])/10, float32(sorted[i].k[2])/10)
+	}
+	addr := sample[sorted[0].k]
+	fmt.Printf("  player locked: copies=%d  address = 0x%X\n", sorted[0].n, addr)
+	return addr
+}
+
+func setTarget(t *targetT) {
+	targetMu.Lock()
+	target = t
+	targetMu.Unlock()
+}
+
+func getTarget() *targetT {
+	targetMu.Lock()
+	defer targetMu.Unlock()
+	return target
+}
+
+func clearTarget() {
+	targetMu.Lock()
+	target = nil
+	targetMu.Unlock()
+}
