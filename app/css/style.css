@@ -234,6 +234,32 @@ body {
 }
 #sbCopy { width: 100%; padding: 9px 0; border-radius: 6px; font-size: 13px; cursor: pointer; }
 
+/* ---------- 帮助弹窗（Q&A） ---------- */
+#helpBox {
+  position: absolute; z-index: 27; width: 440px; max-width: calc(100vw - 24px);
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: var(--panel-solid); border: 1px solid var(--accent2);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px;
+  max-height: min(72vh, 640px); overflow-y: auto;
+}
+.hq h4 { font-size: 12.5px; color: var(--accent2); margin: 14px 0 6px; letter-spacing: .3px; }
+.hq h4:first-child { margin-top: 0; }
+.hq p { font-size: 12px; line-height: 1.7; color: var(--text); margin: 4px 0; }
+.hq p b { color: var(--accent2); font-weight: 600; }
+.hq code {
+  display: block; font-family: Consolas, "Courier New", monospace; font-size: 11px;
+  color: #ffd166; background: rgba(0,0,0,.25); padding: 6px 8px; border-radius: 5px;
+  margin: 4px 0; word-break: break-all; user-select: text; cursor: text;
+  border: 1px dashed rgba(255,209,102,.28);
+}
+.hq p code { display: inline; padding: 1px 5px; font-size: 10.5px; }
+.hq .hq-note { color: var(--text-dim); font-size: 11.5px; }
+.hq hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+.hq .hq-dot { font-weight: 700; }
+.hq .hq-dot.on { color: #7dffa0; }
+.hq .hq-dot.warn { color: #e8b04a; }
+.hq .hq-dot.off { color: #c97a7a; }
+
 /* ---------- 淇℃伅鍗＄墖 ---------- */
 #infoCard {
   position: absolute; z-index: 20; width: 300px; background: var(--panel-solid);

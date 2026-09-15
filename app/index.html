@@ -131,6 +131,36 @@
       <button id="sbCopy" class="primary">复制链接</button>
     </div>
 
+    <!-- 帮助弹窗（Q&A） -->
+    <div id="helpBox" class="hidden">
+      <div class="sb-head">使用帮助 · Q&A
+        <button id="hbClose" class="card-close" title="关闭">×</button>
+      </div>
+      <div class="hq">
+        <h4>📂 加载存档进度</h4>
+        <p>存档文件：<code>game_data.sav</code>，拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
+        <p>Ryujinx（Switch 模拟器）：</p>
+        <code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code>
+        <p class="hq-note">找不到时：按 <code>Win + R</code>，粘贴下面路径回车，进入游戏对应的 ID 目录找 game_data.sav：</p>
+        <code>%APPDATA%\Ryujinx\bis\user\save</code>
+        <p>Cemu（Wii U）：</p>
+        <code>mlc01\usr\save\00050000\101c9400\user\80000001\game_data.sav</code>
+        <hr>
+        <h4>🔄 进度是怎么同步的</h4>
+        <p>上传存档后，浏览器本地解析出神庙 / 塔 / 克洛格 / 主线回忆 / 神兽的收集状态，写进本机浏览器，<b>离线再打开也保留</b>。</p>
+        <p>本机跑 live 服务（悬浮框导航）时，游戏内收集会自动同步，与上传共用同一套进度；手动勾选是叠加，不会冲突，<b>以存档为准</b>。</p>
+        <hr>
+        <h4>🧭 悬浮框与实时导航（本机）</h4>
+        <p>运行 <code>live/start-all.bat</code> 一键启动服务和悬浮框；游戏里走动，浮窗与网页红点实时跟随。</p>
+        <p>点地图上的标注 →「🧭 导航到这里」出现引导线；状态胶囊：<span class="hq-dot on">●</span> 已连接 · <span class="hq-dot warn">◐</span> 定位中（移动角色）· <span class="hq-dot off">●</span> 离线。</p>
+        <hr>
+        <h4>❓ 常见问题</h4>
+        <p>为什么宝箱 / 英杰·EX 回忆一直是 0？—— 这两类在存档里没有逐项记录，只能手动勾选。</p>
+        <p>克洛格计数器和实际数量不一致？—— 以游戏内实际收集为准（逐项记录），计数器仅供参考。</p>
+        <p>手机上能用吗？—— 能，上传存档即可；悬浮框导航仅限本机。</p>
+      </div>
+    </div>
+
     <!-- 设置弹层（地名样式） -->
     <div id="settingsBox" class="hidden">
       <div class="sb-head">地图设置
@@ -229,9 +259,10 @@
 <script src="js/ui.js?v=7"></script>
 <script src="js/main.js?v=5"></script>
 <script src="js/live.js?v=5"></script>
-<script src="js/save_upload.js?v=3"></script>
+<script src="js/save_upload.js?v=4"></script>
 </body>
 </html>
+
 
 
 

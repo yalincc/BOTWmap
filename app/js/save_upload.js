@@ -32,9 +32,10 @@ const SAVE_UPLOAD = (() => {
     });
     btn.addEventListener('click', () => input.click());
 
-    // 存档位置提示（? 问号）：悬停显示 / 点击切换（触屏友好）
+    // 存档位置提示：悬停显示小气泡；点击打开完整帮助弹窗（内容可复制）
     const help = document.getElementById('suHelp');
     const tip = document.getElementById('suTip');
+    const helpBox = document.getElementById('helpBox');
     if (help && tip) {
       const show = () => tip.classList.remove('hidden');
       const hide = () => tip.classList.add('hidden');
@@ -44,10 +45,21 @@ const SAVE_UPLOAD = (() => {
       help.addEventListener('blur', hide);
       help.addEventListener('click', e => {
         e.stopPropagation();
-        tip.classList.toggle('hidden');
+        hide();
+        if (helpBox) helpBox.classList.remove('hidden');
       });
       document.addEventListener('click', e => {
+        if (helpBox && !e.target.closest('#helpBox') && !e.target.closest('.save-upload')) {
+          helpBox.classList.add('hidden');
+        }
         if (!e.target.closest('.save-upload')) hide();
+      });
+      const hbClose = document.getElementById('hbClose');
+      if (hbClose) hbClose.addEventListener('click', () => helpBox.classList.add('hidden'));
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && helpBox && !helpBox.classList.contains('hidden')) {
+          helpBox.classList.add('hidden');
+        }
       });
     }
 
