@@ -72,10 +72,18 @@ const SAVE_UPLOAD = (() => {
       if (f) handleFile(f);
     });
 
-    fetch('../data/save_flags.json?v=' + Date.now(), { cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : null))
-      .then(j => { flags = j; })
-      .catch(() => {});
+    // 查找表：随页面部署（app/data/ 下），多路径兜底（根部署 / app 子目录部署）
+    const cands = ['data/save_flags.json?v=' + Date.now(),
+                   '../data/save_flags.json?v=' + Date.now(),
+                   './data/save_flags.json?v=' + Date.now()];
+    (async () => {
+      for (const c of cands) {
+        try {
+          const r = await fetch(c, { cache: 'no-store' });
+          if (r.ok) { flags = await r.json(); return; }
+        } catch (e) {}
+      }
+    })();
   }
 
   function handleFile(file) {

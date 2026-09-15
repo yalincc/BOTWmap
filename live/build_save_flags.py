@@ -18,7 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 DATA_JS = os.path.join(ROOT, "app", "js", "data.js")
 PROG_JSON = os.path.join(ROOT, "data", "progress_points.json")
-OUT = os.path.join(ROOT, "data", "save_flags.json")
+OUT = os.path.join(ROOT, "app", "data", "save_flags.json")
 
 POINT_TYPES = {  # point t -> marker cat
     "shrine": "shrine", "tower": "tower", "korok": "seed",
