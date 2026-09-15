@@ -136,6 +136,7 @@ body {
 .stat-row { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
 .stat-row .k { color: var(--text-dim); }
 .stat-row .v { color: var(--text); font-weight: 600; }
+.stat-sync { font-size: 10.5px; color: #7dffa0; margin: 2px 0 6px; letter-spacing: .3px; }
 .stat-bar { height: 4px; background: #20301f; border-radius: 2px; margin: 2px 0 8px; overflow: hidden; }
 .stat-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; transition: width .3s; }
 .side-foot { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--text-dim); line-height: 1.5; }

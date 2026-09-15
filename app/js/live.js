@@ -9,8 +9,8 @@
  * 能力：
  *   1. 玩家位置红点 + 移动轨迹
  *   2. 点击标注 →「导航到这里」→ 金色引导线 + 距离
- *   3. 存档收集进度合并：存档已收集的标注自动变灰打勾
- *   4. 统计面板显示「存档进度 · 游戏内」
+ *   3. 存档收集进度吸收式合并：存档已收集的标注自动写回本地完成集合（持久化，离线可见）
+ *   4. 统计面板统一为一套「收集进度」（存档同步 + 手动标记叠加）
  *   5. 服务离线时全站静默降级，普通地图功能不受影响
  */
 'use strict';
@@ -168,9 +168,15 @@ const LIVE = (() => {
       }
       const changed = map.liveDone.size !== done.size;
       map.liveDone = done;
+      // 吸收式合并：存档已收集 → 写回本地完成集合（持久化，离线打开也保留；以存档为准）
+      let grew = false;
+      for (const id of done) {
+        if (!map.doneSet.has(id)) { map.doneSet.add(id); grew = true; }
+      }
+      if (grew) UI.persistDone();
       map.live.counts = j.counts || null;
       map.live.progGen = j.generated || '';
-      if (changed) { map.draw(); UI.renderStats(); }
+      if (changed || grew) { map.draw(); UI.renderStats(); UI.updateLayerList(); }
     } catch (e) { /* 离线时静默 */ } finally { progLoading = false; }
   }
 

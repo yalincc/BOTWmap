@@ -103,38 +103,48 @@ const UI = (() => {
     for (const cat of map.data.categories) {
       const el = $('prog_' + cat.key);
       if (!el) continue;
-      const total = map.data.markers.filter(mk => mk.cat === cat.key).length;
-      const done = map.data.markers.filter(mk => mk.cat === cat.key && map.doneSet.has(mk.id)).length;
+      const [done, total] = catCount(cat.key);
       el.textContent = done ? `${done}/${total}` : '';
       el.style.color = done === total ? '#7dffa0' : 'var(--text-dim)';
     }
   }
 
   /* ---------- 统计面板 ---------- */
+  // 复苏神庙：剧情地点，无存档 flag，不计入神庙收集统计
+  function isResurrection(mk) {
+    return mk.cat === 'shrine' && mk.extra && mk.extra.icon === 'shrine_resurrection.png';
+  }
+  // 某类别的 [已完成, 总数]（已完成 = 本地标记 ∪ 存档进度，与地图标点判定一致）
+  function catCount(key) {
+    let t = 0, d = 0;
+    for (const mk of map.data.markers) {
+      if (mk.cat !== key) continue;
+      if (isResurrection(mk)) continue;
+      t++;
+      if (map._mkDone(mk)) d++;
+    }
+    return [d, t];
+  }
   function renderStats() {
     const total = map.data.markers.length;
     const done = map.doneSet.size;
     const focus = ['shrine', 'tower', 'beast', 'seed', 'memory', 'treasure'];
-    let html = `<h4>收集进度</h4>
-      <div class="stat-row"><span class="k">全部标注</span><span class="v">${done} / ${total}</span></div>
+    let html = `<h4>收集进度</h4>`;
+    // 存档同步状态行（存档 flag 类别的真实进度，来自 live 服务；离线时不显示）
+    const lc = map.live && map.live.counts;
+    if (lc) {
+      const s = lc.shrine || [0, 0], t = lc.tower || [0, 0], k = lc.korok || [0, 0];
+      html += `<div class="stat-sync">存档已同步 ✓ 神庙 ${s[0]}/${s[1]} · 希卡塔 ${t[0]}/${t[1]} · 克洛格 ${k[0]}/${k[1]}</div>`;
+    }
+    html += `<div class="stat-row"><span class="k">全部标注</span><span class="v">${done} / ${total}</span></div>
       <div class="stat-bar"><i style="width:${pct(done, total)}"></i></div>`;
     for (const key of focus) {
       const cat = map.data.categories.find(c => c.key === key);
       if (!cat) continue;
-      const t = map.data.markers.filter(mk => mk.cat === key).length;
-      const d = map.data.markers.filter(mk => mk.cat === key && map.doneSet.has(mk.id)).length;
+      const [d, t] = catCount(key);
+      if (!t) continue;
       html += `<div class="stat-row"><span class="k">${cat.cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
-    }
-    // 存档进度（游戏内真实收集，来自 live 服务）
-    const lc = map.live && map.live.counts;
-    if (lc) {
-      html += `<h4>存档进度 · 游戏内</h4>`;
-      for (const [cn, k] of [['神庙', 'shrine'], ['希卡塔', 'tower'], ['克洛格', 'korok']]) {
-        const [d, t] = lc[k] || [0, 0];
-        html += `<div class="stat-row"><span class="k">${cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
-        html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
-      }
     }
     $('statsPanel').innerHTML = html;
   }
@@ -181,7 +191,7 @@ const UI = (() => {
       box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
     } else {
       box.innerHTML = hits.map(h => `
-        <div class="sr-item ${map.doneSet.has(h.id) ? 'done' : ''}" data-id="${h.id}">
+        <div class="sr-item ${map.doneSet.has(h.id) || (map.liveDone && map.liveDone.has(h.id)) ? 'done' : ''}" data-id="${h.id}">
           <span class="sr-name">${esc(h.name)}</span>
           <span class="sr-meta">${h.catCn}${h.region ? ' · ' + esc(h.region) : ''}</span>
         </div>`).join('');
@@ -697,5 +707,5 @@ const UI = (() => {
     toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo };
+  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone };
 })();

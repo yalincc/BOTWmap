@@ -285,7 +285,8 @@ class BotwMap {
     this._drawMeasure(ctx);
     this._drawMarkers(ctx);
     this._drawCustom(ctx);
-    this._drawLive(ctx);        // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入）
+    // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入；live.js 加载前的早期 draw 可能未挂载，防御）
+    if (typeof this._drawLive === 'function') this._drawLive(ctx);
   }
 
   /* ---------- 地形/区域名（模仿游戏内地图：半透明底深字；字号随缩放放大，随缩放分级切换；高层出现后低层弱化保留） ---------- */
