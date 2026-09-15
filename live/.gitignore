@@ -12,3 +12,4 @@ overlay_pos.json
 # 服务运行日志
 .workbuddy/
 _research/botw-unexplored.tar.gz
+_research/*.png
