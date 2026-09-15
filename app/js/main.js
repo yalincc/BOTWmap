@@ -3,6 +3,20 @@
 
 (function () {
   const canvas = document.getElementById('mapCanvas');
+  const sidebar = document.getElementById('sidebar');
+  const sideCollapseBtn = document.getElementById('sideCollapse');
+  const K_SIDE_COLLAPSE = 'botwmap.sidebarCollapsed.v1';
+
+  // 桌面端侧栏折叠：初始化前先恢复状态（影响 canvas 宽度，必须先于 new BotwMap）
+  let sideCollapsed = false;
+  try { sideCollapsed = localStorage.getItem(K_SIDE_COLLAPSE) === '1'; } catch (e) {}
+  function applySideCollapsed(c) {
+    sidebar.classList.toggle('collapsed', c);
+    sideCollapseBtn.textContent = c ? '›' : '‹';
+    sideCollapseBtn.title = c ? '展开侧栏' : '收起侧栏';
+  }
+  applySideCollapsed(sideCollapsed);
+
   const map = new BotwMap(canvas, BOTW_DATA);
 
   UI.init(map);        // 先绑定 UI（buildLayerList 等）
@@ -25,7 +39,6 @@
   });
 
   // 手机版侧栏抽屉：☰ 打开，× / 遮罩 / Esc 收起
-  const sidebar = document.getElementById('sidebar');
   const sideMask = document.getElementById('sideMask');
   function setSidebar(open) {
     sidebar.classList.toggle('open', open);
@@ -40,6 +53,34 @@
   // 桌面端（>760px）侧栏始终可见，收起态不生效
   window.addEventListener('resize', () => {
     if (window.innerWidth > 760) setSidebar(false);
+  });
+
+  // 桌面端折叠把手：收起后侧栏占 0 宽、地图占满；保留当前缩放中心（不 fit）
+  function resizeCanvasKeepView() {
+    const r = map.canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const oldCx = map.w / 2, oldCy = map.h / 2;
+    const gx = (oldCx - map.view.x) / map.view.scale;
+    const gy = (oldCy - map.view.y) / map.view.scale;
+    map.w = r.width; map.h = r.height;
+    map.canvas.width = Math.round(r.width * map.dpr);
+    map.canvas.height = Math.round(r.height * map.dpr);
+    map.ctx.setTransform(map.dpr, 0, 0, map.dpr, 0, 0);
+    const s = Math.min(map.w / map.MW, map.h / map.MH);
+    map.minScale = s * 0.85;
+    map._regionScale = s;
+    map.view.scale = Math.min(Math.max(map.view.scale, map.minScale), map.maxScale);
+    map.view.x = map.w / 2 - gx * map.view.scale;
+    map.view.y = map.h / 2 - gy * map.view.scale;
+    map.draw();
+  }
+  let sideCollapseTimer = null;
+  sideCollapseBtn.addEventListener('click', () => {
+    sideCollapsed = !sideCollapsed;
+    try { localStorage.setItem(K_SIDE_COLLAPSE, sideCollapsed ? '1' : '0'); } catch (e) {}
+    applySideCollapsed(sideCollapsed);
+    clearTimeout(sideCollapseTimer);
+    sideCollapseTimer = setTimeout(resizeCanvasKeepView, 240);
   });
 
   // 提示
