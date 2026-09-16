@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=10">
+<link rel="stylesheet" href="css/style.css?v=11">
 </head>
 <body>
 <div id="app">
@@ -101,6 +101,12 @@
 
     <div id="coordReadout">X: --  Z: --</div>
     <div id="liveStatus" class="live-status off">● 未连接</div>
+    <div id="collectBar" class="hidden">
+      <span>🧭 收集模式 · <b id="collectBarCat"></b></span>
+      <span class="dim" id="collectBarProg"></span>
+      <span id="collectBarCur"></span>
+      <button id="collectStop" type="button">结束</button>
+    </div>
     <div id="modeHint" class="hidden"></div>
     <div id="toast"></div>
 
@@ -154,6 +160,7 @@
         <h4>🧭 悬浮框与实时导航（本机）</h4>
         <p>运行 <code>live/start-all.bat</code> 一键启动服务和悬浮框；游戏里走动，浮窗与网页红点实时跟随。</p>
         <p>点地图上的标注 →「🧭 导航到这里」出现引导线；状态胶囊：<span class="hq-dot on">●</span> 已连接 · <span class="hq-dot warn">◐</span> 定位中（移动角色）· <span class="hq-dot off">●</span> 离线。</p>
+        <p>回忆 / 克洛格标注的卡片里有「收集模式」开关：开启后自动导航到离你最近的未收集点，收集完成（游戏内保存或手动勾选）自动前往下一个；底部横幅「结束」可随时退出。</p>
         <hr>
         <h4>❓ 常见问题</h4>
         <p>为什么宝箱 / 英杰·EX 回忆一直是 0？—— 这两类在存档里没有逐项记录，只能手动勾选。</p>
@@ -243,6 +250,10 @@
         <div id="cardCoord" class="row"></div>
         <div id="cardExtra" class="row"></div>
       </div>
+      <div id="collectRow" class="collect-row hidden">
+        <span>🧭 收集模式（到达后自动前往下一个）</span>
+        <label class="switch"><input type="checkbox" id="collectSwitch"><span class="slider"></span></label>
+      </div>
       <div class="card-actions">
         <button id="cardNav" class="primary nav hidden">🧭 导航到这里</button>
         <button id="cardDone" class="primary">✓ 标记为已完成</button>
@@ -257,9 +268,9 @@
 <script src="js/data.js?v=3"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=7"></script>
-<script src="js/ui.js?v=8"></script>
+<script src="js/ui.js?v=9"></script>
 <script src="js/main.js?v=9"></script>
-<script src="js/live.js?v=7"></script>
+<script src="js/live.js?v=8"></script>
 <script src="js/save_upload.js?v=4"></script>
 </body>
 </html>

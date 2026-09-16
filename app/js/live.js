@@ -52,6 +52,9 @@ const LIVE = (() => {
       });
     }
 
+    const cbStop = document.getElementById('collectStop');
+    if (cbStop) cbStop.addEventListener('click', () => { stopCollectMode(); UI.toast('已结束收集模式'); });
+
     loadProgress();
     setInterval(poll, 600);
     setInterval(loadProgress, 20000);
@@ -93,6 +96,7 @@ const LIVE = (() => {
       lastPosKey = null;
     }
     updateStatus();
+    tickCollectMode();
     const dk = (L.online ? '1' : '0') + (L.verified ? 'v' : '') +
                (L.mx != null ? Math.round(L.mx / 2) + ':' + Math.round(L.my / 2) : '') +
                (L.tgt ? 't' : '') + (L.tdist != null ? Math.round(L.tdist / 10) : '');
@@ -208,12 +212,11 @@ const LIVE = (() => {
   /* ---------- 导航目标 ---------- */
   function navigate(mk) {
     if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
-    fetch(LIVE_API + '/target', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: mk.name || mk.en || '', x: mk.px[0], y: mk.px[1], type: mk.cat }),
-    }).then(r => r.json()).then(() => {
-      UI.toast('已设置导航：' + (mk.name || mk.en || '目标'));
-    }).catch(() => UI.toast('导航设置失败'));
+    // 收集模式中导航其他类别标注 → 退出收集模式（当前引导线保留）
+    if (mode && mk.cat !== mode.cat) stopCollectMode();
+    curId = mk.id;
+    if (mode) { mode.arrivedShown = false; renderCollectBar(); }
+    postTarget(mk, '已设置导航：' + (mk.name || mk.en || '目标'));
   }
 
   function clearNav() {
@@ -221,6 +224,176 @@ const LIVE = (() => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clear: true }),
     }).catch(() => {});
+  }
+
+  /* ---------- 收集模式（回忆 / 克洛格 连续自动导航） ----------
+   * 点回忆 / 克洛格标注的「导航到这里」时，由标注卡上的「收集模式」开关开启：
+   *   - 每 600ms 轮询：当前目标已收集（存档同步 / 手动勾选）→ 自动设下一个
+   *     = 离玩家最近的未收集同类点；全部收集完 → 自动退出
+   *   - 到达（≤15m）只提示不跳转：收集并保存后自动前进，避免还没解谜就被带走
+   *   - 范围：克洛格 = 全部未收集；回忆 = 有存档 flag 的 13 个主线回忆
+   *     （EX / 英杰回忆无收集记录，不自动排队，仍可手动导航单点）
+   *   - 退出：横幅「结束」/ 手动导航其他类别标注 / 服务离线自动暂停（恢复后继续）
+   */
+  const MEMORY_PHOTO_NOS = new Set([1, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17]); // 主线回忆 13 个（照片N↔回忆#N，见 build_progress.py）
+  const ARRIVE_M = 15;                 // 到达提示阈值（游戏米，1px = 0.5m）
+  let mode = null;                     // { cat, arrivedShown } 当前收集模式
+  let curId = null;                    // 当前导航目标标记 id
+
+  function collectPool(cat) {
+    const out = [];
+    for (const mk of map.markers) {
+      if (mk.cat !== cat) continue;
+      if (cat === 'memory') {
+        const no = mk.extra && mk.extra.memory_no;
+        if (!no || !MEMORY_PHOTO_NOS.has(no)) continue;  // EX / 英杰回忆不进自动队列
+      }
+      if (map._mkDone(mk)) continue;                      // 已收集（存档同步 / 手动勾选）
+      out.push(mk);
+    }
+    return out;
+  }
+  function nearestIn(pool) {
+    const L = map.live;
+    const px = L.mx != null ? L.mx : map.MW / 2;
+    const py = L.my != null ? L.my : map.MH / 2;
+    let best = null, bd = Infinity;
+    for (const mk of pool) {
+      const d = Math.hypot(mk.px[0] - px, mk.px[1] - py);
+      if (d < bd) { bd = d; best = mk; }
+    }
+    return best;
+  }
+  function collectCounts(cat) {
+    // 优先用服务返回的存档计数（克洛格 900 / 主线回忆 13），缺失时按标记现算
+    const c = map.live.counts || {};
+    if (cat === 'seed' && c.korok) return c.korok;
+    if (cat === 'memory' && c.memory) return c.memory;
+    let t = 0, d = 0;
+    for (const mk of map.markers) {
+      if (mk.cat !== cat) continue;
+      if (cat === 'memory') {
+        const no = mk.extra && mk.extra.memory_no;
+        if (!no || !MEMORY_PHOTO_NOS.has(no)) continue;
+      }
+      t++;
+      if (map._mkDone(mk)) d++;
+    }
+    return [d, t];
+  }
+  let _idMap = null, _coordMap = null;
+  function byId(id) {
+    if (!_idMap) { _idMap = new Map(); map.markers.forEach(mk => _idMap.set(mk.id, mk)); }
+    return _idMap.get(id) || null;
+  }
+  function byCoords(x, y) {
+    if (!_coordMap) {
+      _coordMap = new Map();
+      map.markers.forEach(mk => _coordMap.set(Math.round(mk.px[0]) + '_' + Math.round(mk.px[1]), mk));
+    }
+    return _coordMap.get(Math.round(x) + '_' + Math.round(y)) || null;
+  }
+  // 当前服务端目标对应的标记（先按记忆的 curId 坐标核验，再按坐标兜底）
+  function targetMarker() {
+    const t = map.live.tgt;
+    if (!t) return null;
+    if (curId) {
+      const mk = byId(curId);
+      if (mk && Math.abs(mk.px[0] - t.x) < 2 && Math.abs(mk.px[1] - t.y) < 2) return mk;
+    }
+    return byCoords(t.x, t.y);
+  }
+  function postTarget(mk, toastTxt) {
+    fetch(LIVE_API + '/target', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: mk.name || mk.en || '', x: mk.px[0], y: mk.px[1], type: mk.cat }),
+    }).then(r => r.json()).then(() => {
+      if (toastTxt) UI.toast(toastTxt);
+    }).catch(() => { if (toastTxt) UI.toast('导航设置失败'); });
+  }
+  function startCollectMode(cat, mk) {
+    if (!map.live.online) { UI.toast('服务未连接，无法开启收集模式'); return; }
+    if (mode) stopCollectMode();
+    const pool = collectPool(cat);
+    if (!pool.length) { UI.toast('🎉 ' + (CAT_CN[cat] || cat) + '已全部收集完成'); return; }
+    let first = null;
+    if (cat === 'seed' && mk && !map._mkDone(mk)) first = mk;      // 克洛格：点哪个导航哪个
+    if (!first) first = nearestIn(pool);                           // 回忆：最近的未收集
+    mode = { cat, arrivedShown: false };
+    curId = first.id;
+    UI.toast('🧭 收集模式开启 · 目标：' + first.name + '（剩余 ' + pool.length + ' 个）');
+    postTarget(first, '');
+    renderCollectBar();
+    map.draw();
+  }
+  function stopCollectMode() {
+    if (!mode) return;
+    mode = null;
+    renderCollectBar();               // 隐藏横幅；当前引导线保留
+    if (UI && UI.syncCollectSwitch) UI.syncCollectSwitch();
+  }
+  function isModeActive(cat) { return !!(mode && mode.cat === cat); }
+
+  // 每轮轮询的收集模式状态机
+  function tickCollectMode() {
+    if (!mode) return;
+    const L = map.live;
+    if (!L.online) { renderCollectBar(); return; }                // 离线暂停，恢复后继续
+    const pool = collectPool(mode.cat);
+    if (!pool.length) {                                            // 该类别全部收集完成
+      UI.toast('🎉 ' + (CAT_CN[mode.cat] || mode.cat) + '已全部收集完成');
+      fetch(LIVE_API + '/target', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clear: true }),
+      }).catch(() => {});
+      stopCollectMode();
+      return;
+    }
+    const cur = targetMarker();
+    const curInPool = !!(cur && pool.some(x => x.id === cur.id));
+    if (!cur || cur.id !== curId || !curInPool) {                  // 无目标 / 已收集 / 目标失效 → 自动前进
+      const donePrev = !!(cur && cur.id === curId && map._mkDone(cur));
+      const next = nearestIn(pool);
+      if (!next) return;
+      curId = next.id;
+      mode.arrivedShown = false;
+      if (donePrev) UI.toast('已收集：' + cur.name + ' · 前往下一个：' + next.name);
+      postTarget(next, '');
+      renderCollectBar();
+      return;
+    }
+    // 到达提示：只提示不跳转，等收集（存档同步 / 手动勾选）后再自动前进
+    if (mode.arrivedShown && L.tdist != null && L.tdist > ARRIVE_M * 1.5) mode.arrivedShown = false;
+    if (L.tdist != null && L.tdist <= ARRIVE_M && !mode.arrivedShown) {
+      mode.arrivedShown = true;
+      UI.toast('已到达：' + cur.name + ' · 收集后自动前往下一个');
+    }
+    renderCollectBar();
+  }
+
+  function renderCollectBar() {
+    const bar = document.getElementById('collectBar');
+    if (!bar) return;
+    if (!mode) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    document.getElementById('collectBarCat').textContent = CAT_CN[mode.cat] || mode.cat;
+    const [d, t] = collectCounts(mode.cat);
+    document.getElementById('collectBarProg').textContent = '已收集 ' + d + '/' + t;
+    const curEl = document.getElementById('collectBarCur');
+    bar.classList.remove('arrived', 'paused');
+    if (!map.live.online) {
+      bar.classList.add('paused');
+      curEl.textContent = '离线暂停中…（恢复连接后继续）';
+    } else {
+      const cur = targetMarker();
+      if (mode.arrivedShown && cur && cur.id === curId && !map._mkDone(cur)) {
+        bar.classList.add('arrived');
+        curEl.textContent = '已到达 · 收集后自动前往下一个';
+      } else {
+        curEl.textContent = (cur && cur.id === curId) ? '目标：' + cur.name : '正在定位目标…';
+      }
+    }
+    if (UI && UI.syncCollectSwitch) UI.syncCollectSwitch();
   }
 
   /* ---------- 画布绘制（挂到 BotwMap.prototype._drawLive） ---------- */
@@ -294,7 +467,7 @@ const LIVE = (() => {
     BotwMap.prototype._drawLive = drawLive;
   }
 
-  return { init, navigate, clearNav, centerOnPlayer };
+  return { init, navigate, clearNav, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive };
 })();
 
 (function () {

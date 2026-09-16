@@ -273,6 +273,8 @@ const UI = (() => {
     // 导航按钮（live 层；离线时给出提示）
     $('cardNav').classList.remove('hidden');
     $('cardNav').onclick = () => LIVE.navigate(mk);
+    // 收集模式开关（仅回忆 / 克洛格 显示；live 层注入）
+    syncCollectSwitch();
     $('cardDone').onclick = () => { map.doneSet.add(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name); };
     $('cardUndone').onclick = () => { map.doneSet.delete(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name); };
     positionCard();
@@ -294,6 +296,7 @@ const UI = (() => {
     $('cardUndone').classList.add('hidden');
     $('cardDelPin').classList.remove('hidden');
     $('cardNav').classList.add('hidden');
+    $('collectRow').classList.add('hidden');
     $('cardDelPin').onclick = () => {
       map.customMarkers = map.customMarkers.filter(x => x.id !== c.id);
       saveCustom(); hideInfo(); map.draw();
@@ -301,6 +304,22 @@ const UI = (() => {
     };
     positionCard();
     $('infoCard').classList.remove('hidden');
+  }
+
+  /* ---------- 收集模式开关（回忆 / 克洛格 连续导航） ---------- */
+  function syncCollectSwitch() {
+    const mk = currentMarker;
+    const isCollect = !!(mk && (mk.cat === 'memory' || mk.cat === 'seed'));
+    $('collectRow').classList.toggle('hidden', !isCollect);
+    if (!isCollect) return;
+    const sw = $('collectSwitch');
+    sw.checked = LIVE.isModeActive(mk.cat);
+    sw.disabled = !(map.live && map.live.online);
+    sw.onchange = () => {
+      if (sw.checked) LIVE.startCollectMode(mk.cat, mk);
+      else LIVE.stopCollectMode();
+      syncCollectSwitch();
+    };
   }
 
   function positionCard() {
@@ -709,5 +728,5 @@ const UI = (() => {
     toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone };
+  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectSwitch };
 })();
