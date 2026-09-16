@@ -8,7 +8,7 @@
  *
  * 能力：
  *   1. 玩家位置红点 + 移动轨迹
- *   2. 点击标注 →「导航到这里」→ 金色引导线 + 距离
+ *   2. 点击标注 →「🧭 导航」→ 金色引导线 + 距离
  *   3. 存档收集进度吸收式合并：存档已收集的标注自动写回本地完成集合（持久化，离线可见）
  *   4. 统计面板统一为一套「收集进度」（存档同步 + 手动标记叠加）
  *   5. 服务离线时全站静默降级，普通地图功能不受影响
@@ -227,7 +227,7 @@ const LIVE = (() => {
   }
 
   /* ---------- 收集模式（回忆 / 克洛格 连续自动导航） ----------
-   * 点回忆 / 克洛格标注的「导航到这里」时，由标注卡上的「收集模式」开关开启：
+   * 点回忆 / 克洛格标注的「导航」时，由标注卡上的「收集」按钮开启：
    *   - 每 600ms 轮询：当前目标已收集（存档同步 / 手动勾选）→ 自动设下一个
    *     = 离玩家最近的未收集同类点；全部收集完 → 自动退出
    *   - 到达（≤15m）只提示不跳转：收集并保存后自动前进，避免还没解谜就被带走
@@ -330,7 +330,7 @@ const LIVE = (() => {
     if (!mode) return;
     mode = null;
     renderCollectBar();               // 隐藏横幅；当前引导线保留
-    if (UI && UI.syncCollectSwitch) UI.syncCollectSwitch();
+    if (UI && UI.syncCollectBtn) UI.syncCollectBtn();
   }
   function isModeActive(cat) { return !!(mode && mode.cat === cat); }
 
@@ -393,7 +393,7 @@ const LIVE = (() => {
         curEl.textContent = (cur && cur.id === curId) ? '目标：' + cur.name : '正在定位目标…';
       }
     }
-    if (UI && UI.syncCollectSwitch) UI.syncCollectSwitch();
+    if (UI && UI.syncCollectBtn) UI.syncCollectBtn();
   }
 
   /* ---------- 画布绘制（挂到 BotwMap.prototype._drawLive） ---------- */
