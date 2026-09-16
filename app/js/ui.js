@@ -17,6 +17,37 @@ const UI = (() => {
     map._onCoord = onCoord;
     map._onModeChange = onModeChange;
     map._onCustomChange = () => { saveCustom(); renderStats(); };
+    // 记录最近一次点地图的位置（canvas 相对），信息卡以此为锚点放置
+    map.canvas.addEventListener('click', e => {
+      const r = map.canvas.getBoundingClientRect();
+      map._lastClick = { sx: e.clientX - r.left, sy: e.clientY - r.top };
+    });
+    initCardDrag();
+  }
+
+  /* ---------- 信息卡拖拽（按住头部移动） ---------- */
+  function initCardDrag() {
+    const card = $('infoCard');
+    const head = card.querySelector('.card-head');
+    if (!head) return;
+    head.addEventListener('pointerdown', e => {
+      if (e.target.closest('.card-close')) return;          // 关闭按钮不触发拖拽
+      e.preventDefault();
+      const r0 = card.getBoundingClientRect();
+      const offX = e.clientX - r0.left, offY = e.clientY - r0.top;
+      const move = ev => {
+        const left = Math.max(8, Math.min(ev.clientX - offX, window.innerWidth - 60));
+        const top = Math.max(8, Math.min(ev.clientY - offY, window.innerHeight - 50));
+        card.style.left = left + 'px'; card.style.top = top + 'px';
+        card.style.right = 'auto'; card.style.bottom = 'auto';
+      };
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
   }
 
   /* ---------- 图层列表 ---------- */
@@ -273,8 +304,8 @@ const UI = (() => {
     // 导航按钮（live 层；离线时给出提示）
     $('cardNav').classList.remove('hidden');
     $('cardNav').onclick = () => LIVE.navigate(mk);
-    // 收集模式开关（仅回忆 / 克洛格 显示；live 层注入）
-    syncCollectSwitch();
+    // 收集按钮（仅回忆 / 克洛格 显示；live 层注入）
+    syncCollectBtn();
     $('cardDone').onclick = () => { map.doneSet.add(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name); };
     $('cardUndone').onclick = () => { map.doneSet.delete(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name); };
     positionCard();
@@ -296,7 +327,7 @@ const UI = (() => {
     $('cardUndone').classList.add('hidden');
     $('cardDelPin').classList.remove('hidden');
     $('cardNav').classList.add('hidden');
-    $('collectRow').classList.add('hidden');
+    $('cardCollect').classList.add('hidden');
     $('cardDelPin').onclick = () => {
       map.customMarkers = map.customMarkers.filter(x => x.id !== c.id);
       saveCustom(); hideInfo(); map.draw();
@@ -306,31 +337,45 @@ const UI = (() => {
     $('infoCard').classList.remove('hidden');
   }
 
-  /* ---------- 收集模式开关（回忆 / 克洛格 连续导航） ---------- */
-  function syncCollectSwitch() {
+  /* ---------- 收集按钮（回忆 / 克洛格 连续导航） ---------- */
+  function syncCollectBtn() {
     const mk = currentMarker;
     const isCollect = !!(mk && (mk.cat === 'memory' || mk.cat === 'seed'));
-    $('collectRow').classList.toggle('hidden', !isCollect);
+    $('cardCollect').classList.toggle('hidden', !isCollect);
     if (!isCollect) return;
-    const sw = $('collectSwitch');
-    sw.checked = LIVE.isModeActive(mk.cat);
-    sw.disabled = !(map.live && map.live.online);
-    sw.onchange = () => {
-      if (sw.checked) LIVE.startCollectMode(mk.cat, mk);
-      else LIVE.stopCollectMode();
-      syncCollectSwitch();
+    const btn = $('cardCollect');
+    const active = LIVE.isModeActive(mk.cat);
+    btn.classList.toggle('on', active);
+    btn.textContent = active ? '收集中' : '收集';
+    btn.disabled = !(map.live && map.live.online);
+    btn.onclick = () => {
+      if (active) { LIVE.stopCollectMode(); toast('已结束收集模式'); }
+      else LIVE.startCollectMode(mk.cat, mk);
+      syncCollectBtn();
     };
   }
 
   function positionCard() {
     const card = $('infoCard');
-    card.style.left = 'auto'; card.style.right = 'auto';
-    card.style.left = '14px';
-    card.style.top = 'calc(100% - 14px)';
-    card.style.top = 'auto';
-    card.style.bottom = '14px';
-    card.style.maxHeight = '70%';
-    card.style.overflowY = 'auto';
+    const vw = window.innerWidth, vh = window.innerHeight;
+    card.style.right = 'auto'; card.style.bottom = 'auto';
+    card.style.maxHeight = '70%'; card.style.overflowY = 'auto';
+    // 桌面侧边栏展开时避让（300px）；折叠或手机抽屉时不避让
+    const sidebar = document.getElementById('sidebar');
+    const guard = (sidebar && !sidebar.classList.contains('collapsed')) ? 312 : 12;
+    // 锚点：最近一次点击地图的位置；无记录则用画布中心偏上
+    const r = map.canvas.getBoundingClientRect();
+    let ax = r.left + r.width / 2, ay = r.top + r.height * 0.45;
+    if (map._lastClick) { ax = r.left + map._lastClick.sx; ay = r.top + map._lastClick.sy; }
+    const cw = card.offsetWidth || 300;
+    const ch = Math.min(card.offsetHeight || 320, vh * 0.7);
+    let left = ax + 20;                                   // 锚点右侧
+    let top = ay - ch / 2;                                // 纵向居中于锚点
+    if (left + cw > vw - 10) left = ax - cw - 20;         // 放不下 → 锚点左侧
+    left = Math.max(guard, Math.min(left, vw - cw - 10));
+    top = Math.max(10, Math.min(top, vh - 90));
+    card.style.left = left + 'px';
+    card.style.top = top + 'px';
   }
 
   function hideInfo() {
@@ -728,5 +773,5 @@ const UI = (() => {
     toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectSwitch };
+  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn };
 })();
