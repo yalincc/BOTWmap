@@ -28,5 +28,15 @@ live-go/dist/
 *.exe~
 
 # live-go 浮窗版归档（复盘留底，不入库）
-归档/BotwNavi-浮窗-20260915/
+归档/
 live/_research/botw-re-notes/
+
+# 过程文档(md)不入库：README 例外
+*.md
+!README.md
+!live-go/README.md
+!live/README.md
+
+# live-go 运行时/编译产物不入库（本地位于 live-go/）
+live-go/known_addrs.json
+live-go/BotwNavi.exe
