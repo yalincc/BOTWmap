@@ -248,6 +248,10 @@ func loadKnownAddrs() []uintptr {
 }
 
 // verifyKnown 后台校验锁定的地址，读不到时重新定位。
+// 死槽保护：remembered-offset 快速路径（source="known"）可能锁到 Ryujinx 重启后
+// 残留的旧坐标槽——地址可读、数值合理但永不更新。此时 verifyKnown 永远等不到
+// "移动"信号（verified 一直 false），位置追踪/导航/收集全部按错误坐标工作。
+// 处理：known 地址长时间无移动 → 按存档锚点重新扫描定位（20s 首试，失败后 2min 重试）。
 func verifyKnown(addr uintptr) {
 	procMu.Lock()
 	h := procHandle
@@ -257,6 +261,9 @@ func verifyKnown(addr uintptr) {
 	}
 	prev := decodePos(readMem(h, addr, 12))
 	bad := 0
+	smoothN := 0
+	staleSince := time.Now()
+	staleGap := 20 * time.Second
 	for {
 		time.Sleep(300 * time.Millisecond)
 		lock.mu.RLock()
@@ -302,17 +309,53 @@ func verifyKnown(addr uintptr) {
 			continue
 		}
 		bad = 0
-		if prev != nil && (abs32(cur[0]-prev[0]) > 0.2 || abs32(cur[1]-prev[1]) > 0.2 || abs32(cur[2]-prev[2]) > 0.2) {
+		// 位移量（游戏单位/次采样 ≈ 0.3s）。正常走/跑/骑/滑翔单次采样位移远小于
+		// verifyJumpMax；快传、读错槽、或跳到无关数据才会出现大跳变。
+		delta := float32(math.Inf(1))
+		if prev != nil {
+			dx, dy, dz := cur[0]-prev[0], cur[1]-prev[1], cur[2]-prev[2]
+			delta = float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+		}
+		// 平滑移动：位移在 (verifyMoveMin, verifyJumpMax) 区间，且连续多次才确认。
+		// 避免把"静止时抖动"或"坏槽跳变"误判为玩家在移动。
+		if prev != nil && delta > verifyMoveMin && delta < verifyJumpMax {
+			smoothN++
+		} else {
+			smoothN = 0
+		}
+		if smoothN >= verifySmoothN {
 			lock.mu.Lock()
 			if !lock.verified {
-				fmt.Printf("  [verify] address 0x%X is live (moved) -> verified\n", addr)
+				fmt.Printf("  [verify] address 0x%X is live (moving smoothly) -> verified\n", addr)
 				lock.verified = true
 			}
 			lock.mu.Unlock()
 		}
 		prev = cur
+		// 死槽/坏槽保护（仅针对 remembered-offset 快速路径 source="known"）：
+		// 未确认期间，地址可读但始终等不到平滑移动——要么是 Ryujinx 重启后残留的
+		// 死槽（静止不动），要么是跳到无关数据的坏槽（跳变），都不是玩家坐标槽。
+		// 超时后按存档锚点重新扫描定位（20s 首试，失败后 2min 重试）。
+		lock.mu.RLock()
+		staleSrc, verifiedNow := lock.source, lock.verified
+		lock.mu.RUnlock()
+		if staleSrc == "known" && !verifiedNow && time.Since(staleSince) >= staleGap {
+			fmt.Printf("  [verify] address 0x%X never moves smoothly (%v); stale/bad slot -> re-locating\n", addr, staleGap)
+			relocalize("remembered address is stale or erratic (no smooth movement)")
+			if lock.addr != addr {
+				return
+			}
+			staleSince, staleGap = time.Now(), 2*time.Minute
+		}
 	}
 }
+
+// verifyKnown 的移动判定参数（见上方注释）。
+const (
+	verifyMoveMin  = 0.2  // 判定"在移动"的最小位移（游戏单位/采样）
+	verifyJumpMax  = 50.0 // 单次采样位移上限：正常移动不可能超过（快传/坏槽会超）
+	verifySmoothN  = 3    // 连续 N 次平滑移动才确认 verified
+)
 
 // relocalize 方案 B：save anchor 扫描 + shortlist 监听。
 func relocalize(reason string) bool {

@@ -329,10 +329,45 @@ for layerDef in T:
                 cn_name = '神庙挑战：%s' % shrine_cn if shrine_cn else '神庙挑战'
                 extra = {'quest_en': name_en}
             elif cat_key == 'memory':
-                mm = re.match(r'Recovered Memory #(\d+) - (.+?)(?: \(Picture (\d+)\))?$', name_en)
+                # 回忆分层：照片(photo,可导航收集) / 主线自动(auto,英杰+大师剑) / DLC(dlc,英杰之诗)
+                # 照片N↔回忆#N 固定映射(Impa 相册顺序 ≠ 游戏内回忆连续编号):
+                #   照片1→#1 照片2→#3 照片3→#5 照片4→#7 照片5→#8 照片6→#9
+                #   照片7→#11 照片8→#12 照片9→#13 照片10→#14 照片11→#15 照片12→#16 照片13→#17
+                PHOTO_OF_MEMNO = {1: 1, 3: 2, 5: 3, 7: 4, 8: 5, 9: 6,
+                                  11: 7, 12: 8, 13: 9, 14: 10, 15: 11, 16: 12, 17: 13}
+                EX_NO_OF_TITLE = {
+                    "Champion Revali's Song": 1, "Champion Daruk's Song": 2,
+                    "Champion Urbosa's Song": 3, "Champion Mipha's Song": 4,
+                    "The Champions' Ballad": 5,
+                }
+                mm = re.match(r'(?:EX )?Recovered Memory #(\d+) - (.+?)(?: \(Picture (\d+)\))?$', name_en)
                 if mm:
-                    extra['memory_no'] = int(mm.group(1))
-                    extra['memory_title_en'] = mm.group(2)
+                    no = int(mm.group(1))
+                    title_en = mm.group(2)
+                    is_ex = name_en.startswith('EX ')
+                    if is_ex:
+                        # DLC 英杰之诗回忆：与照片回忆共用编号空间会冲突，用 ex_no 标识，不占 memory_no
+                        extra['tier'] = 'dlc'
+                        extra['ex_no'] = EX_NO_OF_TITLE.get(title_en, no)
+                        extra['nav'] = False
+                    elif no in (2, 4, 6, 10):
+                        # 英杰回忆（解放神兽后自动获得）
+                        extra['tier'] = 'auto'
+                        extra['kind'] = 'beast'
+                        extra['nav'] = False
+                    elif no == 18:
+                        # 大师之剑回忆（拔剑后自动获得）
+                        extra['tier'] = 'auto'
+                        extra['kind'] = 'sword'
+                        extra['nav'] = False
+                    else:
+                        # 照片回忆 13 个（含最终 #17 = 照片13），可导航收集
+                        extra['tier'] = 'photo'
+                        extra['photoNo'] = PHOTO_OF_MEMNO.get(no)
+                        extra['nav'] = True
+                    if not is_ex:
+                        extra['memory_no'] = no
+                    extra['memory_title_en'] = title_en
                 cn_name = en2cn(name_en, '')
                 if not cn_name:
                     cn_name = '回忆影片 #%s' % (extra.get('memory_no', mid))

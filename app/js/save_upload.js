@@ -120,9 +120,17 @@ const SAVE_UPLOAD = (() => {
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
 
     // 吸收式合并：写回本地完成集合
+    // flag 引用：单值 [t,id] / [t,id,tier]；多值 [[t,id],[t,id,tier],...]（英杰回忆与神兽共用 Clear_Remains*）
+    const expandRefs = v => (Array.isArray(v[0]) ? v : [v]);
     let grew = 0;
-    for (const [t, id] of done.values()) {
-      if (!map.doneSet.has(id)) { map.doneSet.add(id); grew++; }
+    const byT = {}, memByTier = {};
+    for (const v of done.values()) {
+      for (const ref of expandRefs(v)) {
+        const t = ref[0], id = ref[1], tier = ref[2];
+        byT[t] = (byT[t] || 0) + 1;
+        if (t === 'memory') memByTier[tier || '?'] = (memByTier[tier || '?'] || 0) + 1;
+        if (id && !map.doneSet.has(id)) { map.doneSet.add(id); grew++; }
+      }
     }
     if (grew > 0) {
       UI.persistDone();
@@ -135,11 +143,16 @@ const SAVE_UPLOAD = (() => {
     UI.renderStats();
 
     // 摘要
-    const byT = {};
-    for (const [t] of done.values()) byT[t] = (byT[t] || 0) + 1;
     const parts = [];
-    for (const k of ['shrine', 'tower', 'korok', 'memory', 'beast']) {
+    for (const k of ['shrine', 'tower', 'korok', 'beast']) {
       if (byT[k]) parts.push(CAT_CN[k] + ' ' + byT[k]);
+    }
+    if (byT.memory) {
+      const mp = [];
+      if (memByTier.photo) mp.push('照片 ' + memByTier.photo);
+      if (memByTier.auto) mp.push('主线 ' + memByTier.auto);
+      if (memByTier.dlc) mp.push('DLC ' + memByTier.dlc);
+      parts.push('回忆 ' + (mp.length ? mp.join('/') : byT.memory));
     }
     const hrs = (playtime / 3600).toFixed(1);
     UI.toast('已从存档加载 ✓ ' + parts.join(' · ') + (playtime ? '（游玩 ' + hrs + ' 小时）' : ''));

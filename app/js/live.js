@@ -235,7 +235,10 @@ const LIVE = (() => {
    *     （EX / 英杰回忆无收集记录，不自动排队，仍可手动导航单点）
    *   - 退出：横幅「结束」/ 手动导航其他类别标注 / 服务离线自动暂停（恢复后继续）
    */
-  const MEMORY_PHOTO_NOS = new Set([1, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17]); // 主线回忆 13 个（照片N↔回忆#N，见 build_progress.py）
+  // 照片回忆 13 个（tier='photo'，含最终 #17）才进收集自动队列；EX / 英杰 / 大师剑自动获得不排队
+  function isPhotoMemory(mk) {
+    return !!(mk.extra && mk.extra.tier === 'photo');
+  }
   const ARRIVE_M = 15;                 // 到达提示阈值（游戏米，1px = 0.5m）
   let mode = null;                     // { cat, arrivedShown } 当前收集模式
   let curId = null;                    // 当前导航目标标记 id
@@ -244,10 +247,7 @@ const LIVE = (() => {
     const out = [];
     for (const mk of map.markers) {
       if (mk.cat !== cat) continue;
-      if (cat === 'memory') {
-        const no = mk.extra && mk.extra.memory_no;
-        if (!no || !MEMORY_PHOTO_NOS.has(no)) continue;  // EX / 英杰回忆不进自动队列
-      }
+      if (cat === 'memory' && !isPhotoMemory(mk)) continue;  // EX / 英杰 / 大师剑不进自动队列
       if (map._mkDone(mk)) continue;                      // 已收集（存档同步 / 手动勾选）
       out.push(mk);
     }
@@ -265,17 +265,13 @@ const LIVE = (() => {
     return best;
   }
   function collectCounts(cat) {
-    // 优先用服务返回的存档计数（克洛格 900 / 主线回忆 13），缺失时按标记现算
+    // 回忆按照片 13 个现算（存档逐点已同步到标记）；克洛格用服务返回的 900 总数
     const c = map.live.counts || {};
     if (cat === 'seed' && c.korok) return c.korok;
-    if (cat === 'memory' && c.memory) return c.memory;
     let t = 0, d = 0;
     for (const mk of map.markers) {
       if (mk.cat !== cat) continue;
-      if (cat === 'memory') {
-        const no = mk.extra && mk.extra.memory_no;
-        if (!no || !MEMORY_PHOTO_NOS.has(no)) continue;
-      }
+      if (cat === 'memory' && !isPhotoMemory(mk)) continue;
       t++;
       if (map._mkDone(mk)) d++;
     }

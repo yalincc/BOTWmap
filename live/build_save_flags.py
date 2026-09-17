@@ -59,7 +59,21 @@ def main():
         if len(hits) != 1:
             miss.append((p.get("t"), p.get("hash"), p.get("en"), len(hits)))
             continue
-        out[str(key_hash)] = [t, hits[0]["id"]]
+        # [t, marker_id] + 可选第三元素 tier（回忆分层：photo/auto/dlc，前端摘要细分用）
+        entry = [t, hits[0]["id"]]
+        if p.get("tier"):
+            entry.append(p["tier"])
+        key = str(key_hash)
+        old = out.get(key)
+        if old is None:
+            out[key] = entry
+        else:
+            # 同 hash 命中多个标记（英杰回忆与神兽共用 Clear_Remains* 等）→ 合并为多值，
+            # 前端上传存档时全部打勾：{hash: [[t,id], [t,id,tier], ...]}
+            if isinstance(old[0], list):
+                old.append(entry)
+            else:
+                out[key] = [old, entry]
 
     with io.open(OUT, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))

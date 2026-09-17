@@ -31,6 +31,8 @@ type ProgressPoint struct {
 	Done     bool    `json:"done"`
 	Entered  bool    `json:"entered,omitempty"`
 	Dlc      bool    `json:"dlc,omitempty"`
+	Tier     string  `json:"tier,omitempty"`     // 回忆分层：photo/auto/dlc
+	PhotoNo  int     `json:"photoNo,omitempty"`  // 照片编号 1-13（13=最终回忆）
 }
 
 type progressWatcher struct {
@@ -151,11 +153,47 @@ func (w *progressWatcher) refresh() {
 	for i, name := range progTypes {
 		counts[name] = [2]int{doneN[i], totalN[i]}
 	}
+	// 回忆拆档：照片12（不含最终）/ 最终1（照片13）/ 主线自动5（英杰4+大师剑1）/ DLC EX5
+	var mp, mf, ma, md [2]int
+	for _, p := range pts {
+		if p.T != "memory" {
+			continue
+		}
+		switch {
+		case p.Tier == "photo" && p.PhotoNo != 13:
+			mp[1]++
+			if p.Done {
+				mp[0]++
+			}
+		case p.Tier == "photo" && p.PhotoNo == 13:
+			mf[1]++
+			if p.Done {
+				mf[0]++
+			}
+		case p.Tier == "auto":
+			ma[1]++
+			if p.Done {
+				ma[0]++
+			}
+		case p.Tier == "dlc":
+			md[1]++
+			if p.Done {
+				md[0]++
+			}
+		}
+	}
+	counts["memory_photo"] = mp
+	counts["memory_final"] = mf
+	counts["memory_auto"] = ma
+	counts["memory_dlc"] = md
+	// PictureMemory_Spot_Int：还剩几处未造访（s32 倒计时）
+	const hSpot uint32 = 0x73F13FBC
 	gen := time.Now().Format("2006-01-02 15:04:05")
 	obj := map[string]any{
 		"ok":        true,
 		"points":    pts,
 		"counts":    counts,
+		"spot_int":  int(entries[hSpot]),
 		"generated": gen,
 		"source":    "live-go",
 	}

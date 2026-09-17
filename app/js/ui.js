@@ -163,8 +163,24 @@ const UI = (() => {
     }
     return [d, t];
   }
+  // 回忆分层统计：照片12（不含最终）/ 最终1（照片13）/ 主线自动5（英杰4+大师剑1）/ DLC EX5
+  function memoryCounts() {
+    const PHOTO_MEMNOS = [1, 3, 5, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17];
+    const r = { photo: [0, 0], final: [0, 0], auto: [0, 0], dlc: [0, 0] };
+    for (const mk of map.data.markers) {
+      if (mk.cat !== 'memory') continue;
+      const ex = mk.extra || {};
+      const tier = ex.tier || (ex.memory_no == null ? 'dlc'
+        : (PHOTO_MEMNOS.indexOf(ex.memory_no) >= 0 ? 'photo' : 'auto'));
+      const bucket = tier === 'photo' ? (ex.photoNo === 13 ? r.final : r.photo)
+                   : tier === 'auto' ? r.auto : r.dlc;
+      bucket[1]++;
+      if (map._mkDone(mk)) bucket[0]++;
+    }
+    return r;
+  }
   function renderStats() {
-    const focus = ['shrine', 'tower', 'beast', 'seed', 'memory', 'treasure'];
+    const focus = ['shrine', 'tower', 'beast', 'seed', 'treasure'];
     let html = `<h4>收集进度</h4>`;
     // 存档同步状态行：live 服务已载入存档进度 或 本会话上传过存档（离线且未上传时不显示）
     const lc = map.live && map.live.counts;
@@ -178,6 +194,32 @@ const UI = (() => {
       if (!t) continue;
       html += `<div class="stat-row"><span class="k">${cat.cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
+    }
+    // 回忆分档 4 行：照片记忆 / 最终 / 主线自动 / DLC EX
+    const m = memoryCounts();
+    if (m.photo[1] || m.final[1] || m.auto[1] || m.dlc[1]) {
+      // 显示口径：有存档 counts 以存档为准（live 服务 / 逐点 flag），否则用手动标记
+      const savedOf = k => (lc && lc[k]) ? lc[k][0] : null;
+      const photoDone = savedOf('memory_photo') != null ? savedOf('memory_photo') : m.photo[0];
+      const finalDone = savedOf('memory_final') != null ? savedOf('memory_final') : m.final[0];
+      const autoDone = savedOf('memory_auto') != null ? savedOf('memory_auto') : m.auto[0];
+      const dlcDone = savedOf('memory_dlc') != null ? savedOf('memory_dlc') : m.dlc[0];
+      // 还剩几处未造访：存档倒计时（PictureMemory_Spot_Int）优先，离线用 12-已恢复 推导
+      const remain = (lc && typeof lc.spot_int === 'number') ? lc.spot_int
+                   : Math.max(0, 12 - photoDone);
+      html += `<div class="stat-row stat-mem"><span class="k">回忆 · 照片记忆</span><span class="v">${photoDone} / 12 ${pct(photoDone, 12, true)}</span></div>`;
+      html += `<div class="stat-bar"><i style="width:${pct(photoDone, 12)}"></i></div>`;
+      let note = `还剩 ${remain} 处未造访`;
+      if (m.photo[0] !== photoDone) {
+        note += ` · <span class="warn">手动标记 ${m.photo[0]}（以存档为准）</span>`;
+      }
+      html += `<div class="stat-note">${note}</div>`;
+      html += `<div class="stat-row stat-mem"><span class="k">回忆 · 最终</span><span class="v">${finalDone} / 1</span></div>`;
+      html += `<div class="stat-bar"><i style="width:${pct(finalDone, 1)}"></i></div>`;
+      html += `<div class="stat-row stat-mem"><span class="k">回忆 · 主线自动</span><span class="v">${autoDone} / 5 ${pct(autoDone, 5, true)}</span></div>`;
+      html += `<div class="stat-bar"><i style="width:${pct(autoDone, 5)}"></i></div>`;
+      html += `<div class="stat-row stat-mem"><span class="k">回忆 · DLC EX</span><span class="v">${dlcDone} / 5 ${pct(dlcDone, 5, true)}</span></div>`;
+      html += `<div class="stat-bar"><i style="width:${pct(dlcDone, 5)}"></i></div>`;
     }
     $('statsPanel').innerHTML = html;
   }

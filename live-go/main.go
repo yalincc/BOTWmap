@@ -98,8 +98,8 @@ func main() {
 
 	go poll()
 	go watchdog()
-	if lockAddr() != 0 {
-		go verifyKnown(lockAddr())
+	if a0 := lockAddr(); a0 != 0 {
+		go verifyKnown(a0)
 	}
 
 	time.Sleep(500 * time.Millisecond)

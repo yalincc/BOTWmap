@@ -178,6 +178,11 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .stat-row .k { color: var(--text-dim); }
 .stat-row .v { color: var(--text); font-weight: 600; }
 .stat-sync { font-size: 10.5px; color: #7dffa0; margin: 2px 0 6px; letter-spacing: .3px; }
+.stat-mem .k { padding-left: 10px; }
+.stat-mem { margin-top: 6px; }
+.stat-note { font-size: 10.5px; color: var(--text-dim); margin: -2px 0 4px; padding-left: 10px; line-height: 1.5; }
+.stat-note b { color: #ffd166; font-weight: 600; }
+.stat-note .warn { color: #ff9b66; }
 /* 存档上传入口 */
 .save-upload { position: relative; flex: 0 0 auto; padding: 0 14px 8px; border-top: 1px solid var(--border); }
 .save-upload .su-row { display: flex; gap: 6px; align-items: center; }

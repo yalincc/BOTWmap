@@ -206,24 +206,65 @@ def main():
         })
         n_ko += 1
 
-    # ---- memories: IsGet_MemoryPhoto_000..012 = 主线照片1~13 ----
-    # 地图标记名只保留「回忆#N」(游戏内连续编号)，不再带「(照片N)」后缀。
-    # 照片N ↔ 回忆#N 是固定映射(Impa 相册顺序 ≠ 游戏内回忆连续编号):
-    #   照片1→#1  照片2→#3  照片3→#5  照片4→#7  照片5→#8  照片6→#9  照片7→#11
-    #   照片8→#12 照片9→#13 照片10→#14 照片11→#15 照片12→#16 照片13→#17
-    PHOTO_TO_MEMNO = {1:1, 2:3, 3:5, 4:7, 5:8, 6:9, 7:11, 8:12, 9:13, 10:14, 11:15, 12:16, 13:17}
-    mem_mk = {int(re.search(r"#(\d+)", x.get("name") or "").group(1)): x
-              for x in markers if x["cat"] == "memory" and re.search(r"#(\d+)", x.get("name") or "")}
-    n_mem = 0
-    for i in range(13):
-        photo = i + 1
-        mk = mem_mk.get(PHOTO_TO_MEMNO[photo])
-        if mk is None:
-            print("  [memory] no marker for photo", photo, "(mem#%d)" % PHOTO_TO_MEMNO[photo], file=sys.stderr)
+    # ---- memories: 全量 23 个，全自动逐点判定 ----
+    # 照片回忆 13 个用「影片已播放」flag IsPlayed_Demo126_0~138_0 逐点判定，替代旧的
+    # IsGet_MemoryPhoto_000~012（= 照片入手 flag，英帕给照片即置1，不等于已恢复）。
+    # 编号→flag 映射经 zeldamods Demo 表 + 存档三方互证：
+    #   其1→126 其3→127 其5→128 其7→129 其8→130 其9→131 其14→132 其11→133
+    #   其12→134 其13→135 其15→136 其16→137 其17(最终)→138
+    # 英杰(其2/4/6/10)=Clear_Remains*；大师剑(其18)=Get_MasterSword_Finish；EX=BalladOfHero*_Finish
+    # 交叉校验：照片已恢复数 应 == 12 - PictureMemory_Spot_Int（还剩几处未造访）
+    MEMORY_FLAGS = [
+        # (游戏内回忆编号 or None, tier, flag, en 子串匹配[仅 EX])
+        (1,  "photo", "IsPlayed_Demo126_0", None),     # 其1 空有形式的仪式
+        (3,  "photo", "IsPlayed_Demo127_0", None),     # 其3 决意与苦恼
+        (5,  "photo", "IsPlayed_Demo128_0", None),     # 其5 萨尔达的焦躁
+        (7,  "photo", "IsPlayed_Demo129_0", None),     # 其7 依盖队之凶刃
+        (8,  "photo", "IsPlayed_Demo130_0", None),     # 其8 预兆
+        (9,  "photo", "IsPlayed_Demo131_0", None),     # 其9 宁静公主
+        (14, "photo", "IsPlayed_Demo132_0", None),     # 其14 前往拉聂尔山
+        (11, "photo", "IsPlayed_Demo133_0", None),     # 其11 躲雨
+        (12, "photo", "IsPlayed_Demo134_0", None),     # 其12 父与女
+        (13, "photo", "IsPlayed_Demo135_0", None),     # 其13 未觉醒的力量
+        (15, "photo", "IsPlayed_Demo136_0", None),     # 其15 大灾厄复活
+        (16, "photo", "IsPlayed_Demo137_0", None),     # 其16 绝望
+        (17, "photo", "IsPlayed_Demo138_0", None),     # 其17 萨尔达觉醒（最终，照片13）
+        (2,  "auto",  "Clear_RemainsWind", None),      # 其2 英杰 力巴尔
+        (4,  "auto",  "Clear_RemainsFire", None),      # 其4 英杰 达尔克尔
+        (6,  "auto",  "Clear_RemainsElectric", None),  # 其6 英杰 乌尔波札
+        (10, "auto",  "Clear_RemainsWater", None),     # 其10 英杰 米法
+        (18, "auto",  "Get_MasterSword_Finish", None), # 其18 大师之剑
+        (None, "dlc", "BalladOfHeroRito_Finish", "Revali"),    # EX 其1 力巴尔之诗
+        (None, "dlc", "BalladOfHeroGoron_Finish", "Daruk"),    # EX 其2 达尔克尔之诗
+        (None, "dlc", "BalladOfHeroZora_Finish", "Mipha"),     # EX 其3 米法之诗
+        (None, "dlc", "BalladOfHeroGerudo_Finish", "Urbosa"),  # EX 其4 乌尔波扎之诗
+        (None, "dlc", "BalladOfHeroes_Finish", "Champions"),   # EX 其5 英杰之诗
+    ]
+    mem_mk = {}
+    for x in markers:
+        if x["cat"] != "memory":
             continue
-        h = crc32("IsGet_MemoryPhoto_%03d" % i)
+        ex = x.get("extra") or {}
+        if ex.get("tier") == "dlc":
+            mem_mk.setdefault("dlc:" + (x.get("en") or ""), x)
+            continue
+        m = re.search(r"#(\d+)", x.get("name") or "")
+        if m:
+            mem_mk.setdefault(int(m.group(1)), x)
+    n_mem = 0
+    for no, tier, flag, en_sub in MEMORY_FLAGS:
+        if en_sub:
+            mk = next((v for k, v in mem_mk.items()
+                       if isinstance(k, str) and en_sub in k), None)
+        else:
+            mk = mem_mk.get(no)
+        if mk is None:
+            print("  [memory] no marker for", no or en_sub, file=sys.stderr)
+            continue
+        h = crc32(flag)
         points.append({
-            "t": "memory", "hash": h,
+            "t": "memory", "hash": h, "tier": tier,
+            "photoNo": mk.get("extra", {}).get("photoNo"),
             "en": mk.get("en") or "", "cn": mk.get("name") or "",
             "x": round(mk["px"][0], 3), "y": round(mk["px"][1], 3),
             "done": entries.get(h, 0) != 0,
@@ -259,17 +300,29 @@ def main():
     n_ko_list = [p for p in points if p["t"] == "korok"]
     n_mem_list = [p for p in points if p["t"] == "memory"]
     n_beast_list = [p for p in points if p["t"] == "beast"]
+    # 回忆拆档：照片12（不含最终）/ 最终1（照片13）/ 主线自动5（英杰4+大师剑1）/ DLC EX5
+    mem_photo = [p for p in n_mem_list if p.get("tier") == "photo" and p.get("photoNo") != 13]
+    mem_final = [p for p in n_mem_list if p.get("tier") == "photo" and p.get("photoNo") == 13]
+    mem_auto = [p for p in n_mem_list if p.get("tier") == "auto"]
+    mem_dlc = [p for p in n_mem_list if p.get("tier") == "dlc"]
+    H_SPOT = crc32("PictureMemory_Spot_Int")   # s32 倒计时：还剩几处未造访
+    spot_int = entries.get(H_SPOT, 0)
     obj = {
         "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
         "save": path,
         "playtime": meta["playtime"],
         "korok_counter": meta["korok_counter"],
+        "spot_int": spot_int,
         "counts": {
             "shrine": [sum(1 for p in n_sh_list if p["done"]), len(n_sh_list)],
             "tower": [sum(1 for p in n_tw_list if p["done"]), len(n_tw_list)],
             "korok": [sum(1 for p in n_ko_list if p["done"]), len(n_ko_list)],
             "memory": [sum(1 for p in n_mem_list if p["done"]), len(n_mem_list)],
             "beast": [sum(1 for p in n_beast_list if p["done"]), len(n_beast_list)],
+            "memory_photo": [sum(1 for p in mem_photo if p["done"]), len(mem_photo)],
+            "memory_final": [sum(1 for p in mem_final if p["done"]), len(mem_final)],
+            "memory_auto": [sum(1 for p in mem_auto if p["done"]), len(mem_auto)],
+            "memory_dlc": [sum(1 for p in mem_dlc if p["done"]), len(mem_dlc)],
         },
         "points": points,
     }
@@ -279,6 +332,7 @@ def main():
     print("wrote %s" % OUT)
     print("  save   : %s  playtime=%d  korokCounter=%d"
           % (path, meta["playtime"], meta["korok_counter"]))
+    print("  spot   : PictureMemory_Spot_Int=%d (还剩 %d 处未造访)" % (spot_int, spot_int))
     print("  points : %d  (shrine %d, tower %d, korok %d, memory %d, beast %d)"
           % (len(points), len(n_sh_list), len(n_tw_list), len(n_ko_list),
              len(n_mem_list), len(n_beast_list)))
@@ -289,6 +343,11 @@ def main():
              obj["counts"]["korok"][0], obj["counts"]["korok"][1],
              obj["counts"]["memory"][0], obj["counts"]["memory"][1],
              obj["counts"]["beast"][0], obj["counts"]["beast"][1]))
+    print("  memory : photo %d/%d · final %d/%d · auto %d/%d · dlc %d/%d"
+          % (obj["counts"]["memory_photo"][0], obj["counts"]["memory_photo"][1],
+             obj["counts"]["memory_final"][0], obj["counts"]["memory_final"][1],
+             obj["counts"]["memory_auto"][0], obj["counts"]["memory_auto"][1],
+             obj["counts"]["memory_dlc"][0], obj["counts"]["memory_dlc"][1]))
     entered = sum(1 for p in n_sh_list if p["entered"])
     print("  entered: shrines %d/%d" % (entered, len(n_sh_list)))
     return 0
