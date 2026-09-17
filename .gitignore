@@ -36,6 +36,7 @@ live/_research/botw-re-notes/
 !README.md
 !live-go/README.md
 !live/README.md
+!CHANGELOG.md
 
 # live-go 运行时/编译产物不入库（本地位于 live-go/）
 live-go/known_addrs.json
