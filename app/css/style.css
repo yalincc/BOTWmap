@@ -1,4 +1,4 @@
-﻿/* ============ 鏃烽噹涔嬫伅浜掑姩鍦板浘 鏍峰紡 ============ */
+/* ============ 鏃烽噹涔嬫伅浜掑姩鍦板浘 鏍峰紡 ============ */
 :root {
   --bg: #0e1410;
   --panel: rgba(18, 26, 20, .92);
@@ -169,6 +169,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lrow .lname { flex: 1; }
 .lrow .lcount { color: var(--text-dim); font-size: 11.5px; }
 .lrow .lprog { font-size: 11px; min-width: 52px; text-align: right; }
+.lrow .lsub { color: var(--text-dim); font-size: 10px; margin-left: 6px; white-space: nowrap; }
 .lrow.done .lname { color: var(--text-dim); }
 
 /* ---------- 缁熻 ---------- */
@@ -178,7 +179,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .stat-row .k { color: var(--text-dim); }
 .stat-row .v { color: var(--text); font-weight: 600; }
 .stat-sync { font-size: 10.5px; color: #7dffa0; margin: 2px 0 6px; letter-spacing: .3px; }
-.stat-mem .k { padding-left: 10px; }
+.stat-mem .k { padding-left: 0; }
 .stat-mem { margin-top: 6px; }
 .stat-note { font-size: 10.5px; color: var(--text-dim); margin: -2px 0 4px; padding-left: 10px; line-height: 1.5; }
 .stat-note b { color: #ffd166; font-weight: 600; }

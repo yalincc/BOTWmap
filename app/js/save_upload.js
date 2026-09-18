@@ -129,7 +129,11 @@ const SAVE_UPLOAD = (() => {
         const t = ref[0], id = ref[1], tier = ref[2];
         byT[t] = (byT[t] || 0) + 1;
         if (t === 'memory') memByTier[tier || '?'] = (memByTier[tier || '?'] || 0) + 1;
-        if (id && !map.doneSet.has(id)) { map.doneSet.add(id); grew++; }
+        if (id) {
+          if (!map.liveDone) map.liveDone = new Set();
+          map.liveDone.add(id);          // 存档来源已完成（供 _mkDone 回忆类存档优先判定）
+          if (!map.doneSet.has(id)) { map.doneSet.add(id); grew++; }
+        }
       }
     }
     if (grew > 0) {

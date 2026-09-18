@@ -83,10 +83,12 @@ const UI = (() => {
         const total = map.data.markers.filter(mk => mk.cat === key).length;
         const row = document.createElement('label');
         row.className = 'lrow';
+        const dispName = key === 'memory' ? '照片记忆（12+1）' : cat.cn;
+/* 副标已移除 */
         row.innerHTML = `
           <input type="checkbox" data-cat="${key}" ${map.enabled.has(key) ? 'checked' : ''}>
           <span class="dot" style="background:${cfg.color || '#888'}"></span>
-          <span class="lname">${cat.cn}</span>
+          <span class="lname">${dispName}</span>
           <span class="lprog" id="prog_${key}"></span>
         `;
         row.addEventListener('change', () => {
@@ -141,7 +143,8 @@ const UI = (() => {
     for (const cat of map.data.categories) {
       const el = $('prog_' + cat.key);
       if (!el) continue;
-      const [done, total] = catCount(cat.key);
+      // 回忆类别与统计面板同口径：有存档 counts 以存档为准，否则按标点完成
+      const [done, total] = cat.key === 'memory' ? memoryDoneTotal() : catCount(cat.key);
       el.textContent = done ? `${done}/${total}` : '';
       el.style.color = done === total ? '#7dffa0' : 'var(--text-dim)';
     }
@@ -172,12 +175,24 @@ const UI = (() => {
       const ex = mk.extra || {};
       const tier = ex.tier || (ex.memory_no == null ? 'dlc'
         : (PHOTO_MEMNOS.indexOf(ex.memory_no) >= 0 ? 'photo' : 'auto'));
-      const bucket = tier === 'photo' ? (ex.photoNo === 13 ? r.final : r.photo)
+      const isFinalMem = tier === 'final' || (tier === 'photo' && ex.photoNo === 13);
+      const bucket = isFinalMem ? r.final
+                   : tier === 'photo' ? r.photo
                    : tier === 'auto' ? r.auto : r.dlc;
       bucket[1]++;
       if (map._mkDone(mk)) bucket[0]++;
     }
     return r;
+  }
+  // 回忆类别合计 [已完成, 总数]：与统计面板同口径（有存档 counts 以存档为准，否则按标点完成）
+  function memoryDoneTotal() {
+    // 图层进度口径：只统计 13 个照片回忆（照片12 + 最终1）；主线自动 / DLC 不标注、不计数
+    const m = memoryCounts();
+    const lc = map.live && map.live.counts;
+    const savedOf = k => (lc && lc[k]) ? lc[k][0] : null;
+    const photo = savedOf('memory_photo') != null ? savedOf('memory_photo') : m.photo[0];
+    const final = savedOf('memory_final') != null ? savedOf('memory_final') : m.final[0];
+    return [photo + final, m.photo[1] + m.final[1]];
   }
   function renderStats() {
     const focus = ['shrine', 'tower', 'beast', 'seed', 'treasure'];
@@ -204,16 +219,8 @@ const UI = (() => {
       const finalDone = savedOf('memory_final') != null ? savedOf('memory_final') : m.final[0];
       const autoDone = savedOf('memory_auto') != null ? savedOf('memory_auto') : m.auto[0];
       const dlcDone = savedOf('memory_dlc') != null ? savedOf('memory_dlc') : m.dlc[0];
-      // 还剩几处未造访：存档倒计时（PictureMemory_Spot_Int）优先，离线用 12-已恢复 推导
-      const remain = (lc && typeof lc.spot_int === 'number') ? lc.spot_int
-                   : Math.max(0, 12 - photoDone);
       html += `<div class="stat-row stat-mem"><span class="k">回忆 · 照片记忆</span><span class="v">${photoDone} / 12 ${pct(photoDone, 12, true)}</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(photoDone, 12)}"></i></div>`;
-      let note = `还剩 ${remain} 处未造访`;
-      if (m.photo[0] !== photoDone) {
-        note += ` · <span class="warn">手动标记 ${m.photo[0]}（以存档为准）</span>`;
-      }
-      html += `<div class="stat-note">${note}</div>`;
       html += `<div class="stat-row stat-mem"><span class="k">回忆 · 最终</span><span class="v">${finalDone} / 1</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(finalDone, 1)}"></i></div>`;
       html += `<div class="stat-row stat-mem"><span class="k">回忆 · 主线自动</span><span class="v">${autoDone} / 5 ${pct(autoDone, 5, true)}</span></div>`;
@@ -233,7 +240,7 @@ const UI = (() => {
     searchIndex = map.data.markers
       .filter(mk => mk.name && mk.name.length < 60)
       .map(mk => ({
-        id: mk.id, cat: mk.cat, name: mk.name, en: mk.en,
+        id: mk.id, mk: mk, cat: mk.cat, name: mk.name, en: mk.en,
         region: mk.region, tower: mk.tower, px: mk.px,
         catCn: (map.data.categories.find(c => c.key === mk.cat) || {}).cn || mk.cat,
       }));
@@ -266,7 +273,7 @@ const UI = (() => {
       box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
     } else {
       box.innerHTML = hits.map(h => `
-        <div class="sr-item ${map.doneSet.has(h.id) || (map.liveDone && map.liveDone.has(h.id)) ? 'done' : ''}" data-id="${h.id}">
+        <div class="sr-item ${map._mkDone(h.mk) ? 'done' : ''}" data-id="${h.id}">
           <span class="sr-name">${esc(h.name)}</span>
           <span class="sr-meta">${h.catCn}${h.region ? ' · ' + esc(h.region) : ''}</span>
         </div>`).join('');
@@ -310,7 +317,7 @@ const UI = (() => {
     const cat = map.data.categories.find(c => c.key === mk.cat) || {};
     const cfg = CAT_CFG[mk.cat] || {};
     const [gx, gz] = map.gameCoord(mk.px);
-    const done = map.doneSet.has(mk.id) || (map.liveDone && map.liveDone.has(mk.id));
+    const done = map._mkDone(mk);
     const liveDone = map.liveDone && map.liveDone.has(mk.id);
     $('cardCat').textContent = cat.cn || mk.cat;
     $('cardCat').style.borderColor = cfg.color;
@@ -331,6 +338,7 @@ const UI = (() => {
       if (ex.quest) extra += '<div class="row">神庙任务<b>' + esc(ex.quest) + '</b></div>';
     }
     if (mk.cat === 'memory' && ex.memory_title_en) extra += '<div class="row">回忆<b>#' + ex.memory_no + ' · ' + esc(ex.memory_title_en) + '</b></div>';
+    if (mk.cat === 'memory' && ex.tier === 'final') extra += '<div class="row">类型<b>最终回忆：需找齐 12 张照片后回英帕处激活</b></div>';
     if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row">任务<b>' + esc(ex.quest_en) + '</b></div>';
     if (mk.cat === 'objective' && ex.sub) extra += '<div class="row">目标<b>' + esc(ex.sub) + '</b></div>';
     if (mk.cat === 'beast') extra += '<div class="row">类型<b>神兽·讨伐</b></div>';
@@ -348,8 +356,14 @@ const UI = (() => {
     $('cardNav').onclick = () => LIVE.navigate(mk);
     // 收集按钮（仅回忆 / 克洛格 显示；live 层注入）
     syncCollectBtn();
-    $('cardDone').onclick = () => { map.doneSet.add(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name); };
-    $('cardUndone').onclick = () => { map.doneSet.delete(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name); };
+    $('cardDone').onclick = () => {
+      if (mk.cat === 'memory' && map.saveLoaded()) { toast('回忆以存档为准：游戏中收集后自动同步，无需手动标记'); return; }
+      map.doneSet.add(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name);
+    };
+    $('cardUndone').onclick = () => {
+      if (mk.cat === 'memory' && map.saveLoaded()) { toast('回忆以存档为准：请以游戏内收集状态为准'); return; }
+      map.doneSet.delete(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name);
+    };
     positionCard();
     $('infoCard').classList.remove('hidden');
   }

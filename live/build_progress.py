@@ -228,7 +228,7 @@ def main():
         (13, "photo", "IsPlayed_Demo135_0", None),     # 其13 未觉醒的力量
         (15, "photo", "IsPlayed_Demo136_0", None),     # 其15 大灾厄复活
         (16, "photo", "IsPlayed_Demo137_0", None),     # 其16 绝望
-        (17, "photo", "IsPlayed_Demo138_0", None),     # 其17 萨尔达觉醒（最终，照片13）
+        (17, "final", "IsPlayed_Demo138_0", None),     # 其17 萨尔达觉醒（最终，照片13）
         (2,  "auto",  "Clear_RemainsWind", None),      # 其2 英杰 力巴尔
         (4,  "auto",  "Clear_RemainsFire", None),      # 其4 英杰 达尔克尔
         (6,  "auto",  "Clear_RemainsElectric", None),  # 其6 英杰 乌尔波札
@@ -301,8 +301,8 @@ def main():
     n_mem_list = [p for p in points if p["t"] == "memory"]
     n_beast_list = [p for p in points if p["t"] == "beast"]
     # 回忆拆档：照片12（不含最终）/ 最终1（照片13）/ 主线自动5（英杰4+大师剑1）/ DLC EX5
-    mem_photo = [p for p in n_mem_list if p.get("tier") == "photo" and p.get("photoNo") != 13]
-    mem_final = [p for p in n_mem_list if p.get("tier") == "photo" and p.get("photoNo") == 13]
+    mem_photo = [p for p in n_mem_list if p.get("tier") == "photo"]
+    mem_final = [p for p in n_mem_list if p.get("tier") == "final"]
     mem_auto = [p for p in n_mem_list if p.get("tier") == "auto"]
     mem_dlc = [p for p in n_mem_list if p.get("tier") == "dlc"]
     H_SPOT = crc32("PictureMemory_Spot_Int")   # s32 倒计时：还剩几处未造访

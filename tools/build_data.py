@@ -360,8 +360,13 @@ for layerDef in T:
                         extra['tier'] = 'auto'
                         extra['kind'] = 'sword'
                         extra['nav'] = False
+                    elif no == 17:
+                        # 最终回忆 #17（照片13）：需找齐12张照片后回英帕处激活，单独成 tier
+                        extra['tier'] = 'final'
+                        extra['photoNo'] = PHOTO_OF_MEMNO.get(no)
+                        extra['nav'] = True
                     else:
-                        # 照片回忆 13 个（含最终 #17 = 照片13），可导航收集
+                        # 照片回忆 12 个（不含最终 #17），可导航收集
                         extra['tier'] = 'photo'
                         extra['photoNo'] = PHOTO_OF_MEMNO.get(no)
                         extra['nav'] = True

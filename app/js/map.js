@@ -4,33 +4,33 @@
 /* 类别视觉配置：颜色 / 形状 / 绘制优先级 / 标签显示缩放阈值 / 游戏内图标 / 固定屏幕尺寸 */
 const CAT_CFG = {
   tower:      { color:'#3d8bff', shape:'tower',     order:3, lz:0.5,  icon:'icons_01.png', isz:[28,39] },
-  shrine:     { color:'#2ec4b6', shape:'shrine',    order:4, lz:0.55, icon:'icons_03.png', isz:[26,28] },
-  beast:      { color:'#b18cff', shape:'beast',     order:5, lz:0.5,  icon:'icons_31.png', isz:[50,30] },
-  lab:        { color:'#7fd4ff', shape:'lab',       order:3, lz:0.5,  icon:'icons_05.png', isz:[31,28] },
-  seed:       { color:'#9adc5c', shape:'dot',       order:0, lz:0.85, icon:'icons_04.png', isz:[30,28] },
-  memory:     { color:'#ffd166', shape:'memory',    order:4, lz:0.6,  icon:'icons_28.png', isz:[30,28] },
-  treasure:   { color:'#f4b942', shape:'dot',       order:0, lz:2.2,  icon:'icons_14.png', isz:[29,30] },
-  stable:     { color:'#c68b5c', shape:'house',     order:3, lz:0.55, icon:'icons_10.png', isz:[30,30] },
-  village:    { color:'#ff8f6b', shape:'house',     order:3, lz:0.55, icon:'icons_08.png', isz:[30,30] },
-  inn:        { color:'#9ad1ff', shape:'house',     order:3, lz:0.7,  icon:'icons_07.png', isz:[30,30] },
-  store:      { color:'#f7a8c4', shape:'shop',      order:3, lz:0.7,  icon:'icons_06.png', isz:[30,30] },
-  armor:      { color:'#8fb8ff', shape:'shield',    order:3, lz:0.8,  icon:'icons_09.png', isz:[30,30] },
-  dye:        { color:'#ff8fd0', shape:'dye',       order:3, lz:0.9,  icon:'icons_11.png', isz:[30,30] },
-  jewelry:    { color:'#c9a2ff', shape:'gem',       order:3, lz:0.9,  icon:'icons_33.png', isz:[30,30] },
-  settlement: { color:'#9aa3ad', shape:'fort',      order:3, lz:0.6,  icon:'icons_34.png', isz:[30,30] },
-  fountain:   { color:'#ff9ad5', shape:'fountain',  order:3, lz:0.6,  icon:'icons_19.png', isz:[29,30] },
-  statue:     { color:'#b8e0ff', shape:'statue',    order:2, lz:0.8,  icon:'icons_22.png', isz:[25,30] },
+  shrine:     { color:'#2ec4b6', shape:'shrine',    order:3, lz:0.55, icon:'icons_03.png', isz:[26,28] },
+  beast:      { color:'#b18cff', shape:'beast',     order:3, lz:0.5,  icon:'icons_31.png', isz:[50,30] },
+  lab:        { color:'#7fd4ff', shape:'lab',       order:0, lz:0.5,  icon:'icons_05.png', isz:[31,28] },
+  seed:       { color:'#9adc5c', shape:'dot',       order:4, lz:0.85, icon:'icons_04.png', isz:[30,28] },
+  memory:     { color:'#ffd166', shape:'memory',    order:3, lz:0.6,  icon:'icons_28.png', isz:[30,28] },
+  treasure:   { color:'#f4b942', shape:'dot',       order:4, lz:2.2,  icon:'icons_14.png', isz:[29,30] },
+  stable:     { color:'#c68b5c', shape:'house',     order:0, lz:0.55, icon:'icons_10.png', isz:[30,30] },
+  village:    { color:'#ff8f6b', shape:'house',     order:0, lz:0.55, icon:'icons_08.png', isz:[30,30] },
+  inn:        { color:'#9ad1ff', shape:'house',     order:0, lz:0.7,  icon:'icons_07.png', isz:[30,30] },
+  store:      { color:'#f7a8c4', shape:'shop',      order:0, lz:0.7,  icon:'icons_06.png', isz:[30,30] },
+  armor:      { color:'#8fb8ff', shape:'shield',    order:0, lz:0.8,  icon:'icons_09.png', isz:[30,30] },
+  dye:        { color:'#ff8fd0', shape:'dye',       order:0, lz:0.9,  icon:'icons_11.png', isz:[30,30] },
+  jewelry:    { color:'#c9a2ff', shape:'gem',       order:0, lz:0.9,  icon:'icons_33.png', isz:[30,30] },
+  settlement: { color:'#9aa3ad', shape:'fort',      order:0, lz:0.6,  icon:'icons_34.png', isz:[30,30] },
+  fountain:   { color:'#ff9ad5', shape:'fountain',  order:0, lz:0.6,  icon:'icons_19.png', isz:[29,30] },
+  statue:     { color:'#b8e0ff', shape:'statue',    order:0, lz:0.8,  icon:'icons_22.png', isz:[25,30] },
   pot:        { color:'#7d6a5a', shape:'dot',       order:0, lz:0.9,  icon:'icons_16.png', isz:[29,30] },
   raft:       { color:'#a98f6e', shape:'raft',      order:0, lz:0.9,  icon:'icons_26.png', isz:[27,30] },
-  talus:      { color:'#8d99a6', shape:'talus',     order:1, lz:0.8,  icon:'icons_20.png', isz:[26,30] },
-  hinox:      { color:'#7ac97a', shape:'hinox',     order:1, lz:0.8,  icon:'icons_12.png', isz:[29,30] },
-  lynel:      { color:'#ff6b5e', shape:'lynel',     order:1, lz:0.7,  icon:'icons_24.png', isz:[26,30] },
-  molduga:    { color:'#f2d45c', shape:'molduga',   order:1, lz:0.8,  icon:'icons_17.png', isz:[29,30] },
-  guardian:   { color:'#e05e5e', shape:'guardian',  order:1, lz:0.8,  icon:'icons_35.png', isz:[32,26] },
-  mainquest:  { color:'#ffd166', shape:'star',      order:4, lz:0.6,  icon:'icons_31.png', isz:[50,30] },
-  shrinequest:{ color:'#ffb347', shape:'qmark',     order:4, lz:0.6,  icon:'icons_30.png', isz:[30,30] },
-  sidequest:  { color:'#6fc7ff', shape:'star',      order:3, lz:0.7,  icon:'icons_05.png', isz:[28,39] },
-  objective:  { color:'#ffe066', shape:'excl',      order:3, lz:0.7,  icon:'icons_32.png', isz:[20,20] },
+  talus:      { color:'#8d99a6', shape:'talus',     order:2, lz:0.8,  icon:'icons_20.png', isz:[26,30] },
+  hinox:      { color:'#7ac97a', shape:'hinox',     order:2, lz:0.8,  icon:'icons_12.png', isz:[29,30] },
+  lynel:      { color:'#ff6b5e', shape:'lynel',     order:2, lz:0.7,  icon:'icons_24.png', isz:[26,30] },
+  molduga:    { color:'#f2d45c', shape:'molduga',   order:2, lz:0.8,  icon:'icons_17.png', isz:[29,30] },
+  guardian:   { color:'#e05e5e', shape:'guardian',  order:2, lz:0.8,  icon:'icons_35.png', isz:[32,26] },
+  mainquest:  { color:'#ffd166', shape:'star',      order:1, lz:0.6,  icon:'icons_31.png', isz:[50,30] },
+  shrinequest:{ color:'#ffb347', shape:'qmark',     order:1, lz:0.6,  icon:'icons_30.png', isz:[30,30] },
+  sidequest:  { color:'#6fc7ff', shape:'star',      order:1, lz:0.7,  icon:'icons_05.png', isz:[28,39] },
+  objective:  { color:'#ffe066', shape:'excl',      order:1, lz:0.7,  icon:'icons_32.png', isz:[20,20] },
 };
 const CAT_GROUP = {
   '探索收集': ['shrine','tower','beast','seed','memory','treasure'],
@@ -264,7 +264,10 @@ class BotwMap {
         const cell = this.grid[cy * cols + cx];
         if (cell) for (const idx of cell) {
           const mk = this.markers[idx];
-          if (this.enabled.has(mk.cat)) out.push(mk);
+        if (!this.enabled.has(mk.cat)) continue;
+        // 回忆：地图上只标注 13 个照片回忆点（照片12 + 最终1）；主线自动 / DLC 回忆随任务触发，不标注
+        if (mk.cat === 'memory' && !(mk.extra && (mk.extra.tier === 'photo' || mk.extra.tier === 'final'))) continue;
+        out.push(mk);
         }
       }
     }
@@ -366,8 +369,18 @@ class BotwMap {
     return Math.min(Math.max(s, min), max);
   }
 
+  /* 是否已载入存档进度（live 服务 /progress 或手动上传存档） */
+  saveLoaded() {
+    return !!((this.live && this.live.counts)) || !!window.__saveUploaded;
+  }
+
   /* 是否已完成：本地标记完成 或 存档进度（live.js 注入的 liveDone） */
   _mkDone(mk) {
+    // 回忆类别与统计面板同口径：已载入存档进度时以存档为准（忽略本地手动标记），
+    // 避免手动标记的回忆点与面板统计/地图图标不一致（照片/主线/DLC 逐点 flag）
+    if (mk.cat === "memory" && this.saveLoaded()) {
+      return !!(this.liveDone && this.liveDone.has(mk.id));
+    }
     return this.doneSet.has(mk.id) ||
            (!!this.liveDone && this.liveDone.has(mk.id));
   }
@@ -425,7 +438,8 @@ class BotwMap {
   /* 标记图形：优先绘制游戏内图标，缺失时回退矢量 */
   _glyph(ctx, mk, x, y, size, done) {
     const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
-    const img = cfg.icon ? this.icons[cfg.icon] : null;
+    const isFinalMem = mk.cat === 'memory' && mk.extra && mk.extra.tier === 'final';
+    const img = (cfg.icon && !isFinalMem) ? this.icons[cfg.icon] : null;
     ctx.save();
     if (done) ctx.globalAlpha = .45;
     if (img && img.complete && img.naturalWidth > 0) {
@@ -482,7 +496,18 @@ class BotwMap {
         ctx.closePath(); ctx.fill(); ctx.stroke();
         break;
       }
-      case 'memory': { // 回忆：圆内小方
+      case 'memory': { // 回忆：圆内小方（照片）；最终回忆 #17：金色五角星
+        if (isFinalMem) { // 金色五角星（外 r，内 r*.42）
+          ctx.beginPath();
+          for (let k = 0; k < 10; k++) {
+            const ang = -Math.PI / 2 + k * Math.PI / 5;
+            const rad = k % 2 === 0 ? r : r * .42;
+            const px2 = x + Math.cos(ang) * rad, py2 = y + Math.sin(ang) * rad;
+            if (k === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+          }
+          ctx.closePath(); ctx.fill(); ctx.stroke();
+          break;
+        }
         ctx.arc(x, y, r * .8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.fillStyle = done ? '#7a8a7a' : '#26302a';
         ctx.fillRect(x - r * .3, y - r * .3, r * .6, r * .6);
