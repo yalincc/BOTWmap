@@ -1,9 +1,9 @@
 # 第三方参考克隆（MrCheeze/botw-waypoint-map，仅本地参考，不入库）
 waypoint-data/
 
-# source 下 git 残留（非本项目数据）
-source/botw-all-hoes/
-source/object-map/
+# 开发流水线（原始数据/清洗脚本/瓦片工具），产物已打进 app/，不入库
+source/
+tools/
 
 # 系统/编辑器
 Thumbs.db
@@ -30,6 +30,9 @@ live-go/dist/
 # live-go 浮窗版归档（复盘留底，不入库）
 归档/
 live/_research/botw-re-notes/
+
+# 调试截图（本地留底，不入库）
+screenshot/
 
 # 过程文档(md)不入库：README 例外
 *.md
