@@ -445,6 +445,9 @@ class BotwMap {
       ctx.fillText(label, sx, ly);
     }
 
+    // 克洛格挑战起点第二标记（v1.1.1）：类型色菱形 + 与收获点虚线连线
+    this._drawKorokStarts(ctx, vis);
+
     // 悬停高亮
     if (this.hover) {
       const [hsx, hsy] = this.m2s(this.hover.px);
@@ -454,6 +457,89 @@ class BotwMap {
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+  }
+
+  /* ---------- 克洛格挑战起点第二标记（v1.1.1） ---------- */
+  // 懒建索引：BOTW_KOROKS 里有 has_start_diff 的条目 -> {start, mk, color, no}
+  _buildKorokStarts() {
+    if (this._korokStarts) return;
+    this._korokStarts = new Map();
+    if (typeof BOTW_KOROKS === 'undefined' || !BOTW_KOROKS.items) return;
+    const colors = window.KOROK_TYPE_COLORS || {};
+    const byId = new Map();
+    for (const mk of this.markers) if (mk.cat === 'seed') byId.set(mk.id, mk);
+    for (const k of BOTW_KOROKS.items) {
+      if (!k.has_start_diff || !k.start) continue;
+      const mk = byId.get(k.id);
+      if (!mk) continue;
+      this._korokStarts.set(k.id, {
+        start: k.start, mk, no: k.no, type_cn: k.type_cn,
+        color: colors[k.type] || '#9aa5a0',
+      });
+    }
+  }
+
+  _drawKorokStarts(ctx, vis) {
+    const scale = this.view.scale;
+    if (scale < 0.04) return;            // 全图/低倍不画，避免 168 个点盖住地图
+    this._buildKorokStarts();
+    if (!this._korokStarts || !this._korokStarts.size) return;
+    const { w, h } = this;
+    ctx.save();
+    for (const mk of vis) {
+      if (mk.cat !== 'seed') continue;
+      const ks = this._korokStarts.get(mk.id);
+      if (!ks) continue;
+      const [kx, ky] = this.m2s(ks.start);
+      if (kx < -40 || ky < -40 || kx > w + 40 || ky > h + 40) continue;
+      const [sx, sy] = this.m2s(mk.px);
+      // 收获点 → 起点 虚线连线（类型色，低透明）
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = ks.color;
+      ctx.lineWidth = 1.3;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(kx, ky); ctx.stroke();
+      ctx.setLineDash([]);
+      // 起点：类型色菱形 + 深色描边（随缩放 3~8px）
+      const r = Math.min(Math.max(3 * scale * 20, 2.6), 8);
+      ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      ctx.moveTo(kx, ky - r); ctx.lineTo(kx + r * 0.75, ky); ctx.lineTo(kx, ky + r); ctx.lineTo(kx - r * 0.75, ky);
+      ctx.closePath();
+      ctx.fillStyle = ks.color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(8,12,8,.92)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      // 深缩放时标注"起点"
+      if (scale >= 0.8) {
+        ctx.globalAlpha = 1;
+        ctx.font = '600 10px "PingFang SC","Microsoft YaHei",sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,12,8,.85)';
+        ctx.strokeText('起点', kx, ky - r - 2);
+        ctx.fillStyle = ks.color;
+        ctx.fillText('起点', kx, ky - r - 2);
+      }
+    }
+    ctx.restore();
+  }
+
+  /* 点击起点第二标记 → 选中对应克洛格（同 hitTest 容差） */
+  _hitKorokStart(mx, my) {
+    if (!this.enabled.has('seed')) return null;
+    this._buildKorokStarts();
+    if (!this._korokStarts || !this._korokStarts.size) return null;
+    const tol = 12 / this.view.scale;
+    let best = null, bd = 1e18;
+    for (const ks of this._korokStarts.values()) {
+      const dx = ks.start[0] - mx, dy = ks.start[1] - my;
+      if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) {
+        const d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = ks.mk; }
+      }
+    }
+    return best;
   }
 
   /* 标记图形：优先绘制游戏内图标，缺失时回退矢量 */
@@ -760,6 +846,11 @@ class BotwMap {
     }
     const mhit = this._matHitTest(mx, my);
     if (mhit) return mhit;
+    // 克洛格挑战起点第二标记（v1.1.1）：点在起点上 → 选中该克洛格
+    if (!best) {
+      const startMk = this._hitKorokStart(mx, my);
+      if (startMk) return { marker: startMk };
+    }
     return best ? { marker: best } : null;
   }
 

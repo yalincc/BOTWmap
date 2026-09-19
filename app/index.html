@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=20">
+<link rel="stylesheet" href="css/style.css?v=22">
 </head>
 <body>
 <div id="app">
@@ -169,6 +169,14 @@
       </div>
     </div>
 
+    <!-- 截图大图灯箱（v1.1.1） -->
+    <div id="imgLightbox" class="hidden">
+      <div id="lbBack"></div>
+      <img id="lbImg" alt="">
+      <div id="lbMeta"></div>
+      <button id="lbClose" class="card-close" title="关闭">×</button>
+    </div>
+
     <!-- 设置弹层（地名样式） -->
     <div id="settingsBox" class="hidden">
       <div class="sb-head">地图设置
@@ -248,6 +256,7 @@
         <div id="cardRegion" class="row"></div>
         <div id="cardTower" class="row"></div>
         <div id="cardCoord" class="row"></div>
+        <div id="cardKorok" class="hidden"></div>
         <div id="cardExtra" class="row"></div>
       </div>
       <div class="card-actions">
@@ -263,13 +272,14 @@
 </div>
 
 <script src="js/data.js?v=4"></script>
+<script src="js/koroks.js?v=1"></script>
 <script src="js/supercluster.min.js"></script>
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
-<script src="js/map.js?v=14"></script>
-<script src="js/ui.js?v=24"></script>
+<script src="js/map.js?v=15"></script>
+<script src="js/ui.js?v=26"></script>
 <script src="js/main.js?v=9"></script>
-<script src="js/live.js?v=9"></script>
+<script src="js/live.js?v=10"></script>
 <script src="js/save_upload.js?v=5"></script>
 </body>
 </html>

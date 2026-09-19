@@ -365,6 +365,54 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 #cardCollect.collect.on { background: #5a4a10; border-color: #ffd166; color: #ffdf7e; font-weight: 600; box-shadow: 0 0 0 1px rgba(255, 209, 102, .35); }
 #cardCollect.collect:disabled { opacity: .5; cursor: not-allowed; }
 
+/* ---------- 克洛格详情块（v1.1.1） ---------- */
+.korok-badge {
+  display: inline-block; padding: 1px 9px; border-radius: 10px;
+  border: 1px solid; font-size: 11px; line-height: 1.7;
+  background: rgba(255,255,255,.05);
+}
+.korok-shot-wrap { position: relative; margin: 7px 0 3px; }
+/* 截图为 200px 源图：按自然尺寸居中显示（不拉伸），灯箱与原图同分辨率，避免"放大反而变小"的错觉 */
+.korok-shot {
+  display: block; width: auto; max-width: 100%; height: auto;
+  margin: 0 auto; border-radius: 8px;
+  border: 1px solid var(--border); background: #0b140e;
+  cursor: zoom-in; image-rendering: auto;
+}
+.korok-zoom {
+  position: absolute; right: 6px; bottom: 6px; font-size: 10px; color: #fff;
+  background: rgba(8,12,8,.72); padding: 2px 8px; border-radius: 8px;
+  pointer-events: none;
+}
+.korok-note { color: var(--text-dim); font-size: 11px; margin-left: 4px; }
+.korok-start { flex-wrap: wrap; gap: 4px; }
+.korok-nav-start {
+  margin-left: 6px; padding: 1px 9px; border-radius: 9px; font-size: 11px;
+  background: rgba(255,255,255,.06); border: 1px solid; cursor: pointer;
+}
+.korok-nav-start:active { transform: scale(.96); }
+
+/* 截图大图灯箱（v1.1.1） */
+#imgLightbox {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+#lbBack { position: absolute; inset: 0; background: rgba(5,10,7,.9); cursor: zoom-out; }
+#lbImg {
+  position: relative; max-width: 92vw; max-height: 86vh;
+  border-radius: 8px; box-shadow: 0 6px 30px rgba(0,0,0,.6);
+  touch-action: manipulation;
+}
+#lbMeta {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+  font-size: 11px; color: #cfd8cf; background: rgba(8,12,8,.72);
+  padding: 3px 10px; border-radius: 9px; white-space: nowrap;
+}
+#lbClose {
+  position: absolute; top: 12px; right: 16px; z-index: 2;
+  font-size: 28px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.7);
+}
+
 /* 婊氬姩鏉?*/
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-thumb { background: #2c3f2e; border-radius: 4px; }

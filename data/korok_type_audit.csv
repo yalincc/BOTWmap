@@ -1,0 +1,901 @@
+﻿No,类型,信号,位置提示,游戏坐标,挑战起点,起点差,解法原文,截图
+1,跳水环,text,初始台地,"-890.4, 1889.6",,,Jump from the promontory into the circle of lilies.,Korok001.jpg
+2,搬石头,text,希克里森林,"1936.0, 2567.6",,,Lift the rock on this small island.,Korok002.jpg
+3,磁铁·方块拼图,text,波努鲁山地,"2059.6, 1212.4",,,Complete the block puzzle.,Korok003.jpg
+4,追花,text,诺凯河,"1047.6, 1787.0","981.4, 1837.2",是,"Start at the south side of the river, and follow the flowers.",Korok004.jpg
+5,射气球,text,诺凯河,"867.6, 1903.6",,,Stand near the pinwheel and shoot the balloons.,Korok005.jpg
+6,推石入坑,text,包美尔高地,"644.0, 1762.4",,,Push the boulder into the nearby large hole.,Korok006.jpg
+7,追花,text,包美尔高地,"514.4, 1791.0","1006.4, 1828.5",是,Follow the flower trail which starts at the bottom of the hollow log pieces.,Korok007.jpg
+8,射气球,text,包美尔高地,"315.6, 1765.0",,,Stand near the pinwheel and shoot the balloons.,Korok008.jpg
+9,垒石·石圈,text,精灵森林,"-954.4, 1721.6",,,Pick up the rock at the top of the rock structure.,Korok009.jpg
+10,精灵光点,text,黄泉河,"-1382.0, 1861.6",,,Interact with the fairy lights under the bridge. Use Magnesis to make a safe platform.,Korok010.jpg
+11,搬石头,text,双子山,"1258.0, 1851.0",,,Pick up the solitary rock at the peak of the shorter Dueling Peak.,Korok011.jpg
+12,精灵光点,text,格鲁德峡谷 入口,"-1503.6, 1923.6",,,"Melt the block of ice, then examine the fairy lights.",Korok012.jpg
+13,垒石·石圈,text,海利亚山,"-1362.4, 2219.6",,,Use the nearby rock to complete the circle.,Korok013.jpg
+14,磁铁·方块拼图,text,海利亚山,"-1441.6, 2105.0","-1721.9, 2246.2",是,Use Magnesis to place the metal block to match the nearby set.,Korok014.jpg
+15,精灵光点,text,黄泉河,"-1134.0, 1921.0",,,Interact with the fairy lights. You must have left the Great Plateau to obtain this seed. This is above the pool you awaken from within the Shrine of Resurrection.,Korok015.jpg
+16,搬石头,text,海利亚山,"-1173.6, 2319.6",,,Pick up this rock.,Korok016.jpg
+17,搬石头,text,海利亚山,"-1197.0, 2326.4",,,"Go to the edge of the cliff (behind the wall) to find the large slab. Move it using Stasis, then pick up the smaller rock under it.",Korok017.jpg
+18,精灵光点,text,Temple of Time (Breath of the Wild),"-809.0, 1966.4",,,Examine the fairy lights at the top of the Temple of Time.,Korok018.jpg
+19,精灵光点,text,Temple of Time (Breath of the Wild),"-789.0, 2261.0",,,Examine the fairy lights on the top of the Woodcutter's Cabin.,Korok019.jpg
+20,磁铁·方块拼图,text,东部神殿遗迹,"-428.0, 2022.4",,,"Use Magnesis to lift the metal door, then lift the rock hidden underneath. This seed is found at the very base of the Great Plateau, so it won't be available until the Paraglider is obtained.",Korok020.jpg
+21,磁铁·方块拼图,text,东部神殿遗迹,"-422.0, 1994.4",,,"Use Magnesis to lift the metal door, then lift the rock hidden underneath.",Korok021.jpg
+22,搬石头,text,精灵森林,"-848.4, 1669.6",,,"Clear the leaves, then pick up the rock.",Korok022.jpg
+23,追花,text,精灵森林,"-966.4, 1627.0","-997.5, 1660.8",是,Follow the flower trail through the giant hollow log.,Korok023.jpg
+24,磁铁·方块拼图,text,精灵森林,"-769.6, 1578.4",,,Use Magnesis to lift the ball on the chain into the hole of the tree trunk.,Korok024.jpg
+25,搬石头,text,精灵森林,"-820.4, 1550.4",,,Lift the rock found underneath two larger rocks.,Korok025.jpg
+26,磁铁·方块拼图,text,青蛙池塘,"-1339.0, 1677.6",,,Use Magnesis to put the block in the correct place. Located on a cliff ledge.,Korok026.jpg
+27,食物祭品,text,奥克诺湾,"4209.0, 2269.6",,,Place a palm fruit in the empty basket.,Korok027.jpg
+28,食物祭品,text,Kakariko Village (Breath of the Wild),"1803.0, 991.0",,,Place an apple in the empty basket.,Korok028.jpg
+29,搬石头,text,雷兽山,"3894.4, -705.6",,,Blow up the boulders and pick up the rock underneath.,Korok029.jpg
+30,搬石头,text,皮埃尔高地,"2163.0, 1039.0",,,Climb to the top of the hill and lift up the solitary rock. Level 1 cold resistance recommended.,Korok030.jpg
+31,垒石·石圈,text,托斯迈吉亚台地,"-4066.4, 442.4",,,"Grab a rock from the plateau to the northeast, and get it up to and complete the rock circle. You can jump up onto the platform from the southwestern edge.",Korok031.jpg
+32,磁铁·方块拼图,text,许愿河畔,"2746.0, -180.0",,,Use Magnesis to lift the ball-and-chain and put it into the hollow stump.,Korok032.jpg
+33,精灵光点,text,贝利尔雪原,"-4688.4, 842.0",,,Melt the ice and examine the fairy lights.,Korok033.jpg
+34,搬石头,text,露朵山,"3304.0, 20.4",,,Climb to the top of the hill and lift the small rock.,Korok034.jpg
+35,射气球,text,门前驿站村遗迹,"-653.0, 1388.4",,,Shoot the balloons.,Korok035.jpg
+36,搬石头,text,德谷多吊桥,"-1674.4, 1400.0",,,Lift the rock in the tree.,Korok036.jpg
+37,射箭·射靶,text,亚阔湖,"-1364.4, 1163.6","-1389.8, 1148.9",是,"Stand on the stump, and shoot the flying acorns.",Korok037.jpg
+38,搬石头,text,竞技场遗迹,"-1223.6, 1357.0",,,Pick up the rock.,Korok038.jpg
+39,磁铁·方块拼图,text,北格鲁德巨石,"-3354.4, 2275.0",,,Solve the Magnesis block puzzle.,Korok039.jpg
+40,精灵光点,text,诺凯河,"672.0, 1636.4",,,"Climb to the top of the flag pole, then examine the fairy lights.",Korok040.jpg
+41,搬石头,text,南纳比湖,"852.4, 1627.6",,,Lift the rock.,Korok041.jpg
+42,追花,text,萨托利山,"-2248.4, 463.0","-2288.8, 413.6",是,"Start between the three large cliffs to the northwest, and follow the flowers.",Korok042.jpg
+43,垒石·石圈,text,格鲁德峡谷 入口,"-1494.0, 1830.0",,,"Throw a rock into the circle of rocks. This seed belongs to the Great Plateau Tower Region, but won't be available until the Paraglider is obtained.",Korok043.jpg
+44,精灵光点,text,Zora's Domain (Breath of the Wild),"3327.0, -525.0",,,"In the 'spout' of the fish statue on top of Zora's Domain, examine the fairy lights.",Korok044.jpg
+45,食物祭品,text,阿卡莱湖,"3886.4, -1340.4",,,Place an apple in the empty offering bowl.,Korok045.jpg
+46,追花,text,一始村,"4096.0, -1631.0","4578.0, -1756.8",是,Start on top of the rock bridge and chase the flower trail by climbing down and around under the bridge.,Korok046.jpg
+47,搬石头,text,马丘兹半岛,"4530.4, -2094.4",,,Burn or cut away the dead leaves and then lift up the small rock.,Korok047.jpg
+48,食物祭品,text,达夫奈斯山,"-1024.4, 560.0",,,Place apple.,Korok048.jpg
+49,搬石头,text,科摩罗驻军地遗迹,"-460.4, 1275.6",,,Burn the leaves and pick up the revealed rock.,Korok049.jpg
+50,食物祭品,text,布莱德台地,"2511.6, 1571.6",,,Place an apple in the empty basket.,Korok050.jpg
+51,推石入坑,text,莱波纳桥,"627.6, 182.4",,,Push the boulder off the small tower into the indented hole below.,Korok051.jpg
+52,搬石头,text,麦贝草原,"386.4, 131.0",,,Lift the rock up.,Korok052.jpg
+53,树叶下,text,阿卡莱古代研究所,"4501.6, -3165.6",,,Examine the swirling leaves at the top of the Tech Lab.,Korok053.jpg
+54,射气球,text,马兹拉桥,"683.6, -636.4",,,"Stand near the pinwheel and shoot the balloons. The third balloon is behind you, hidden in the log.",Korok054.jpg
+55,搬石头,text,更格尔山丘,"838.4, -694.0",,,Pick up the rock in the stump.,Korok055.jpg
+56,精灵光点,manual,哈特诺古代研究所,"3785.0, 2123.6",,,Climb atop the guardian found at the top of the Hateno Ancient Tech Lab. The easiest place to climb up is the broken guardian's leg.,Korok056.jpg
+57,射气球,text,奥布力平原,"3166.4, 1833.6",,,Stand near the pinwheel and shoot all five balloon targets.,Korok057.jpg
+58,射箭·射靶,text,火萤台地,"3152.4, 2404.4","3144.0, 2231.2",是,Pick up the metal cube and place it back into its correct spot.,Korok058.jpg
+59,追花,text,艾波尼山,"3425.0, 2390.4","3372.4, 2301.1",是,Follow the long yellow flower trail to the top of the hill. The start of the trail is pictured here and begins a bit north west of the location on the ground around the hill.,Korok059.jpg
+60,射气球,text,布冰嘉森林,"2048.0, 2093.6",,,Stand next to the pinwheel and shoot the three balloon targets.,Korok060.jpg
+61,射气球,text,哈特诺堡垒,"2327.6, 1829.0",,,Climb on top of the stone wall and stand next to the pinwheel. Two acorns will fly above the treetops. Carefully aim and destroy them with arrows. You can use Stasis on the acorns to help you.,Korok061.jpg
+62,跳水环,text,拉纳湖,"2482.4, 2103.0",,,Jump or dive into the ring of flowers in the water below the cliff.,Korok062.jpg
+63,垒石·石圈,text,卡卡利科桥,"1752.0, 1544.4",,,"From the bridge above, put a Cryonis pillar just in front of the circle of rocks, then toss a rock onto the pillar so it bounces into the circle.",Korok063.jpg
+64,其他,text,Lake Hylia (Breath of the Wild),"-103.0, 2301.0",,,Light the two torches up here.,Korok064.jpg
+65,跳水环,text,Lake Hylia (Breath of the Wild),"76.4, 2302.0",,,Jump or dive into the ring of flowers. You can glide from the top of the Hylia bridge or use a cryonis pillar.,Korok065.jpg
+66,磁铁·方块拼图,text,海利亚河,"172.0, 1726.4","324.0, 1917.7",是,Move the metal block to match both sets identically.,Korok066.jpg
+67,推石入坑,text,海利亚河,"104.4, 1716.0",,,Throw a boulder into the ring of rocks in the river.,Korok067.jpg
+68,搬石头,text,花柔利亚山,"1936.0, 2778.4",,,Lift the rock found at the top of Mount Floria.,Korok068.jpg
+69,食物祭品,text,双子山,"1244.0, 1942.0",,,Drop an apple into the empty offering bowl.,Korok069.jpg
+70,搬石头,text,纳比湖,"1040.0, 1318.4",,,Swim to the small island in the lake and lift the small rock on top.,Korok070.jpg
+71,搬石头,text,天望山丘,"2.0, 1895.6",,,Pick up this rock.,Korok071.jpg
+72,食物祭品,text,天望山丘,"161.6, 1949.0",,,Investigate behind the two statues.,Korok072.jpg
+73,精灵光点,text,Bridge of Hylia (Breath of the Wild),"-39.0, 2514.0",,,Examine the fairy lights at the top of the fountain.,Korok073.jpg
+74,精灵光点,text,萨尔达的研究室,"-385.0, -995.6",,,Examine the fairy lights at the top of the spire.,Korok074.jpg
+75,精灵光点,text,格鲁德小镇,"-3887.0, 2967.6",,,Climb to the very top of the waterfall pillar and examine the fairy lights.,Korok075.jpg
+76,磁铁·方块拼图,text,格鲁德峡谷 入口,"-1662.0, 2344.0","-1721.9, 2246.2",是,Solve the Magnesis block puzzle. The block is above the pavilion.,Korok076.jpg
+77,磁铁·方块拼图,text,斯塔尔里台地,"-1809.6, 2463.0","-1721.9, 2246.2",是,Solve the Magnesis block puzzle. The block is on the wooden platform above.,Korok077.jpg
+78,精灵光点,text,费罗龙台地,"603.0, 2410.4",,,There are two fairy lights dancing around here. Catch them both for two seeds.,Korok078.jpg
+79,冰块,text,智慧之泉,"3742.0, 1154.4",,,Melt the block of ice. Cold Resistance Level 2 recommended.,Korok079.jpg
+80,冰块,text,智慧之泉,"3798.0, 1271.0",,,Melt the block of ice. Cold Resistance Level 2 recommended.,Korok080.jpg
+81,射气球,text,阿米麦台地,"215.0, 3496.4",,,"Stand next to the pinwheel, shoot the three acorns. You can use stasis to make it easier.",Korok081.jpg
+82,精灵光点,text,托托湖,"3566.0, -916.4",,,Catch the fairy lights circling the area.,Korok082.jpg
+83,射箭·射靶,text,皮埃尔高地,"2148.0, 796.4",,,On the cliffside there are some metal cubes. Put the missing cube back into the correct spot to make everything match.,Korok083.jpg
+84,追花,text,拉聂尔参道西口,"2288.4, 702.0","2308.2, 750.6",是,"The flower trail to this seed starts to the south, on the eastern cliff face. Follow the flowers to the seed.",Korok084.jpg
+85,赛跑·树桩,text,巴尔麦平原,"271.6, 3289.6","546.2, 3580.4",是,"This race platform starts far to the southeast, on the peak above the Ka'o Makagh Shrine. Race to the ring for the seed.",Korok085.jpg
+86,射气球,text,阿米麦台地,"269.0, 3666.4",,,Stand near the pinwheel and shoot the five balloons circling overhead.,Korok086.jpg
+87,射箭·射靶,text,湿地的驻军地遗迹,"1388.4, -112.4",,,"There are two ruins side by side. The one to the north has an extra rock, the one to the south is missing a rock. Carry the extra to the missing spot for the seed.",Korok087.jpg
+88,垒石·石圈,text,文特岛,"4537.6, 1017.0",,,Use the rock to complete the circle.,Korok088.jpg
+89,追花,text,文特岛,"4497.6, 1016.4","4517.6, 630.7",是,The flower trail for this begins as you reach the island.,Korok089.jpg
+90,赛跑·树桩,text,哈特诺小岛,"4083.6, 2973.6","4017.0, 2971.4",是,"Stand on the seed platform at the nearby shrine. Within the timer, reach the tiny island east of there.",Korok090.jpg
+91,垒石·石圈,text,奇塔诺湾,"3675.6, 2419.6",,,Throw a small rock into the ring of rocks found in the water. Cryonis can make it easier to reach.,Korok091.jpg
+92,搬石头,text,塔尔荷池塘,"3350.4, 2255.6",,,Lift up the small rock found at the edge of the creek.,Korok092.jpg
+93,彩色花·按序踩,text,海拉鲁驿站村废墟,"-191.6, 1833.6",,,"In a cave in this hill, count to 5 using the flowers.",Korok093.jpg
+94,垒石·石圈,text,草笛山丘,"-106.4, 1049.6",,,Complete the circle of rocks using three nearby rocks.,Korok094.jpg
+95,推石入坑,text,海利亚河,"55.6, 1760.0",,,Push the boulder so it rolls into the hole.,Korok095.jpg
+96,搬石头,text,莫约里桥 ,"224.4, 1705.6",,,Pick up this rock.,Korok096.jpg
+97,精灵光点,text,交易所遗迹,"-750.4, 893.6",,,Catch the fairy lights that run around the ruins.,Korok097.jpg
+98,搬石头,text,莫约里桥 ,"231.6, 1600.4",,,"Look under the bridge, and pick up the rock.",Korok098.jpg
+99,搬石头,text,利特村,"-3561.0, -1759.0",,,Under a rock.,Korok099.jpg
+100,精灵光点,text,东部的驿站村废墟,"87.0, 1587.6",,,"Climb the flag pole, then examine the fairy lights.",Korok100.jpg
+101,赛跑·树桩,text,利利特特湖,"-3696.4, -1684.0","-3782.4, -1798.7",是,Climb to the top of the stone pillar northwest of here to find the seed platform. Glide to the ring before the time runs out.,Korok101.jpg
+102,搬石头,text,阿乌尔桥,"314.0, 1400.0",,,Remove the big boulder and then lift the smaller rock.,Korok102.jpg
+103,射箭·射靶,text,阿乌尔桥,"334.0, 1275.6","320.9, 1205.8",是,"Under the bridge, shoot the hanging acorn.",Korok103.jpg
+104,磁铁·方块拼图,text,塔邦挞村遗迹,"-2361.0, -1872.0",,,Put the magnetic rock in the well.,Korok104.jpg
+105,射箭·射靶,text,诺凯河,"516.0, 1484.0","320.9, 1205.8",是,Stand on the stump and look at the large tree behind it. You will see two targets being tossed up behind the tree. Aim carefully and you can hit them with arrows.,Korok105.jpg
+106,推石入坑,text,诺凯河,"668.4, 1467.6",,,"At the top of the hill to the west, roll the boulder down into the hole.",Korok106.jpg
+107,搬石头,text,戴比岛,"4697.6, -546.0",,,Blow up the boulders and pick up the rock under them.,Korok107.jpg
+108,其他,text,南纳比湖,"786.0, 1470.0",,,Jump all three fences in a row. This can also be done with the Master Cycle Zero using the Zero Jump.,Korok108.jpg
+109,追花,text,思古兰特树海,"694.4, 3072.4","1012.1, 3255.0",是,Follow the flower trail in a little circle around the area.,Korok109.jpg
+110,射气球,text,阿乌尔桥,"293.6, 1212.4",,,Stand on the stump and shoot the three balloons.,Korok110.jpg
+111,垒石·石圈,text,废弃的北部矿坑,"1631.0, -2933.6",,,Lift the rock on top of the rock formation.,Korok111.jpg
+112,跳水环,text,娜波露山,"-1735.0, 1822.0",,,Jump into lilies.,Korok112.jpg
+113,搬石头,text,德谷多吊桥,"-1743.6, 1470.0",,,Pick up the rock.,Korok113.jpg
+114,射箭·射靶,text,竞技场遗迹,"-1292.4, 1388.4",,,Shoot the acorn in the log.,Korok114.jpg
+115,搬石头,text,平原外围的驿站,"-1317.0, 1262.4",,,Pick up the rock.,Korok115.jpg
+116,搬石头,text,竞技场遗迹,"-1152.4, 1220.4",,,Pick up the rock on the top floor of the Coliseum.,Korok116.jpg
+117,精灵光点,text,竞技场遗迹,"-1057.0, 1335.0",,,Chase the fairy lights and examine them.,Korok117.jpg
+118,赛跑·树桩,text,亚阔湖,"-1190.0, 1116.4","-1173.6, 1166.1",是,Race from the tree surrounded by Malice goo and climb up to the rock point.,Korok118.jpg
+119,射箭·射靶,text,亚阔桥,"-1136.4, 1031.0",,,Shoot the acorn hanging under the bridge.,Korok119.jpg
+120,搬石头,text,伊萨奇海角,"3794.4, 3624.4",,,Hidden underneath the small rock near the palm tree.,Korok120.jpg
+121,搬石头,text,亚阔桥,"-1157.6, 963.0",,,Halfway down the cliff there is a tiny ledge with a rock. Pick it up.,Korok121.jpg
+122,磁铁·方块拼图,text,亚阔桥,"-1106.0, 902.4","-1442.3, 845.6",是,Solve the cube puzzle.,Korok122.jpg
+123,垒石·石圈,text,亚阔桥,"-1010.4, 933.0",,,Complete the rock circle.,Korok123.jpg
+124,垒石·石圈,text,德谷多吊桥,"-1575.6, 1590.0",,,Throw a rock into the circle. You may have to slide the rock over a cryonis block.,Korok124.jpg
+125,垒石·石圈,text,希麦加米河,"-1504.4, 922.4",,,Throw a rock into the circle of rocks. Use Cryonis to help cover the distance.,Korok125.jpg
+126,赛跑·树桩,text,希麦加米河,"-1441.6, 845.6","-1190.0, 1116.8",是,Put the ball into the stump.,Korok126.jpg
+127,射箭·射靶,text,古利奥桥,"-1249.6, 718.4",,,Shoot the acorn.,Korok127.jpg
+128,搬石头,text,希麦加米河,"-1313.6, 624.0",,,Pick up the rock in the dried up well.,Korok128.jpg
+129,跳水环,text,腐朽的千年古树,"-1120.0, 419.0","-1021.9, 560.6",是,Dive into the circle of lilies.,Korok129.jpg
+130,磁铁·方块拼图,text,希麦加米河,"-1336.4, 366.4",,,Solve the cube puzzle. The cube is in the water.,Korok130.jpg
+131,搬石头,text,贤者之神殿遗迹,"-1336.4, 249.0",,,Pick up the rock on a standalone wall.,Korok131.jpg
+132,追花,text,巨人森林,"-1154.4, 245.0","-1194.8, -236.6",是,Follow the flower trail that starts on a stump to the northeast.,Korok132.jpg
+133,赛跑·树桩,text,莫尔赛湖,"711.6, 1331.6",,,Put the metal rock in the hole in the stump.,Korok133.jpg
+134,搬石头,text,莫尔赛湖,"513.6, 1169.6",,,"Climb the thick tree, and pick up the rock on top.",Korok134.jpg
+135,搬石头,text,梅布尔高原,"1294.0, 1332.4",,,"Climb the tree, lift the rock.",Korok135.jpg
+136,食物祭品,text,双子山,"1378.0, 1682.0",,,Drop an apple into the empty offering bowl.,Korok136.jpg
+137,搬石头,text,诺凯河,"1099.6, 1890.4",,,Pick up the rock.,Korok137.jpg
+138,搬石头,text,船坞,"-305.6, -1167.0",,,Lift the stone.,Korok138.jpg
+139,搬石头,text,泡泡拉高地,"811.6, 2091.0",,,"Move the large slab, then lift the small rock underneath.",Korok139.jpg
+140,垒石·石圈,text,东阿卡莱驿站,"4396.4, -2721.6",,,Complete the circle with a rock found on the same cliffside.,Korok140.jpg
+141,搬石头,text,诺凯河,"704.4, 1794.0",,,"Inside of a cave behind a bombable wall, lift the rock.",Korok141.jpg
+142,搬石头,text,亚玛比湖,"2560.4, 3602.4",,,Climb to the top of this mountain and lift up the small rock.,Korok142.jpg
+143,食物祭品,text,阿迪亚湖,"550.4, 1897.6",,,Remove apples from the tree on the left until it looks like the two on the right.,Korok143.jpg
+144,搬石头,text,觉醒山,"2925.0, 1394.4",,,Lift the small rock at the top of the peak. Cold Resistance Level 1 recommended.,Korok144.jpg
+145,磁铁·方块拼图,text,德谷多吊桥,"-1794.4, 1625.0",,,Solve the block puzzle.,Korok145.jpg
+146,搬石头,text,湖畔驿站,"1449.0, 3531.6",,,Lift the rock on the small island at the center of the poisonous bog.,Korok146.jpg
+147,食物祭品,text,湖畔驿站,"1375.6, 3501.0",,,Offer a Hearty Durian.,Korok147.jpg
+148,垒石·石圈,text,希麦加米河,"-1151.6, -283.6",,,Throw a rock into the center of the protruding rocks.,Korok148.jpg
+149,射气球,text,希麦加米河,"-1255.0, -239.6",,,Shoot the balloon that's underneath the bridge.,Korok149.jpg
+150,搬石头,text,古斯塔夫山,"-891.6, -285.0",,,Blow up the rock pile and pick up the rock underneath.,Korok150.jpg
+151,磁铁·方块拼图,text,勇气之泉,"835.0, 2425.6",,,Use Magnesis to grab the iron cube from the block puzzle on the east hand of the statue and take it to the west hand.,Korok151.jpg
+152,彩色花·按序踩,text,费罗龙台地,"516.0, 2492.0",,,"Visit each group of flowers in order, 1 through 5.",Korok152.jpg
+153,射气球,text,砕石场遗迹,"-661.0, -437.6",,,Shoot the balloon.,Korok153.jpg
+154,搬石头,text,砕石场遗迹,"-806.4, -401.6",,,Pick up the rock.,Korok154.jpg
+155,搬石头,text,海拉鲁西城邑遗迹,"-548.0, -229.0",,,Pick up the rock.,Korok155.jpg
+156,垒石·石圈,text,储水池遗迹,"-664.4, -544.4",,,Complete the rock spiral.,Korok156.jpg
+157,搬石头,text,欧荷利桥,"-764.4, -607.6",,,Bomb the wall and pick up the rock.,Korok157.jpg
+158,垒石·石圈,text,砕石场遗迹,"-798.4, -560.0",,,"Complete the rock circle. The rock is in the direction of the gap in the circle, to the north.",Korok158.jpg
+159,垒石·石圈,text,腾图丘陵,"2140.0, 3531.6",,,"Grab the boulder at the center of the rock ring west of here, and place it in the empty spot.",Korok159.jpg
+160,垒石·石圈,text,Lake Hylia (Breath of the Wild),"-65.6, 2332.4",,,Stand on the edge of the bridge at the north end. Toss a boulder down into the ring of rocks in the water below.,Korok160.jpg
+161,赛跑·树桩,text,乌拉伊特湖,"1785.6, 3009.0","1777.0, 3057.8",是,"Stand on the seed platform at the base of the waterfall, then swim up the waterfall using Zora Armor.",Korok161.jpg
+162,精灵光点,text,花柔莉亚河,"807.0, 3116.4",,,Catch the fairy lights.,Korok162.jpg
+163,磁铁·方块拼图,text,左纳乌遗迹群,"823.6, 3008.0",,,"Put a boulder on each of the three islands here. The boulders are magnetic, but two of them are chained together. Use Stasis to hold one of the chained boulders in place while you place the other.",Korok163.jpg
+164,食物祭品,text,费罗龙台地,"588.0, 2675.0",,,Remove fruit from the tree with too many to make it match.,Korok164.jpg
+165,推石入坑,text,谢拉湖,"1638.0, 1375.6",,,Toss a boulder into the circle of rocks found in the lake.,Korok165.jpg
+166,搬石头,text,Arbiter's Grounds (Breath of the Wild),"-4306.4, 3461.6",,,Pick up the rock.,Korok166.jpg
+167,磁铁·方块拼图,text,茹特拉河,"2923.0, 333.0",,,Use Magnesis to solve the block puzzle.,Korok167.jpg
+168,食物祭品,text,Arbiter's Grounds (Breath of the Wild),"-4345.0, 3714.0",,,Grab fruit from the cactus with extra until they match.,Korok168.jpg
+169,精灵光点,manual,露朵山,"3208.4, 24.0",,,,Korok169.jpg
+170,精灵光点,manual,格鲁德大化石,"-4861.0, 3833.0",,,Climb to the highest point on the skeleton.,Korok170.jpg
+171,搬石头,text,东格鲁德,"-2549.6, 3952.0",,,Pick up the rock on top of the pillar.,Korok171.jpg
+172,赛跑·树桩,text,东格鲁德,"-2448.4, 3752.0","-2591.2, 3543.4",是,The seed platform for this race is on the arch to the northwest.,Korok172.jpg
+173,垒石·石圈,text,东格鲁德,"-3030.4, 3755.0",,,Complete the rock circle.,Korok173.jpg
+174,食物祭品,text,南部绿洲,"-3287.0, 3785.6",,,Remove fruit from the cactus with extra until it matches.,Korok174.jpg
+175,磁铁·方块拼图,text,东格鲁德,"-2632.4, 3303.0",,,Solve the Magnesis block puzzle inside the skull rock. The cube to use is on the ceiling.,Korok175.jpg
+176,磁铁·方块拼图,text,帕鲁荒原,"-2919.0, 3061.6",,,"Solve the Magnesis block puzzle. If you're having trouble putting the block in, try lining a corner up with the hole in the puzzle.",Korok176.jpg
+177,食物祭品,text,东部格鲁德遗迹,"-2684.4, 2930.0",,,At the very top of the statue.,Korok177.jpg
+178,射气球,text,东部格鲁德遗迹,"-2629.0, 2749.6",,,Shoot the balloon in between the statue's wrists.,Korok178.jpg
+179,搬石头,text,Spectacle Rock (Breath of the Wild),"-2300.0, 2848.4",,,Pick up the rock on top of the pillar.,Korok179.jpg
+180,搬石头,text,卓拉大桥,"3293.6, -260.4",,,Pick up the rock.,Korok180.jpg
+181,射气球,text,卡斯拉山,"-3331.6, -2299.6",,,Shoot the balloons while standing near the pinwheel.,Korok181.jpg
+182,磁铁·方块拼图,text,亚娜谷,"-2023.0, 2880.0",,,Solve the large Magnesis Block puzzle.,Korok182.jpg
+183,垒石·石圈,text,亚娜谷,"-1936.4, 2671.6",,,"Not counting the rock in the middle, two of these lines have only 8 rocks in them. Put the 2 extra rocks at the east and southwest arms to finish the pattern.",Korok183.jpg
+184,搬石头,text,东格鲁德高地,"-1461.6, 2953.6",,,Pick up the rock.,Korok184.jpg
+185,搬石头,text,东格鲁德高地,"-1539.6, 3071.0",,,Bomb the rocks and pick up the one underneath.,Korok185.jpg
+186,垒石·石圈,text,东格鲁德高地,"-1599.0, 3099.0",,,Complete the rock pattern.,Korok186.jpg
+187,磁铁·方块拼图,text,贝立德关卡,"-2172.0, 3201.6",,,Solve the Magnesis block puzzle.,Korok187.jpg
+188,搬石头,text,贝立德关卡,"-1925.0, 3279.6",,,Climb the pillar and pick up the rock.,Korok188.jpg
+189,搬石头,text,拉聂尔参道中央广场,"2705.0, 1167.0",,,Lift the rock at the center of the promenade.,Korok189.jpg
+190,跳水环,text,卡伊更池塘,"3179.0, 1605.0",,,Jump or dive into the ring of flowers.,Korok190.jpg
+191,跳水环,text,卡伊更台地,"3173.6, 1488.4",,,Jump or dive into the ring of flowers.,Korok191.jpg
+192,推石入坑,text,阿莫西亚海岸,"4442.0, 1437.6",,,Roll a large boulder into the hole. The Stasis rune may help if the boulder misses the mark.,Korok192.jpg
+193,射气球,text,阿莫西亚海岸,"4617.0, 1921.0",,,"Lift the big rock (using Stasis or an Octo Balloon), and then pick up the small rock under it.",Korok193.jpg
+194,射气球,text,卡艾德半岛,"4513.0, 2311.6",,,Stand near the pinwheel and shoot down all three balloon targets.,Korok194.jpg
+195,搬石头,text,伊格尔斯桥,"961.0, 941.0",,,Pick up the rock found underneath the bridge.,Korok195.jpg
+196,垒石·石圈,text,卡艾德半岛,"4535.6, 2521.0",,,Fill in all three missing spots in the ring of rocks.,Korok196.jpg
+197,食物祭品,text,特洽湖,"1600.4, 810.4",,,"At water level, in the cave, drop an apple into the offering bowl.",Korok197.jpg
+198,追花,text,卡艾德半岛,"4659.0, 2380.0","4594.9, 2520.4",是,Follow the yellow flower trail up the hill.,Korok198.jpg
+199,跳水环,text,Kakariko Village (Breath of the Wild),"1775.0, 963.0","1806.4, 989.1",是,Jump into the circle of lilies.,Korok199.jpg
+200,搬石头,text,Kakariko Village (Breath of the Wild),"1794.0, 1051.6",,,"Climb up to this ledge, and lift the rock.",Korok200.jpg
+201,射箭·射靶,text,Kakariko Village (Breath of the Wild),"1799.6, 1076.0",,,Shoot this emblem.,Korok201.jpg
+202,射箭·射靶,text,Kakariko Village (Breath of the Wild),"1957.0, 1060.0",,,Shoot this emblem.,Korok202.jpg
+203,搬石头,text,纳利夏高地,"1938.4, 1112.4",,,"On the upper ledge, lift this rock.",Korok203.jpg
+204,食物祭品,text,利利特特湖,"-3778.4, -1865.0",,,Climb up into the hollow top of the stone pillar and place an apple in the empty basket by the statue.,Korok204.jpg
+205,射气球,text,利特村,"-3628.4, -1804.4",,,Shoot the balloon in the heart shaped opening next to vah medoh.,Korok205.jpg
+206,精灵光点,manual,谢拉湖,"2207.6, 1374.4",,,Climb to the top of the tallest tree here.,Korok206.jpg
+207,搬石头,text,纳利夏高地,"1933.6, 1220.4",,,"Climb to the top, and lift up the rock.",Korok207.jpg
+208,搬石头,text,纳利夏高地,"1739.0, 1185.6",,,"Climb to the top, and lift up the rock.",Korok208.jpg
+209,食物祭品,text,纳利夏高地,"1672.4, 1159.0",,,"Two of these trees have only one apple, make the third look like them.",Korok209.jpg
+210,跳水环,text,谢拉湖,"1552.4, 1299.0","1809.2, 994.7",是,Geronimo.,Korok210.jpg
+211,赛跑·树桩,text,格鲁德峡谷驿站,"-2697.6, 2105.0","-2603.8, 2126.6",是,"Climb up to the seed platform on the wood platform high above the chasm to the east, then race to the seed. The ring disappears quickly, so save before you attempt it. Speed boosts help, run off the platform, paraglide very little (gliding spends the most time while covering the least distance and height), then sprint to the circle.",Korok211.jpg
+212,推石入坑,text,格鲁德峡谷,"-2258.4, 2224.0",,,Roll the boulder into the hole.,Korok212.jpg
+213,精灵光点,text,双子驿站,"1754.4, 1920.0",,,"Climb to the top of Dueling Peaks Stable, then examine the fairy lights.",Korok213.jpg
+214,搬石头,text,双子驿站,"1875.6, 2051.6",,,"Climb the tree, lift the rock.",Korok214.jpg
+215,磁铁·方块拼图,text,卡琳高原,"2497.6, 1804.4",,,Solve the simple block puzzle for the seed.,Korok215.jpg
+216,射气球,text,洛兹伍德山,"2367.0, 2301.0",,,Stand near the pinwheel and shoot acorns that get thrown up above the nearby tree to the north.,Korok216.jpg
+217,搬石头,text,希克里森林,"1887.0, 2418.4",,,Pick up the rock here.,Korok217.jpg
+218,搬石头,text,双胞弟弟桥,"1682.0, 2329.0",,,"Climb up to this ledge, and lift this rock.",Korok218.jpg
+219,搬石头,text,花柔利亚山,"1967.6, 2635.6",,,"Climb up the tree, lift the rock.",Korok219.jpg
+220,推石入坑,text,双子山,"1518.0, 1850.0","1393.0, 1857.1",是,Roll a boulder through the two trees. Some boulders can be found uphill to the west.,Korok220.jpg
+221,磁铁·方块拼图,text,卡伊更台地,"3279.6, 1438.4",,,Use Magnesis to move the iron cube into the correct spot.,Korok221.jpg
+222,垒石·石圈,text,克洛伊达高地,"2104.0, 2628.4",,,Throw one of the many available rocks into the center of the circle. Use Cryonis Rune to help.,Korok222.jpg
+223,射箭·射靶,text,亚哲台地,"1385.0, 2274.0","1441.9, 2350.1",是,Find the acorn in a hole in a tree and shoot it.,Korok223.jpg
+224,垒石·石圈,text,拉贝岩礁,"-133.0, 3804.0",,,Complete the star-shaped stone pattern with a nearby rock.,Korok224.jpg
+225,搬石头,text,拉贝岩礁,"10.0, 3790.0",,,Roll this boulder away and then lift the uncovered rock.,Korok225.jpg
+226,精灵光点,text,帕发海岸,"260.4, 3832.0",,,Catch the fairy lights below the overhang.,Korok226.jpg
+227,磁铁·方块拼图,text,帕发海岸,"418.0, 3850.4",,,Half this block puzzle is underwater. Solve it.,Korok227.jpg
+228,磁铁·方块拼图,text,奥赛平原,"-877.6, 3567.6",,,Complete the block puzzle.,Korok228.jpg
+229,射气球,text,摩尔达巴山,"-1173.6, 3579.0",,,Stand next to the pinwheel to trigger a balloon. A well timed bomb will make this balloon much easier than attempting to shoot it with arrows.,Korok229.jpg
+230,赛跑·树桩,text,特托拉平原,"-387.6, 3151.6","-276.8, 3316.5",是,The seed platform is on a ledge to the southeast. Race to the ring at the top of the enemy encampment.,Korok230.jpg
+231,食物祭品,text,特托拉平原,"-421.0, 3369.6",,,Offer an apple to the offering bowl that's missing one.,Korok231.jpg
+232,其他,text,珊湖,"-94.4, 3130.4",,,"The rock needed to complete this x-shaped puzzle is hidden in a nearby bush to the east. If you have a weapon that cuts grass/bushes, this will make it much easier to find.",Korok232.jpg
+233,推石入坑,text,Lake Hylia (Breath of the Wild),"220.0, 2865.0",,,Roll the boulder into the hole.,Korok233.jpg
+234,精灵光点,text,Lake Hylia (Breath of the Wild),"174.4, 2903.6",,,Catch the fairy lights.,Korok234.jpg
+235,磁铁·方块拼图,text,Lake Hylia (Breath of the Wild),"201.0, 2606.0","287.9, 2261.1",是,"Surrounding this rock are a square pattern of large metal cubes in the water . One is out of place. Use Cryonis to reach it, and Magnesis to move it into place.",Korok235.jpg
+236,搬石头,text,Bridge of Hylia (Breath of the Wild),"-2.4, 2613.0",,,Pick up the rock at the ruins of the broken pillar.,Korok236.jpg
+237,赛跑·树桩,text,贝莱平原,"1398.0, -856.4","1585.2, -719.4",是,Uphill to the southeast is a shield vendor who talks about shield surfing. This should be a hint. In the tree above him is the seed platform to start the race. Shield surf down to the marker for your seed.,Korok237.jpg
+238,追花,text,Bridge of Hylia (Breath of the Wild),"-12.0, 2582.0",,,Follow the flower trail down the side of the broken pillar.,Korok238.jpg
+239,赛跑·树桩,text,东阿卡莱驿站,"4181.0, -2540.4","4069.0, -2462.2",是,The seed platform is to the southwest next to a dead guardian. Race to the ring.,Korok239.jpg
+240,射箭·射靶,text,北阿卡莱平原,"3737.0, -2883.6","3572.9, -3046.9",是,Shoot the acorn tucked inside this hollow log.,Korok240.jpg
+241,追花,text,克洛伊达高地,"2105.0, 2724.0","2043.6, 2660.8",是,Follow the yellow flower trail. It begins on the hill just northwest of the end mark. Note that the final yellow flower before the end hides on the edge of the cliff.,Korok241.jpg
+242,追花,text,花柔利亚大瀑布,"1803.6, 3220.0","1737.6, 3204.0",是,Follow the flower trail that starts on the pillar to the west.,Korok242.jpg
+243,垒石·石圈,text,奈弗拉高地,"-2080.0, 1480.4",,,"There are three very large rock circles, with smaller circles of rocks within them. Take the stray rock from between the 3 large boulders in the southern huge circle, and put it in the middle of the smallest circle of rocks in the northern huge circle.",Korok243.jpg
+244,搬石头,text,塔尔塔尔台地,"4236.0, -211.6",,,Lift the stone hidden behind the bombable rocks.,Korok244.jpg
+245,搬石头,text,格鲁德峡谷 入口,"-1720.0, 2240.4",,,Lift up the iron ball and put it into the well.,Korok245.jpg
+246,精灵光点,text,阿拉布平原,"2685.0, 567.0",,,Chase and catch the fairy lights circling the pond.,Korok246.jpg
+247,磁铁·方块拼图,text,贝利尔雪原,"-4353.0, 711.6",,,Solve the block puzzle. The block is downhill to the west.,Korok247.jpg
+248,磁铁·方块拼图,text,贝立德关卡,"-1931.0, 3244.4",,,Solve the Magnesis block puzzle.,Korok248.jpg
+249,赛跑·树桩,text,南洛美城堡遗迹,"-1996.4, 3619.6","-2018.3, 3437.2",是,The seed platform for this race is on the larger plateau to the north.,Korok249.jpg
+250,搬石头,text,摩尔迦娜山,"-1525.6, 3406.4",,,Pick up the rock.,Korok250.jpg
+251,冰块,text,南洛美城堡遗迹,"-1611.6, 3677.0",,,Melt the ice.,Korok251.jpg
+252,追花,text,帕鲁荒原,"-3106.0, 2882.0","-3498.9, 2952.6",是,Follow the flower trail across the ribs.,Korok252.jpg
+253,追花,text,帕鲁荒原,"-3437.0, 2979.0","-3063.7, 2905.9",是,This flower trail goes back and forth to the various rocks in the area.,Korok253.jpg
+254,食物祭品,text,西格鲁德,"-4226.0, 2740.0",,,One cactus has too many voltfruit. Make it look like the other two.,Korok254.jpg
+255,追花,text,格鲁德小镇,"-4195.0, 3090.0","-4171.2, 3058.9",是,Follow the flower trail across the ribs.,Korok255.jpg
+256,搬石头,text,Arbiter's Grounds (Breath of the Wild),"-4159.6, 3825.0",,,Pick up the rock.,Korok256.jpg
+257,食物祭品,text,龙之流放地,"-4864.4, 3262.0",,,Remove fruit from the cactus with extra until it matches.,Korok257.jpg
+258,磁铁·方块拼图,text,哈特诺堡垒,"2320.4, 1725.0",,,"Lift the metal door with Magnesis, then the little rock with your bulging muscles.",Korok258.jpg
+259,搬石头,text,忘却神殿,"-1410.0, -2305.6",,,Blow up the cracked boulders on top of the temple entrance and lift up the small rock hidden underneath.,Korok259.jpg
+260,磁铁·方块拼图,text,忘却神殿,"-1415.0, -2220.4",,,"Use Magnesis to move the metal door away, then lift up the small rock hidden underneath.",Korok260.jpg
+261,搬石头,text,忘却神殿,"-1581.6, -2128.4",,,Under a rock on top of the pillar.,Korok261.jpg
+262,精灵光点,text,托西奇池塘,"2408.0, 2513.0",,,Catch the fairy lights.,Korok262.jpg
+263,射气球,text,花柔利亚桥,"1739.0, 3453.0",,,Stand near the pinwheel and shoot all three balloon targets.,Korok263.jpg
+264,跳水环,text,托西奇池塘,"2303.0, 2380.0",,,Jump or dive into the ring of flowers in the water.,Korok264.jpg
+265,搬石头,text,布伊达湖,"1815.0, 3743.6",,,Lift the rock.,Korok265.jpg
+266,彩色花·按序踩,text,凯波拉岭,"4109.0, -1351.0",,,Run through the yellow flower patches in order from 1 to 5. Patch 5 is in the tree behind patch 4.,Korok266.jpg
+267,食物祭品,text,卡伊更台地,"3231.6, 1547.0",,,Remove apples from the tree with too many until it looks like the other two.,Korok267.jpg
+268,磁铁·方块拼图,text,乌拉伊特湖,"1774.0, 2933.6",,,Use Magnesis to lift the chained metal boulder into the center of the stone pillars.,Korok268.jpg
+269,搬石头,text,罗达伊湖,"1801.0, 3157.6",,,Halfway down the northern waterfall there's a ledge with a rock. Pick up the rock.,Korok269.jpg
+270,冰块,text,摩尔达巴山,"-1356.4, 3672.4",,,Melt the ice.,Korok270.jpg
+271,搬石头,text,摩尔迦娜山,"-1376.4, 3328.4",,,"Climb the pillar, pick up the rock.",Korok271.jpg
+272,精灵光点,text,鸟鸣草原,"-725.0, 133.6",,,Catch the fairy lights.,Korok272.jpg
+273,赛跑·树桩,text,泰荷塔湿地,"-658.0, 3852.0","-597.9, 3845.4",是,The seed platform is on the tree just to the east. Race to the ring.,Korok273.jpg
+274,赛跑·树桩,text,北部冰屋,"-3752.0, 2531.6","-3757.1, 2445.9",是,"Climb up to the seed platform a short bit to the north, then race to the ring.",Korok274.jpg
+275,食物祭品,text,勇萨米平原,"2293.6, 3028.0",,,Put an apple in the empty basket near the statue so that both baskets match.,Korok275.jpg
+276,磁铁·方块拼图,text,克拉尔湖,"2031.6, 3168.0","1766.2, 2936.5",是,Solve the Magnesis block puzzle. The block you need is in the lake.,Korok276.jpg
+277,跳水环,text,哈希毕罗湖,"-3152.0, -1563.0",,,Jump/dive into the ring of water lilies.,Korok277.jpg
+278,追花,text,阿迪亚湖,"399.0, 2151.0","468.2, 1717.4",是,The flower trail starts in the stump to the west.,Korok278.jpg
+279,精灵光点,text,阿迪亚湖,"476.0, 2148.0",,,Catch the fairy lights.,Korok279.jpg
+280,追花,actor,巴美山丘,"-4064.4, -1679.0","-3968.9, -1671.4",是,"The first flower in this trail is southeast of the Voo Lota Shrine location, just past the tree.",Korok280.jpg
+281,搬石头,text,龙骨沼泽,"-4224.0, -1744.0",,,Under a rock under a pile of leaves.,Korok281.jpg
+282,垒石·石圈,text,兄弟岩,"-4036.0, -1746.0",,,Complete the stone circle.,Korok282.jpg
+283,跳水环,text,塔玛湖,"-2976.0, -1875.6",,,Dive or jump into the circle of water lilies.,Korok283.jpg
+284,赛跑·树桩,text,终焉の谷,"-1631.6, -515.0","-1787.7, -377.9",是,"Stand on the seed platform found on the large cliff southwest of here (jutting out from the eastern cliff face), and then race to the ring before the time runs out.",Korok284.jpg
+285,精灵光点,text,雷之台地,"-2317.6, -805.6",,,Catch the fairy lights that run around in the area.,Korok285.jpg
+286,磁铁·方块拼图,text,查波雪原,"-3225.6, 1020.4",,,Solve the block-puzzle by using Magnesis.,Korok286.jpg
+287,垒石·石圈,text,卢驰尔湖,"-2543.6, 640.4",,,Throw a rock into the circle of rocks in the pond.,Korok287.jpg
+288,磁铁·方块拼图,text,卢驰尔湖,"-2493.6, 591.6",,,Put two magnetic rocks into two hollowed out tree stumps.,Korok288.jpg
+289,彩色花·按序踩,text,卢驰尔湖,"-2478.4, 547.0",,,"Run through each of the flower bunches in order from least to most. To reach the fourth flower bunch inside the hollow tree surrounded by thorns you can burn away the thorns, or glide down from a nearby tree.",Korok289.jpg
+290,搬石头,text,卢驰尔湖,"-2482.0, 504.0",,,"Blow up the boulders, pick up the rock.",Korok290.jpg
+291,垒石·石圈,text,泰阿蒙河,"-2450.4, 372.4",,,Complete the circle of rocks.,Korok291.jpg
+292,精灵光点,text,更格尔山丘,"703.6, -811.6",,,Climb up the dead tree in in the hollow stump next to the shrine. Examine the fairy lights at the top.,Korok292.jpg
+293,推石入坑,text,鼓大河,"1414.0, -1762.4",,,Roll a boulder into the pond below.,Korok293.jpg
+294,追花,actor,拉鲁特大桥,"3123.0, -19.0","2984.5, -177.1",是,,Korok294.jpg
+295,垒石·石圈,text,贝弗岛,"2751.6, -1676.0",,,Find a nearby small rock just to the west underneath a Bokoblin camp. Bring it over to the stone circle and drop it in place to reveal the Korok.,Korok295.jpg
+296,赛跑·树桩,text,盖洛湖,"2407.6, -1613.6","2330.1, -1486.4",是,"The seed platform is to the southwest, at the top of the tall rock pillar arching over the road. Race to the ring.",Korok296.jpg
+297,跳水环,text,丘萨茨湖,"1939.6, -1217.0",,,Dive into the circle below.,Korok297.jpg
+298,磁铁·方块拼图,text,贝莱平原,"1695.0, -860.4",,,"Use Magnesis on the metal cube that's in the nearby broken down house. Match the box puzzle, making the patterns identical.",Korok298.jpg
+299,射箭·射靶,text,吉萨山丘,"-3716.0, -1039.0",,,Under a rock behind corrupted area. Shoot the eye to clear the Malice.,Korok299.jpg
+300,磁铁·方块拼图,text,希麦加米河,"-1501.0, 154.4",,,Solve the cube puzzle. The cube is in the water.,Korok300.jpg
+301,磁铁·方块拼图,text,Spectacle Rock (Breath of the Wild),"-2302.4, 2560.4",,,Solve the Magnesis block puzzle.,Korok301.jpg
+302,磁铁·方块拼图,text,东部格鲁德遗迹,"-2594.0, 2541.0",,,Solve the Magnesis block puzzle.,Korok302.jpg
+303,搬石头,text,格鲁德峡谷驿站,"-2814.0, 2248.4",,,"Climb the thin rock pillar next to Gerudo Stables, and lift the rock.",Korok303.jpg
+304,搬石头,text,娜波露山,"-2018.4, 2186.4",,,Lift up the small rock.,Korok304.jpg
+305,射箭·射靶,text,杜艾斯岛,"1737.0, 85.6",,,Shoot the hanging acorn.,Korok305.jpg
+306,垒石·石圈,text,吉萨的环形山,"-4010.4, -1162.4",,,Put a rock in the middle of the stone rings.,Korok306.jpg
+307,磁铁·方块拼图,text,吉萨的环形山,"-3971.0, -921.0",,,Use Magnesis to put the iron ball in the treestump.,Korok307.jpg
+308,食物祭品,text,路茨平原,"-4058.4, -774.4",,,Put apples in all offering bowls that are missing one.,Korok308.jpg
+309,搬石头,text,路茨平原,"-3966.4, -625.0",,,Under a rock on top of a stone pillar.,Korok309.jpg
+310,彩色花·按序踩,actor,库库甲谷,"-4037.6, -348.0",,,Run through the patches of flowers 1-5.,Korok310.jpg
+311,垒石·石圈,text,库库甲谷,"-4027.0, -232.4",,,Complete the circle of rocks.,Korok311.jpg
+312,搬石头,text,利利特特湖,"-3421.0, -2068.0",,,Under the rock.,Korok312.jpg
+313,跳水环,text,古代石柱群,"-3519.0, -450.4","-3433.0, -708.2",是,Dive/jump into the circle of water lilies.,Korok313.jpg
+314,射气球,text,吉希山丘,"-3444.4, -663.6",,,Stand next to the pinwheel and shoot down all five balloon targets.,Korok314.jpg
+315,食物祭品,text,吉希山丘,"-3430.4, -710.0",,,"Under the overhang in the cave, fill the remaining bowls with an apple.",Korok315.jpg
+316,垒石·石圈,text,乌洛克海角,"3442.4, 3123.6",,,Complete the rock circle. The rock is in the direction of the open gap (west).,Korok316.jpg
+317,搬石头,text,三殿,"-389.6, -783.6",,,Pick up the rock.,Korok317.jpg
+318,其他,manual,萨尔达的房间,"-327.6, -1008.4",,,,Korok318.jpg
+319,射气球,text,巴奇平原,"-919.6, -1622.4",,,"From on top of the well, shoot the balloons as they fly behind the trees.",Korok319.jpg
+320,磁铁·方块拼图,text,哈希毕罗湖,"-3443.0, -1324.4",,,Box Puzzle. Make the two patterns identical using Magnesis on the metal box.,Korok320.jpg
+321,追花,actor,海布拉河,"-2750.4, -2255.0","-2723.2, -2263.2",是,Follow the trail of flowers across the stone crossing.,Korok321.jpg
+322,推石入坑,text,马神桥,"525.0, 3679.6",,,"Directly to the north, wedged between two cliffs are some boulders. Roll one of them down the small ravine and into the hole.",Korok322.jpg
+323,搬石头,text,千之中洲,"1981.6, 454.0",,,"Climb the tree, pick up the rock.",Korok323.jpg
+324,垒石·石圈,text,荷隆湾,"4197.6, 461.0",,,Throw a rock into the circle of rocks.,Korok324.jpg
+325,搬石头,text,茹特拉河,"2379.0, 376.0",,,"Climb the tree, lift the rock.",Korok325.jpg
+326,射气球,text,阿拉布平原,"2471.0, 463.6",,,"Stand near the pinwheel, shoot the nearby flying acorns.",Korok326.jpg
+327,搬石头,text,茹特拉河,"2637.6, 373.6",,,"Climb the tree, lift the rock.",Korok327.jpg
+328,精灵光点,text,阿拉布平原,"2890.0, 517.0",,,Climb the tallest tree and examine the fairy lights at the top.,Korok328.jpg
+329,食物祭品,text,阔塔台地,"2129.6, 679.0",,,One tree has too many apples. Make it look like the others.,Korok329.jpg
+330,搬石头,text,萨托利山,"-2286.0, 469.0",,,Under a rock under a pile of leaves.,Korok330.jpg
+331,食物祭品,text,拉聂尔参道西口,"2240.0, 725.6",,,Drop an apple in the offering bowl.,Korok331.jpg
+332,推石入坑,text,拉聂尔参道西口,"2411.6, 851.6","2496.0, 892.1",是,Bowl the boulder into the hole. The boulder is uphill to the southeast.,Korok332.jpg
+333,冰块,text,拉聂尔群山,"3899.0, 1557.6",,,Melt the block of ice. Cold Resistance Level 2 recommended.,Korok333.jpg
+334,垒石·石圈,text,拉聂尔台地,"2727.0, 906.0",,,Push the center boulder to where it belongs.,Korok334.jpg
+335,赛跑·树桩,text,凯亚池塘,"3526.0, 1710.4","3736.0, 1686.9",是,"This seed starts at a seed platform next to the tree on the peak to the east of this location. Start the race, then quickly glide and climb over to the closer tree. Climb to the very top of this tree, and then glide to the ring to get the seed. Cold Resistance Level 2 recommended.",Korok335.jpg
+336,垒石·石圈,text,拉聂尔湾,"3383.0, 983.0",,,Put a rock in the gap to finish the circle. The rock you need is to the northwest.,Korok336.jpg
+337,精灵光点,text,飞行训练场,"-3792.4, -2319.6",,,Fairy lights on top of the hut.,Korok337.jpg
+338,搬石头,text,乌尔希池塘,"3708.0, 1941.0",,,"Climb to the top of the tree in the middle of the lake, and pick up the rock.",Korok338.jpg
+339,赛跑·树桩,text,洁净池塘,"3433.0, 1150.4","3439.1, 1100.8",是,"Stand on the leaf stump (located north and slightly east), and then race to the circle before time runs out. Cold Resistance Level 2 recommended.",Korok339.jpg
+340,跳水环,text,拉聂尔参道中央广场,"2632.4, 1113.6",,,Jump or dive into the circle of water lilies.,Korok340.jpg
+341,垒石·石圈,text,法兰台地,"2525.6, 1258.0",,,Place a rock to finish the circle. The rock you need is to the east.,Korok341.jpg
+342,食物祭品,text,本拉斯树海,"1410.4, 3201.6",,,Place a Hearty Durian in the leaf at the base of the easternmost statue.,Korok342.jpg
+343,搬石头,text,阿卡莱古代研究所,"4429.6, -3182.0",,,Pick up the rock near the pile of dead guardians.,Korok343.jpg
+344,跳水环,text,齐纳嘉莱湿地带,"-2008.0, -514.4",,,Jump or dive into the circle of water lilies.,Korok344.jpg
+345,搬石头,text,死亡之山登山口,"2505.6, -1303.6",,,Blast the boulders then pick up the small rock.,Korok345.jpg
+346,精灵光点,text,聂尔龙雪原,"3539.0, 1374.4",,,Fairy Lights are circling the location. Catch them. Cold Resistance Level 2 recommended.,Korok346.jpg
+347,跳水环,text,戴比岛,"4625.0, -635.6",,,Jump into the ring of water lilies.,Korok347.jpg
+348,搬石头,text,阿克伦岛,"4699.6, -1001.6",,,"Climb the small pillar, pick up the small rock.",Korok348.jpg
+349,搬石头,text,阿克伦岛,"4704.4, -1036.4",,,Pick up the rock on the wooden platform just down the cliff.,Korok349.jpg
+350,追花,text,奇克伦岛,"4704.4, -1353.0","4635.9, -1836.4",是,The flower trail starts on the southwest side of the hill. Follow it to the peak.,Korok350.jpg
+351,追花,text,玛林湾,"4636.0, -1836.4","4683.9, -1340.3",是,This long distance flower trail starts all the way at the top of the hill to the southwest. Specifically beginning at the end of the broken staircase in the ruins on top of the hill.,Korok351.jpg
+352,磁铁·方块拼图,text,玛林湾,"4695.0, -1776.4",,,Solve the block puzzle. The cube is located on top of the ruins to the west.,Korok352.jpg
+353,赛跑·树桩,text,玛林湾,"4357.0, -1528.0","4349.1, -1496.8",是,"Activate the timer by standing on the seed platform, then quickly race to the top of the two angled pillars and jump off before the time runs out.",Korok353.jpg
+354,射气球,text,牢房,"-382.4, -1108.4",,,Find the pinwheel on the far end of the castle wall. Shoot five balloons to reveal the Korok.,Korok354.jpg
+355,赛跑·树桩,text,主殿,"-254.0, -994.4","-254.0, -1044.5",是,The seed platform is on the Sanctum balcony. Reach the spire before time runs out.,Korok355.jpg
+356,射气球,text,主殿,"-255.6, -1055.0","-381.9, -1110.6",是,"In the tower at the top of the castle, shoot the balloon hiding above the bell.",Korok356.jpg
+357,精灵光点,text,主殿,"-251.0, -1064.4",,,Climb the castle to the very top of the spire and examine the fairy lights.,Korok357.jpg
+358,射箭·射靶,actor,二殿,"-157.6, -872.0","-214.1, -751.0",是,Climb to the top of the spire on the roof of the Second Gatehouse.,Korok358.jpg
+359,射箭·射靶,text,二殿,"-166.0, -859.6","-214.1, -751.0",是,"From outside, head through the Dining Hall and into the corridor on the other side. From there, follow the left wall to find a bombable wall in a corridor before the next room. Break it and shoot the acorn hanging above the statue holding the Rusty Claymore, to reveal a Korok.",Korok359.jpg
+360,搬石头,text,阿卡莱古代研究所,"4426.0, -3332.0",,,Blow up the wall to reveal the rock.,Korok360.jpg
+361,彩色花·按序踩,actor,北阿卡莱海岸,"4818.4, -3094.4","4733.0, -3122.0",是,Follow the order of the flowers. The first flower is on the dead guardian next to the group of two flowers.,Korok361.jpg
+362,磁铁·方块拼图,text,东阿卡莱海岸,"4509.6, -2643.6",,,Finish the magnetic block puzzle with the block submerged to the east.,Korok362.jpg
+363,垒石·石圈,text,智慧之泉,"4088.0, 1142.4",,,Place a rock to complete the circle. The rock you need is to the east by some bare trees; use Stasis to help you find it. Cold Resistance Level 2 recommended.,Korok363.jpg
+364,射气球,text,死亡之山登山口,"2409.0, -1226.4",,,A balloon is next to some of the supports for the rock bridge. Shoot it to get the seed.,Korok364.jpg
+365,彩色花·按序踩,text,深远阿卡莱平原,"3815.6, -3418.4",,,Run through the flowers in order.,Korok365.jpg
+366,垒石·石圈,text,拉聂尔湾,"3951.6, 695.0",,,Use the nearby rock to complete the circle.,Korok366.jpg
+367,赛跑·树桩,text,沃尔纳特山,"4282.4, 1655.6","4079.9, 1716.6",是,The race starts west of the seed's location. You can face the nearby shrine and climb the snow path to the right up a ways to find the seed platform which starts the race.,Korok367.jpg
+368,搬石头,text,凯亚池塘,"3474.0, 1917.6",,,"Climb the tree, lift the rock.",Korok368.jpg
+369,跳水环,text,卡艾德半岛,"4543.6, 2405.6","4213.8, 2271.9",是,Jump into the ring of water lilies.,Korok369.jpg
+370,磁铁·方块拼图,text,芬拉斯树海,"581.0, 3007.0",,,Use Magnesis to move the iron boulder into the dug out tree stump.,Korok370.jpg
+371,跳水环,text,艾奇斯帕森林,"3901.6, 2098.0","4209.9, 2271.9",是,"Jump, dive, or fall into the ring of water lilies.",Korok371.jpg
+372,搬石头,text,乌克池塘,"-4340.4, -2354.4",,,Under the rock.,Korok372.jpg
+373,磁铁·方块拼图,text,阿迪亚湖,"285.0, 2256.4",,,Use Magnesis to move the chained rock into the stump.,Korok373.jpg
+374,磁铁·方块拼图,text,贾拉湖,"2863.6, 2183.0",,,Seed is under a metal door in the middle of some ruins.,Korok374.jpg
+375,追花,text,沃尔纳特山,"4271.6, 1980.4","4131.1, 2002.0",是,The flower trail to this seed starts at the top of the hill directly to the west. Cold Resistance Level 2 recommended.,Korok375.jpg
+376,跳水环,text,葛亚娜峡谷,"3291.0, 3345.0",,,Jump or dive into the circle of lilies in the water.,Korok376.jpg
+377,追花,text,哈特诺湾,"4111.6, 2587.0","4594.9, 2520.4",是,This short flower trail begins on the coast on the way to the seed.,Korok377.jpg
+378,跳水环,text,克莱西亚半岛,"3363.6, 3656.0",,,Dive into the circle of floating seaweed.,Korok378.jpg
+379,垒石·石圈,text,艾波尼山,"3516.0, 2629.6",,,Drop a rock to complete the circle. The rock is downhill in the direction of the open spot (southwest).,Korok379.jpg
+380,搬石头,text,乌洛克海角,"3641.6, 3261.0",,,Just below the top of the cliff is a small ledge with a rock. Pick it up.,Korok380.jpg
+381,精灵光点,text,利科纳半岛,"1690.0, 667.0",,,Catch the fairy lights.,Korok381.jpg
+382,搬石头,text,乌克池塘,"-4072.4, -2545.6",,,Under a rock behind some destructible rocks.,Korok382.jpg
+383,推石入坑,text,忘却神殿,"-1416.0, -2395.0",,,Roll a giant boulder from uphill to the south down into the dug out pit.,Korok383.jpg
+384,食物祭品,text,科嘉奈亚池塘,"3233.0, 2848.4",,,Remove apples from the tree with many to have it match the other two.,Korok384.jpg
+385,垒石·石圈,text,库姆的秘泉,"-4155.0, -2613.0",,,Complete the spiral rock pattern.,Korok385.jpg
+386,射箭·射靶,text,多尔米森林,"3145.6, 2238.0","2834.5, 2120.2",是,Shoot the acorn hidden in the tree trunk.,Korok386.jpg
+387,搬石头,text,贾拉湖,"2990.4, 2274.0",,,Pick up this rock.,Korok387.jpg
+388,搬石头,text,海布拉山西岳,"-4424.0, -3218.0",,,Under the rock.,Korok388.jpg
+389,跳水环,text,库斯湖,"3033.6, 2024.4",,,Jump or fall into the ring of water lilies.,Korok389.jpg
+390,射气球,text,海布拉冻原,"-3352.4, -2992.0",,,Stand next to the pinwheel and shoot the three balloons. Cold Resistance Level 2 recommended,Korok390.jpg
+391,食物祭品,text,马布尔德平原,"2810.0, 2390.4",,,One of the trees has too many apples. Remove them until it matches the other two.,Korok391.jpg
+392,射箭·射靶,text,马布尔德平原,"2715.6, 2343.0","2834.5, 2120.2",是,Shoot the acorn in the tree.,Korok392.jpg
+393,射气球,text,贾拉湖,"2835.6, 2120.0",,,"The nearby dirt road makes a loop; along that loop are 10 signs with bullseye targets. Shoot them all. Back at the cabin, a balloon will appear, shoot it too for the seed.",Korok393.jpg
+394,搬石头,text,海布拉山山顶,"-2785.0, -2894.0",,,Under a rock. Cold Resistance Level 2 recommended,Korok394.jpg
+395,搬石头,text,海布拉山山顶,"-2835.0, -2832.0",,,Under a rock hidden beneath the snowy hill formation. Cold Resistance Level 2 recommended,Korok395.jpg
+396,推石入坑,text,谢拉湖,"2279.6, 1502.4","2345.4, 1529.6",是,Roll the boulder into the hole. Boulders are uphill to the east.,Korok396.jpg
+397,磁铁·方块拼图,text,阿德亚村遗迹,"323.6, 1924.4",,,Use Magnesis to move the chained rock into the well.,Korok397.jpg
+398,射箭·射靶,text,阿卡莱湖,"4098.4, -1755.6",,,Pick up the rock to the east of here and place it in the missing spot in the ring of boulders.,Korok398.jpg
+399,搬石头,text,谢拉湖,"2274.0, 1604.0",,,"Blow up the rocks here, then pick up the one under them.",Korok399.jpg
+400,射箭·射靶,text,默米河,"2884.4, 1762.4","3154.2, 1801.9",是,Shoot the acorn in the tree.,Korok400.jpg
+401,精灵光点,text,西海拉鲁平原,"-1692.0, -168.4",,,Catch the fairy lights.,Korok401.jpg
+402,追花,text,希麦加米河,"-1148.4, -223.0","-1154.6, 245.0",是,Follow the flowers up the bridge support and to the left.,Korok402.jpg
+403,赛跑·树桩,text,骷髅池塘,"3152.4, -3328.4","3170.8, -3317.5",是,"Look to the southeast of the marker, one ledge down, to find the seed platform. Race up the cliff to the circle.",Korok403.jpg
+404,追花,text,科尔奈海滩,"3027.0, 3654.0","2941.7, 3430.5",是,"Follow the yellow flower trail. It begins east of the mark in the middle of a group of trees, and zigzags a little, going out of the circle of trees then returning nearby.",Korok404.jpg
+405,垒石·石圈,text,克拉里海滩,"2505.6, 3827.6",,,Complete the heart shaped rock formation.,Korok405.jpg
+406,搬石头,text,八爪怪森林,"3353.0, -3080.4",,,Pick up the rock on top of the large tree.,Korok406.jpg
+407,垒石·石圈,text,骷髅池塘,"3327.0, -3588.4",,,Complete the stone circle with a rock by the nearby Bokoblin camp to the north. It will be next to one of the wooden pillars.,Korok407.jpg
+408,垒石·石圈,text,哈拉亚池塘,"278.0, 3503.6",,,Complete the rock pattern. The rock you need is just downhill.,Korok408.jpg
+409,垒石·石圈,text,科尔奈海滩,"2856.4, 3652.4",,,Put three rocks in the big circular stone formation from the smaller rock formations around it.,Korok409.jpg
+410,搬石头,text,乌波茨台地,"1514.4, 3723.6",,,Pick up the stone on the small ledge.,Korok410.jpg
+411,搬石头,text,依盖队基地,"-3846.4, 1469.0",,,"Pick up this rock, almost at the top of the cliff.",Korok411.jpg
+412,垒石·石圈,text,卡尔萨谷,"-4134.0, 1720.4",,,Complete the rock pattern.,Korok412.jpg
+413,垒石·石圈,text,马神桥,"517.0, 3765.6",,,The rock needed to complete this stone circle is on the cliff above.,Korok413.jpg
+414,垒石·石圈,text,玛萨海湾,"1373.6, 3755.0",,,"On the beach is a ring of rocks with one spot missing. Find the nearby boulder (close to the palm tree), pick it up and drop it into the missing spot.",Korok414.jpg
+415,射气球,text,海布拉山北岳,"-4001.0, -3623.6",,,"Stand next to the pinwheel, shoot the balloon. Cold Resistance Level 2 recommended.",Korok415.jpg
+416,树叶下,text,海布拉大化石,"-4030.4, -3756.4",,,Melt the left piece of ice to reveal leaves to examine. Cold Resistance Level 2 recommended.,Korok416.jpg
+417,射箭·射靶,text,海布拉北峰,"-3756.4, -3847.6","-3990.4, -3615.3",是,Pick up the rock from the center of the circle and put it in the missing spot on the outer circle.,Korok417.jpg
+418,射气球,text,北塔邦挞雪原,"-1969.6, -3795.0",,,Stand near the pinwheel and shoot the balloons.,Korok418.jpg
+419,垒石·石圈,text,萨托利山,"-2040.4, 296.4",,,"Bomb the large pile of rocks, then lift up the small rock that was hidden underneath.",Korok419.jpg
+420,追花,text,达思齐达高原,"2951.6, 3003.6","2947.3, 3436.0",是,Follow the yellow flower trail in a loop around the little pond area.,Korok420.jpg
+421,搬石头,text,千之中洲,"1107.6, 553.0",,,"Remove the large rock (use Stasis and hit it), then pick up the smaller.",Korok421.jpg
+422,射气球,text,比利丁高地,"-3844.0, 1902.4",,,Stand next to the pinwheel and then shoot down all three balloon targets.,Korok422.jpg
+423,精灵光点,text,千之中洲,"1312.4, 504.0",,,Fairy lights circle the area. Catch them.,Korok423.jpg
+424,搬石头,text,力量之泉,"3730.4, -2674.0",,,"Above the Spring of Power on an upper rock layer, a rock sits on top a small hill. Lift it and a Korok will appear to give you a seed.",Korok424.jpg
+425,食物祭品,text,千之中洲,"1446.4, 562.4",,,Remove apples from the tree with too many to match the other two.,Korok425.jpg
+426,磁铁·方块拼图,text,艾美拉尔台地,"-4179.6, 1483.0",,,Solve the block puzzle. The block is on top of a pillar to the west. You'll need Level 1 cold resistance where the puzzle is.,Korok426.jpg
+427,磁铁·方块拼图,text,萨乌兹岛,"1435.0, 137.0",,,Use magnesis to put the rock in the well.,Korok427.jpg
+428,搬石头,text,湿地驿站,"881.6, 273.6",,,"Burn away the brambles or float over them, and pick up the rock.",Korok428.jpg
+429,精灵光点,text,杜艾斯岛,"1593.6, 115.0",,,Fairy lights circle the area. Catch them.,Korok429.jpg
+430,射箭·射靶,actor,亚阔湖,"-1355.6, 998.0","-1389.8, 1148.9",是,Complete the rock triangle.,Korok430.jpg
+431,垒石·石圈,text,米奥乌岛,"2086.4, 183.6",,,Use the nearby rock to complete the circle.,Korok431.jpg
+432,冰块,text,澳尔帕台地,"-3064.4, 1288.4",,,Melt the large chunk of ice.,Korok432.jpg
+433,垒石·石圈,text,更格尔山,"1185.6, -66.0",,,Use the nearby rock to complete the circle.,Korok433.jpg
+434,垒石·石圈,text,更格尔山,"1089.0, -215.0",,,Use the rock to complete the circle.,Korok434.jpg
+435,垒石·石圈,text,马克雅林高地,"-3700.4, 804.4",,,Make both rock patterns match.,Korok435.jpg
+436,射气球,text,更格尔山,"1104.0, -444.4",,,Shoot the balloon hiding in the tree.,Korok436.jpg
+437,磁铁·方块拼图,text,鲁皮湖,"1198.4, -1149.6",,,Use Magnesis to lift the block out of the water and complete the puzzle.,Korok437.jpg
+438,搬石头,text,阿卡莱古代研究所,"4818.4, -3303.0",,,Move the slab to reveal the rock to pick up.,Korok438.jpg
+439,射箭·射靶,text,秋叶台地,"3997.0, -3145.6","3736.2, -2884.6",是,"Hit the leaves, then pick up the rock.",Korok439.jpg
+440,跳水环,text,泽罗池塘,"1629.6, -550.4",,,Create a cryonis pillar next to the circle of water lilies and then dive into it.,Korok440.jpg
+441,跳水环,text,鲁皮湖,"1284.4, -1121.6",,,Dive into the circle of lilies.,Korok441.jpg
+442,赛跑·树桩,text,泽罗池塘,"1832.4, -535.6","1585.2, -719.4",是,"The seed platform for this race is along the line of the ridge to the southeast. It's the peak just uphill to the west of the Soh Kofi Shrine. Once you reach the seed platform, glide and sprint to the end for your seed.",Korok442.jpg
+443,垒石·石圈,text,密斯密桥,"1267.6, -699.6",,,Throw a rock into the circle of rocks in the water.,Korok443.jpg
+444,精灵光点,text,达尔布尔桥,"2426.4, -410.4",,,Climb to the top of the tree and examine the fairy lights.,Korok444.jpg
+445,跳水环,text,林芭海滩,"3174.4, 3822.4",,,Jump into the circle of seaweed/plants.,Korok445.jpg
+446,追花,actor,沃托里村,"2966.0, 3381.0","2967.1, 2948.4",是,"Get a rock to the roof, and complete the rock triangle. This can be difficult and there are multiple methods.",Korok446.jpg
+447,搬石头,text,乌奥谷,"2635.0, 3198.0",,,Clear away the leaves and then lift up the small rock.,Korok447.jpg
+448,跳水环,text,茨卡耶台地,"2877.6, 2687.6",,,Jump or dive into the ring of flower lilies in the water.,Korok448.jpg
+449,搬石头,text,克洛伊达高地,"2182.0, 2535.0",,,Climb to the top of the peak here and lift the small rock.,Korok449.jpg
+450,搬石头,text,克洛伊达高地,"2286.4, 2658.4",,,"Lift the small rock next to this tree, right next to the opening that leads into the tunnel beneath the hill.",Korok450.jpg
+451,食物祭品,text,罗达伊湖,"1945.6, 3008.0",,,At the top of this plateau are 3 durian trees. Pluck 2 Hearty Durians to make the west-most tree identical to the other 2 trees.,Korok451.jpg
+452,赛跑·树桩,text,奇希莱平原,"1562.4, 2898.4",,,The seed platform is at the bottom of the cliff. Climb up to the ring.,Korok452.jpg
+453,磁铁·方块拼图,text,路特斯湖,"1658.4, 3163.0","1766.2, 2936.5",是,"Halfway up the waterfall are two ledges to the left and the right. On one of them is a Magnesis puzzle; the other ledge contains the missing block. Refrain from using Cryonis on the waterfall, since the blocks will come out tilted and will make the cube fall; the range of Magnesis is long enough for the cube to reach the puzzle ledge.",Korok453.jpg
+454,射气球,text,本拉斯树海,"1494.4, 3373.0",,,"Climb to the top of the tree and stand near the pinwheel. Three balloons will appear. Shoot them all to make the Korok appear. These Balloons are well hidden, including one hanging just below the edge of the tree platform, so look around carefully.",Korok454.jpg
+455,搬石头,text,塔巴尔森林,"2517.6, -212.4",,,Lift the rock.,Korok455.jpg
+456,磁铁·方块拼图,text,卓拉河,"2796.0, -499.0","2737.9, -174.6",是,Solve the block puzzle.,Korok456.jpg
+457,垒石·石圈,text,许愿河畔,"2664.0, -0.4",,,Throw a rock in the circle of rocks. Getting some height from the ledge to the left and using Cryonis makes it easier.,Korok457.jpg
+458,射气球,text,杜·邦山脉,"2772.4, 351.6","2472.0, 460.4",是,"A balloon is floating above the river. Shoot it. Gliding close and using a mid-air shot might help, or just drop a bomb on it like you can for every other balloon",Korok458.jpg
+459,射箭·射靶,text,格鲁德峡谷,"-2263.0, 2164.4","-2550.2, 2038.1",是,Destroy the acorn. Shooting it with an arrow is easiest.,Korok459.jpg
+460,食物祭品,text,凯波拉岭,"4038.0, -1258.0",,,Match the apple pattern on the tree.,Korok460.jpg
+461,精灵光点,text,茹特拉河,"3140.4, 326.0",,,Catch the Fairy Lights.,Korok461.jpg
+462,搬石头,text,珊湖,"-152.0, 3070.0",,,Look for a small ledge jutting out of the rock face with a rock on it approximately halfway up the wall.,Korok462.jpg
+463,追花,actor,特托拉平原,"-227.6, 3344.0","-209.4, 3445.0",是,Follow the trail of flowers starting from slightly south.,Korok463.jpg
+464,搬石头,text,卡洛克桥,"-1036.0, -445.6",,,Under a rock.,Korok464.jpg
+465,追花,text,露朵湖,"3085.0, -167.0","2984.5, -177.1",是,"The flower trail starts downhill to the west, and will involve some climbing to reach the seed.",Korok465.jpg
+466,精灵光点,text,Zora's Domain (Breath of the Wild),"3321.6, -512.0",,,"In the tail fin of the fish statue on top of Zora's Domain, almost the very highest point, examine the fairy lights.",Korok466.jpg
+467,射气球,text,八爪怪森林,"3181.6, -3073.6",,,"Move the large, flat rock with Stasis or an Octo Balloon, then pick up the rock underneath it.",Korok467.jpg
+468,磁铁·方块拼图,text,奥尔龙盆地,"3439.0, -2528.0",,,Solve the Magnesis puzzle on the cliff wall (at the lowest level of the quarry). The metal block is on top of the nearby rising to the south.,Korok468.jpg
+469,磁铁·方块拼图,text,露朵台地,"3520.4, -382.4",,,Solve the block puzzle.,Korok469.jpg
+470,射气球,text,乌波茨台地,"1633.0, 3886.4",,,"From the ground below, look up into the overhanging rock and shoot the lone balloon.",Korok470.jpg
+471,搬石头,text,卓拉台地,"3208.4, -1012.0",,,Climb up here and pick up the rock.,Korok471.jpg
+472,射箭·射靶,actor,鸟鸣草原,"-868.4, 219.6","-516.9, 97.8",是,On top of a flagpole.,Korok472.jpg
+473,磁铁·方块拼图,text,塔尔塔尔台地,"4075.0, -463.0",,,Look across the river for a boulder. Use Magnesis to carry the large metal boulder to the hole.,Korok473.jpg
+474,追花,text,塔尔塔尔台地,"4139.0, -410.0","4083.1, -424.8",是,Follow the flower trail up the hill.,Korok474.jpg
+475,搬石头,text,露朵台地,"3526.4, -275.6",,,Pick up the rock.,Korok475.jpg
+476,射箭·射靶,text,鸟鸣草原,"-424.4, 151.0","-516.9, 97.8",是,Stand on the tree stump by the paper windmill and shoot the acorn that is being thrown between two trees to southwest.,Korok476.jpg
+477,磁铁·方块拼图,text,塔尔塔尔台地,"4081.0, -215.0",,,Solve the block puzzle.,Korok477.jpg
+478,搬石头,text,加卜台地,"4133.6, 61.6",,,This one left a clue for you. Bomb the boulders and pick up the rock under them.,Korok478.jpg
+479,搬石头,text,荷隆湾,"4294.0, 77.6",,,Bomb the rock pile and pick up the rock underneath.,Korok479.jpg
+480,磁铁·方块拼图,text,荷隆湾,"4140.4, 199.0",,,Solve the block puzzle.,Korok480.jpg
+481,精灵光点,text,布兰努山丘,"3855.0, 352.4",,,Catch the fairy lights.,Korok481.jpg
+482,追花,text,拉聂尔湾,"3455.0, 550.4","3509.6, 519.4",是,"The flower trail starts to the east, follow it through the tunnel to the west.",Korok482.jpg
+483,搬石头,text,萨玛莎平原,"3432.0, 525.0",,,"Clear the leaves, pick up the rock beneath.",Korok483.jpg
+484,垒石·石圈,text,萨玛莎平原,"3271.0, 656.4",,,Complete the rock circle using the rock at the other end of the beach.,Korok484.jpg
+485,搬石头,text,拉聂尔湾,"3560.0, 627.6",,,"Blow up the boulders, pick up the rock underneath.",Korok485.jpg
+486,搬石头,text,萨托利山,"-2296.4, 344.4",,,Under a rock on top of a tree.,Korok486.jpg
+487,搬石头,text,拉聂尔湾,"3721.0, 619.6",,,Pick up this rock.,Korok487.jpg
+488,食物祭品,text,西海拉鲁平原,"-1881.0, -28.4",,,Make the three trees identical by picking apples.,Korok488.jpg
+489,射气球,text,罗德拉姆半岛,"4265.0, 628.4",,,"Lift the big rock with an Octo Balloon, then pick up the small rock yourself.",Korok489.jpg
+490,射气球,text,托洛伊瓦高原,"4451.6, 484.4",,,Shoot the balloon inside the big stone arch.,Korok490.jpg
+491,追花,text,罗德拉姆半岛,"4568.0, 646.4","4497.5, 1016.6",是,"The flower trail for this starts up the cliffs to the west, in the grove.",Korok491.jpg
+492,赛跑·树桩,text,萨托利山,"-2175.0, 463.6","-2187.6, 573.4",是,Start the race on the seed platform to the south and slightly west. Race up to the cliff edge before the time runs out.,Korok492.jpg
+493,搬石头,text,尼凯尔平原,"-2200.0, 733.6",,,Get the large boulder out of the way and then lift up the small rock hidden underneath it.,Korok493.jpg
+494,搬石头,text,萨托利山,"-1962.4, 407.6",,,Pick up the rock in the hollow stump.,Korok494.jpg
+495,射气球,text,西海拉鲁平原,"-1997.6, 162.4",,,"Stand on the patch of grass near the pinwheel, and shoot the three balloons.",Korok495.jpg
+496,搬石头,text,阿卡莱练兵场遗迹,"3408.4, -1277.6",,,"Move the door, pick up the rock.",Korok496.jpg
+497,垒石·石圈,text,南阿卡莱瀑布,"3724.4, -1132.0",,,Pick up a nearby rock on the eastern bank and throw it into the stone circle in the river.,Korok497.jpg
+498,精灵光点,text,摩尔达巴山,"-1126.0, 3627.0",,,Catch the fairy lights.,Korok498.jpg
+499,磁铁·方块拼图,text,布伊达湖,"1841.6, 3599.0",,,Use the magnesis block behind the waterfall to complete the cliffside puzzle. Cryonis will be required to reach the puzzle.,Korok499.jpg
+500,精灵光点,text,海利亚河,"396.0, -626.4",,,Catch the fairy lights as they circle around the area.,Korok500.jpg
+501,精灵光点,text,拉明平原,"-1060.4, -1928.0",,,Climb on top of the destroyed building and examine the fairy lights.,Korok501.jpg
+502,搬石头,text,阿卡莱堡垒遗迹,"3287.6, -1573.6",,,Move the leaves to uncover a rock. Pick up the rock.,Korok502.jpg
+503,跳水环,text,更格尔山丘,"506.4, -881.6",,,Dive into the circle of lilies.,Korok503.jpg
+504,射气球,text,西格鲁德遗迹,"-4608.4, 2340.4",,,Climb up the rib to the pinwheel and examine the fairy lights.,Korok504.jpg
+505,垒石·石圈,text,鼓大湖,"1427.0, -1545.6",,,Complete the stone circle using nearby rocks.,Korok505.jpg
+506,射气球,text,格鲁德峡谷,"-2548.4, 2041.0",,,Shoot the balloon in the rock bridge cleft.,Korok506.jpg
+507,赛跑·树桩,text,梅竹台地,"-2429.0, 1921.6","-2395.8, 1915.5",是,Stand on the nearby seed platform and then race to the ring.,Korok507.jpg
+508,精灵光点,text,梅竹台地,"-2415.6, 1928.0",,,Examine the fairy lights in the cleft in the rock bridge.,Korok508.jpg
+509,赛跑·树桩,text,第八位英雄的雕像,"-4325.6, 698.4","-4276.3, 610.6",是,The seed platform for this race is at the top of the cliff to the northeast. Race to the ring.,Korok509.jpg
+510,追花,text,贝利尔雪原,"-4343.0, 780.4","-4381.9, 782.6",是,"This flower trail starts directly west, at the bottom of the cliff, and requires you to climb straight up. Bring lots of stamina 3 full bars isn't enough will need to replenish.",Korok510.jpg
+511,推石入坑,text,第八位英雄的雕像,"-4411.6, 333.0",,,Push the boulders at the top of the cliff into the hole at the bottom.,Korok511.jpg
+512,赛跑·树桩,text,海马高地,"-4183.6, 291.0","-4207.9, 266.8",是,The seed platform is on the ledge to the northwest. Race to the ring.,Korok512.jpg
+513,射气球,text,比托谷,"1307.0, 2436.0",,,Stand near the pinwheel and shoot the balloons.,Korok513.jpg
+514,追花,text,奇希莱平原,"1373.0, 2748.0","1378.7, 2767.8",是,"The flower trail starts inside the tunnel, then works its way up the northern cave entrance.",Korok514.jpg
+515,磁铁·方块拼图,text,利诺斯岭,"-3834.4, -2112.0",,,Put the rock in the well using Magnesis.,Korok515.jpg
+516,追花,text,沃托里村,"2941.6, 3430.4","2967.1, 2948.4",是,"On top of the inn, there are 3 palm tree trunks. Climb around these chasing the yellow flower trail.",Korok516.jpg
+517,食物祭品,text,沃托里村,"2838.0, 3454.4",,,"Remove the apple from between the palm fruits, such as by shooting it.",Korok517.jpg
+518,食物祭品,text,克拉尔湖,"2170.0, 3272.4",,,Remove two Hearty Durian from the western tree so that all three trees match.,Korok518.jpg
+519,食物祭品,text,布伊达湖,"1759.0, 3688.4",,,Place Mighty Bananas on the leaf below the statue.,Korok519.jpg
+520,树叶下,text,湖畔驿站,"1554.0, 3529.0",,,Burn the goatee made out of leaves of the Horse structure above the stables.,Korok520.jpg
+521,食物祭品,text,利贝拉树海,"1859.0, 3354.0",,,Remove the Luminous Stone from the eye of the statue.,Korok521.jpg
+522,搬石头,text,奇比纳湖,"1217.0, 3525.6",,,Lift up the small rock found on top of the ledge here.,Korok522.jpg
+523,垒石·石圈,text,奇比纳湖,"1072.4, 3624.4",,,"This Korok's rock pattern is in the shape of a large spiral. On the second line from the outside is a missing rock, simply complete the pattern with the rock found nearby.",Korok523.jpg
+524,赛跑·树桩,text,古奇尼扎平原,"963.6, 3371.0","894.8, 3476.6",是,This race begins at the even taller pillar to the southwest.,Korok524.jpg
+525,射气球,text,思古兰特树海,"742.0, 3243.6",,,"Remove the slab using Stasis or an Octo Balloon since there's several octoroks in the area, then pick up the rock.",Korok525.jpg
+526,垒石·石圈,text,思古兰特树海,"701.0, 3278.4",,,Throw a nearby rock into the ring of stones in the pond. Cryonis might help.,Korok526.jpg
+527,追花,text,撒戎桥,"1012.0, 3255.0","679.0, 3061.2",是,Follow the yellow flower trail that starts just on the opposite side of the bridge.,Korok527.jpg
+528,射气球,text,撒戎桥,"1055.0, 3255.0",,,Shoot the balloon hidden in the top of the palm tree. It is easiest to spot if you climb up the ledge to the east.,Korok528.jpg
+529,跳水环,text,左纳乌遗迹群,"704.4, 2960.4",,,Dive into the ring of lilies.,Korok529.jpg
+530,推石入坑,text,阿米麦台地,"369.0, 3645.6",,,High on the cliff above this hole are three boulders. Push one of them off the cliff and into the hole.,Korok530.jpg
+531,垒石·石圈,text,马神桥,"640.4, 3712.0",,,Pick up a rock to the north just up the ledge and move it to complete the stone circle.,Korok531.jpg
+532,跳水环,text,马神湖,"646.4, 3616.4",,,Dive into the ring of flower lilies in the water.,Korok532.jpg
+533,搬石头,text,马泷之泉,"890.0, 3694.4",,,Lift up the small rock at the top of this mountain.,Korok533.jpg
+534,磁铁·方块拼图,text,伊巴拉高地,"913.0, 3836.4",,,Solve the block puzzle.,Korok534.jpg
+535,跳水环,text,帕发海岸,"286.4, 3903.0",,,Jump into the ring of seaweed to reveal a Korok.,Korok535.jpg
+536,食物祭品,text,帕发海岸,"98.4, 3821.6",,,Climb to the top of the mushroom shaped pillar and pick up the rock at the top.,Korok536.jpg
+537,搬石头,text,拉贝岩礁,"-249.6, 3831.0",,,Bomb the wall and lift the hidden rock.,Korok537.jpg
+538,精灵光点,text,拉贝岩礁,"-241.6, 3883.0",,,Catch the fairy lights.,Korok538.jpg
+539,精灵光点,text,拉贝岩礁,"-266.0, 3889.0",,,Climb the palm tree and examine the fairy lights.,Korok539.jpg
+540,搬石头,text,拉贝岩礁,"-352.0, 3898.4",,,Drop one cliff level down from the top of the cliff to find a rock to pick up.,Korok540.jpg
+541,磁铁·方块拼图,text,珊湖,"-28.4, 3044.4",,,"This one is very hard to see. The metal cube is underwater next to the islands, but can only be seen from certain angles (look down where the arrow is in the picture). Then take it to the block puzzle on the cliff, which can be hard to spot. It's on the north side of the cliff.",Korok541.jpg
+542,搬石头,text,爱恩河,"65.0, 3221.6",,,Bomb the wall in the corner of the hillside then lift the revealed rock.,Korok542.jpg
+543,搬石头,text,芬拉斯树海,"609.0, 2872.0",,,Pick up the rock.,Korok543.jpg
+544,推石入坑,text,芬拉斯树海,"415.6, 2877.6",,,Roll the boulder into the hole.,Korok544.jpg
+545,射箭·射靶,text,Lake Hylia (Breath of the Wild),"338.4, 2831.0","349.3, 2592.9",是,Shoot the acorn.,Korok545.jpg
+546,搬石头,text,Lake Hylia (Breath of the Wild),"165.0, 2783.0",,,Pick up the rock.,Korok546.jpg
+547,射气球,text,Bridge of Hylia (Breath of the Wild),"-68.0, 2439.6",,,Shoot the balloon.,Korok547.jpg
+548,搬石头,text,Bridge of Hylia (Breath of the Wild),"-73.6, 2416.0",,,"Move the slab, and pick up the rock under it.",Korok548.jpg
+549,射箭·射靶,text,Bridge of Hylia (Breath of the Wild),"-54.0, 2492.0","-66.2, 2440.6",是,Climb down the bridge to the first set of windows. Pick up the tree branch on the narrow ledge.,Korok549.jpg
+550,精灵光点,text,海利亚岛,"-400.0, 2559.6",,,"Examine the fairy lights at the top of the tree. Refrain from attempting it during a thunderstorm, since lightning will strike and take the tree down.",Korok550.jpg
+551,磁铁·方块拼图,text,Lake Hylia (Breath of the Wild),"-466.4, 2907.0",,,Solve the Magnesis block puzzle. The block is in the water nearby.,Korok551.jpg
+552,搬石头,text,海利亚岛,"-602.4, 2659.6",,,Pick up the rock.,Korok552.jpg
+553,赛跑·树桩,text,Lake Hylia (Breath of the Wild),"-610.0, 2390.4","-668.9, 2392.4",是,Step on the seed platform on the coast to the west and then race to the ring.,Korok553.jpg
+554,磁铁·方块拼图,text,Lake Hylia (Breath of the Wild),"34.4, 2101.6","208.6, 2076.1",是,Use Magnesis on the metal cube and bring it to the other side of the waterfall. Use Cryonis on the waterfall to reach the box puzzle above.,Korok554.jpg
+555,磁铁·方块拼图,text,阿德亚村遗迹,"215.0, 2072.4",,,Use Magnesis to move the chained rock into the stump.,Korok555.jpg
+556,搬石头,text,阿德亚村遗迹,"355.0, 1998.0",,,Lift the rock.,Korok556.jpg
+557,磁铁·方块拼图,text,阿迪亚湖,"624.0, 2301.0","287.9, 2261.1",是,Solve the block puzzle. The block is in the nearby tree.,Korok557.jpg
+558,精灵光点,text,费罗龙台地,"615.0, 2418.4",,,There are two fairy lights dancing around here. Catch them both for two seeds.,Korok558.jpg
+559,搬石头,text,费罗龙台地,"679.0, 2502.4",,,Lift stone at the top of the hill.,Korok559.jpg
+560,射气球,text,Lake Hylia (Breath of the Wild),"371.6, 2564.0",,,"Stand near the pinwheel, shoot the balloons.",Korok560.jpg
+561,推石入坑,text,Lake Hylia (Breath of the Wild),"283.0, 2404.4",,,Roll the boulder into the hole.,Korok561.jpg
+562,搬石头,text,勇气之泉,"756.0, 2348.4",,,"Bomb the nearby breakable wall in the mountainside, then lift the revealed stone.",Korok562.jpg
+563,搬石头,text,勇气之泉,"890.0, 2391.6",,,Climb up the tree and lift the small rock.,Korok563.jpg
+564,食物祭品,text,卡兹溜湖,"789.6, 2565.6",,,"Get the boulder off the pillar and to the corner, matching the other three surrounding the statue.",Korok564.jpg
+565,搬石头,text,卡兹溜河,"1171.6, 2851.0",,,Lift the stone above the small waterfall.,Korok565.jpg
+566,精灵光点,text,撒戎树海,"1198.4, 3056.0",,,Interact with the fairy lights floating around the lake.,Korok566.jpg
+567,精灵光点,text,卡玛斯台地,"1324.4, 3009.6",,,Interact with the fairy lights floating around the area.,Korok567.jpg
+568,射气球,text,亚哲台地,"1462.0, 2367.6",,,Stand near the pinwheel and shoot the balloons.,Korok568.jpg
+569,射箭·射靶,actor,比托谷,"1323.0, 2453.6",,,Complete the rock triangle on the island in the tar pit. Knock down a tree to make a bridge.,Korok569.jpg
+570,赛跑·树桩,text,比托谷,"1188.4, 2476.4","1131.8, 2327.6",是,The seed platform is visible to the north-northwest. Race to the ring for the seed.,Korok570.jpg
+571,搬石头,text,奥赛平原,"-925.6, 3438.0",,,"Blow up the middle set of boulders, and then pick up the rock.",Korok571.jpg
+572,搬石头,text,摩尔迦娜山,"-1257.6, 3134.0",,,"Blow up the boulders, then lift up the small rock that was hidden beneath them.",Korok572.jpg
+573,射气球,text,奥布巴巴草地,"-1065.0, 2911.6",,,Shoot the balloon.,Korok573.jpg
+574,射箭·射靶,text,泰格利平原,"-924.4, 2939.6","-1066.8, 2910.0",是,Shoot the acorn hiding inside the end of the hollowed out log.,Korok574.jpg
+575,精灵光点,text,卡坡莱山,"-1011.6, 2640.0",,,Climb the lone tree to the very top and examine the fairy lights.,Korok575.jpg
+576,射箭·射靶,text,奥布巴巴草地,"-1213.0, 2704.0","-1066.8, 2910.0",是,Shoot the small acorn hanging from the tall tree.,Korok576.jpg
+577,磁铁·方块拼图,text,奥布巴巴草地,"-1378.4, 2743.6",,,Solve the Magnesis block puzzle.,Korok577.jpg
+578,射气球,text,海利亚山,"-1399.6, 2376.4",,,"Stand near the pinwheel, shoot the balloons.",Korok578.jpg
+579,精灵光点,text,格鲁德峡谷 入口,"-1656.0, 2309.0",,,Climb the tree and examine the fairy lights.,Korok579.jpg
+580,射气球,text,斯塔尔里台地,"-1617.6, 2446.4",,,Stand near the pinwheel and shoot the balloons.,Korok580.jpg
+581,射气球,text,Spectacle Rock (Breath of the Wild),"-2207.0, 2550.0",,,Shoot the balloon underneath the rock bridge.,Korok581.jpg
+582,搬石头,text,Spectacle Rock (Breath of the Wild),"-2357.6, 2557.0",,,Pick up the rock on the first ledge from the top of the cliff.,Korok582.jpg
+583,搬石头,text,Spectacle Rock (Breath of the Wild),"-2059.0, 2416.0",,,Pick up the rock.,Korok583.jpg
+584,赛跑·树桩,text,Spectacle Rock (Breath of the Wild),"-2066.4, 2397.0","-2103.9, 2297.2",是,Just to the north is a seed platform on a wooden platform. Race to the ring for the seed.,Korok584.jpg
+585,搬石头,text,格鲁德沙漠 入口,"-2852.4, 2320.4",,,"Go to the westernmost part of the cliff behind the shrine, climb up 4 cliffs, then pick up the rock.",Korok585.jpg
+586,磁铁·方块拼图,text,基尔克台地,"-2462.0, 1711.6",,,Solve the block puzzle.,Korok586.jpg
+587,搬石头,text,格鲁德峡谷,"-2169.6, 2078.4",,,"Climb the tree, lift the rock.",Korok587.jpg
+588,磁铁·方块拼图,text,梅竹台地,"-2062.4, 1851.0",,,Solve the Magnesis Block puzzle near the top of the cliff.,Korok588.jpg
+589,射气球,text,南部绿洲,"-3728.4, 3613.0",,,Shoot the balloon in the tree.,Korok589.jpg
+590,赛跑·树桩,text,西格鲁德,"-4374.0, 2587.0",,,"Climb up to the seed platform, and then get to the ring, quick.",Korok590.jpg
+591,精灵光点,text,西格鲁德遗迹,"-4709.6, 2177.6",,,Climb to the highest point of the rib structure and examine the fairy lights.,Korok591.jpg
+592,精灵光点,text,西格鲁德遗迹,"-4686.4, 1972.4",,,Climb to the highest point of the rib structure and examine the fairy lights.,Korok592.jpg
+593,垒石·石圈,text,卡尔萨谷,"-4172.4, 1991.0",,,Complete the rock circle. The rock to use is in a corner of the cliff wall.,Korok593.jpg
+594,追花,text,卡尔萨谷,"-4353.6, 1837.0",,,Follow the flower trail up the wall to the cliff above.,Korok594.jpg
+595,食物祭品,text,卡尔萨谷,"-4314.4, 1628.4",,,Offer a Mighty Banana to the offering bowl.,Korok595.jpg
+596,食物祭品,text,卡尔萨谷,"-4264.4, 1694.0",,,Offer Mighty Bananas to the two offering bowls.,Korok596.jpg
+597,食物祭品,text,卡尔萨谷,"-4222.4, 1667.0",,,Offer Mighty Bananas to the three offering bowls.,Korok597.jpg
+598,食物祭品,text,艾美拉尔台地,"-4076.0, 1596.0",,,Offer Mighty Bananas to the four offering bowls.,Korok598.jpg
+599,食物祭品,text,艾美拉尔台地,"-3999.0, 1568.0",,,Offer Mighty Bananas to the five offering bowls.,Korok599.jpg
+600,搬石头,text,依盖队基地,"-3713.6, 1556.4",,,"Roll the...No, wait, pick up the snowball and place it in the hole.",Korok600.jpg
+601,磁铁·方块拼图,text,北格鲁德巨石,"-3075.0, 2043.6",,,"This Magnesis puzzle is more spread out than most. Solution is on the west wall, puzzle on the east, and block's in the middle.",Korok601.jpg
+602,垒石·石圈,text,萨菲亚斯台地,"-3130.0, 1469.0",,,Find a rock just to the east of the rock circle. Walk along the narrow cliff path to complete the pattern.,Korok602.jpg
+603,垒石·石圈,text,塔菲亚高地,"-2815.0, 1649.6",,,"This is a rock circle made up of pieces of 3 rocks each, except for a large rock out of place. Put it in place.",Korok603.jpg
+604,搬石头,text,基尔克台地,"-2647.6, 1536.4",,,"At the top of this section of the mountain, lift up the small rock.",Korok604.jpg
+605,垒石·石圈,text,基尔克台地,"-2521.6, 1319.6",,,A circle of rocks on this ledge on the side of the mountain is incomplete. Grab the rock from the ledge slightly higher up and bring it down to the ring and complete the circle of rocks. Level 2 Cold Resistance recommended,Korok605.jpg
+606,冰块,text,澳尔帕台地,"-2849.0, 1229.0",,,Melt the chunk of ice that's closest to the edge.,Korok606.jpg
+607,精灵光点,text,澳尔帕台地,"-2869.0, 1126.4",,,Climb the tree and examine the fairy lights.,Korok607.jpg
+608,垒石·石圈,text,澳尔帕台地,"-3070.4, 913.0",,,Complete the rock pattern.,Korok608.jpg
+609,磁铁·方块拼图,text,奥尔汀台地,"2087.6, -3571.0",,,Complete the magnetic block puzzle.,Korok609.jpg
+610,搬石头,text,奥尔汀台地,"2232.0, -3670.0",,,Bomb the rock wall and pick up the rock behind it.,Korok610.jpg
+611,搬石头,text,东埃文坡高地,"1619.0, -3657.6",,,"Climb inside of the skeleton's north-facing eye socket, burn or bomb the leaves, then pick up the rock.",Korok611.jpg
+612,垒石·石圈,text,东埃文坡高地,"1144.0, -3743.6",,,Complete the stone circle using a nearby rock (which is in a clump of bushes to the east as you head to the Lynel.  Stasis can help you see it.).,Korok612.jpg
+613,磁铁·方块拼图,text,埃文坡高地,"605.6, -3634.0",,,Finish the magnetic block puzzle.,Korok613.jpg
+614,搬石头,text,埃文坡高地,"210.4, -3559.6",,,Pick up the rock.,Korok614.jpg
+615,射气球,text,沃尔纳高地,"-485.0, -3140.0",,,Stand near the pinwheel and shoot the balloons.,Korok615.jpg
+616,垒石·石圈,text,鲁皮湖,"1378.0, -1262.4",,,Finish the rock pattern with a nearby rock.,Korok616.jpg
+617,跳水环,text,国王的书房,"-141.6, -1167.0",,,Dive into the circle of lilies at the bottom of the waterfall.,Korok617.jpg
+618,搬石头,text,卡尔加岭,"-3677.6, -2467.6",,,Under a rock.,Korok618.jpg
+619,搬石头,text,蟹蟹岛,"1551.6, -3108.4",,,Lift the rock on top of the structure surrounding the shrine.,Korok619.jpg
+620,射气球,text,八爪怪森林,"3573.0, -3046.4",,,Shoot the balloon underneath the upper cliff.,Korok620.jpg
+621,磁铁·方块拼图,text,八爪怪森林,"3322.4, -2802.0",,,Complete the magnetic block puzzle in the ruins.,Korok621.jpg
+622,树叶下,text,海布拉河,"-3042.4, -2520.0",,,Thaw the ice block and examine the whirling glittering leaves.,Korok622.jpg
+623,精灵光点,text,暴风谷,"-3061.0, -2815.0",,,Thaw the ice and examine the fairy lights.,Korok623.jpg
+624,树叶下,text,夏利巴山,"-3117.0, -2805.6",,,Thaw the ice and examine the whirling glittering leaves.,Korok624.jpg
+625,推石入坑,text,深远阿卡莱平原,"3781.6, -3359.0","4010.4, -3207.7",是,Roll a boulder into the hole. Boulders can be found on the nearby hill to the southeast. It is advised to kill the Lynel first.,Korok625.jpg
+626,射箭·射靶,actor,杰德桥,"-1861.0, 335.0","-1999.0, 152.8",是,Break the nut in the hole in the tree.,Korok626.jpg
+627,射气球,text,尼凯尔平原,"-1968.0, 598.4",,,Shoot five balloons near the pinwheel.,Korok627.jpg
+628,射箭·射靶,text,尼凯尔平原,"-1730.4, 377.0","-1931.1, 608.9",是,Destroy the acorn in the hole in the side of the tree.,Korok628.jpg
+629,射箭·射靶,actor,尼凯尔平原,"-2053.0, 635.6","-1967.2, 609.0",是,Break the nut in the hole of the fallen tree.,Korok629.jpg
+630,搬石头,text,卢驰尔湖,"-2732.4, 759.6",,,Hidden under a small rock that is covered by the leaves.,Korok630.jpg
+631,推石入坑,text,卢驰尔湖,"-2349.0, 846.4","-2351.3, 741.9",是,Roll a boulder (found to the north) into the hole.,Korok631.jpg
+632,搬石头,text,卢驰尔湖,"-2647.6, 548.4",,,Use a bladed weapon to clear the leaves and then lift the small rock that was hidden underneath.,Korok632.jpg
+633,赛跑·树桩,text,拉布拉山,"-1856.0, -1192.4","-1892.1, -1235.1",是,Race from the top of the mountain to the northwest.,Korok633.jpg
+634,垒石·石圈,text,玛丽塔平原,"-1093.0, -1734.4",,,Finish the rock pattern using a rock on a nearby ledge to the south.,Korok634.jpg
+635,精灵光点,text,门前驿站村遗迹,"-770.4, 1380.4",,,Catch the fairy lights.,Korok635.jpg
+636,推石入坑,text,路茨平原,"-3840.4, -803.6",,,Push the nearby boulder into the hole.,Korok636.jpg
+637,射气球,text,海拉鲁城邑遗迹,"-163.6, -260.4",,,The pinwheel at the top of this section of wall spawns balloons to the north. Shoot them.,Korok637.jpg
+638,其他,manual,城邑监视塔遗迹,"97.6, -433.0",,,Climb to the top of the flagpole.,Korok638.jpg
+639,搬石头,text,沃尔纳山,"-567.6, -2598.0",,,Pick up the rock on the peak of the mountain.,Korok639.jpg
+640,赛跑·树桩,text,阿卡莱古代研究所,"4344.0, -3178.4","4252.4, -3134.4",是,"The seed platform is to the southwest, across the chasm. Race to the ring.",Korok640.jpg
+641,搬石头,text,阿卡莱堡垒遗迹,"3290.0, -1427.0",,,Look near the cannons for a rock to pick up.,Korok641.jpg
+642,树叶下,text,丝蕾米的小屋,"-2945.6, -3147.0",,,Climb to the top of the cabin and examine the swirling leaves. Cold Resistance Level 2 recommended,Korok642.jpg
+643,垒石·石圈,text,柯库皮雪原,"-2468.0, -2764.4",,,Complete the circle using two nearby stones.,Korok643.jpg
+644,垒石·石圈,text,鼓隆温泉,"1647.0, -2245.0",,,Complete the rock circle from the rock next to a nearby lava flow.,Korok644.jpg
+645,推石入坑,text,马尔鼓池塘,"2017.6, -2165.6",,,Roll the boulder into the lava at the end of the hill.,Korok645.jpg
+646,射气球,text,达鲁马湖,"1887.0, -2748.4",,,"Stand near the pinwheel, shoot the balloon.",Korok646.jpg
+647,树叶下,text,茨茨齐齐雪原,"-2211.6, -2908.0",,,Thaw the ice block and examine the glittering leaves. Cold Resistance Level 2 recommended,Korok647.jpg
+648,搬石头,text,达拉伊特森林,"-2343.6, 1105.6",,,Under a rock up the large curved tree.,Korok648.jpg
+649,射箭·射靶,text,达拉伊特森林,"-2098.4, 1106.4","-2442.1, 1143.6",是,Shoot the acorn hanging from a tree.,Korok649.jpg
+650,食物祭品,text,萨尔法山丘,"-1819.0, 976.0",,,Put an apple in every bowl.,Korok650.jpg
+651,搬石头,text,希麦加米河,"-1405.6, 453.0",,,Under a rock up in a tree.,Korok651.jpg
+652,追花,actor,交易所遗迹,"-643.0, 877.0","-587.1, 875.6",是,Follow a trail of flowers that starts slightly to the east.,Korok652.jpg
+653,磁铁·方块拼图,text,城邑监视塔遗迹,"80.0, -409.6",,,Move the metal door and pick up the rock under it.,Korok653.jpg
+654,射气球,text,观察室,"-237.0, -743.0",,,Shoot the 3 balloons hiding behind the Malice to reveal the Korok.,Korok654.jpg
+655,射气球,text,观察室,"-248.4, -741.6",,,Shoot the balloon in the far distance to reveal the Korok.,Korok655.jpg
+656,跳水环,text,科摩罗池,"-427.0, 1192.4",,,Dive into the ring in the water.,Korok656.jpg
+657,射箭·射靶,text,科摩罗池,"-601.6, 1072.4","-662.5, 1377.2",是,Shoot the acorn hanging from the tree.,Korok657.jpg
+658,精灵光点,text,达思齐达山,"3178.0, 3202.4",,,Catch the fairy lights.,Korok658.jpg
+659,推石入坑,text,泡泡拉高地,"910.4, 2196.0","1045.1, 2176.4",是,Get one of the giant boulders to the east into the hole.,Korok659.jpg
+660,射气球,text,海马高地,"-4256.4, -78.4",,,Shoot 3 balloons near the pinwheel.,Korok660.jpg
+661,搬石头,text,库库甲谷,"-3328.0, -337.6",,,Under a rock under a slab.,Korok661.jpg
+662,垒石·石圈,text,龙骨沼泽,"-4327.6, -2052.4",,,Complete the three stone circles using rocks that lie approximately in the direction of each circles gap.,Korok662.jpg
+663,垒石·石圈,text,泽卡瓦米的秘泉,"-4157.6, -3403.6",,,Find the missing rock to fill in the triangle.,Korok663.jpg
+664,赛跑·树桩,text,海布拉大化石,"-4167.0, -3616.0","-4251.8, -3590.2",是,"Climb the hill to the west of the marker to find this seed platform. You'll need to shield surf down the hill to reach the circle in time, as it expires very quickly. Cold Resistance Level 2 recommended",Korok664.jpg
+665,磁铁·方块拼图,text,冰冻山麓,"-4397.6, -3771.6",,,Complete the block puzzle. Cold Resistance Level 2 recommended,Korok665.jpg
+666,射气球,text,海布拉冻原,"-3575.0, -3271.6",,,Climb to the top of the hill to find a pinwheel. The three balloons constantly disappear and reappear over the nearby trees.,Korok666.jpg
+667,搬石头,text,比隆雪原,"-3796.0, -3035.0",,,Under a rock.,Korok667.jpg
+668,射箭·射靶,text,塔邦挞山丘,"-2524.0, -1734.4",,,Destroy the acorn in the hollow of the tree log.,Korok668.jpg
+669,搬石头,text,库库甲谷,"-3206.4, -329.0",,,Under a rock between the pillars.,Korok669.jpg
+670,食物祭品,text,无底沼泽,"316.4, 527.6",,,Place an apple in the empty basket.,Korok670.jpg
+671,垒石·石圈,text,拉布拉山丘,"-2516.0, -1436.0",,,Complete the circle of rocks. the rock is hidden behind some bushes southwest of the circle.,Korok671.jpg
+672,搬石头,text,玛丽塔交易所遗迹,"-2036.0, -1620.4",,,"At the bottom of the canyon, blow up the cracked boulders then lift the small rock hidden behind them.",Korok672.jpg
+673,搬石头,text,玛丽塔交易所遗迹,"-1885.6, -1812.4",,,Under a rock.,Korok673.jpg
+674,磁铁·方块拼图,text,沃尔纳山,"-1050.0, -2614.4",,,"On top of the temple, use Magnesis to put the cube back in its rightful spot.",Korok674.jpg
+675,磁铁·方块拼图,text,库库甲谷,"-3209.0, -493.6",,,Solve the block puzzle.,Korok675.jpg
+676,赛跑·树桩,text,古代石柱群,"-3675.0, -393.6","-3647.1, -436.4",是,Race from a lower pillar just to the north-northeast to this high pillar.,Korok676.jpg
+677,精灵光点,text,库库甲谷球场,"-3107.6, -915.6",,,Climb up to the top of the flagpole and examine the fairy lights.,Korok677.jpg
+678,搬石头,text,库库甲谷球场,"-3086.4, -1112.0",,,Pick up the rock on a ledge about one-fourth of the way down the cliff.,Korok678.jpg
+679,射气球,text,东阿卡莱海岸,"4336.0, -2438.4",,,Stand near the pinwheel and shoot the balloons.,Korok679.jpg
+680,磁铁·方块拼图,text,库库甲谷,"-2214.0, -1620.4","-2366.9, -1871.1",是,"Solve the block puzzle, making the two patterns identical.",Korok680.jpg
+681,磁铁·方块拼图,text,沃尔纳山,"-1096.4, -3397.6",,,Complete the box puzzle.,Korok681.jpg
+682,推石入坑,text,沃尔纳山,"-1113.0, -3042.0","-1267.9, -3216.0",是,Roll a boulder (from uphill to the northwest) into the hole.,Korok682.jpg
+683,射气球,text,忘却神殿,"-1684.0, -2183.0",,,Stand near the pinwheel and shoot the balloons around you. Using a long ranged bow is recommended.,Korok683.jpg
+684,射气球,text,泰阿蒙河,"-3019.0, 374.4",,,Shoot a balloon in a tree.,Korok684.jpg
+685,垒石·石圈,text,明弗拉的秘泉,"-3500.4, -3577.0",,,"Jump into the water and go under the rock structure as far northwest as you can go. You'll find a pile of leaves to cut away, revealing a rock to pick up. Cold Resistance Level 2 recommended",Korok685.jpg
+686,彩色花·按序踩,actor,伊露美娜池,"-3457.0, 167.6",,,Run through flowers 1-5.,Korok686.jpg
+687,食物祭品,text,达拉伊特森林,"-1973.0, 1093.6",,,Put an apple in the empty bowl.,Korok687.jpg
+688,搬石头,text,库库甲谷,"-3479.6, -71.6",,,"Under a rock, a fourth down the canyon.",Korok688.jpg
+689,精灵光点,text,塔玛湖,"-2834.0, -1593.6",,,Climb up to the top of the windmill and examine the fairy lights.,Korok689.jpg
+690,射箭·射靶,text,库库甲谷,"-3864.0, -149.6","-4256.3, -92.1",是,Shoot an acorn hanging from the lower part of the windmill.,Korok690.jpg
+691,追花,text,海布拉大化石,"-3961.6, -3721.0","-4084.9, -3717.7",是,"Inside the cave, there's a yellow flower at the bottom of the Leviathan's spine directly behind the Shrine. Follow it to get the Korok Seed. Cold Resistance Level 2 recommended.",Korok691.jpg
+692,射箭·射靶,text,达拉伊特森林,"-2393.6, 1041.0","-2444.3, 1141.7",是,Destroy the acorn hanging under an outcrop.,Korok692.jpg
+693,射气球,text,达拉伊特森林,"-2456.4, 1161.6",,,Shoot the balloons near the windmill.,Korok693.jpg
+694,垒石·石圈,text,沃尔纳山,"-1367.0, -3647.0",,,"Complete the three circles, using the rock lying in one of the circles.",Korok694.jpg
+695,射箭·射靶,text,草笛山丘,"224.4, 874.4","320.9, 1199.5",是,Destroy the acorn in the hole in the side of the large tree.,Korok695.jpg
+696,射箭·射靶,text,东部的驿站村废墟,"68.4, 1438.4","320.9, 1205.8",是,"Stand on the stump, then shoot the flying acorns.",Korok696.jpg
+697,推石入坑,text,卡洛克桥,"-1129.6, -676.4","-1203.2, -631.0",是,Roll a boulder from the west (up the hill) downhill to the east into a small hole.,Korok697.jpg
+698,搬石头,text,哈希毕罗湖,"-3297.6, -1364.0",,,Under a rock behind some destructible boulders.,Korok698.jpg
+699,精灵光点,text,奥尔龙盆地,"3878.0, -2369.6",,,Catch the flying lights.,Korok699.jpg
+700,追花,text,北阿卡莱高地,"4104.0, -2838.0",,,Follow the flower order. The third flower is behind some bushes.,Korok700.jpg
+701,搬石头,text,更格尔山丘,"615.0, -744.0",,,Lift the rock up.,Korok701.jpg
+702,赛跑·树桩,text,Goron City (Breath of the Wild),"1725.6, -2554.0","1610.2, -2544.7",是,Climb to the top of the rock sculpture of Daruk's head to find the seed platform. Race east towards the ring before the time runs out.,Korok702.jpg
+703,磁铁·方块拼图,text,马尔鼓池塘,"2168.0, -2109.6",,,Complete the magnetic puzzle here using Magnesis.,Korok703.jpg
+704,射气球,text,监狱遗迹,"-941.6, -816.0",,,Stand on the tree stump with the pinwheel. There will be an acorn jumping at the top of one of the trees. Shoot it.,Korok704.jpg
+705,搬石头,text,希麦加米河,"-1370.4, -114.4",,,Pick up the rock on the shore.,Korok705.jpg
+706,射箭·射靶,text,希麦加米河,"-1516.0, 56.4","-1258.4, -240.5",是,Shoot the acorn hidden in the tree.,Korok706.jpg
+707,磁铁·方块拼图,text,北海拉鲁平原,"-1143.6, -761.6",,,Solve the block puzzle.,Korok707.jpg
+708,搬石头,text,卡洛克桥,"-933.6, -640.0",,,Under a rock.,Korok708.jpg
+709,射箭·射靶,text,卡洛克桥,"-1095.6, -495.6","-1258.4, -240.5",是,Shoot the acorn hanging under the bridge.,Korok709.jpg
+710,搬石头,text,鸟鸣草原,"-734.4, 330.4",,,Under a rock.,Korok710.jpg
+711,射箭·射靶,text,鸟鸣草原,"-707.6, 105.6","-516.9, 97.8",是,Destroy the acorn in the hole in the side of a tree.,Korok711.jpg
+712,射气球,text,鸟鸣草原,"-519.0, 94.0","-426.7, 149.9",是,Pop the balloon on top of the tree.,Korok712.jpg
+713,射箭·射靶,text,风标草原,"-365.0, 398.0","-516.9, 97.8",是,Shoot the acorn hanging from the wreck of a carriage.,Korok713.jpg
+714,精灵光点,text,海拉鲁驻军地遗迹,"-510.4, 554.0",,,Examine the fairy lights at the top of the flagpole.,Korok714.jpg
+715,精灵光点,text,风标草原,"-121.6, 591.6",,,Catch the fairy lights.,Korok715.jpg
+716,精灵光点,text,草笛山丘,"-131.0, 947.0",,,Catch the fairy lights.,Korok716.jpg
+717,搬石头,text,草笛山丘,"40.4, 1033.0",,,Under a rock on top of the large tree.,Korok717.jpg
+718,食物祭品,text,监狱遗迹,"-682.0, -860.4",,,"Place a Rusty Shield in the offering bowl. One is nearby, to the southeast.",Korok718.jpg
+719,射箭·射靶,text,明弗拉的秘泉,"-3614.4, -3493.0","-3572.7, -3277.7",是,Shoot the acorn that's at the end of the hollow log. Cold Resistance Level 2 recommended,Korok719.jpg
+720,跳水环,text,巴尔麦平原,"65.0, 3149.0",,,Dive into the circle.,Korok720.jpg
+721,射气球,text,海布拉河,"-2900.0, -2503.6",,,Shoot the balloon under the alcove where the river begins.,Korok721.jpg
+722,搬石头,text,泰阿蒙河,"-2919.0, 479.6",,,Pick up the rock.,Korok722.jpg
+723,搬石头,text,泰阿蒙河,"-2909.6, 796.4",,,Under a rock.,Korok723.jpg
+724,搬石头,text,希麦加米河,"-1555.6, 815.0",,,Under a rock.,Korok724.jpg
+725,精灵光点,text,萨托利山,"-1984.4, 364.0",,,Climb up the long bare tree to examine the fairy lights.,Korok725.jpg
+726,搬石头,text,泰阿蒙河,"-2314.0, 24.0",,,Under a rock.,Korok726.jpg
+727,搬石头,text,路茨平原,"-3805.6, -773.0",,,Under a rock.,Korok727.jpg
+728,精灵光点,text,塔邦挞大桥驿站,"-2717.6, -435.0",,,Catch the fairy lights that run around in the area,Korok728.jpg
+729,搬石头,text,利特驿站,"-3276.4, -1865.0",,,Under the rock on top of the tree.,Korok729.jpg
+730,搬石头,text,海拉鲁城堡护城河,"-754.0, -1083.0",,,Lift up the rock.,Korok730.jpg
+731,赛跑·树桩,text,鼓洛斯湖,"1868.0, -2400.4","1915.7, -2382.1",是,To the east of the seed marker there's a ledge with the seed platform on it. Race to the ring.,Korok731.jpg
+732,垒石·石圈,text,波奇桥,"287.6, -723.0",,,Throw a rock into the ring of rocks in the river.,Korok732.jpg
+733,搬石头,text,南塔邦挞雪原,"-1350.4, -2732.0",,,Under a rock behind some cracked boulders.,Korok733.jpg
+734,食物祭品,text,龙骨沼泽,"-4122.4, -1935.0",,,Put a Spicy Pepper in the offering bowl that is missing one.,Korok734.jpg
+735,彩色花·按序踩,text,平原牧场遗迹,"146.4, 299.0",,,Run through the flower patches in order from 1 to 5.,Korok735.jpg
+736,搬石头,text,科嘉奈亚池塘,"3085.0, 2883.6",,,"In a cave with Luminous Ore, blow up the boulders and pick up the small rock behind them. the cave can be found next to the big tree.",Korok736.jpg
+737,射气球,text,乌克克平原,"3968.0, -856.0",,,"Stand by the pinwheel, shoot the three balloons.",Korok737.jpg
+738,食物祭品,text,乌尔拉峡谷谷,"4239.6, -994.4",,,Three trees stand on top of this plateau. Pluck the apples one of them so that it matches the other two trees.,Korok738.jpg
+739,搬石头,text,乌尔拉峡谷谷,"4042.4, -661.0",,,Move the large boulder surrounded by smaller rocks. Then lift up the rock underneath it to reveal a Korok.,Korok739.jpg
+740,追花,actor,乌尔拉峡谷谷,"4146.0, -593.6","4139.2, -409.9",是,Climb to the top of the tallest pine tree here and examine the sparkles.,Korok740.jpg
+741,树叶下,text,乌尔拉峡谷谷,"4331.6, -694.0",,,Examine the flying leaves at the top of the hill.,Korok741.jpg
+742,搬石头,text,骷髅池塘,"3078.0, -3683.0",,,Pick up the rock on top of the large tree.,Korok742.jpg
+743,搬石头,text,塔邦挞村遗迹,"-2204.4, -1767.0",,,"On the side of the cliff, blow up the cracked boulders then lift the small rock hidden behind them.",Korok743.jpg
+744,追花,text,王室古代研究所遗迹,"-1226.4, -1001.6","-1234.3, -1094.2",是,Follow the flower trail that starts in the north section of the ruins.,Korok744.jpg
+745,搬石头,text,塔邦挞大桥,"-3213.0, -574.0",,,Race that starts from the under the east end of the bridge to finish under the west end of the bridge.,Korok745.jpg
+746,赛跑·树桩,text,库库甲谷,"-3829.0, -118.4","-3822.2, -170.9",是,Race from a cliff to the north to the finish to the south.,Korok746.jpg
+747,搬石头,text,罗姆山,"-2697.6, -766.0",,,Under a rock.,Korok747.jpg
+748,搬石头,text,罗姆山,"-2669.6, -864.0",,,Under a rock.,Korok748.jpg
+749,赛跑·树桩,text,塔玛湖,"-2826.4, -1580.0","-2772.8, -1472.8",是,Race from a cliff to the south to the finish to the north.,Korok749.jpg
+750,搬石头,text,库库甲谷,"-2083.6, -1564.4",,,"On the side of the cliff, blow up the cracked boulders then lift the small rock hidden behind them.",Korok750.jpg
+751,搬石头,text,库库甲谷,"-2217.6, -1563.0",,,Under a rock.,Korok751.jpg
+752,精灵光点,text,拉布拉山,"-2023.0, -1301.0",,,Catch the fairy lights at the top of the bare tree.,Korok752.jpg
+753,搬石头,text,拉布拉山丘,"-2386.4, -1148.4",,,"At ground level, blow up the cracked boulders then lift the small rock hidden behind them.",Korok753.jpg
+754,搬石头,text,丘萨茨湖,"2313.6, -1133.0",,,"Blast the rock wall, enter the cave and pick up the rock.",Korok754.jpg
+755,垒石·石圈,text,齐纳嘉莱湿地带,"-2059.0, -778.0",,,"On top of the giant mushroom, complete the stone circle using 3 nearby rocks.",Korok755.jpg
+756,食物祭品,text,齐纳嘉莱湿地带,"-2030.4, -545.6",,,"Follow the trail of flowers that start on top of the large mushroom tree to the southwest. Note, the final flower is on the floor, not a mushroom.",Korok756.jpg
+757,食物祭品,text,齐纳嘉莱湿地带,"-1964.4, -584.0",,,Race from ground level just north up to the small mushroom.,Korok757.jpg
+758,射气球,text,赛莱斯平原,"-2439.0, -489.0",,,Shoot the balloon hanging under the huge mushroom tree.,Korok758.jpg
+759,射气球,text,赛莱斯平原,"-2369.0, -345.6",,,Shoot the balloon hanging under the huge mushroom tree.,Korok759.jpg
+760,食物祭品,text,沃尔纳山,"-1044.4, -2707.6",,,"Inside the Forgotten Temple, behind the Goddess Statue's head, north of the shrine, lift the rock.",Korok760.jpg
+761,射箭·射靶,text,马拉松报名处,"-2637.0, -1247.6",,,Shoot the acorn in the hole in the side of the tree.,Korok761.jpg
+762,食物祭品,text,赛莱斯平原,"-2548.0, -306.4",,,"Race from a large mushroom tree to the southeast, finish on topside of another large mushroom tree.",Korok762.jpg
+763,彩色花·按序踩,actor,西海拉鲁平原,"-1648.0, -40.0",,,Run through the flower patches 1-5.,Korok763.jpg
+764,搬石头,text,西海拉鲁平原,"-1583.6, -226.4",,,"Move the slab, and pick up the rock under it.",Korok764.jpg
+765,赛跑·树桩,text,卡洛克桥,"-1115.6, -528.4","-989.9, -541.0",是,Race from the beach to the east of the seed location to the yellow ring on the rock.,Korok765.jpg
+766,搬石头,text,巴奇平原,"-1081.6, -1276.4",,,Under a rock on top of the tree.,Korok766.jpg
+767,射气球,text,南部采矿场,"1540.0, -2088.4",,,Use the updraft to float straight into the air. Look under the nearby rock formation and shoot the balloon.,Korok767.jpg
+768,赛跑·树桩,text,吉萨山丘,"-3661.6, -829.0","-3692.1, -792.1",是,Reach the circle before the time limit. The seed platform is on the curved ledge to the southwest.,Korok768.jpg
+769,食物祭品,text,卢玛琳沙丘,"-4881.0, 2470.0",,,One cactus has too many voltfruit. Make it look like the other two.,Korok769.jpg
+770,射气球,text,北洛美城堡遗迹,"-874.0, -3313.6",,,Shoot the balloon in the tree.,Korok770.jpg
+771,磁铁·方块拼图,text,奥尔龙盆地,"3732.4, -2423.0",,,Solve the Magnesis puzzle on the side of the cliff wall.,Korok771.jpg
+772,搬石头,text,玛丽塔平原,"-1802.4, -1840.4",,,Under a rock behind some destructible boulders.,Korok772.jpg
+773,射气球,text,德依布朗遗迹,"235.0, -2942.0",,,Shoot the balloons that appear near the pinwheel.,Korok773.jpg
+774,搬石头,text,海布拉山西岳,"-4328.4, -2601.6",,,Under a rock on the top of the peak.,Korok774.jpg
+775,射气球,text,乌克池塘,"-4507.0, -2148.0",,,"Shoot the three balloons, standing next to the pinwheel.",Korok775.jpg
+776,搬石头,text,龙骨沼泽,"-4481.6, -1967.6",,,Under a rock.,Korok776.jpg
+777,追花,actor,乌克池塘,"-4022.0, -2350.0","-4204.8, -2782.2",是,Follow the trail of flowers starting uphill to the southwest.,Korok777.jpg
+778,赛跑·树桩,text,龙骨沼泽,"-4397.0, -2050.0",,,"The seed platform is way to the north, at the southwest corner of the plateau the Hebra West Summit is on, next to a large flag. Shield surf or paraglide to the end location.",Korok778.jpg
+779,射箭·射靶,text,海拉鲁城邑遗迹,"-254.4, -266.0","-163.7, -271.9",是,"Shoot the Hylian symbol on the north side of the wall, above the gate.",Korok779.jpg
+780,赛跑·树桩,actor,中央广场遗迹,"-254.0, -425.6","-296.8, -261.9",是,"There is a Korok platform on top of the wall to the south of the fountain, west of the gate. Glide from there to the fountain.",Korok780.jpg
+781,精灵光点,text,贝莱平原,"1404.4, -832.4",,,Catch the fairy lights.,Korok781.jpg
+782,搬石头,text,海布拉湖,"-2633.6, -2055.0",,,Under a rock behind the shrine.,Korok782.jpg
+783,搬石头,text,西南阿卡莱桥,"3601.0, -1008.4",,,"Go to the southeastern corner of the bridge and move underneath it, to where a single rock is. Pick up the rock to reveal the Korok.",Korok783.jpg
+784,垒石·石圈,text,阿卡莱堡垒联络桥遗迹,"3113.0, -1295.0",,,"Complete the rock circle with the rock that is downhill from the circle, next to a dead guardian.",Korok784.jpg
+785,搬石头,text,塔林湿地,"3709.6, -1684.4",,,Pick up rock on top of destroyed structure.,Korok785.jpg
+786,射箭·射靶,text,三殿,"-324.0, -798.4","-214.9, -751.0",是,"In a corridor under the First Gatehouse, break the bombable wall, then shoot the acorn with an arrow.",Korok786.jpg
+787,食物祭品,text,萨尔达的研究室,"-439.6, -932.4",,,Place a Bird Egg in front of each statue.,Korok787.jpg
+788,搬石头,text,萨尔达的研究室,"-369.6, -994.4",,,Lift the rock found halfway down the shaft.,Korok788.jpg
+789,搬石头,text,Hyrule Castle (Breath of the Wild),"-254.4, -632.0",,,On top of the gate to Hyrule Castle is a rock. Lift the rock.,Korok789.jpg
+790,追花,text,Hyrule Castle (Breath of the Wild),"-230.4, -630.4","-246.7, -579.2",是,Follow the flower trail starting under the bridge on the southern side of the moat.,Korok790.jpg
+791,搬石头,text,海拉鲁大圣堂遗迹,"88.0, -634.4",,,Get rid of the leaves and pick up the rock underneath.,Korok791.jpg
+792,树叶下,text,茨茨齐齐雪原,"-2293.0, -3407.0",,,Thaw the ice block and examine the glittering leaves. Cold Resistance Level 2 recommended,Korok792.jpg
+793,搬石头,text,忘却神殿,"-1257.6, -2365.0",,,On top of the temple. Under a rock behind the bombable boulders.,Korok793.jpg
+794,搬石头,text,忘却神殿,"-1673.6, -2140.0",,,Under a rock.,Korok794.jpg
+795,其他,text,拉明平原,"-1310.0, -1940.4",,,Jump the three fences while riding. This can also be done with the Master Cycle Zero using the Zero Jump,Korok795.jpg
+796,精灵光点,text,海布拉山西岳,"-4418.4, -2862.4",,,Catch the fairy lights.,Korok796.jpg
+797,搬石头,text,南部绿洲,"-3798.4, 3430.0",,,Pick up the rock.,Korok797.jpg
+798,食物祭品,text,乌利尔山,"3661.6, -2065.6",,,Clear the apples on the tree with too many to have the same amount as the others.,Korok798.jpg
+799,垒石·石圈,text,摩尔达巴山,"-1350.4, 3770.0",,,Complete the rock square.,Korok799.jpg
+800,搬石头,text,卡札娜裂谷,"3496.0, -3374.0",,,"Remove the rock slab, then pick up the rock.",Korok800.jpg
+801,搬石头,text,深远阿卡莱平原,"3453.0, -3581.6",,,"Knock the boulder off, then pick up the little rock.",Korok801.jpg
+802,搬石头,text,死亡之山登山口,"2436.0, -1238.0",,,Look under the rock bridge to find a small ledge with a rock on it. Pick up the rock to reveal the Korok.,Korok802.jpg
+803,精灵光点,text,艾美拉尔台地,"-4113.0, 1378.0",,,Catch the fairy lights.,Korok803.jpg
+804,射箭·射靶,text,巴奇平原,"-704.0, -1444.4","-902.8, -1587.6",是,Destroy the acorn inside the hollow of the tree log.,Korok804.jpg
+805,赛跑·树桩,text,海布拉水源,"-2884.0, -2398.0","-2941.3, -2483.4",是,"The seed platform is to the north, just west of where the water begins, at the highest point overlooking the falls. Race to the ring.",Korok805.jpg
+806,射气球,text,海布拉水源,"-2839.6, -2422.0",,,Shoot the balloon down by the water.,Korok806.jpg
+807,射箭·射靶,text,夏利巴山,"-3280.0, -2616.4","-2984.9, -2693.6",是,Destroy the acorn in the hollow of the tree log.,Korok807.jpg
+808,磁铁·方块拼图,text,阿卡莱堡垒遗迹,"3237.6, -1526.0",,,Located on a higher ledge than the nearby seed. There are two blocks and pile of leaves here. Disturb the leaves and pick up the rock.,Korok808.jpg
+809,磁铁·方块拼图,text,阿卡莱堡垒遗迹,"3299.0, -1586.4",,,Located on a lower ledge than the nearby seed. Move the door with Magnesis to uncover a rock to pick up.,Korok809.jpg
+810,搬石头,text,阿卡莱堡垒遗迹,"3297.0, -1417.6",,,Drop down from the southern ledge with the cannons to find a pile of leaves. Disturb the leaves and pick up the rock.,Korok810.jpg
+811,搬石头,text,阿卡莱大桥,"3009.0, -1199.6",,,"Under the bridge, move the rock slab, then pick up the rock.",Korok811.jpg
+812,搬石头,text,毅力崖 ,"2550.0, -3595.6",,,Blow up the rock wall and lift up the small rock that was hidden behind it.,Korok812.jpg
+813,搬石头,text,死亡破火山口,"2471.0, -3178.4",,,"Blow up the boulders, lift up the rock underneath.",Korok813.jpg
+814,树叶下,text,夏特岭,"3372.4, -2315.0",,,Climb a tall pine tree and examine the glowing leaves to find the Korok.,Korok814.jpg
+815,射气球,text,东埃文坡高地,"859.6, -3353.0",,,Stand next to the pinwheel atop the tree and shoot the balloons.,Korok815.jpg
+816,其他,text,卡纳莱特高原,"3245.6, -1999.0",,,An invisible Korok will be running around the area. Interact with it and collect the Korok seed.,Korok816.jpg
+817,搬石头,text,乌利尔山,"3480.0, -2077.0",,,Clear the leaves and pick up the rock to find the Korok.,Korok817.jpg
+818,搬石头,text,北阿卡莱高地,"4006.4, -2736.4",,,Disturb the leaves with a bladed weapon then lift up the small rock hidden underneath them.,Korok818.jpg
+819,赛跑·树桩,text,鼓大河,"1544.4, -1837.6","1527.4, -1887.4",是,The seed platform is on the skull. Race to the ring.,Korok819.jpg
+820,搬石头,text,托洛鼓悬崖,"1950.0, -1832.4",,,Use a bomb on the breakable wall then lift the rock.,Korok820.jpg
+821,射箭·射靶,text,贝莱谷,"2275.0, -720.0",,,Find the seed platform up hill. Race in time to the target to reveal the Korok.,Korok821.jpg
+822,垒石·石圈,text,盖洛湖,"2425.6, -1738.0",,,Throw one of the rocks into the rock circle.,Korok822.jpg
+823,磁铁·方块拼图,text,贝弗岛,"2705.0, -1747.6",,,"Complete the Magnesis cube puzzle. The metal cube is located on the eastern edge of the canyon floor, the template on the northeast side of the pond, and the puzzle is found on the island center.",Korok823.jpg
+824,射箭·射靶,text,北塔邦挞雪原,"-1528.0, -3479.0",,,Destroy the acorn in the hollow of the log.,Korok824.jpg
+825,磁铁·方块拼图,text,劳鲁村遗迹,"582.0, -1105.0",,,Solve the block puzzle.,Korok825.jpg
+826,搬石头,text,海拉鲁森林公园遗迹,"179.0, -938.4",,,Lift the stone on top of the fountain.,Korok826.jpg
+827,射气球,text,艾尔姆丘陵,"-424.4, -1733.6",,,Stand on the stump with the pinwheel and shoot the 3 targets that are circling the nearby trees.,Korok827.jpg
+828,搬石头,text,艾尔姆丘陵,"-333.6, -1745.0",,,Lift the rock in the center of the dead trees.,Korok828.jpg
+829,射箭·射靶,text,沃尔纳高地,"-41.0, -2987.0","234.3, -2963.1",是,Shoot the acorn inside the hollow tree log.,Korok829.jpg
+830,跳水环,text,海布拉湖,"-2994.4, -2168.0",,,Dive/jump/fall into the circle of water lilies.,Korok830.jpg
+831,搬石头,text,莫里桥,"-3125.0, -1368.4",,,Under a rock behind some destructible boulders.,Korok831.jpg
+832,搬石头,text,毅力崖 ,"2664.0, -3472.0",,,Pick up the rock on the northernmost pillar and move it to the upper edge of the pillar so it matches the rock placement on the other pillars.,Korok832.jpg
+833,搬石头,text,南塔邦挞雪原,"-1764.4, -2350.0",,,Under a rock under a pile of leaves.,Korok833.jpg
+834,推石入坑,text,鼓大河,"1684.4, -1720.4",,,Roll a boulder into the lava pond below.,Korok834.jpg
+835,磁铁·方块拼图,text,幽芬湖,"2478.0, -1392.0",,,Complete the puzzle using Magnesis.,Korok835.jpg
+836,垒石·石圈,text,密兹达湖,"2755.0, -1368.4",,,Carry a rock through the shallow water to the rock circle and throw it in.,Korok836.jpg
+837,追花,text,库姆的秘泉,"-4193.6, -2681.0","-4227.9, -3135.1",是,"Follow the flower trail. It starts west-northwest of Sturnida Secret Hot Spring, halfway up the cliff. The trail leads south along the cliff face.",Korok837.jpg
+838,追花,text,比隆雪原,"-4228.0, -3135.0","-4193.4, -2681.0",是,The flower trail starts a short distance southeast and down the cliff. Follow it up the cliff.,Korok838.jpg
+839,精灵光点,text,比隆雪原,"-3841.6, -3346.0",,,Climb the dead tree and interact with the fairy lights.,Korok839.jpg
+840,精灵光点,text,明弗拉的秘泉,"-3410.4, -3508.0",,,Examine the fairy lights on the top of the dead tree. Cold Resistance Level 2 recommended,Korok840.jpg
+841,搬石头,text,比隆雪原,"-3739.0, -2961.6",,,Under a rock.,Korok841.jpg
+842,垒石·石圈,text,丝蕾米的小屋,"-2851.6, -3489.6",,,Complete the rock pattern using a nearby rock.,Korok842.jpg
+843,搬石头,text,祭奠场遗迹,"-239.0, -112.4",,,Climb up the tallest pillar in the northeast section and pick up the rock at the top.,Korok843.jpg
+844,跳水环,text,欧荷利桥,"-607.6, -675.0","-679.4, -858.6",是,Dive into the ring of flowers in the water next to the bridge.,Korok844.jpg
+845,树叶下,text,海布拉山东岳,"-2604.4, -3238.0",,,Climb to the top of the tree and examine the swirling leaves.,Korok845.jpg
+846,射气球,text,茨茨齐齐雪原,"-2257.0, -3085.0",,,Stand near the pinwheel and shoot the acorn. Cold Resistance Level 2 recommended,Korok846.jpg
+847,精灵光点,text,茨茨齐齐雪原,"-2492.4, -3028.0",,,Thaw the ice block and examine the fairy lights. Cold Resistance Level 2 recommended,Korok847.jpg
+848,射气球,text,夏利巴山,"-2987.6, -2693.6",,,Shoot the balloon that hangs high up under a cliff.,Korok848.jpg
+849,搬石头,text,海布拉河,"-2938.4, -2410.4",,,Pick up a rock.,Korok849.jpg
+850,树叶下,text,海布拉河,"-2735.0, -2584.0",,,Thaw the ice block and examine the glittering leaves.,Korok850.jpg
+851,搬石头,text,海布拉河,"-2641.6, -2362.4",,,Under a rock.,Korok851.jpg
+852,树叶下,text,海布拉湖,"-2790.4, -1943.0",,,Examine the glittering leaves at the top of the dead tree.,Korok852.jpg
+853,精灵光点,text,塔玛湖,"-2912.0, -1635.6",,,Examine the fairy lights at the top of the tree.,Korok853.jpg
+854,追花,actor,库库甲谷,"-2338.0, -1728.0","-2376.8, -1790.9",是,Follow the trail of flowers that starts next to the road to the north.,Korok854.jpg
+855,搬石头,text,塔邦挞村遗迹,"-2385.6, -2128.4",,,Under a rock.,Korok855.jpg
+856,推石入坑,text,柯库皮雪原,"-2295.6, -2287.0",,,Snow boulders can be carried. Put one in the hole below.,Korok856.jpg
+857,射箭·射靶,text,南塔邦挞雪原,"-2022.0, -2464.0","-1731.4, -2210.2",是,Destroy the acorn in the hollow in the tree log.,Korok857.jpg
+858,搬石头,text,彭多的小屋,"-2019.6, -1931.6",,,Under a rock.,Korok858.jpg
+859,精灵光点,text,南塔邦挞雪原,"-1791.0, -2746.0",,,Catch the fairy lights.,Korok859.jpg
+860,搬石头,text,希麦加米河,"-1820.0, 1533.0",,,Pick up the rock.,Korok860.jpg
+861,垒石·石圈,text,鲁奇玛高地,"-4528.0, 1423.6",,,Use the nearby rock to complete the rock circle.,Korok861.jpg
+862,搬石头,text,山麓驿站,"2652.4, -973.6",,,Lift the rock.,Korok862.jpg
+863,搬石头,text,达鲁波池塘,"2355.6, -2064.4",,,Lift the rock.,Korok863.jpg
+864,搬石头,text,贝弗岛,"2664.0, -2064.4",,,"Break the wall, then lift the stone.",Korok864.jpg
+865,射气球,text,中鼓湖,"2270.4, -1823.0",,,"Find the pinwheel inside the skull, look outside the eye to find the target balloon. Shoot it with an arrow to reveal the Korok.",Korok865.jpg
+866,垒石·石圈,text,丘萨茨湖,"2179.6, -1281.0",,,Complete the stone circle.,Korok866.jpg
+867,搬石头,text,中鼓湖,"2265.6, -1562.0",,,"Break the wall, lift the stone.",Korok867.jpg
+868,搬石头,text,Faron Woods (Breath of the Wild),"407.6, 3051.0",,,"Climb the pillar, pick up the rock.",Korok868.jpg
+869,垒石·石圈,text,达鲁马湖,"2060.4, -2756.4",,,Use the rock above to complete the stone circle below.,Korok869.jpg
+870,搬石头,text,达鲁马湖,"2203.0, -3001.0",,,Lift the rock to reveal the Korok.,Korok870.jpg
+871,搬石头,text,Goron City (Breath of the Wild),"1655.0, -2563.0",,,Lift the rock that's located under the rock sculpture's armpit.,Korok871.jpg
+872,精灵光点,text,鼓隆桥,"1593.6, -2477.0",,,"From the city entrance, look up and to the left. Climb into the mouth of the southwest goron in the rock structure, and examine the fairy lights.",Korok872.jpg
+873,精灵光点,text,鼓洛斯湖,"1865.0, -2463.0",,,Examine the fairy lights on top of the stone ribcage.,Korok873.jpg
+874,射箭·射靶,text,海拉鲁森林公园遗迹,"324.4, -959.6",,,Shoot the acorn in the hole in the tree.,Korok874.jpg
+875,搬石头,text,鲁奇玛高地,"-4552.4, 1352.4",,,Pick up the rock.,Korok875.jpg
+876,推石入坑,text,巴尔麦平原,"150.0, 2982.4",,,Roll the boulder to the hole.,Korok876.jpg
+877,射箭·射靶,text,Hyrule Castle (Breath of the Wild),"-272.0, -607.6","-237.5, -632.5",是,Shoot the acorn hidden in the alcove under the bridge to the gate to Hyrule Castle.,Korok877.jpg
+878,赛跑·树桩,text,艾美拉尔台地,"-4210.0, 1133.6","-4388.9, 1218.4",是,Race to the finish from the platform to the west-southwest. Use the updraft and your paraglider to gain height quickly.,Korok878.jpg
+879,射箭·射靶,text,观察室,"-256.4, -739.6","-213.8, -743.1",是,Shoot the stone Coat of Arms to reveal the Korok.,Korok879.jpg
+880,搬石头,text,齐洛利森琳,"1008.4, -1563.0",,,Climb the platform and lift the rock.,Korok880.jpg
+881,射箭·射靶,text,海拉鲁军事演习场遗迹,"869.0, -1361.6",,,Shoot the acorn in the hole in the tree.,Korok881.jpg
+882,搬石头,text,麦贝镇遗迹,"23.0, 148.4",,,Lift the rock up.,Korok882.jpg
+883,精灵光点,text,玛丽塔山丘,"-1229.6, -1576.0",,,Interact with the fairy lights.,Korok883.jpg
+884,射箭·射靶,text,玛丽塔山丘,"-1438.0, -1663.6",,,Shoot the acorn in the tree trunk.,Korok884.jpg
+885,射箭·射靶,text,阿尔达台地,"-820.4, -1927.0","-902.8, -1587.6",是,Shoot the acorn in the log.,Korok885.jpg
+886,射箭·射靶,text,拉明平原,"-1023.6, -2078.4",,,Shoot the acorn in the hollow log.,Korok886.jpg
+887,搬石头,text,船坞,"-269.6, -1139.0",,,"Bomb the breakable wall high up on the cliffside, then lift the stone.",Korok887.jpg
+888,搬石头,text,东坑道,"-68.0, -978.0",,,Lift the stone.,Korok888.jpg
+889,精灵光点,text,东坑道,"-99.6, -977.0",,,"Enter the East Passage. Just before the room with the Talus, you find blocks of ice along a wall. Melt the largest ice block, then examine the fairy lights.",Korok889.jpg
+890,搬石头,text,训练所,"-270.4, -874.4",,,"This ledge is just below the last curve in the path before it enters the castle. Bomb the breakable wall, then lift the stone.",Korok890.jpg
+891,射箭·射靶,actor,三殿,"-350.0, -829.0","-214.9, -751.0",是,Climb to the top of the spire above the First Gatehouse.,Korok891.jpg
+892,搬石头,text,马克雅林高地,"-3676.0, 700.0",,,Lift the rock.,Korok892.jpg
+893,垒石·石圈,text,北海拉鲁平原,"-1015.0, -1064.4",,,Throw a rock into the ring of stones in the water.,Korok893.jpg
+894,搬石头,text,海拉鲁城堡护城河,"-132.0, -1379.0",,,Lift the rock.,Korok894.jpg
+895,磁铁·方块拼图,text,海拉鲁城堡护城河,"-671.6, -934.0",,,Solve the block puzzle. Half of it is underwater nearby.,Korok895.jpg
+896,搬石头,text,二殿,"-163.6, -784.4",,,"On a rock ledge just above the water, bomb the breakable wall, then lift the stone.",Korok896.jpg
+897,搬石头,text,莱波纳桥,"797.6, 24.0",,,Lift the rock under the bridge.,Korok897.jpg
+898,食物祭品,text,苹果森林,"624.0, -191.6",,,Pick apples on the third tree to make it match the other two.,Korok898.jpg
+899,射箭·射靶,text,马兹拉桥,"503.0, -494.4","690.6, -614.8",是,Shoot the acorn.,Korok899.jpg
+900,射气球,text,玛科莱湖,"683.6, -2756.4",,,Stand near the pinwheel and shoot the balloon.,Korok900.jpg

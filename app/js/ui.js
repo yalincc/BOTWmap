@@ -25,6 +25,35 @@ const UI = (() => {
     initCardDrag();
   }
 
+  /* ---------- 克洛格类型配色与灯箱（v1.1.1，P3 第二标记复用同色表） ---------- */
+  const KOROK_TYPE_COLORS = {
+    lift_rock: '#e8b04a', magnesis: '#6fb9ff', balloon: '#ff9ad5',
+    fairy_light: '#7dffa0', rock_circle: '#b18cff', shoot_target: '#ff5252',
+    race: '#ffd166', offering: '#ff8c42', flower_trail: '#9be564',
+    color_flower: '#4dd6c8', dive: '#6ad0ff', push_rock: '#c9a227',
+    leaves: '#7cbf5a', ice: '#a8d8ff', other: '#9aa5a0'
+  };
+  window.KOROK_TYPE_COLORS = KOROK_TYPE_COLORS;
+  const KOROK_ITEMS = (typeof BOTW_KOROKS !== 'undefined' && BOTW_KOROKS.items) ? BOTW_KOROKS.items : [];
+
+  function openLightbox(src, alt) {
+    const lb = $('imgLightbox'), img = $('lbImg'), meta = $('lbMeta');
+    if (!lb || !img) return;
+    img.onload = () => {
+      if (meta) meta.textContent = '原图分辨率 ' + img.naturalWidth + ' × ' + img.naturalHeight + '（这就是源站图的最高分辨率）';
+    };
+    img.src = src; img.alt = alt || '';
+    if (meta) meta.textContent = '';
+    lb.classList.remove('hidden');
+  }
+  function closeLightbox() {
+    const lb = $('imgLightbox'), img = $('lbImg'), meta = $('lbMeta');
+    if (!lb) return;
+    lb.classList.add('hidden');
+    if (img) img.src = '';
+    if (meta) meta.textContent = '';
+  }
+
   /* ---------- 信息卡拖拽（按住头部移动） ---------- */
   function initCardDrag() {
     const card = $('infoCard');
@@ -568,6 +597,8 @@ const UI = (() => {
     if (m.count === 0) extra += '<div class="row">说明<b style="color:#e8b04a">无 MainField 固定刷点（动态生成 / 仅栖息地）</b></div>';
     extra += '<div class="row">图层<b>' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（请勾选侧栏「材料」组）') + '</b></div>';
     $('cardExtra').innerHTML = extra;
+    $('cardKorok').classList.add('hidden');
+    $('cardKorok').innerHTML = '';
     $('cardDone').classList.add('hidden');
     $('cardUndone').classList.add('hidden');
     $('cardDelPin').classList.add('hidden');
@@ -575,6 +606,43 @@ const UI = (() => {
     $('cardCollect').classList.add('hidden');
     positionCard();
     $('infoCard').classList.remove('hidden');
+  }
+
+  /* 克洛格详情块（v1.1.1 P2）：类型徽章 + 位置截图（点击放大灯箱）+ 解法一句话 + 挑战起点行 */
+  function renderKorokBlock(mk) {
+    const el = $('cardKorok');
+    if (mk.cat !== 'seed') { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    const k = KOROK_ITEMS.find(x => x.id === mk.id);
+    if (!k) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    const color = KOROK_TYPE_COLORS[k.type] || '#9aa5a0';
+    // 头部徽章 = 类型名 + 类型配色（15 类各一色）
+    $('cardCat').textContent = '克洛格 · ' + k.type_cn;
+    $('cardCat').style.borderColor = color;
+    $('cardCat').style.color = color;
+    let html = '<div class="row">谜题类型<b><span class="korok-badge" style="color:' + color + ';border-color:' + color + '">' + esc(k.type_cn) + '</span></b></div>';
+    html += '<div class="korok-shot-wrap"><img class="korok-shot" data-src="assets/korok/' + esc(k.img) + '" alt="克洛格 No.' + k.no + ' 位置截图"><span class="korok-zoom">查看原图</span></div>';
+    html += '<div class="row">解法<b>' + esc(k.hint) + '</b></div>';
+    if (k.has_start_diff && k.start) {
+      const s = map.gameCoord(k.start);
+      html += '<div class="row korok-start">挑战起点<b style="color:' + color + '">X ' + s[0] + ' · Z ' + s[1] + '</b><button type="button" class="korok-nav-start" style="color:' + color + ';border-color:' + color + '">导航到起点</button><span class="korok-note">（开启挑战的位置，与收获点不同）</span></div>';
+    }
+    el.innerHTML = html;
+    const img = el.querySelector('.korok-shot');
+    if (img) {
+      img.src = img.dataset.src;   // 打开卡片时才真正加载（懒加载，900 张不会一次全载）
+      img.onclick = () => openLightbox(img.src, img.alt);
+    }
+    const navBtn = el.querySelector('.korok-nav-start');
+    if (navBtn) {
+      navBtn.onclick = () => {
+        if (typeof LIVE !== 'undefined' && LIVE.navigateToStart) {
+          LIVE.navigateToStart({ name: '克洛格 No.' + k.no + ' 挑战起点', start: k.start });
+        } else {
+          toast('服务未连接，无法导航');
+        }
+      };
+    }
+    el.classList.remove('hidden');
   }
 
   function renderCard() {
@@ -593,6 +661,7 @@ const UI = (() => {
     $('cardRegion').innerHTML = '区域<b>' + (mk.region || '—') + '</b>';
     $('cardTower').innerHTML = '塔域<b>' + (mk.tower || '—') + '</b>';
     $('cardCoord').innerHTML = '游戏坐标<b>X ' + gx + ' · Z ' + gz + '</b>';
+    renderKorokBlock(mk);
     let extra = '';
     const ex = mk.extra || {};
     if (mk.cat === 'seed' && ex.korok_loc) extra += '<div class="row">位置提示<b>' + esc(ex.korok_loc) + '</b></div>';
@@ -645,6 +714,8 @@ const UI = (() => {
     $('cardTower').innerHTML = '坐标<b>X ' + gx + ' · Z ' + gz + '</b>';
     $('cardCoord').innerHTML = '';
     $('cardExtra').innerHTML = c.note ? '<div class="row">备注<b>' + esc(c.note) + '</b></div>' : '';
+    $('cardKorok').classList.add('hidden');
+    $('cardKorok').innerHTML = '';
     $('cardDone').classList.add('hidden');
     $('cardUndone').classList.add('hidden');
     $('cardDelPin').classList.remove('hidden');
@@ -733,6 +804,12 @@ const UI = (() => {
     wireShare();
     wireCombos();
     $('cardClose').addEventListener('click', hideInfo);
+    // 截图灯箱（v1.1.1）
+    $('lbClose').addEventListener('click', closeLightbox);
+    $('lbBack').addEventListener('click', closeLightbox);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !$('imgLightbox').classList.contains('hidden')) closeLightbox();
+    });
     $('searchInput').addEventListener('keydown', e => {
       if (e.key === 'Escape') { hideResults(); $('searchInput').blur(); }
     });
