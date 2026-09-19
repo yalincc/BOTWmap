@@ -445,9 +445,6 @@ class BotwMap {
       ctx.fillText(label, sx, ly);
     }
 
-    // 克洛格挑战起点第二标记（v1.1.1）：类型色菱形 + 与收获点虚线连线
-    this._drawKorokStarts(ctx, vis);
-
     // 悬停高亮
     if (this.hover) {
       const [hsx, hsy] = this.m2s(this.hover.px);
@@ -849,8 +846,6 @@ class BotwMap {
     if (mhit) return mhit;
     // 克洛格挑战起点第二标记（v1.1.1）：点在起点上 → 选中该克洛格
     if (!best) {
-      const startMk = this._hitKorokStart(mx, my);
-      if (startMk) return { marker: startMk };
     }
     return best ? { marker: best } : null;
   }

@@ -226,14 +226,6 @@ const LIVE = (() => {
     }).catch(() => {});
   }
 
-  /* 导航到克洛格挑战起点（v1.1.1 第二标记）：直接设服务端目标，不进入收集模式 */
-  function navigateToStart(ks) {
-    if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
-    if (mode) stopCollectMode();
-    curId = null;   // 避免收集模式 / 目标核验把它当成普通克洛格点
-    postTarget({ name: ks.name, px: ks.start, cat: 'seed' }, '已设置导航：' + ks.name);
-  }
-
   /* ---------- 收集模式（回忆 / 克洛格 连续自动导航） ----------
    * 点回忆 / 克洛格标注的「导航」时，由标注卡上的「收集」按钮开启：
    *   - 每 600ms 轮询：当前目标已收集（存档同步 / 手动勾选）→ 自动设下一个
@@ -471,7 +463,7 @@ const LIVE = (() => {
     BotwMap.prototype._drawLive = drawLive;
   }
 
-  return { init, navigate, navigateToStart, clearNav, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive };
+  return { init, navigate, clearNav, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive };
 })();
 
 (function () {

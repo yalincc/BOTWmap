@@ -608,39 +608,23 @@ const UI = (() => {
     $('infoCard').classList.remove('hidden');
   }
 
-  /* 克洛格详情块（v1.1.1 P2）：类型徽章 + 位置截图（点击放大灯箱）+ 解法一句话 + 挑战起点行 */
+  /* 克洛格详情块（简化版）：位置截图（点击放大灯箱）+ 英文解法原文 */
   function renderKorokBlock(mk) {
     const el = $('cardKorok');
     if (mk.cat !== 'seed') { el.classList.add('hidden'); el.innerHTML = ''; return; }
     const k = KOROK_ITEMS.find(x => x.id === mk.id);
     if (!k) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-    const color = KOROK_TYPE_COLORS[k.type] || '#9aa5a0';
-    // 头部徽章 = 类型名 + 类型配色（15 类各一色）
-    $('cardCat').textContent = '克洛格 · ' + k.type_cn;
-    $('cardCat').style.borderColor = color;
-    $('cardCat').style.color = color;
-    let html = '<div class="row">谜题类型<b><span class="korok-badge" style="color:' + color + ';border-color:' + color + '">' + esc(k.type_cn) + '</span></b></div>';
-    html += '<div class="korok-shot-wrap"><img class="korok-shot" data-src="assets/korok/' + esc(k.img) + '" alt="克洛格 No.' + k.no + ' 位置截图"><span class="korok-zoom">查看原图</span></div>';
-    html += '<div class="row">解法<b>' + esc(k.hint) + '</b></div>';
-    if (k.has_start_diff && k.start) {
-      const s = map.gameCoord(k.start);
-      html += '<div class="row korok-start">挑战起点<b style="color:' + color + '">X ' + s[0] + ' · Z ' + s[1] + '</b><button type="button" class="korok-nav-start" style="color:' + color + ';border-color:' + color + '">导航到起点</button><span class="korok-note">（开启挑战的位置，与收获点不同）</span></div>';
-    }
+    $('cardCat').textContent = '克洛格的果实 · No.' + k.no;
+    $('cardCat').style.borderColor = '#ffd700';
+    $('cardCat').style.color = '#ffd700';
+    let html = '<div class="korok-shot-wrap"><img class="korok-shot" data-src="assets/korok/' + esc(k.img) + '" alt="克洛格 No.' + k.no + ' 位置截图"><span class="korok-zoom">查看原图</span></div>';
+    const hint = k.hint_cn || k.hint_en || '';
+    html += '<div class="row">解法<b>' + esc(hint) + '</b></div>';
     el.innerHTML = html;
     const img = el.querySelector('.korok-shot');
     if (img) {
       img.src = img.dataset.src;   // 打开卡片时才真正加载（懒加载，900 张不会一次全载）
       img.onclick = () => openLightbox(img.src, img.alt);
-    }
-    const navBtn = el.querySelector('.korok-nav-start');
-    if (navBtn) {
-      navBtn.onclick = () => {
-        if (typeof LIVE !== 'undefined' && LIVE.navigateToStart) {
-          LIVE.navigateToStart({ name: '克洛格 No.' + k.no + ' 挑战起点', start: k.start });
-        } else {
-          toast('服务未连接，无法导航');
-        }
-      };
     }
     el.classList.remove('hidden');
   }
