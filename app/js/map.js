@@ -481,7 +481,7 @@ class BotwMap {
 
   _drawKorokStarts(ctx, vis) {
     const scale = this.view.scale;
-    if (scale < 0.04) return;            // 全图/低倍不画，避免 168 个点盖住地图
+    if (scale < 0.2) return;              // 全局小视图不画，避免 168 条连线盖住地图；放大到找克洛格的尺度才显示
     this._buildKorokStarts();
     if (!this._korokStarts || !this._korokStarts.size) return;
     const { w, h } = this;
@@ -527,6 +527,7 @@ class BotwMap {
 
   /* 点击起点第二标记 → 选中对应克洛格（同 hitTest 容差） */
   _hitKorokStart(mx, my) {
+    if (this.view.scale < 0.2) return null;   // 与绘制阈值同步：小视图不画也不响应
     if (!this.enabled.has('seed')) return null;
     this._buildKorokStarts();
     if (!this._korokStarts || !this._korokStarts.size) return null;
