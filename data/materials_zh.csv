@@ -1,0 +1,75 @@
+﻿类别,图鉴条目,actor,中文名,英文名,来源,是否命中
+昆虫,IsNewPictureBook_Animal_Insect_A,Animal_Insect_A,速速蛙,Hot-Footed Frog,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_AA,Animal_Insect_AA,精力独角仙,Energetic Rhino Beetle,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_AB,Animal_Insect_AB,耐火凤蝶,Smotherwing Butterfly,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_B,Animal_Insect_B,毅力蛙,Tireless Frog,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_C,Animal_Insect_C,冰冷蜻蜓,Cold Darner,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_E,Animal_Insect_E,静静萤火虫,Sunset Firefly,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_F,Animal_Insect_F,精灵,Fairy,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_G,Animal_Insect_G,大剑独角仙,Bladed Rhino Beetle,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_H,Animal_Insect_H,精力蚱蜢,Restless Cricket,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_I,Animal_Insect_I,酥麻蜻蜓,Electric Darner,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_M,Animal_Insect_M,生命蜥,Hearty Lizard,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_N,Animal_Insect_N,冰冷凤蝶,Winterwing Butterfly,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_P,Animal_Insect_P,铠甲独角仙,Rugged Rhino Beetle,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_Q,Animal_Insect_Q,暖暖凤蝶,Summerwing Butterfly,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_R,Animal_Insect_R,酥麻凤蝶,Thunderwing Butterfly,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_S,Animal_Insect_S,速速蜥,Hightail Lizard,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_T,Animal_Insect_T,暖暖蜻蜓,Warm Darner,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Animal_Insect_X,Animal_Insect_X,耐火蜥,Fireproof Lizard,CapturedActor.msbt,是
+昆虫,IsNewPictureBook_Item_InsectGet_K,Item_InsectGet_K,大剑螃蟹,Razorclaw Crab,Item.msbt,是
+昆虫,IsNewPictureBook_Item_InsectGet_O,Item_InsectGet_O,铠甲螃蟹,Ironshell Crab,Item.msbt,是
+昆虫,IsNewPictureBook_Item_InsectGet_Z,Item_InsectGet_Z,精力螃蟹,Bright-Eyed Crab,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_A,Item_PlantGet_A,海拉鲁草,Hyrule Herb,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_B,Item_PlantGet_B,生命小萝卜,Hearty Radish,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_C,Item_PlantGet_C,生命大萝卜,Big Hearty Radish,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_E,Item_PlantGet_E,冰冷香草,Cool Safflina,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_F,Item_PlantGet_F,暖暖香草,Warm Safflina,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_G,Item_PlantGet_G,大剑草,Mighty Thistle,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_H,Item_PlantGet_H,铠甲草,Armoranth,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_I,Item_PlantGet_I,潜行草,Blue Nightshade,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_J,Item_PlantGet_J,静谧公主,Silent Princess,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_L,Item_PlantGet_L,酥麻香草,Electric Safflina,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_M,Item_PlantGet_M,速速胡萝卜,Swift Carrot,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_O,Item_PlantGet_O,速速紫罗兰,Swift Violet,Item.msbt,是
+植物,IsNewPictureBook_Item_PlantGet_Q,Item_PlantGet_Q,毅力胡萝卜,Endura Carrot,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_A,Item_Fruit_A,苹果,Apple,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_B,Item_Fruit_B,草莓,Wildberry,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_C,Item_Fruit_C,酥麻水果,Voltfruit,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_D,Item_Fruit_D,生命榴莲,Hearty Durian,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_E,Item_Fruit_E,速速莲蓬,Fleet-Lotus Seeds,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_F,Item_Fruit_F,冰冷蜜瓜,Hydromelon,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_G,Item_Fruit_G,椰子,Palm Fruit,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_H,Item_Fruit_H,大剑香蕉,Mighty Bananas,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_I,Item_Fruit_I,暖暖草果,Spicy Pepper,Item.msbt,是
+水果,IsNewPictureBook_Item_Fruit_J,Item_Fruit_J,铠甲南瓜,Fortified Pumpkin,Item.msbt,是
+矿物,IsNewPictureBook_Obj_Mineral_A_01,Obj_Mineral_A_01,矿床,Ore Deposit,Item.msbt,是
+矿物,IsNewPictureBook_Obj_Mineral_B_01,Obj_Mineral_B_01,稀有矿床,Rare Ore Deposit,Item.msbt,是
+矿物,IsNewPictureBook_Obj_Mineral_C_01,Obj_Mineral_C_01,夜光矿床,Luminous Stone Deposit,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_MushroomGet_D,Item_MushroomGet_D,速速蘑菇,Rushroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_A,Item_Mushroom_A,精力蘑菇,Stamella Shroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_B,Item_Mushroom_B,冰冷蘑菇,Chillshroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_C,Item_Mushroom_C,暖暖蘑菇,Sunshroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_E,Item_Mushroom_E,海拉鲁蘑菇,Hylian Shroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_F,Item_Mushroom_F,生命松露,Hearty Truffle,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_H,Item_Mushroom_H,酥麻蘑菇,Zapshroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_J,Item_Mushroom_J,潜行蘑菇,Silent Shroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_L,Item_Mushroom_L,大剑蘑菇,Razorshroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_M,Item_Mushroom_M,铠甲蘑菇,Ironshroom,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_N,Item_Mushroom_N,大生命松露,Big Hearty Truffle,Item.msbt,是
+蘑菇,IsNewPictureBook_Item_Mushroom_O,Item_Mushroom_O,毅力蘑菇,Endura Shroom,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_A,Item_FishGet_A,海拉鲁鲈鱼,Hyrule Bass,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_B,Item_FishGet_B,生命鲈鱼,Hearty Bass,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_C,Item_FishGet_C,冰冷鳟鱼,Chillfin Trout,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_D,Item_FishGet_D,酥麻鳟鱼,Voltfin Trout,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_E,Item_FishGet_E,大剑鲤鱼,Mighty Carp,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_F,Item_FishGet_F,大剑鲷鱼,Mighty Porgy,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_G,Item_FishGet_G,铠甲鲷鱼,Armored Porgy,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_H,Item_FishGet_H,铠甲鲤鱼,Armored Carp,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_I,Item_FishGet_I,生命三文鱼,Hearty Salmon,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_J,Item_FishGet_J,暖暖鳟鱼,Sizzlefin Trout,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_K,Item_FishGet_K,生命海螺,Hearty Blueshell Snail,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_L,Item_FishGet_L,精力鲈鱼,Staminoka Bass,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_M,Item_FishGet_M,潜行田螺,Sneaky River Snail,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_X,Item_FishGet_X,潜行鳟鱼,Stealthfin Trout,Item.msbt,是
+鱼,IsNewPictureBook_Item_FishGet_Z,Item_FishGet_Z,三色鲤鱼,Sanke Carp,Item.msbt,是

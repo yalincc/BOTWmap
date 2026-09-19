@@ -1,0 +1,668 @@
+[
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_A",
+  "actor": "Animal_Insect_A",
+  "中文名": "速速蛙",
+  "英文名": "Hot-Footed Frog",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_AA",
+  "actor": "Animal_Insect_AA",
+  "中文名": "精力独角仙",
+  "英文名": "Energetic Rhino Beetle",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_AB",
+  "actor": "Animal_Insect_AB",
+  "中文名": "耐火凤蝶",
+  "英文名": "Smotherwing Butterfly",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_B",
+  "actor": "Animal_Insect_B",
+  "中文名": "毅力蛙",
+  "英文名": "Tireless Frog",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_C",
+  "actor": "Animal_Insect_C",
+  "中文名": "冰冷蜻蜓",
+  "英文名": "Cold Darner",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_E",
+  "actor": "Animal_Insect_E",
+  "中文名": "静静萤火虫",
+  "英文名": "Sunset Firefly",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_F",
+  "actor": "Animal_Insect_F",
+  "中文名": "精灵",
+  "英文名": "Fairy",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_G",
+  "actor": "Animal_Insect_G",
+  "中文名": "大剑独角仙",
+  "英文名": "Bladed Rhino Beetle",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_H",
+  "actor": "Animal_Insect_H",
+  "中文名": "精力蚱蜢",
+  "英文名": "Restless Cricket",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_I",
+  "actor": "Animal_Insect_I",
+  "中文名": "酥麻蜻蜓",
+  "英文名": "Electric Darner",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_M",
+  "actor": "Animal_Insect_M",
+  "中文名": "生命蜥",
+  "英文名": "Hearty Lizard",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_N",
+  "actor": "Animal_Insect_N",
+  "中文名": "冰冷凤蝶",
+  "英文名": "Winterwing Butterfly",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_P",
+  "actor": "Animal_Insect_P",
+  "中文名": "铠甲独角仙",
+  "英文名": "Rugged Rhino Beetle",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_Q",
+  "actor": "Animal_Insect_Q",
+  "中文名": "暖暖凤蝶",
+  "英文名": "Summerwing Butterfly",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_R",
+  "actor": "Animal_Insect_R",
+  "中文名": "酥麻凤蝶",
+  "英文名": "Thunderwing Butterfly",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_S",
+  "actor": "Animal_Insect_S",
+  "中文名": "速速蜥",
+  "英文名": "Hightail Lizard",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_T",
+  "actor": "Animal_Insect_T",
+  "中文名": "暖暖蜻蜓",
+  "英文名": "Warm Darner",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Animal_Insect_X",
+  "actor": "Animal_Insect_X",
+  "中文名": "耐火蜥",
+  "英文名": "Fireproof Lizard",
+  "来源": "CapturedActor.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Item_InsectGet_K",
+  "actor": "Item_InsectGet_K",
+  "中文名": "大剑螃蟹",
+  "英文名": "Razorclaw Crab",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Item_InsectGet_O",
+  "actor": "Item_InsectGet_O",
+  "中文名": "铠甲螃蟹",
+  "英文名": "Ironshell Crab",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "昆虫",
+  "图鉴条目": "IsNewPictureBook_Item_InsectGet_Z",
+  "actor": "Item_InsectGet_Z",
+  "中文名": "精力螃蟹",
+  "英文名": "Bright-Eyed Crab",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_A",
+  "actor": "Item_PlantGet_A",
+  "中文名": "海拉鲁草",
+  "英文名": "Hyrule Herb",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_B",
+  "actor": "Item_PlantGet_B",
+  "中文名": "生命小萝卜",
+  "英文名": "Hearty Radish",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_C",
+  "actor": "Item_PlantGet_C",
+  "中文名": "生命大萝卜",
+  "英文名": "Big Hearty Radish",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_E",
+  "actor": "Item_PlantGet_E",
+  "中文名": "冰冷香草",
+  "英文名": "Cool Safflina",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_F",
+  "actor": "Item_PlantGet_F",
+  "中文名": "暖暖香草",
+  "英文名": "Warm Safflina",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_G",
+  "actor": "Item_PlantGet_G",
+  "中文名": "大剑草",
+  "英文名": "Mighty Thistle",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_H",
+  "actor": "Item_PlantGet_H",
+  "中文名": "铠甲草",
+  "英文名": "Armoranth",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_I",
+  "actor": "Item_PlantGet_I",
+  "中文名": "潜行草",
+  "英文名": "Blue Nightshade",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_J",
+  "actor": "Item_PlantGet_J",
+  "中文名": "静谧公主",
+  "英文名": "Silent Princess",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_L",
+  "actor": "Item_PlantGet_L",
+  "中文名": "酥麻香草",
+  "英文名": "Electric Safflina",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_M",
+  "actor": "Item_PlantGet_M",
+  "中文名": "速速胡萝卜",
+  "英文名": "Swift Carrot",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_O",
+  "actor": "Item_PlantGet_O",
+  "中文名": "速速紫罗兰",
+  "英文名": "Swift Violet",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "植物",
+  "图鉴条目": "IsNewPictureBook_Item_PlantGet_Q",
+  "actor": "Item_PlantGet_Q",
+  "中文名": "毅力胡萝卜",
+  "英文名": "Endura Carrot",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_A",
+  "actor": "Item_Fruit_A",
+  "中文名": "苹果",
+  "英文名": "Apple",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_B",
+  "actor": "Item_Fruit_B",
+  "中文名": "草莓",
+  "英文名": "Wildberry",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_C",
+  "actor": "Item_Fruit_C",
+  "中文名": "酥麻水果",
+  "英文名": "Voltfruit",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_D",
+  "actor": "Item_Fruit_D",
+  "中文名": "生命榴莲",
+  "英文名": "Hearty Durian",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_E",
+  "actor": "Item_Fruit_E",
+  "中文名": "速速莲蓬",
+  "英文名": "Fleet-Lotus Seeds",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_F",
+  "actor": "Item_Fruit_F",
+  "中文名": "冰冷蜜瓜",
+  "英文名": "Hydromelon",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_G",
+  "actor": "Item_Fruit_G",
+  "中文名": "椰子",
+  "英文名": "Palm Fruit",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_H",
+  "actor": "Item_Fruit_H",
+  "中文名": "大剑香蕉",
+  "英文名": "Mighty Bananas",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_I",
+  "actor": "Item_Fruit_I",
+  "中文名": "暖暖草果",
+  "英文名": "Spicy Pepper",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "水果",
+  "图鉴条目": "IsNewPictureBook_Item_Fruit_J",
+  "actor": "Item_Fruit_J",
+  "中文名": "铠甲南瓜",
+  "英文名": "Fortified Pumpkin",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "矿物",
+  "图鉴条目": "IsNewPictureBook_Obj_Mineral_A_01",
+  "actor": "Obj_Mineral_A_01",
+  "中文名": "矿床",
+  "英文名": "Ore Deposit",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "矿物",
+  "图鉴条目": "IsNewPictureBook_Obj_Mineral_B_01",
+  "actor": "Obj_Mineral_B_01",
+  "中文名": "稀有矿床",
+  "英文名": "Rare Ore Deposit",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "矿物",
+  "图鉴条目": "IsNewPictureBook_Obj_Mineral_C_01",
+  "actor": "Obj_Mineral_C_01",
+  "中文名": "夜光矿床",
+  "英文名": "Luminous Stone Deposit",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_MushroomGet_D",
+  "actor": "Item_MushroomGet_D",
+  "中文名": "速速蘑菇",
+  "英文名": "Rushroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_A",
+  "actor": "Item_Mushroom_A",
+  "中文名": "精力蘑菇",
+  "英文名": "Stamella Shroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_B",
+  "actor": "Item_Mushroom_B",
+  "中文名": "冰冷蘑菇",
+  "英文名": "Chillshroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_C",
+  "actor": "Item_Mushroom_C",
+  "中文名": "暖暖蘑菇",
+  "英文名": "Sunshroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_E",
+  "actor": "Item_Mushroom_E",
+  "中文名": "海拉鲁蘑菇",
+  "英文名": "Hylian Shroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_F",
+  "actor": "Item_Mushroom_F",
+  "中文名": "生命松露",
+  "英文名": "Hearty Truffle",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_H",
+  "actor": "Item_Mushroom_H",
+  "中文名": "酥麻蘑菇",
+  "英文名": "Zapshroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_J",
+  "actor": "Item_Mushroom_J",
+  "中文名": "潜行蘑菇",
+  "英文名": "Silent Shroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_L",
+  "actor": "Item_Mushroom_L",
+  "中文名": "大剑蘑菇",
+  "英文名": "Razorshroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_M",
+  "actor": "Item_Mushroom_M",
+  "中文名": "铠甲蘑菇",
+  "英文名": "Ironshroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_N",
+  "actor": "Item_Mushroom_N",
+  "中文名": "大生命松露",
+  "英文名": "Big Hearty Truffle",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "蘑菇",
+  "图鉴条目": "IsNewPictureBook_Item_Mushroom_O",
+  "actor": "Item_Mushroom_O",
+  "中文名": "毅力蘑菇",
+  "英文名": "Endura Shroom",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_A",
+  "actor": "Item_FishGet_A",
+  "中文名": "海拉鲁鲈鱼",
+  "英文名": "Hyrule Bass",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_B",
+  "actor": "Item_FishGet_B",
+  "中文名": "生命鲈鱼",
+  "英文名": "Hearty Bass",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_C",
+  "actor": "Item_FishGet_C",
+  "中文名": "冰冷鳟鱼",
+  "英文名": "Chillfin Trout",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_D",
+  "actor": "Item_FishGet_D",
+  "中文名": "酥麻鳟鱼",
+  "英文名": "Voltfin Trout",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_E",
+  "actor": "Item_FishGet_E",
+  "中文名": "大剑鲤鱼",
+  "英文名": "Mighty Carp",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_F",
+  "actor": "Item_FishGet_F",
+  "中文名": "大剑鲷鱼",
+  "英文名": "Mighty Porgy",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_G",
+  "actor": "Item_FishGet_G",
+  "中文名": "铠甲鲷鱼",
+  "英文名": "Armored Porgy",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_H",
+  "actor": "Item_FishGet_H",
+  "中文名": "铠甲鲤鱼",
+  "英文名": "Armored Carp",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_I",
+  "actor": "Item_FishGet_I",
+  "中文名": "生命三文鱼",
+  "英文名": "Hearty Salmon",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_J",
+  "actor": "Item_FishGet_J",
+  "中文名": "暖暖鳟鱼",
+  "英文名": "Sizzlefin Trout",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_K",
+  "actor": "Item_FishGet_K",
+  "中文名": "生命海螺",
+  "英文名": "Hearty Blueshell Snail",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_L",
+  "actor": "Item_FishGet_L",
+  "中文名": "精力鲈鱼",
+  "英文名": "Staminoka Bass",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_M",
+  "actor": "Item_FishGet_M",
+  "中文名": "潜行田螺",
+  "英文名": "Sneaky River Snail",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_X",
+  "actor": "Item_FishGet_X",
+  "中文名": "潜行鳟鱼",
+  "英文名": "Stealthfin Trout",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ },
+ {
+  "类别": "鱼",
+  "图鉴条目": "IsNewPictureBook_Item_FishGet_Z",
+  "actor": "Item_FishGet_Z",
+  "中文名": "三色鲤鱼",
+  "英文名": "Sanke Carp",
+  "来源": "Item.msbt",
+  "是否命中": "是"
+ }
+]

@@ -116,8 +116,184 @@ const UI = (() => {
     });
     $('checkAll').addEventListener('click', () => setAllLayers(true));
     $('uncheckAll').addEventListener('click', () => setAllLayers(false));
+    buildMatLayerGroup();
     updateLayerList();
   }
+
+  /* 材料追踪组（v1.1.0）：6 类分组 + 74 种材料单材料 checkbox（b 方案，按材料分别聚合） */
+  function buildMatLayerGroup() {
+    const wrap = $('layerList');
+    if (!map.MATS) return;
+    const grp = document.createElement('div');
+    grp.className = 'lg-group';
+    grp.dataset.group = '材料';
+    const g = document.createElement('div');
+    g.className = 'lg';
+    const gLabel = document.createElement('span');
+    gLabel.textContent = '材料 · 采集';
+    const gBtn = document.createElement('button');
+    gBtn.type = 'button';
+    gBtn.className = 'lg-btn';
+    gBtn.dataset.group = '材料';
+    gBtn.title = '全选 / 清空所有材料';
+    g.appendChild(gLabel);
+    g.appendChild(gBtn);
+    grp.appendChild(g);
+    const lrows = document.createElement('div');
+    lrows.className = 'lrows';
+    grp.appendChild(lrows);
+    wrap.appendChild(grp);
+    // 手风琴：6 大类默认折叠，点大类展开/收起；一次只展开一个
+    const openCatKey = { value: null };
+    window._matOpenCat = openCatKey;  // 供搜索联动
+    window._matSetOpenCat = (cat) => {
+      openCatKey.value = cat;
+      lrows.querySelectorAll('.mat-cat-body').forEach(b => {
+        if (b.dataset.cat === '__fav__') return;  // 常用分组独立，不随大类折叠
+        b.style.display = (b.dataset.cat === cat) ? '' : 'none';
+      });
+      lrows.querySelectorAll('.mat-cat-head').forEach(h => {
+        h.querySelector('.mat-tri').textContent = (h.dataset.cat === cat) ? '▼' : '▶';
+      });
+    };
+    for (const cat of MAT_GROUPS) {
+      const list = map.MATS.materials.map((m, i) => [m, i]).filter(([m]) => m.cat === cat);
+      if (!list.length) continue;
+      const cfg = MAT_CAT_CFG[cat] || {};
+      const totalCount = list.reduce((s, [m]) => s + m.count, 0);
+      const catHead = document.createElement('div');
+      catHead.className = 'lrow mat-cat-head';
+      catHead.dataset.cat = cat;
+      catHead.style.cursor = 'pointer';
+      catHead.innerHTML = `
+        <span class="mat-tri" style="width:12px;display:inline-block">▶</span>
+        <span class="dot" style="background:${cfg.color || '#888'}"></span>
+        <span class="lname" style="font-weight:600">${cat}</span>
+        <span class="lprog">${list.length}种 / ${totalCount}点</span>
+        <button type="button" class="mat-cat-btn" data-cat="${cat}" style="margin-left:6px;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>`;
+      lrows.appendChild(catHead);
+      const catBody = document.createElement('div');
+      catBody.className = 'mat-cat-body';
+      catBody.dataset.cat = cat;
+      catBody.style.display = 'none';
+      lrows.appendChild(catBody);
+      // 点大类行（非全选按钮）切换展开
+      catHead.addEventListener('click', (e) => {
+        if (e.target.closest('.mat-cat-btn')) return;
+        window._matSetOpenCat(openCatKey.value === cat ? null : cat);
+      });
+      for (const [m, id] of list) {
+        const row = document.createElement('label');
+        row.className = 'lrow mat-item';
+        row.style.whiteSpace = 'nowrap';
+        row.dataset.matid = id;
+        row.dataset.cat = cat;
+        row.innerHTML = `
+          <input type="checkbox" data-matid="${id}" ${map.matIds.has(id) ? 'checked' : ''}>
+          <span class="lname">${m.cn}</span>
+          <span class="lprog">${m.count}</span>
+          <span class="mat-fav" data-favid="${id}" title="收藏到常用" style="cursor:pointer;margin-left:auto;color:${favSet.has(id) ? '#ffd84d' : '#555'};font-size:12px;line-height:1">${favSet.has(id) ? '★' : '☆'}</span>`;
+        row.querySelector('.mat-fav').addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (favSet.has(id)) favSet.delete(id); else favSet.add(id);
+          saveFav();
+          e.target.textContent = favSet.has(id) ? '★' : '☆';
+          e.target.style.color = favSet.has(id) ? '#ffd84d' : '#555';
+          refreshFavGroup();
+        });
+        row.addEventListener('change', () => {
+          const cb = row.querySelector('input');
+          const mid = +cb.dataset.matid;
+          if (cb.checked) map.matIds.add(mid); else map.matIds.delete(mid);
+          saveMatLayers(); updateLayerList(); map.draw();
+        });
+        catBody.appendChild(row);
+      }
+    }
+    // 常用材料分组（星标置顶）
+    const favGrp = document.createElement('div');
+    favGrp.className = 'lrow';
+    favGrp.style.cssText = 'margin-top:2px;color:#ffd84d;font-weight:600;';
+    favGrp.innerHTML = '★ 常用材料<span class="lprog" id="matFavCount" style="margin-left:6px;color:var(--text-dim);font-weight:400"></span><button type="button" id="matFavAll" style="margin-left:auto;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>';
+    // 插到 lrows 最前：材料标题行下、第一个大类前
+    const firstCatHead = lrows.querySelector('.mat-cat-head');
+    lrows.insertBefore(favGrp, firstCatHead);
+    const favBody = document.createElement('div');
+    favBody.className = 'mat-cat-body';
+    favBody.dataset.cat = '__fav__';
+    favBody.style.display = 'none';
+    lrows.insertBefore(favBody, firstCatHead);
+    favGrp.style.cursor = 'pointer';
+    favGrp.addEventListener('click', (e) => {
+      if (e.target.closest('#matFavAll')) {
+        // 全选常用材料
+        const ids = [...favSet];
+        const allOn = ids.length > 0 && ids.every(id => map.matIds.has(id));
+        ids.forEach(id => { if (allOn) map.matIds.delete(id); else map.matIds.add(id); });
+        saveMatLayers(); updateLayerList(); map.draw();
+        // 同步常用区 checkbox
+        favBody.querySelectorAll('input[data-matid]').forEach(cb => { cb.checked = !allOn; });
+        e.stopPropagation();
+        return;
+      }
+      favBody.style.display = favBody.style.display === 'none' ? '' : 'none';
+    });
+    window._refreshFavGroup = refreshFavGroup;
+    function refreshFavGroup() {
+      favBody.innerHTML = '';
+      document.getElementById('matFavCount').textContent = favSet.size ? '(' + favSet.size + ')' : '';
+      favBody.style.display = favSet.size ? '' : 'none';
+      favGrp.style.display = favSet.size ? '' : 'none';
+      for (const id of favSet) {
+        const m = map.MATS.materials[id];
+        if (!m) continue;
+        const row = document.createElement('label');
+        row.className = 'lrow mat-item';
+        row.style.whiteSpace = 'nowrap';
+        row.innerHTML = `
+          <input type="checkbox" data-matid="${id}" ${map.matIds.has(id) ? 'checked' : ''}>
+          <span class="lname">${m.cn}</span>
+          <span class="lprog">${m.count}</span>
+          <span class="mat-fav" data-favid="${id}" style="cursor:pointer;margin-left:auto;color:#ffd84d;font-size:12px">★</span>`;
+        row.querySelector('input').addEventListener('change', () => {
+          const mid = +row.querySelector('input').dataset.matid;
+          if (row.querySelector('input').checked) map.matIds.add(mid); else map.matIds.delete(mid);
+          saveMatLayers(); updateLayerList(); map.draw();
+        });
+        row.querySelector('.mat-fav').addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          favSet.delete(id); saveFav(); refreshFavGroup();
+          // 同步主列表里的 ☆ 显示
+          const star = document.querySelector(`#layerList .mat-fav[data-favid="${id}"]`);
+          if (star) { star.textContent = '☆'; star.style.color = '#555'; }
+        });
+        favBody.appendChild(row);
+      }
+    }
+    refreshFavGroup();
+
+    gBtn.addEventListener('click', () => {
+      const all = map.matIds.size === map.MATS.materials.length;
+      if (all) map.matIds.clear(); else map.MATS.materials.forEach((_, i) => map.matIds.add(i));
+      lrows.querySelectorAll('input[data-matid]').forEach(cb => cb.checked = !all);
+      saveMatLayers(); updateLayerList(); map.draw();
+    });
+    lrows.querySelectorAll('.mat-cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const cat = btn.dataset.cat;
+        const ids = map.MATS.materials.map((m, i) => [m, i]).filter(([m]) => m.cat === cat).map(([, i]) => i);
+        const on = ids.every(i => map.matIds.has(i));
+        ids.forEach(i => { if (on) map.matIds.delete(i); else map.matIds.add(i); });
+        lrows.querySelectorAll('input[data-matid]').forEach(cb => {
+          const m = map.MATS.materials[+cb.dataset.matid];
+          if (m.cat === cat) cb.checked = !on;
+        });
+        saveMatLayers(); updateLayerList(); map.draw();
+      });
+    });
+  }
+
+  const MAT_GROUPS = ['植物', '蘑菇', '水果', '昆虫', '鱼', '矿物'];
 
   function setAllLayers(on) {
     if (on) map.data.categories.forEach(c => map.enabled.add(c.key));
@@ -147,6 +323,24 @@ const UI = (() => {
       const [done, total] = cat.key === 'memory' ? memoryDoneTotal() : catCount(cat.key);
       el.textContent = done ? `${done}/${total}` : '';
       el.style.color = done === total ? '#7dffa0' : 'var(--text-dim)';
+    }
+    // 材料组按钮 + 行统计
+    if (map.MATS) {
+      const mbtn = wrap.querySelector('.lg-btn[data-group="材料"]');
+      if (mbtn) {
+        const total = map.MATS.materials.length;
+        const on = map.matIds.size;
+        mbtn.textContent = on === total ? '清空本组' : (on === 0 ? '全选本组' : `全选（${on}/${total}）`);
+        mbtn.style.opacity = on === total ? '1' : '0.75';
+      }
+      for (const cat of MAT_GROUPS) {
+        const el = $('mprog_' + cat);
+        if (!el) continue;
+        const list = map.MATS.materials.filter(m => m.cat === cat);
+        const n = list.length;
+        const total = list.reduce((sum, m) => sum + m.count, 0);
+        el.textContent = n ? `${n}种 · ${total}点` : '';
+      }
     }
   }
 
@@ -244,6 +438,12 @@ const UI = (() => {
         region: mk.region, tower: mk.tower, px: mk.px,
         catCn: (map.data.categories.find(c => c.key === mk.cat) || {}).cn || mk.cat,
       }));
+    // 材料追踪（v1.1.0）：74 种材料并入搜索
+    if (map.MATS) {
+      map.MATS.materials.forEach(m => {
+        searchIndex.push({ mat: m, cat: m.cat, name: m.cn, en: m.en, catCn: '材料·' + m.cat, px: null });
+      });
+    }
     const input = $('searchInput');
     let timer = null;
     input.addEventListener('input', () => {
@@ -273,10 +473,37 @@ const UI = (() => {
       box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
     } else {
       box.innerHTML = hits.map(h => `
-        <div class="sr-item ${map._mkDone(h.mk) ? 'done' : ''}" data-id="${h.id}">
+        <div class="sr-item ${h.mat ? '' : (map._mkDone(h.mk) ? 'done' : '')}" ${h.mat ? 'data-mat="' + h.mat.id + '"' : 'data-id="' + h.id + '"'}>
           <span class="sr-name">${esc(h.name)}</span>
           <span class="sr-meta">${h.catCn}${h.region ? ' · ' + esc(h.region) : ''}</span>
         </div>`).join('');
+      // 材料命中：自动启用对应类目 → 飞到分布中心 → 选中材料（高亮全部点）
+      box.querySelectorAll('.sr-item[data-mat]').forEach(el => {
+        el.addEventListener('click', () => {
+          const m = map.MATS.materials[+el.dataset.mat];
+          if (m) {
+            if (!map.matIds.has(m.id)) { map.matIds.add(m.id); saveMatLayers(); updateLayerList(); }
+            // 手风琴联动：展开对应大类 + 滚到该条目
+            if (window._matSetOpenCat) window._matSetOpenCat(m.cat);
+            const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + m.id + '"]');
+            if (targetRow) targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            const pts = map.matPointsBy[m.id];
+            if (pts && pts.length) {
+              let ax = 0, ay = 0;
+              const n = Math.min(pts.length, 2000);
+              for (let i = 0; i < n; i++) { ax += pts[i][0]; ay += pts[i][1]; }
+              ax /= n; ay /= n;
+              map.view.scale = Math.min(Math.max(map.view.scale, 0.35), map.maxScale);
+              map.view.x = map.w / 2 - ax * map.view.scale;
+              map.view.y = map.h / 2 - ay * map.view.scale;
+            }
+            map.draw();
+            map._selectMaterial(m.id);
+          }
+          hideResults();
+          $('searchInput').blur();
+        });
+      });
       box.querySelectorAll('.sr-item[data-id]').forEach(el => {
         el.addEventListener('click', () => {
           const mk = map.data.markers.find(x => x.id === el.dataset.id);
@@ -307,8 +534,43 @@ const UI = (() => {
       showCustomInfo(hit.custom);
       return;
     }
+    if (hit.material) {
+      currentMarker = null;
+      // 侧栏联动：展开对应大类 + 滚到该条目
+      if (window._matSetOpenCat) window._matSetOpenCat(hit.material.cat);
+      const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + hit.material.id + '"]');
+      if (targetRow) targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      showMaterialCard(hit.material, hit.matPx);
+      return;
+    }
     currentMarker = hit.marker;
     renderCard();
+  }
+
+  /* 材料详情卡（v1.1.0）：复用信息卡 DOM，隐藏收集类按钮 */
+  function showMaterialCard(m, matPx) {
+    const cfg = MAT_CAT_CFG[m.cat] || {};
+    $('cardCat').textContent = m.cat;
+    $('cardCat').style.borderColor = cfg.color;
+    $('cardCat').style.color = cfg.color;
+    $('cardName').textContent = m.cn;
+    $('cardEn').textContent = m.en || '';
+    $('cardRegion').innerHTML = '图鉴编号<b>' + esc(m.entry) + '</b>';
+    $('cardTower').innerHTML = '全图点位<b>' + m.count + ' 个</b>';
+    $('cardCoord').innerHTML = matPx
+      ? '游戏坐标<b>X ' + map.gameCoord(matPx)[0] + ' · Z ' + map.gameCoord(matPx)[1] + '</b>'
+      : '分布<b>' + (m.count ? '全图可采集' : '无固定刷点') + '</b>';
+    let extra = '';
+    if (m.count === 0) extra += '<div class="row">说明<b style="color:#e8b04a">无 MainField 固定刷点（动态生成 / 仅栖息地）</b></div>';
+    extra += '<div class="row">图层<b>' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（请勾选侧栏「材料」组）') + '</b></div>';
+    $('cardExtra').innerHTML = extra;
+    $('cardDone').classList.add('hidden');
+    $('cardUndone').classList.add('hidden');
+    $('cardDelPin').classList.add('hidden');
+    $('cardNav').classList.add('hidden');
+    $('cardCollect').classList.add('hidden');
+    positionCard();
+    $('infoCard').classList.remove('hidden');
   }
 
   function renderCard() {
@@ -661,6 +923,10 @@ const UI = (() => {
 
   /* ---------- 持久化 ---------- */
   const K_DONE = 'botwmap.done.v1', K_CUSTOM = 'botwmap.custom.v1', K_LAYERS = 'botwmap.layers.v2';
+  const K_MAT_LAYERS = 'botwmap.matLayers.v1';
+  const K_MAT_FAV = 'botwmap.matFav.v1';
+  const favSet = new Set(JSON.parse(localStorage.getItem(K_MAT_FAV) || '[]'));
+  function saveFav() { try { localStorage.setItem(K_MAT_FAV, JSON.stringify([...favSet])); } catch (e) {} }
   function loadState() {
     try {
       const d = JSON.parse(localStorage.getItem(K_DONE) || '[]');
@@ -675,11 +941,17 @@ const UI = (() => {
       if (Array.isArray(l) && l.length) l.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
       else def.forEach(k => map.enabled.add(k));
     } catch (e) { def.forEach(k => map.enabled.add(k)); }
+    // 材料追踪图层恢复（v1.1.0，单材料 id 数组）
+    try {
+      const ml = JSON.parse(localStorage.getItem(K_MAT_LAYERS) || '[]');
+      ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
+    } catch (e) {}
     // 图层组合 + 地名显示开关
     loadCombos();
     map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
     // 同步复选框与图层计数
     document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
+    document.querySelectorAll('#layerList input[data-matid]').forEach(cb => cb.checked = map.matIds.has(+cb.dataset.matid));
     updateLayerList();
     renderCombos();
     renderStats();
@@ -692,6 +964,9 @@ const UI = (() => {
   }
   function saveLayers() {
     try { localStorage.setItem(K_LAYERS, JSON.stringify([...map.enabled])); } catch (e) {}
+  }
+  function saveMatLayers() {
+    try { localStorage.setItem(K_MAT_LAYERS, JSON.stringify([...map.matIds])); } catch (e) {}
   }
 
   /* ---------- 地名样式（顶栏⚙️设置弹层） ---------- */

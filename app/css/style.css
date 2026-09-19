@@ -425,6 +425,16 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .combo-del { background: none; border: none; color: var(--text-dim); font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
 .combo-del:hover { color: var(--danger); }
 
-
-
-
+/* 材料组双列：对齐任务/设施组，grid 两列，数字右对齐，星星在名字后 */
+.lg-group[data-group="材料"] .mat-cat-body {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 6px;
+}
+.lg-group[data-group="材料"] .mat-item {
+  flex-wrap: nowrap; padding: 3px 2px; align-items: center; white-space: nowrap; min-width: 0; overflow: hidden;
+}
+.lg-group[data-group="材料"] .mat-item input { width: 13px; height: 13px; flex-shrink: 0; margin-right: 3px; }
+.lg-group[data-group="材料"] .mat-item .lname { flex: 1 1 0%; min-width: 0; overflow: hidden; text-overflow: clip; white-space: nowrap; }
+.lg-group[data-group="材料"] .mat-item .lprog {
+  flex: 0 0 auto; min-width: 0; width: 26px; text-align: right; font-size: 10.5px; color: var(--text-dim);
+}
+.lg-group[data-group="材料"] .mat-item .mat-fav { flex: 0 0 auto; margin-left: 3px; font-size: 11px; }

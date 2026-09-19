@@ -39,6 +39,16 @@ const CAT_GROUP = {
   '任务':     ['mainquest','shrinequest','sidequest','objective'],
 };
 
+/* 材料追踪层（v1.1.0）：6 类采集材料的类目视觉配置 */
+const MAT_CAT_CFG = {
+  '植物': { color: '#7fd45f' },
+  '蘑菇': { color: '#c98a4a' },
+  '水果': { color: '#ff6b6b' },
+  '昆虫': { color: '#f2d45c' },
+  '鱼':   { color: '#4fc3f7' },
+  '矿物': { color: '#b0a8e8' },
+};
+
 class BotwMap {
   constructor(canvas, data) {
     this.canvas = canvas;
@@ -70,6 +80,15 @@ class BotwMap {
 
     this._buildIndex();
     this._loadIcons();
+    // 材料追踪层（v1.1.0）：数据源 BOTW_MATERIALS（materials.js）
+    this.MATS = (typeof BOTW_MATERIALS !== 'undefined') ? BOTW_MATERIALS : null;
+    this.matIds = new Set();       // 启用的材料 id（单材料勾选，b 方案）
+    this.matSel = null;           // 选中的材料 id（高亮其全部点）
+    this.matIcons = {};           // entry -> HTMLImageElement
+    this.matByEntry = {};         // entry -> material
+    this.matPointsBy = [];        // [id] -> [[px,py],...]
+    this.matClusters = {};        // [id] -> Supercluster 实例（懒加载缓存）
+    if (this.MATS) { this._buildMatIndex(); this._loadMatIcons(); }
     this._bindEvents();
     // 等两帧确保 CSS 布局完成；再监听 load 事件兜底（rAF 时 flex 布局可能尚未算高）
     requestAnimationFrame(() => requestAnimationFrame(() => this._resize()));
@@ -287,7 +306,9 @@ class BotwMap {
     this._drawRegions(ctx);   // 地形/区域名（瓦片之上、标记之下，作为背景标注）
 
     this._drawMeasure(ctx);
+    this._drawMaterials(ctx); // 材料追踪层（下层：不遮挡神庙/塔等主标记）
     this._drawMarkers(ctx);
+    this._drawMatSel(ctx);    // 材料选中高亮（最上层）
     this._drawCustom(ctx);
     // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入；live.js 加载前的早期 draw 可能未挂载，防御）
     if (typeof this._drawLive === 'function') this._drawLive(ctx);
@@ -737,6 +758,8 @@ class BotwMap {
         }
       }
     }
+    const mhit = this._matHitTest(mx, my);
+    if (mhit) return mhit;
     return best ? { marker: best } : null;
   }
 
@@ -757,9 +780,14 @@ class BotwMap {
       const hit = self.hitTest(sx, sy);
       if (hit) {
         if (hit.custom) self._selectCustom(hit.custom);
+        else if (hit.material != null) {
+          if (hit.cluster != null) self._expandCluster(hit.material, hit.cluster, hit.matPx[0], hit.matPx[1], sx, sy);
+          else self._selectMaterial(hit.material, hit.matPx);
+        }
         else self._selectMarker(hit.marker);
       } else {
         self._selectMarker(null);
+        if (self.matSel != null) self._selectMaterial(null);
       }
     }
 
@@ -913,9 +941,14 @@ class BotwMap {
       const hit = this.hitTest(e.clientX - r.left, e.clientY - r.top);
       if (hit) {
         if (hit.custom) this._selectCustom(hit.custom);
+        else if (hit.material != null) {
+          if (hit.cluster != null) this._expandCluster(hit.material, hit.cluster, hit.matPx[0], hit.matPx[1], e.clientX - r.left, e.clientY - r.top);
+          else this._selectMaterial(hit.material, hit.matPx);
+        }
         else this._selectMarker(hit.marker);
       } else {
         this._selectMarker(null);
+        if (this.matSel != null) this._selectMaterial(null);
       }
     });
 
@@ -980,4 +1013,190 @@ class BotwMap {
   }
 
   _onCustomChange() { /* ui 覆盖 */ }
+
+  /* ================= 材料追踪层（v1.1.0） ================= */
+
+  /* 材料索引：entry 查找 + 每材料点列表（用于高亮/搜索/详情） */
+  _buildMatIndex() {
+    const ms = this.MATS.materials;
+    for (const m of ms) this.matByEntry[m.entry] = m;
+    const pts = this.MATS.points;
+    this.matPointsBy = new Array(ms.length);
+    for (let i = 0; i < pts.length; i += 3) {
+      const id = pts[i], px = pts[i + 1], py = pts[i + 2];
+      (this.matPointsBy[id] = this.matPointsBy[id] || []).push([px, py]);
+    }
+  }
+
+  /* 预加载 74 个材料图标（app/assets/materials/<entry>.webp） */
+  _loadMatIcons() {
+    if (!this.MATS) return;
+    const seen = new Set();
+    for (const m of this.MATS.materials) {
+      if (seen.has(m.entry)) continue;
+      seen.add(m.entry);
+      const img = new Image();
+      img.onload = () => this.draw();
+      img.src = 'assets/materials/' + m.entry + '.webp';
+      this.matIcons[m.entry] = img;
+    }
+  }
+
+  /* Supercluster 坐标归一化：地图像素 → [lng,lat]（lat 压到 ±85 防 mercator 爆） */
+  _pxLng(px) { return (px / this.MW) * 360 - 180; }
+  _pyLat(py) { return (py / this.MH) * 170 - 85; }
+  _lngPx(lng) { return (lng + 180) / 360 * this.MW; }
+  _latPy(lat) { return (lat + 85) / 170 * this.MH; }
+
+  /* 屏幕 scale → supercluster zoom（0=最聚合 … 16=全单点） */
+  _mapZoom() {
+    const s = Math.max(0.03, this.view.scale);
+    return Math.max(0, Math.min(16, Math.log2(s / 0.03) * 2.84));
+  }
+  _unmapZoom(ez) { return 0.03 * Math.pow(2, ez / 2.84); }
+
+  /* 点击聚合点：以点击点为中心放大到 supercluster 建议 zoom，自动散开 */
+  _expandCluster(materialId, clusterId, mx, my, sx, sy) {
+    const ez = this._getClusterer(materialId).getClusterExpansionZoom(clusterId);
+    const newScale = Math.min(this.maxScale, this._unmapZoom(ez) * 1.1);
+    this.view.x = sx - mx * newScale;
+    this.view.y = sy - my * newScale;
+    this.view.scale = newScale;
+    this.draw();
+  }
+
+  /* 懒加载：每种材料一个 Supercluster 实例，首次勾选时建立并缓存 */
+  _getClusterer(id) {
+    if (this.matClusters[id]) return this.matClusters[id];
+    const pts = this.matPointsBy[id] || [];
+    const feats = pts.map((pt) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [this._pxLng(pt[0]), this._pyLat(pt[1])] },
+      properties: { id: id }
+    }));
+    const c = new Supercluster({ radius: 52, maxZoom: 16, minZoom: 0, nodeSize: 64 });
+    c.load(feats);  // 此版 load 直接接受 features 数组
+    this.matClusters[id] = c;
+    return c;
+  }
+
+  /* 材料图标：官方 StockItem 缩略图，缺失时回退类目色圆点 */
+  _matIcon(ctx, id, sx, sy, size) {
+    const m = this.MATS.materials[id];
+    const img = this.matIcons[m.entry];
+    if (img && img.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, sx - size / 2, sy - size / 2, size, size);
+    } else {
+      const cfg = MAT_CAT_CFG[m.cat] || {};
+      ctx.beginPath();
+      ctx.arc(sx, sy, size / 2, 0, Math.PI * 2);
+      ctx.fillStyle = cfg.color || '#888';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  /* 数量徽标：小圆角底 + 数字 */
+  _matBadge(ctx, sx, sy, n) {
+    const t = String(n);
+    ctx.font = '700 10px sans-serif';
+    const tw = ctx.measureText(t).width;
+    const bw = Math.max(16, tw + 8), bh = 13;
+    const x = sx - bw / 2, y = sy - bh / 2;
+    ctx.fillStyle = 'rgba(10,14,10,.88)';
+    this._roundRect(ctx, x, y, bw, bh, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(t, sx, y + bh / 2 + 0.5);
+  }
+
+  /* 材料层主绘制（Supercluster）：每种启用材料各自聚合，互不混合 */
+  _drawMaterials(ctx) {
+    if (!this.MATS || this.matIds.size === 0) return;
+    const z = this._mapZoom();
+    const pad = 60;
+    const x0 = Math.max(0, (-pad - this.view.x) / this.view.scale);
+    const y0 = Math.max(0, (-pad - this.view.y) / this.view.scale);
+    const x1 = Math.min(this.MW, (this.w + pad - this.view.x) / this.view.scale);
+    const y1 = Math.min(this.MH, (this.h + pad - this.view.y) / this.view.scale);
+    const bbox = [this._pxLng(x0), this._pyLat(y0), this._pxLng(x1), this._pyLat(y1)];
+    for (const id of this.matIds) {
+      const feats = this._getClusterer(id).getClusters(bbox, z);
+      for (const f of feats) {
+        const [lng, lat] = f.geometry.coordinates;
+        const px = this._lngPx(lng), py = this._latPy(lat);
+        const [sx, sy] = this.m2s([px, py]);
+        if (sx < -60 || sy < -60 || sx > this.w + 60 || sy > this.h + 60) continue;
+        const isCl = !!f.properties.cluster;
+        const size = (id === this.matSel) ? 36 : (isCl ? 30 : 26);
+        this._matIcon(ctx, id, sx, sy, size);
+        if (isCl) this._matBadge(ctx, sx, sy - size / 2 - 9, f.properties.point_count);
+      }
+    }
+  }
+
+  /* 选中材料高亮：该材料所有点加白色描边环（画在最上层） */
+  _drawMatSel(ctx) {
+    if (this.matSel == null) return;
+    const pts = this.matPointsBy[this.matSel];
+    if (!pts || !pts.length) return;
+    const pad = 24;
+    const x0 = (-pad - this.view.x) / this.view.scale;
+    const y0 = (-pad - this.view.y) / this.view.scale;
+    const x1 = (this.w + pad - this.view.x) / this.view.scale;
+    const y1 = (this.h + pad - this.view.y) / this.view.scale;
+    for (let i = 0; i < pts.length; i++) {
+      const px = pts[i][0], py = pts[i][1];
+      if (px < x0 || py < y0 || px > x1 || py > y1) continue;
+      const [sx, sy] = this.m2s([px, py]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 15, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,.95)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(sx, sy, 19, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(0,0,0,.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  /* 材料层命中测试（Supercluster）：查各启用材料当前 zoom 的簇/点，屏幕距离最近者 */
+  _matHitTest(mx, my) {
+    if (!this.MATS || this.matIds.size === 0) return null;
+    const z = this._mapZoom();
+    const R = 44 / this.view.scale;  // 屏幕命中半径 44px → 世界
+    const bbox = [this._pxLng(mx - R), this._pyLat(my - R), this._pxLng(mx + R), this._pyLat(my + R)];
+    let best = null, bestD = 26;
+    for (const id of this.matIds) {
+      const feats = this._getClusterer(id).getClusters(bbox, z);
+      for (const f of feats) {
+        const [lng, lat] = f.geometry.coordinates;
+        const px = this._lngPx(lng), py = this._latPy(lat);
+        const d = Math.hypot(px - mx, py - my) * this.view.scale;
+        if (d <= bestD) {
+          bestD = d;
+          best = { material: id, matPx: [px, py], cluster: f.properties.cluster ? f.properties.cluster_id : null };
+        }
+      }
+    }
+    return best;
+  }
+
+  /* 选中材料（id=null 取消）：通知 UI 显示材料详情卡 */
+  _selectMaterial(id, matPx) {
+    this.matSel = (id != null) ? id : null;
+    if (this._onSelect) {
+      this._onSelect(id != null ? { material: this.MATS.materials[id], matPx: matPx || null } : null);
+    }
+    this.draw();
+  }
 }
