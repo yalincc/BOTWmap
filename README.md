@@ -10,8 +10,6 @@
 
 在线版：https://botw.yalin.site/
 
-> **部署方式**：腾讯云 EdgeOne Pages 关联 Gitee 仓库 `yalincc/botwmap`，push 到 `gitee/main` 即自动部署，输出目录 `app/`。改完代码只 push Gitee 即可（GitHub 为镜像备份，非部署源）。
-
 ## 实时角色导航（可选）
 
 配合 `live-go/BotwNavi.exe`（单文件约 7MB，无需安装、无需 Python），在线地图可实时显示你在游戏里的位置：
