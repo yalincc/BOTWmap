@@ -243,7 +243,8 @@ const UI = (() => {
       favBody.innerHTML = '';
       document.getElementById('matFavCount').textContent = favSet.size ? '(' + favSet.size + ')' : '';
       favBody.style.display = favSet.size ? '' : 'none';
-      favGrp.style.display = favSet.size ? '' : 'none';
+      // 标题始终显示，空时显示(0)提示用户去星标
+      favGrp.style.display = '';
       for (const id of favSet) {
         const m = map.MATS.materials[id];
         if (!m) continue;
