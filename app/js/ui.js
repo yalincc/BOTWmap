@@ -214,7 +214,7 @@ const UI = (() => {
     const favGrp = document.createElement('div');
     favGrp.className = 'lrow';
     favGrp.style.cssText = 'margin-top:2px;color:#ffd84d;font-weight:600;';
-    favGrp.innerHTML = '★ 常用材料<span class="lprog" id="matFavCount" style="margin-left:6px;color:var(--text-dim);font-weight:400"></span><button type="button" id="matFavAll" style="margin-left:auto;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>';
+    favGrp.innerHTML = '<span class="mat-tri" id="matFavTri" style="width:12px;display:inline-block">▼</span><span style="color:#ffd84d">★</span><span style="margin-left:4px">常用材料</span><span class="lprog" id="matFavCount" style="margin-left:6px;color:var(--text-dim);font-weight:400"></span><button type="button" id="matFavAll" style="margin-left:auto;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>';
     // 插到 lrows 最前：材料标题行下、第一个大类前
     const firstCatHead = lrows.querySelector('.mat-cat-head');
     lrows.insertBefore(favGrp, firstCatHead);
@@ -236,7 +236,9 @@ const UI = (() => {
         e.stopPropagation();
         return;
       }
-      favBody.style.display = favBody.style.display === 'none' ? '' : 'none';
+      const show = favBody.style.display === 'none';
+      favBody.style.display = show ? '' : 'none';
+      document.getElementById('matFavTri').textContent = show ? '▼' : '▶';
     });
     window._refreshFavGroup = refreshFavGroup;
     function refreshFavGroup() {
@@ -245,6 +247,7 @@ const UI = (() => {
       favBody.style.display = favSet.size ? '' : 'none';
       // 标题始终显示，空时显示(0)提示用户去星标
       favGrp.style.display = '';
+      document.getElementById('matFavTri').textContent = favSet.size ? '▼' : '▶';
       for (const id of favSet) {
         const m = map.MATS.materials[id];
         if (!m) continue;
