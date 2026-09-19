@@ -123,6 +123,13 @@ func tryOffsets() (uintptr, [3]float32, bool) {
 }
 
 // poll 10Hz 把锁定的地址镜像到 STATE。
+// 跳变过滤：打开暂停菜单/过场动画时相机 actor 会跳变（如果误锁到相机），
+// 单次位移 >10 米视为可疑；连续 3 次才确认新坐标（快速旅行后位置稳定）。
+var (
+	lastPollGx, lastPollGy, lastPollGz float32
+	bigJumpN                           int
+)
+
 func poll() {
 	for {
 		lock.mu.RLock()
@@ -144,14 +151,33 @@ func poll() {
 		state.mu.Lock()
 		if v != nil {
 			gx, gz, alt := v[0], v[1], v[2]
-			state.ok = true
-			state.gx, state.gy, state.gz = gx, alt, gz
-			state.mx, state.my = 2*gx+12000, 2*gz+10000
-			state.layer = 0
+			// 跳变过滤：与上一个有效坐标比
+			accept := true
+			if state.ok && lastPollGx != 0 {
+				dx, dy, dz := gx-lastPollGx, alt-lastPollGy, gz-lastPollGz
+				delta := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+				if delta > pollJumpMax {
+					bigJumpN++
+					if bigJumpN < pollJumpConfirmN {
+						accept = false
+					} else {
+						fmt.Printf("  [poll] big jump %.1fm x%d -> accept new position\n", delta, pollJumpConfirmN)
+					}
+				} else {
+					bigJumpN = 0
+				}
+			}
+			if accept {
+				lastPollGx, lastPollGy, lastPollGz = gx, alt, gz
+				state.ok = true
+				state.gx, state.gy, state.gz = gx, alt, gz
+				state.mx, state.my = 2*gx+12000, 2*gz+10000
+				state.layer = 0
+				state.verified = verified
+				state.copies = copies
+				state.source = src
+			}
 			state.age = float64(time.Now().UnixNano()) / 1e9
-			state.verified = verified
-			state.copies = copies
-			state.source = src
 		} else {
 			state.ok = false
 			if a != 0 {
@@ -164,6 +190,12 @@ func poll() {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+// poll 跳变过滤参数（见 poll 注释）。
+const (
+	pollJumpMax      = 10.0 // 单次采样位移上限（游戏单位）：正常走/跑/骑远小于此；菜单/过场/坏槽会超
+	pollJumpConfirmN = 3   // 连续 N 次大跳变才确认新坐标（快速旅行后位置稳定；菜单跳变只有 1-2 次）
+)
 
 // watchShortlist 锁定真正在动的候选组。
 func watchShortlist(sl []ShortlistEntry) {
@@ -214,6 +246,11 @@ func watchShortlist(sl []ShortlistEntry) {
 		for i := 1; i < len(moved); i++ {
 			if moved[i] > moved[top] {
 				top = i
+			} else if moved[i] >= moved[top]-1 {
+				// moved 计数接近（差<=1）：选 alt 更低的（更贴地，排除相机 actor——相机通常比玩家高 2-3 米）
+				if sl[i].Hud[2] < sl[top].Hud[2] {
+					top = i
+				}
 			}
 		}
 		if moved[top] >= 3 && top != confirmed {
