@@ -14,6 +14,10 @@ import (
 
 const knownFile = "known_addrs.json"
 
+// Fix 4：偏移记忆条数上限——旧版无限追加，实测积累 40+ 条垃圾偏移，
+// 快路径投票被污染、启动锁错槽。只保留最近 knownCap 条。
+const knownCap = 10
+
 type knownData struct {
 	Block   string   `json:"block"`
 	Offsets []string `json:"offsets"`
@@ -82,6 +86,9 @@ func saveKnown(addrs []uintptr, block uintptr) {
 			seen[o] = true
 			offs = append(offs, hex8(o))
 		}
+	}
+	if len(offs) > knownCap {
+		offs = offs[:knownCap]
 	}
 	d := knownData{
 		Block:   hex12(block),

@@ -67,10 +67,21 @@ func decodePos(d []byte) []float32 {
 		return nil
 	}
 	a := floats(d[:12])
+	gx, alt, gz := a[0], a[1], a[2]
 	if a[0] == 0 && a[1] == 0 && a[2] == 0 {
 		return nil // 标题/加载画面，槽位未初始化
 	}
-	gx, alt, gz := a[0], a[1], a[2]
+	// Fix 5：近零残留（denormal 极小值 / 原点附近残留，如 (0.9,1.2,0.9)）
+	// 判无效——否则 known 快路径会锁到零残留槽，启动即漂移/卡死。
+	// 阈值 5.0 与运动扫描的玩家候选门槛一致（真实坐标 |x|,|z| 都 >5）。
+	if abs32(gx) < 5 && abs32(gz) < 5 {
+		return nil // 近零簇（原点残留，两轴都近零）
+	}
+	// Fix 5b：单轴 denormal/极小值（如 4.6e-44）——「半个槽被覆盖」的垃圾
+	// 数据：gx 已被覆写、gz 还是旧值。真实玩家坐标绝不会 <1e-20 量级。
+	if abs32(gx) < 1e-20 || abs32(gz) < 1e-20 {
+		return nil
+	}
 	if gx <= -7000 || gx >= 7000 || gz <= -7000 || gz >= 7000 ||
 		alt <= -600 || alt >= 5000 {
 		return nil

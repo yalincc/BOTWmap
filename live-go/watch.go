@@ -377,6 +377,30 @@ func verifyKnown(addr uintptr) {
 		staleSrc, verifiedNow := lock.source, lock.verified
 		lock.mu.RUnlock()
 		if staleSrc == "known" && !verifiedNow && time.Since(staleSince) >= staleGap {
+			// Fix 1：超时无移动 ≠ 死槽——玩家站桩时锁一样「不动」。
+			// 先按存档锚点扫描一次：候选位置与当前锁接近（<verifyKeepDist）
+			// 说明锁的值就是玩家当前位置 → 站桩，锁有效，直接 verified；
+			// 候选与锁差异大才判定死槽/坏槽 → 重新定位。
+			// 旧逻辑 20s 无条件 relocalize，站桩玩家会被反复误杀 → 位置漂移。
+			cur := decodePos(readMem(h, addr, 12))
+			if cur != nil {
+				silent := func(string) {}
+				if res := locate(procPID, 60.0, silent); res != nil {
+					dx, dy, dz := cur[0]-res.Hud[0], cur[1]-res.Hud[1], cur[2]-res.Hud[2]
+					scanDist := float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
+					if scanDist < verifyKeepDist {
+						fmt.Printf("  [verify] player idle (scan dist=%.1fm) - lock valid, keeping\n", scanDist)
+						lock.mu.Lock()
+						lock.verified = true
+						lock.mu.Unlock()
+						staleSince, staleGap = time.Now(), 2*time.Minute
+						continue
+					}
+					fmt.Printf("  [verify] scan dist=%.1fm disagrees -> re-locating\n", scanDist)
+				} else {
+					fmt.Println("  [verify] idle check scan found nothing -> re-locating")
+				}
+			}
 			fmt.Printf("  [verify] address 0x%X never moves smoothly (%v); stale/bad slot -> re-locating\n", addr, staleGap)
 			relocalize("remembered address is stale or erratic (no smooth movement)")
 			if lock.addr != addr {
@@ -392,6 +416,7 @@ const (
 	verifyMoveMin  = 0.2  // 判定"在移动"的最小位移（游戏单位/采样）
 	verifyJumpMax  = 50.0 // 单次采样位移上限：正常移动不可能超过（快传/坏槽会超）
 	verifySmoothN  = 3    // 连续 N 次平滑移动才确认 verified
+	verifyKeepDist = 15.0 // Fix 1：站桩判定——扫描候选与当前锁的允许距离（m）
 )
 
 // relocalize 方案 B：save anchor 扫描 + shortlist 监听。
