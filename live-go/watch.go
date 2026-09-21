@@ -9,6 +9,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,7 +17,7 @@ var (
 	procMu     sync.Mutex
 	procHandle uintptr
 	procPID    uint32
-	guestBase  uintptr
+	guestBase  atomic.Uintptr
 )
 
 type lockT struct {
@@ -89,7 +90,7 @@ func tryOffsets() (uintptr, [3]float32, bool) {
 	if base == 0 {
 		return 0, [3]float32{}, false
 	}
-	guestBase = base
+	guestBase.Store(base)
 	offs := loadOffsets()
 	type val struct {
 		addr uintptr
@@ -242,16 +243,22 @@ func watchShortlist(sl []ShortlistEntry) {
 				}
 			}
 		}
-		top := 0
-		for i := 1; i < len(moved); i++ {
-			if moved[i] > moved[top] {
-				top = i
-			} else if moved[i] >= moved[top]-1 {
-				// moved 计数接近（差<=1）：选 alt 更低的（更贴地，排除相机 actor——相机通常比玩家高 2-3 米）
-				if sl[i].Hud[2] < sl[top].Hud[2] {
-					top = i
-				}
-			}
+top := 0
+for i := 1; i < len(moved); i++ {
+	// struct 高的组不被低 struct 组抢：真槽 struct>=6，副本组 struct=0~4
+	if sl[i].Struct > sl[top].Struct {
+		top = i // 真槽优先，不管 moved
+	} else if sl[i].Struct == sl[top].Struct {
+		if moved[i] > moved[top] || (moved[i] == moved[top] && sl[i].Hud[2] < sl[top].Hud[2]) {
+			top = i
+		}
+	} else {
+		// 低 struct 组（副本）要明显领先才换
+		if moved[i] > moved[top]+2 {
+			top = i
+		}
+	}
+}
 		}
 		if moved[top] >= 3 && top != confirmed {
 			confirmed = top
@@ -264,7 +271,7 @@ func watchShortlist(sl []ShortlistEntry) {
 			lock.mu.Unlock()
 			addrs := loadKnownAddrs()
 			addrs = append(addrs, a)
-			saveKnown(addrs, guestBase)
+			saveKnown(addrs, guestBase.Load())
 			fmt.Printf("  [watch] locked onto group %d: copies=%d struct=%d mem=%v\n",
 				top, sl[top].Copies, sl[top].Struct, sl[top].Hud)
 		}
@@ -273,7 +280,7 @@ func watchShortlist(sl []ShortlistEntry) {
 
 func loadKnownAddrs() []uintptr {
 	// 已知偏移转绝对地址（当前块）
-	base := guestBase
+	base := guestBase.Load()
 	if base == 0 {
 		return nil
 	}
@@ -330,8 +337,8 @@ func verifyKnown(addr uintptr) {
 					lock.copies = 0
 					lock.source = "known"
 					lock.mu.Unlock()
-					prev, bad = []float32{v[0], v[1], v[2]}, 0
-					continue
+					go verifyKnown(a) // 新地址需要新 goroutine 校验；本实例退出
+					return
 				}
 			}
 			if bad >= 10 {
@@ -444,7 +451,7 @@ func relocalize(reason string) bool {
 		lock.verified = true
 		lock.mu.Unlock()
 	}
-	saveKnown(append([]uintptr{res.Addr}, loadKnownAddrs()...), guestBase)
+	saveKnown(append([]uintptr{res.Addr}, loadKnownAddrs()...), guestBase.Load())
 	fmt.Printf("  [relocate] candidate 0x%X mem=(%.1f, %.1f, %.1f) - being watched\n",
 		res.Addr, res.Hud[0], res.Hud[1], res.Hud[2])
 	return true

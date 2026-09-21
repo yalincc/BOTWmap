@@ -1,4 +1,4 @@
-// BotwNavi（BOTW live 追踪服务，Go 版）
+﻿// BotwNavi（BOTW live 追踪服务，Go 版）
 //
 // 用途：在本地为在线互动地图 https://botw.yalin.site/ 提供实时角色追踪。
 // 原理：读 Ryujinx 模拟器进程内存定位玩家坐标 → HTTP API（127.0.0.1:8766）
@@ -85,7 +85,7 @@ func main() {
 				lock.copies = 0
 				lock.source = "motion"
 				lock.mu.Unlock()
-				saveKnown(append([]uintptr{a2}, loadKnownAddrs()...), guestBase)
+				saveKnown(append([]uintptr{a2}, loadKnownAddrs()...), guestBase.Load())
 			} else {
 				fmt.Println("  no luck yet - serving anyway, the watchdog keeps trying.")
 			}
@@ -98,6 +98,7 @@ func main() {
 
 	go poll()
 	go watchdog()
+	go statusLoop()
 	if a0 := lockAddr(); a0 != 0 {
 		go verifyKnown(a0)
 	}
