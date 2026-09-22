@@ -24,6 +24,8 @@ const UI = (() => {
     });
     initCardDrag();
     initSideTabs();
+    initStatsFold();
+    initMatSearch();
   }
 
   /* ---------- 侧栏 Tab（v1.1.7）：探索/材料切换，CSS 显隐不重建 DOM，状态记忆 ---------- */
@@ -44,6 +46,85 @@ const UI = (() => {
     try { saved = localStorage.getItem('botwmap.sideTab.v1'); } catch (e) {}
     if (saved === 'explore' || saved === 'material') applyTab(saved);
     tabs.forEach(t => t.addEventListener('click', () => applyTab(t.dataset.tab)));
+  }
+
+  /* ---------- 探索度折叠（v1.1.8）：原收集进度，点击展开/收起，状态记忆 ---------- */
+  const K_STATS_FOLD = 'botwmap.statsFold.v1';
+  function initStatsFold() {
+    const toggle = $('statsToggle');
+    const panel = $('statsPanel');
+    if (!toggle || !panel) return;
+    let folded = false;
+    try { folded = localStorage.getItem(K_STATS_FOLD) === '1'; } catch (e) {}
+    const apply = () => {
+      panel.style.display = folded ? 'none' : '';
+      toggle.textContent = (folded ? '▶' : '▼') + ' 探索度';
+      toggle.setAttribute('aria-expanded', String(!folded));
+    };
+    apply();
+    toggle.addEventListener('click', () => {
+      folded = !folded;
+      try { localStorage.setItem(K_STATS_FOLD, folded ? '1' : '0'); } catch (e) {}
+      apply();
+    });
+  }
+
+  /* ---------- 材料 tab 搜索（v1.1.8）：仅搜 74 种材料，命中即展开大类+勾选+飞分布中心 ---------- */
+  function initMatSearch() {
+    const input = $('matSearchInput');
+    const box = $('matSearchResults');
+    if (!input || !box || !map.MATS) return;
+    let timer = null;
+    const doMatSearch = () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+      const hits = map.MATS.materials
+        .filter(m => (m.cn || '').toLowerCase().includes(q) || (m.en || '').toLowerCase().includes(q))
+        .slice(0, 40);
+      if (!hits.length) {
+        box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
+      } else {
+        box.innerHTML = hits.map(m => `
+          <div class="sr-item" data-mat="${m.id}">
+            <span class="sr-name">${esc(m.cn)}</span>
+            <span class="sr-meta">${m.cat} · ${m.count}点</span>
+          </div>`).join('');
+        box.querySelectorAll('.sr-item[data-mat]').forEach(el => {
+          el.addEventListener('click', () => {
+            const mm = map.MATS.materials[+el.dataset.mat];
+            if (mm) {
+              if (!map.matIds.has(mm.id)) { map.matIds.add(mm.id); saveMatLayers(); updateLayerList(); }
+              if (window._matSetOpenCat) window._matSetOpenCat(mm.cat);
+              const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + mm.id + '"]');
+              if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); const cb = targetRow.querySelector('input'); if (cb) cb.checked = true; }
+              const pts = map.matPointsBy[mm.id];
+              if (pts && pts.length) {
+                let ax = 0, ay = 0;
+                const n = Math.min(pts.length, 2000);
+                for (let i = 0; i < n; i++) { ax += pts[i][0]; ay += pts[i][1]; }
+                ax /= n; ay /= n;
+                map.view.scale = Math.min(Math.max(map.view.scale, 0.35), map.maxScale);
+                map.view.x = map.w / 2 - ax * map.view.scale;
+                map.view.y = map.h / 2 - ay * map.view.scale;
+              }
+              map.draw();
+              map._selectMaterial(mm.id);
+            }
+            box.classList.add('hidden'); box.innerHTML = '';
+            input.blur();
+          });
+        });
+      }
+      box.classList.remove('hidden');
+    };
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doMatSearch, 90); });
+    input.addEventListener('focus', () => { if (input.value) doMatSearch(); });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { box.classList.add('hidden'); box.innerHTML = ''; input.blur(); }
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#matSearchWrap')) { box.classList.add('hidden'); box.innerHTML = ''; }
+    });
   }
 
   /* ---------- 克洛格类型配色与灯箱（v1.1.1，P3 第二标记复用同色表） ---------- */
@@ -194,17 +275,15 @@ const UI = (() => {
     lrows.className = 'lrows';
     grp.appendChild(lrows);
     wrap.appendChild(grp);
-    // 手风琴：6 大类默认折叠，点大类展开/收起；一次只展开一个
-    const openCatKey = { value: null };
-    window._matOpenCat = openCatKey;  // 供搜索联动
+    // 6 大类默认全部展开（v1.1.8：材料已独立成 tab，去掉手风琴互斥）；点大类行独立展开/收起
     window._matSetOpenCat = (cat) => {
-      openCatKey.value = cat;
       lrows.querySelectorAll('.mat-cat-body').forEach(b => {
         if (b.dataset.cat === '__fav__') return;  // 常用分组独立，不随大类折叠
-        b.style.display = (b.dataset.cat === cat) ? '' : 'none';
+        if (b.dataset.cat === cat) b.style.display = '';
       });
       lrows.querySelectorAll('.mat-cat-head').forEach(h => {
-        h.querySelector('.mat-tri').textContent = (h.dataset.cat === cat) ? '▼' : '▶';
+        const body = lrows.querySelector('.mat-cat-body[data-cat="' + h.dataset.cat + '"]');
+        h.querySelector('.mat-tri').textContent = (body && body.style.display !== 'none') ? '▼' : '▶';
       });
     };
     for (const cat of MAT_GROUPS) {
@@ -217,7 +296,7 @@ const UI = (() => {
       catHead.dataset.cat = cat;
       catHead.style.cursor = 'pointer';
       catHead.innerHTML = `
-        <span class="mat-tri" style="width:12px;display:inline-block">▶</span>
+        <span class="mat-tri" style="width:12px;display:inline-block">▼</span>
         <span class="dot" style="background:${cfg.color || '#888'}"></span>
         <span class="lname" style="font-weight:600">${cat}</span>
         <span class="lprog">${list.length}种 / ${totalCount}点</span>
@@ -226,12 +305,13 @@ const UI = (() => {
       const catBody = document.createElement('div');
       catBody.className = 'mat-cat-body';
       catBody.dataset.cat = cat;
-      catBody.style.display = 'none';
       lrows.appendChild(catBody);
-      // 点大类行（非全选按钮）切换展开
+      // 点大类行（非全选按钮）独立展开/收起，不影响其他大类
       catHead.addEventListener('click', (e) => {
         if (e.target.closest('.mat-cat-btn')) return;
-        window._matSetOpenCat(openCatKey.value === cat ? null : cat);
+        const show = catBody.style.display === 'none';
+        catBody.style.display = show ? '' : 'none';
+        catHead.querySelector('.mat-tri').textContent = show ? '▼' : '▶';
       });
       for (const [m, id] of list) {
         const row = document.createElement('label');
@@ -445,7 +525,7 @@ const UI = (() => {
   }
   function renderStats() {
     const focus = ['shrine', 'tower', 'beast', 'seed', 'treasure'];
-    let html = `<h4>收集进度</h4>`;
+    let html = '';
     // 存档同步状态行：live 服务已载入存档进度 或 本会话上传过存档（离线且未上传时不显示）
     const lc = map.live && map.live.counts;
     if (lc || window.__saveUploaded) {
@@ -541,7 +621,7 @@ const UI = (() => {
             // 手风琴联动：展开对应大类 + 滚到该条目
             if (window._matSetOpenCat) window._matSetOpenCat(m.cat);
             const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + m.id + '"]');
-            if (targetRow) targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); const cb = targetRow.querySelector('input'); if (cb) cb.checked = true; }
             const pts = map.matPointsBy[m.id];
             if (pts && pts.length) {
               let ax = 0, ay = 0;
@@ -815,7 +895,6 @@ const UI = (() => {
     });
     $('btnShare').addEventListener('click', share);
     wireShare();
-    wireCombos();
     $('cardClose').addEventListener('click', hideInfo);
     // 截图灯箱（v1.1.1）
     $('lbClose').addEventListener('click', closeLightbox);
@@ -921,80 +1000,7 @@ const UI = (() => {
     $('shareUrl').addEventListener('keydown', e => { if (e.key === 'Escape') $('sbClose').click(); });
   }
 
-  /* ---------- 图层组合（保存当前勾选，一键切换） ---------- */
-  const K_COMBOS = 'botwmap.combos.v1';
-  let combos = [];
-  function wireCombos() {
-    $('comboSave').addEventListener('click', () => {
-      $('comboInputWrap').classList.remove('hidden');
-      $('comboName').value = '';
-      $('comboName').focus();
-    });
-    $('comboOk').addEventListener('click', saveCombo);
-    $('comboCancel').addEventListener('click', () => $('comboInputWrap').classList.add('hidden'));
-    $('comboName').addEventListener('keydown', e => {
-      if (e.key === 'Enter') saveCombo();
-      if (e.key === 'Escape') $('comboCancel').click();
-    });
-  }
-  function saveCombo() {
-    const name = $('comboName').value.trim();
-    if (!name) { toast('请输入组合名称'); $('comboName').focus(); return; }
-    const keys = [...map.enabled];
-    const idx = combos.findIndex(c => c.name === name);
-    if (idx >= 0) combos[idx] = { name, keys };
-    else combos.push({ name, keys });
-    saveCombos();
-    renderCombos();
-    $('comboInputWrap').classList.add('hidden');
-    toast('已保存组合：' + name + '（' + keys.length + ' 个图层）');
-  }
-  function saveCombos() {
-    try { localStorage.setItem(K_COMBOS, JSON.stringify(combos)); } catch (e) {}
-  }
-  function loadCombos() {
-    try {
-      const c = JSON.parse(localStorage.getItem(K_COMBOS) || '[]');
-      combos = Array.isArray(c) ? c : [];
-    } catch (e) { combos = []; }
-  }
-  function renderCombos() {
-    const box = $('comboList');
-    if (!box) return;
-    if (!combos.length) {
-      box.innerHTML = '<div class="combo-empty">还没有组合，勾选图层后点「保存当前组合」</div>';
-      return;
-    }
-    box.innerHTML = combos.map(c =>
-      `<div class="combo-item" data-name="${esc(c.name)}">
-         <span class="combo-name">${esc(c.name)}</span>
-         <span class="combo-count">${c.keys.length} 图层</span>
-         <button class="combo-del" title="删除组合">×</button>
-       </div>`).join('');
-    box.querySelectorAll('.combo-item').forEach(row => {
-      row.addEventListener('click', e => {
-        if (e.target.closest('.combo-del')) return;
-        applyCombo(row.dataset.name);
-      });
-      row.querySelector('.combo-del').addEventListener('click', e => {
-        e.stopPropagation();
-        const n = row.dataset.name;
-        combos = combos.filter(c => c.name !== n);
-        saveCombos();
-        renderCombos();
-        toast('已删除组合：' + n);
-      });
-    });
-  }
-  function applyCombo(name) {
-    const c = combos.find(x => x.name === name);
-    if (!c) return;
-    map.enabled.clear();
-    c.keys.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
-    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
-    saveLayers(); updateLayerList(); map.draw(); renderStats();
-    toast('已应用组合：' + name);
-  }
+  /* ---------- 图层组合（v1.1.8 已移除：刷新易丢失、用处不大） ---------- */
 
   function applyHash() {
     if (!location.hash) return;
@@ -1040,8 +1046,7 @@ const UI = (() => {
       const ml = JSON.parse(localStorage.getItem(K_MAT_LAYERS) || '[]');
       ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
     } catch (e) {}
-    // 图层组合 + 地名显示开关
-    loadCombos();
+    // 地名显示开关
     map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
     // 克洛格轨迹开关（v1.1.4）
     map.showKorokPaths = localStorage.getItem(K_KOROK_PATHS) !== '0';
@@ -1049,7 +1054,6 @@ const UI = (() => {
     document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
     document.querySelectorAll('#layerList input[data-matid]').forEach(cb => cb.checked = map.matIds.has(+cb.dataset.matid));
     updateLayerList();
-    renderCombos();
     renderStats();
   }
   function saveDone() {

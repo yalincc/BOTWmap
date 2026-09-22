@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=25">
+<link rel="stylesheet" href="css/style.css?v=26">
 </head>
 <body>
 <div id="app">
@@ -40,9 +40,15 @@
       <button type="button" class="side-tab active" data-tab="explore" role="tab" aria-selected="true">探索</button>
       <button type="button" class="side-tab" data-tab="material" role="tab" aria-selected="false">材料</button>
     </div>
-    <div class="search-wrap">
+    <!-- 探索搜索 -->
+    <div class="search-wrap" id="exploreSearchWrap">
       <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off">
       <div id="searchResults" class="hidden"></div>
+    </div>
+    <!-- 材料搜索（v1.1.8）：仅搜 74 种材料 -->
+    <div class="search-wrap" id="matSearchWrap">
+      <input id="matSearchInput" type="text" placeholder="搜索材料（如：生命、松露）…" autocomplete="off">
+      <div id="matSearchResults" class="hidden"></div>
     </div>
 
     <div class="layer-actions">
@@ -51,23 +57,13 @@
       <span id="layerCount" class="hint"></span>
     </div>
 
-    <!-- 图层组合：保存当前勾选为自定义组合，一键切换 -->
-    <div class="combo-area">
-      <div class="combo-head">
-        <span>图层组合</span>
-        <button id="comboSave" class="mini" title="把当前勾选的图层保存为组合">保存当前组合</button>
-      </div>
-      <div id="comboInputWrap" class="hidden">
-        <input id="comboName" type="text" placeholder="组合名称，如：神庙+塔" maxlength="20" autocomplete="off">
-        <button id="comboOk" class="mini">保存</button>
-        <button id="comboCancel" class="mini">取消</button>
-      </div>
-      <div id="comboList"></div>
-    </div>
-
     <div id="layerList" class="layer-list"></div>
 
-    <div id="statsPanel" class="stats"></div>
+    <!-- 探索度（原收集进度，v1.1.8 可折叠） -->
+    <div id="statsCollapse">
+      <button type="button" class="collapsible-head" id="statsToggle" aria-expanded="true">▼ 探索度</button>
+      <div id="statsPanel" class="stats"></div>
+    </div>
 
     <div class="save-upload">
       <div class="su-row">
@@ -85,7 +81,7 @@
     </div>
 
     <footer class="side-foot">
-      <p>BOTWMAP V1.1.7</p>
+      <p>BOTWMAP V1.1.8</p>
       <p>© 2026 yalin · github.com/yalincc</p>
     </footer>
   </aside>
@@ -291,7 +287,7 @@
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=17"></script>
-<script src="js/ui.js?v=29"></script>
+<script src="js/ui.js?v=30"></script>
 <script src="js/main.js?v=9"></script>
 <script src="js/live.js?v=10"></script>
 <script src="js/save_upload.js?v=5"></script>
