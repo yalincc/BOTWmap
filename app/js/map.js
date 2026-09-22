@@ -317,6 +317,14 @@ class BotwMap {
     this._drawCustom(ctx);
     // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入；live.js 加载前的早期 draw 可能未挂载，防御）
     if (typeof this._drawLive === 'function') this._drawLive(ctx);
+    this._updateZoomPct();
+  }
+
+  /* 右下角缩放百分比：全图适配 = 100%，放大 2 倍 = 200% */
+  _updateZoomPct() {
+    const el = document.getElementById('zoomPct');
+    if (!el) return;
+    el.textContent = Math.round(this.view.scale / (this._regionScale || 0.05) * 100) + '%';
   }
 
   /* ---------- 地形/区域名（模仿游戏内地图：半透明底深字；字号随缩放放大，随缩放分级切换；高层出现后低层弱化保留） ---------- */
@@ -465,9 +473,14 @@ class BotwMap {
   }
 
   /* ---------- 克洛格轨迹（v1.1.4）：黄色折线 + 起点小圆环 ---------- */
+  /* 轨迹显示最低缩放：全图适配的 2 倍（区域级别，与地名 r1→r2 切换点一致），绝对下限 0.04 */
+  _korokPathMinScale() {
+    return Math.max(0.04, (this._regionScale || 0.05) * 2);
+  }
+
   _drawKorokPaths(ctx, vis) {
     const scale = this.view.scale;
-    if (!this.showKorokPaths || scale < 0.04 || !this.enabled.has('seed') || !this.KOROK_PATHS.length) return;
+    if (!this.showKorokPaths || scale < this._korokPathMinScale() || !this.enabled.has('seed') || !this.KOROK_PATHS.length) return;
     const { w, h } = this;
     ctx.save();
     ctx.lineJoin = 'round';
@@ -515,7 +528,7 @@ class BotwMap {
 
   /* 点击轨迹折线 → 选中对应克洛格（点到线段距离，容差 12px） */
   _hitKorokPath(mx, my) {
-    if (!this.showKorokPaths || this.view.scale < 0.04 || !this.enabled.has('seed')) return null;
+    if (!this.showKorokPaths || this.view.scale < this._korokPathMinScale() || !this.enabled.has('seed')) return null;
     const tol = 12 / this.view.scale;
     let best = null, bd = 1e18;
     for (const p of this.KOROK_PATHS) {

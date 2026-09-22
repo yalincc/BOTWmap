@@ -208,6 +208,10 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 
 /* ---------- 鍦板浘鎺т欢 ---------- */
 #zoomControls { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
+#zoomPct {
+  text-align: center; font-size: 10px; color: var(--text-dim);
+  font-variant-numeric: tabular-nums; user-select: none; line-height: 1.2;
+}
 #zoomControls button {
   width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
   background: var(--panel); color: var(--text); font-size: 17px; cursor: pointer;
