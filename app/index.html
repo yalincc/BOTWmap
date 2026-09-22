@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=24">
+<link rel="stylesheet" href="css/style.css?v=25">
 </head>
 <body>
 <div id="app">
@@ -30,10 +30,15 @@
   </header>
 
   <!-- 侧栏 -->
-  <aside id="sidebar">
+  <aside id="sidebar" data-tab="explore">
     <div class="side-head">
       <span>图层与搜索</span>
       <button id="sideClose" class="card-close" title="收起面板">×</button>
+    </div>
+    <!-- 侧栏 Tab（v1.1.7）：探索 = 搜索/组合/图层/探索度/存档；材料 = 材料·采集组 -->
+    <div class="side-tabs" role="tablist">
+      <button type="button" class="side-tab active" data-tab="explore" role="tab" aria-selected="true">探索</button>
+      <button type="button" class="side-tab" data-tab="material" role="tab" aria-selected="false">材料</button>
     </div>
     <div class="search-wrap">
       <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off">
@@ -80,7 +85,7 @@
     </div>
 
     <footer class="side-foot">
-      <p>BOTWMAP V1.1.6</p>
+      <p>BOTWMAP V1.1.7</p>
       <p>© 2026 yalin · github.com/yalincc</p>
     </footer>
   </aside>
@@ -286,7 +291,7 @@
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=17"></script>
-<script src="js/ui.js?v=28"></script>
+<script src="js/ui.js?v=29"></script>
 <script src="js/main.js?v=9"></script>
 <script src="js/live.js?v=10"></script>
 <script src="js/save_upload.js?v=5"></script>

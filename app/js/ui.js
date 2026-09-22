@@ -23,6 +23,27 @@ const UI = (() => {
       map._lastClick = { sx: e.clientX - r.left, sy: e.clientY - r.top };
     });
     initCardDrag();
+    initSideTabs();
+  }
+
+  /* ---------- 侧栏 Tab（v1.1.7）：探索/材料切换，CSS 显隐不重建 DOM，状态记忆 ---------- */
+  function initSideTabs() {
+    const sidebar = $('sidebar');
+    const tabs = document.querySelectorAll('.side-tab');
+    if (!sidebar || !tabs.length) return;
+    const applyTab = tab => {
+      sidebar.dataset.tab = tab;
+      tabs.forEach(t => {
+        const on = t.dataset.tab === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      try { localStorage.setItem('botwmap.sideTab.v1', tab); } catch (e) {}
+    };
+    let saved = null;
+    try { saved = localStorage.getItem('botwmap.sideTab.v1'); } catch (e) {}
+    if (saved === 'explore' || saved === 'material') applyTab(saved);
+    tabs.forEach(t => t.addEventListener('click', () => applyTab(t.dataset.tab)));
   }
 
   /* ---------- 克洛格类型配色与灯箱（v1.1.1，P3 第二标记复用同色表） ---------- */

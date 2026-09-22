@@ -105,6 +105,25 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 #sideMask.hidden { display: none; }
 .side-head { display: none; align-items: center; justify-content: space-between; padding: 10px 14px 4px; font-size: 13px; font-weight: 600; color: var(--accent2); }
 
+/* 侧栏 Tab（v1.1.7）：探索/材料切换；CSS 显隐不重建 DOM，图层/搜索/统计逻辑零改动 */
+.side-tabs { display: flex; gap: 6px; padding: 10px 12px 0; }
+.side-tab {
+  flex: 1; padding: 9px 0; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--panel); color: var(--text-dim); border: 1px solid var(--border);
+  border-radius: 8px; letter-spacing: 1px; line-height: 1.2;
+}
+.side-tab:hover { color: var(--accent2); border-color: var(--accent); }
+.side-tab.active { background: #1f4a2a; border-color: var(--accent); color: #d8ffe2; }
+/* 探索 Tab：隐藏材料组 */
+#sidebar[data-tab="explore"] .lg-group[data-group="材料"] { display: none; }
+/* 材料 Tab：隐藏探索侧内容，只留材料·采集组 */
+#sidebar[data-tab="material"] .search-wrap,
+#sidebar[data-tab="material"] .layer-actions,
+#sidebar[data-tab="material"] .combo-area,
+#sidebar[data-tab="material"] #statsPanel,
+#sidebar[data-tab="material"] .save-upload,
+#sidebar[data-tab="material"] .lg-group:not([data-group="材料"]) { display: none; }
+
 /* ---------- 鎼滅储 ---------- */
 .search-wrap { padding: 12px 12px 6px; position: relative; }
 .search-wrap input {
