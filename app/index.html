@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=24">
+<link rel="stylesheet" href="css/style.css?v=28">
 </head>
 <body>
 <div id="app">
@@ -30,14 +30,25 @@
   </header>
 
   <!-- 侧栏 -->
-  <aside id="sidebar">
+  <aside id="sidebar" data-tab="explore">
     <div class="side-head">
       <span>图层与搜索</span>
       <button id="sideClose" class="card-close" title="收起面板">×</button>
     </div>
-    <div class="search-wrap">
+    <!-- 侧栏 Tab（v1.1.7）：探索 = 搜索/组合/图层/探索度/存档；材料 = 材料·采集组 -->
+    <div class="side-tabs" role="tablist">
+      <button type="button" class="side-tab active" data-tab="explore" role="tab" aria-selected="true">探索</button>
+      <button type="button" class="side-tab" data-tab="material" role="tab" aria-selected="false">材料</button>
+    </div>
+    <!-- 探索搜索 -->
+    <div class="search-wrap" id="exploreSearchWrap">
       <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off">
       <div id="searchResults" class="hidden"></div>
+    </div>
+    <!-- 材料搜索（v1.1.8）：仅搜 74 种材料 -->
+    <div class="search-wrap" id="matSearchWrap">
+      <input id="matSearchInput" type="text" placeholder="搜索材料（如：生命、松露）…" autocomplete="off">
+      <div id="matSearchResults" class="hidden"></div>
     </div>
 
     <div class="layer-actions">
@@ -46,23 +57,12 @@
       <span id="layerCount" class="hint"></span>
     </div>
 
-    <!-- 图层组合：保存当前勾选为自定义组合，一键切换 -->
-    <div class="combo-area">
-      <div class="combo-head">
-        <span>图层组合</span>
-        <button id="comboSave" class="mini" title="把当前勾选的图层保存为组合">保存当前组合</button>
-      </div>
-      <div id="comboInputWrap" class="hidden">
-        <input id="comboName" type="text" placeholder="组合名称，如：神庙+塔" maxlength="20" autocomplete="off">
-        <button id="comboOk" class="mini">保存</button>
-        <button id="comboCancel" class="mini">取消</button>
-      </div>
-      <div id="comboList"></div>
-    </div>
-
     <div id="layerList" class="layer-list"></div>
 
-    <div id="statsPanel" class="stats"></div>
+    <!-- 探索度（v1.1.9 弹卡查看，不再内嵌占位） -->
+    <div id="statsCollapse">
+      <button type="button" class="collapsible-head" id="statsToggle">▤ 探索度</button>
+    </div>
 
     <div class="save-upload">
       <div class="su-row">
@@ -80,10 +80,21 @@
     </div>
 
     <footer class="side-foot">
-      <p>BOTWMAP V1.1.6</p>
+      <p>BOTWMAP V1.2.0</p>
       <p>© 2026 yalin · github.com/yalincc</p>
     </footer>
   </aside>
+
+  <!-- 探索度卡片（v1.1.9）：完整统计弹层，PC 居中 / 手机底部抽屉 -->
+  <div class="stats-overlay hidden" id="statsOverlay">
+    <div class="stats-card" id="statsCard" role="dialog" aria-label="探索度">
+      <div class="stats-card-head">
+        <span>探索度</span>
+        <button type="button" class="card-close" id="statsClose" title="关闭">×</button>
+      </div>
+      <div id="statsPanel" class="stats-body"></div>
+    </div>
+  </div>
 
   <!-- 地图 -->
   <main id="mapArea">
@@ -286,7 +297,7 @@
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=17"></script>
-<script src="js/ui.js?v=28"></script>
+<script src="js/ui.js?v=32"></script>
 <script src="js/main.js?v=9"></script>
 <script src="js/live.js?v=10"></script>
 <script src="js/save_upload.js?v=5"></script>

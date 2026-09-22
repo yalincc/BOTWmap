@@ -105,6 +105,25 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 #sideMask.hidden { display: none; }
 .side-head { display: none; align-items: center; justify-content: space-between; padding: 10px 14px 4px; font-size: 13px; font-weight: 600; color: var(--accent2); }
 
+/* 侧栏 Tab（v1.1.7）：探索/材料切换；CSS 显隐不重建 DOM，图层/搜索/统计逻辑零改动 */
+.side-tabs { display: flex; gap: 6px; padding: 10px 12px 0; }
+.side-tab {
+  flex: 1; padding: 9px 0; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--panel); color: var(--text-dim); border: 1px solid var(--border);
+  border-radius: 8px; letter-spacing: 1px; line-height: 1.2;
+}
+.side-tab:hover { color: var(--accent2); border-color: var(--accent); }
+.side-tab.active { background: #1f4a2a; border-color: var(--accent); color: #d8ffe2; }
+/* 探索 Tab：隐藏材料组与材料搜索 */
+#sidebar[data-tab="explore"] #matSearchWrap,
+#sidebar[data-tab="explore"] .lg-group[data-group="材料"] { display: none; }
+/* 材料 Tab：隐藏探索侧内容，只留材料·采集组 */
+#sidebar[data-tab="material"] #exploreSearchWrap,
+#sidebar[data-tab="material"] .layer-actions,
+#sidebar[data-tab="material"] #statsCollapse,
+#sidebar[data-tab="material"] .save-upload,
+#sidebar[data-tab="material"] .lg-group:not([data-group="材料"]) { display: none; }
+
 /* ---------- 鎼滅储 ---------- */
 .search-wrap { padding: 12px 12px 6px; position: relative; }
 .search-wrap input {
@@ -112,7 +131,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   background: #0f1a12; color: var(--text); font-size: 13px; outline: none;
 }
 .search-wrap input:focus { border-color: var(--accent); }
-#searchResults {
+#searchResults, #matSearchResults {
   position: absolute; left: 12px; right: 12px; top: 52px; max-height: 320px; overflow-y: auto;
   background: var(--panel-solid); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: var(--shadow); z-index: 30;
@@ -132,7 +151,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .mini:hover { color: var(--text); border-color: var(--accent2); }
 #layerCount { font-size: 11px; color: var(--text-dim); margin-left: auto; }
 
-.layer-list { flex: 1; overflow-y: auto; padding: 4px 8px 8px; }
+.layer-list { flex: 1; overflow-y: auto; padding: 4px 8px 8px; scrollbar-gutter: stable; }
 
 /* ---------- 设置弹层（地名样式） ---------- */
 #settingsBox {
@@ -160,21 +179,65 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lg-btn { background: none; border: 1px solid rgba(255,255,255,.16); border-radius: 3px; color: var(--text-dim); font-size: 10.5px; padding: 1px 7px; cursor: pointer; letter-spacing: 0; white-space: nowrap; }
 .lg-btn:hover { color: #fff; border-color: var(--accent); }
 .lrow {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
+  display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 6px;
   cursor: pointer; font-size: 13px; user-select: none;
 }
 .lrow:hover { background: rgba(255,255,255,.04); }
-.lrow input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+.lrow .lg-ic { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
+.lrow .lg-ic-mat { width: 16px; height: 16px; }
 .lrow .dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
 .lrow .lname { flex: 1; }
 .lrow .lcount { color: var(--text-dim); font-size: 11.5px; }
 .lrow .lprog { font-size: 11px; min-width: 52px; text-align: right; }
 .lrow .lsub { color: var(--text-dim); font-size: 10px; margin-left: 6px; white-space: nowrap; }
 .lrow.done .lname { color: var(--text-dim); }
+/* v1.2.0 激活行：整行点击切换，高亮底色 + 文字变亮 + 图标微发光 */
+.lrow.on { background: rgba(125,255,160,.1); }
+.lrow.on:hover { background: rgba(125,255,160,.14); }
+.lrow.on .lname { color: var(--accent2); }
+.lrow.on .lg-ic { filter: brightness(1.15) drop-shadow(0 0 2px rgba(125,255,160,.5)); }
 
 /* ---------- 缁熻 ---------- */
-.stats { flex: 0 0 auto; border-top: 1px solid var(--border); padding: 10px 14px; max-height: 30%; overflow-y: auto; }
+/* 探索度按钮（v1.1.9 弹卡查看） */
+.collapsible-head {
+  display: flex; align-items: center; gap: 4px; width: 100%;
+  background: none; border: none; border-top: 1px solid var(--border);
+  color: var(--accent2); font-size: 12px; font-weight: 600; letter-spacing: 1px;
+  cursor: pointer; padding: 10px 14px 4px;
+}
+.collapsible-head:hover { color: var(--accent); }
+
+/* 探索度卡片（v1.1.9）：PC 居中 / 手机底部抽屉 */
+.stats-overlay {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(0,0,0,.5);
+  display: flex; align-items: center; justify-content: center;
+}
+.stats-overlay.hidden { display: none; }
+.stats-card {
+  width: min(380px, calc(100vw - 32px));
+  max-height: 80vh; overflow-y: auto;
+  background: var(--panel-solid); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+.stats-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; font-size: 13px; font-weight: 700; color: var(--accent2);
+  border-bottom: 1px solid var(--border); letter-spacing: 1px;
+  position: sticky; top: 0; background: var(--panel-solid); z-index: 1;
+}
+.stats-body { padding: 10px 14px 12px; }
+@media (max-width: 760px) {
+  .stats-overlay { align-items: flex-end; }
+  .stats-card { width: 100%; max-height: 78vh; border-radius: 14px 14px 0 0; }
+}
 .stats h4 { font-size: 12px; color: var(--accent2); margin-bottom: 8px; letter-spacing: 1px; }
+
+/* 细滚动条（v1.1.9）：全站统一，减轻视觉重量 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
+::-webkit-scrollbar-track { background: transparent; }
 .stat-row { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
 .stat-row .k { color: var(--text-dim); }
 .stat-row .v { color: var(--text); font-weight: 600; }
@@ -417,10 +480,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   font-size: 28px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.7);
 }
 
-/* 婊氬姩鏉?*/
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-thumb { background: #2c3f2e; border-radius: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* 滚动条（v1.1.9 细样式已在上面统一，此处不再重复定义） */
 
 @media (max-width: 760px) {
   /* 椤舵爮绮剧畝锛氶殣钘忓壇鏍囬涓庡伐鍏锋枃瀛楋紝鍙暀鍥炬爣 */
@@ -460,25 +520,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   #collectBar { font-size: 11px; bottom: 62px; max-width: 92vw; }
 }
 
-/* ---------- 图层组合 ---------- */
-.combo-area { padding: 2px 12px 6px; }
-.combo-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 0 4px; font-size: 11.5px; color: var(--accent2); letter-spacing: 1px; font-weight: 600; }
-.combo-head .mini { letter-spacing: 0; }
-#comboInputWrap { display: flex; gap: 6px; margin: 4px 0 6px; }
-#comboInputWrap input { flex: 1; min-width: 0; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: #0f1a12; color: var(--text); font-size: 12px; outline: none; }
-#comboInputWrap input:focus { border-color: var(--accent); }
-#comboList { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
-.combo-empty { font-size: 11px; color: var(--text-dim); padding: 2px 0 4px; }
-.combo-item {
-  display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 6px;
-  border: 1px solid var(--border); background: rgba(255,255,255,.03);
-  cursor: pointer; font-size: 12.5px; user-select: none;
-}
-.combo-item:hover { border-color: var(--accent2); }
-.combo-item .combo-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.combo-item .combo-count { font-size: 10.5px; color: var(--text-dim); flex-shrink: 0; }
-.combo-del { background: none; border: none; color: var(--text-dim); font-size: 15px; line-height: 1; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
-.combo-del:hover { color: var(--danger); }
+/* ---------- 图层组合（v1.1.8 已移除） ---------- */
 
 /* 材料组双列：对齐任务/设施组，grid 两列，数字右对齐，星星在名字后 */
 .lg-group[data-group="材料"] .mat-cat-body {
@@ -487,7 +529,6 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lg-group[data-group="材料"] .mat-item {
   flex-wrap: nowrap; padding: 3px 2px; align-items: center; white-space: nowrap; min-width: 0; overflow: hidden;
 }
-.lg-group[data-group="材料"] .mat-item input { width: 13px; height: 13px; flex-shrink: 0; margin-right: 3px; }
 .lg-group[data-group="材料"] .mat-item .lname { flex: 1 1 0%; min-width: 0; overflow: hidden; text-overflow: clip; white-space: nowrap; }
 .lg-group[data-group="材料"] .mat-item .lprog {
   flex: 0 0 auto; min-width: 0; width: 26px; text-align: right; font-size: 10.5px; color: var(--text-dim);

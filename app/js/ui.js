@@ -23,6 +23,104 @@ const UI = (() => {
       map._lastClick = { sx: e.clientX - r.left, sy: e.clientY - r.top };
     });
     initCardDrag();
+    initSideTabs();
+    initStatsCard();
+    initMatSearch();
+  }
+
+  /* ---------- 侧栏 Tab（v1.1.7）：探索/材料切换，CSS 显隐不重建 DOM，状态记忆 ---------- */
+  function initSideTabs() {
+    const sidebar = $('sidebar');
+    const tabs = document.querySelectorAll('.side-tab');
+    if (!sidebar || !tabs.length) return;
+    const applyTab = tab => {
+      sidebar.dataset.tab = tab;
+      tabs.forEach(t => {
+        const on = t.dataset.tab === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
+      try { localStorage.setItem('botwmap.sideTab.v1', tab); } catch (e) {}
+    };
+    let saved = null;
+    try { saved = localStorage.getItem('botwmap.sideTab.v1'); } catch (e) {}
+    if (saved === 'explore' || saved === 'material') applyTab(saved);
+    tabs.forEach(t => t.addEventListener('click', () => applyTab(t.dataset.tab)));
+    window._applySideTab = applyTab;  // v1.2.0：探索搜索命中材料时联动切换
+  }
+
+  /* ---------- 探索度卡片（v1.1.9）：点击弹出完整统计，PC 居中 / 手机底部抽屉 ---------- */
+  function initStatsCard() {
+    const toggle = $('statsToggle');
+    const overlay = $('statsOverlay');
+    const close = $('statsClose');
+    if (!toggle || !overlay || !close) return;
+    const hide = () => overlay.classList.add('hidden');
+    toggle.addEventListener('click', () => {
+      renderStats();  // 打开时重渲染，保证最新
+      overlay.classList.remove('hidden');
+    });
+    close.addEventListener('click', hide);
+    overlay.addEventListener('click', e => { if (e.target === overlay) hide(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+  }
+
+  /* ---------- 材料 tab 搜索（v1.1.8）：仅搜 74 种材料，命中即展开大类+勾选+飞分布中心 ---------- */
+  function initMatSearch() {
+    const input = $('matSearchInput');
+    const box = $('matSearchResults');
+    if (!input || !box || !map.MATS) return;
+    let timer = null;
+    const doMatSearch = () => {
+      const q = input.value.trim().toLowerCase();
+      if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+      const hits = map.MATS.materials
+        .filter(m => (m.cn || '').toLowerCase().includes(q) || (m.en || '').toLowerCase().includes(q))
+        .slice(0, 40);
+      if (!hits.length) {
+        box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
+      } else {
+        box.innerHTML = hits.map(m => `
+          <div class="sr-item" data-mat="${m.id}">
+            <span class="sr-name">${esc(m.cn)}</span>
+            <span class="sr-meta">${m.cat} · ${m.count}点</span>
+          </div>`).join('');
+        box.querySelectorAll('.sr-item[data-mat]').forEach(el => {
+          el.addEventListener('click', () => {
+            const mm = map.MATS.materials[+el.dataset.mat];
+            if (mm) {
+              if (!map.matIds.has(mm.id)) { map.matIds.add(mm.id); saveMatLayers(); updateLayerList(); }
+              if (window._matSetOpenCat) window._matSetOpenCat(mm.cat);
+              const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + mm.id + '"]');
+              if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); targetRow.classList.add('on'); }
+              const pts = map.matPointsBy[mm.id];
+              if (pts && pts.length) {
+                let ax = 0, ay = 0;
+                const n = Math.min(pts.length, 2000);
+                for (let i = 0; i < n; i++) { ax += pts[i][0]; ay += pts[i][1]; }
+                ax /= n; ay /= n;
+                map.view.scale = Math.min(Math.max(map.view.scale, 0.35), map.maxScale);
+                map.view.x = map.w / 2 - ax * map.view.scale;
+                map.view.y = map.h / 2 - ay * map.view.scale;
+              }
+              map.draw();
+              map._selectMaterial(mm.id);
+            }
+            box.classList.add('hidden'); box.innerHTML = '';
+            input.blur();
+          });
+        });
+      }
+      box.classList.remove('hidden');
+    };
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(doMatSearch, 90); });
+    input.addEventListener('focus', () => { if (input.value) doMatSearch(); });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { box.classList.add('hidden'); box.innerHTML = ''; input.blur(); }
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#matSearchWrap')) { box.classList.add('hidden'); box.innerHTML = ''; }
+    });
   }
 
   /* ---------- 克洛格类型配色与灯箱（v1.1.1，P3 第二标记复用同色表） ---------- */
@@ -111,19 +209,19 @@ const UI = (() => {
         if (!cat) continue;
         const cfg = CAT_CFG[key] || {};
         const total = map.data.markers.filter(mk => mk.cat === key).length;
-        const row = document.createElement('label');
-        row.className = 'lrow';
+        const row = document.createElement('div');
+        row.className = 'lrow' + (map.enabled.has(key) ? ' on' : '');
+        row.dataset.cat = key;
         const dispName = key === 'memory' ? '照片记忆（12+1）' : cat.cn;
-/* 副标已移除 */
         row.innerHTML = `
-          <input type="checkbox" data-cat="${key}" ${map.enabled.has(key) ? 'checked' : ''}>
-          <span class="dot" style="background:${cfg.color || '#888'}"></span>
+          ${cfg.icon ? `<img class="lg-ic" src="assets/icons/${cfg.icon}" alt="" loading="lazy">` : `<span class="dot" style="background:${cfg.color || '#888'}"></span>`}
           <span class="lname">${dispName}</span>
           <span class="lprog" id="prog_${key}"></span>
         `;
-        row.addEventListener('change', () => {
-          const cb = row.querySelector('input');
-          if (cb.checked) map.enabled.add(key); else map.enabled.delete(key);
+        row.title = '点击整行切换显示 / 隐藏';
+        row.addEventListener('click', () => {
+          if (map.enabled.has(key)) map.enabled.delete(key); else map.enabled.add(key);
+          row.classList.toggle('on', map.enabled.has(key));
           saveLayers();
           updateLayerList();
           map.draw();
@@ -139,8 +237,8 @@ const UI = (() => {
       const keys = CAT_GROUP[btn.dataset.group] || [];
       const allOn = keys.length > 0 && keys.every(k => map.enabled.has(k));
       keys.forEach(k => { if (allOn) map.enabled.delete(k); else map.enabled.add(k); });
-      wrap.querySelectorAll('input[data-cat]').forEach(cb => {
-        if (keys.includes(cb.dataset.cat)) cb.checked = !allOn;
+      wrap.querySelectorAll('.lrow[data-cat]').forEach(r => {
+        if (keys.includes(r.dataset.cat)) r.classList.toggle('on', !allOn);
       });
       saveLayers(); updateLayerList(); map.draw(); renderStats();
     });
@@ -150,7 +248,7 @@ const UI = (() => {
     updateLayerList();
   }
 
-  /* 材料追踪组（v1.1.0）：6 类分组 + 74 种材料单材料 checkbox（b 方案，按材料分别聚合） */
+  /* 材料追踪组（v1.1.0）：6 类分组 + 74 种材料单材料行（v1.2.0 起整行点击，带官方图标） */
   function buildMatLayerGroup() {
     const wrap = $('layerList');
     if (!map.MATS) return;
@@ -173,17 +271,15 @@ const UI = (() => {
     lrows.className = 'lrows';
     grp.appendChild(lrows);
     wrap.appendChild(grp);
-    // 手风琴：6 大类默认折叠，点大类展开/收起；一次只展开一个
-    const openCatKey = { value: null };
-    window._matOpenCat = openCatKey;  // 供搜索联动
+    // 6 大类默认全部展开（v1.1.8：材料已独立成 tab，去掉手风琴互斥）；点大类行独立展开/收起
     window._matSetOpenCat = (cat) => {
-      openCatKey.value = cat;
       lrows.querySelectorAll('.mat-cat-body').forEach(b => {
         if (b.dataset.cat === '__fav__') return;  // 常用分组独立，不随大类折叠
-        b.style.display = (b.dataset.cat === cat) ? '' : 'none';
+        if (b.dataset.cat === cat) b.style.display = '';
       });
       lrows.querySelectorAll('.mat-cat-head').forEach(h => {
-        h.querySelector('.mat-tri').textContent = (h.dataset.cat === cat) ? '▼' : '▶';
+        const body = lrows.querySelector('.mat-cat-body[data-cat="' + h.dataset.cat + '"]');
+        h.querySelector('.mat-tri').textContent = (body && body.style.display !== 'none') ? '▼' : '▶';
       });
     };
     for (const cat of MAT_GROUPS) {
@@ -195,9 +291,10 @@ const UI = (() => {
       catHead.className = 'lrow mat-cat-head';
       catHead.dataset.cat = cat;
       catHead.style.cursor = 'pointer';
+      const repIcon = list.length ? list[0][0].entry : null;
       catHead.innerHTML = `
-        <span class="mat-tri" style="width:12px;display:inline-block">▶</span>
-        <span class="dot" style="background:${cfg.color || '#888'}"></span>
+        <span class="mat-tri" style="width:12px;display:inline-block">▼</span>
+        ${repIcon ? `<img class="lg-ic lg-ic-mat" src="assets/materials/${repIcon}.webp" alt="" loading="lazy">` : `<span class="dot" style="background:${cfg.color || '#888'}"></span>`}
         <span class="lname" style="font-weight:600">${cat}</span>
         <span class="lprog">${list.length}种 / ${totalCount}点</span>
         <button type="button" class="mat-cat-btn" data-cat="${cat}" style="margin-left:6px;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>`;
@@ -205,21 +302,22 @@ const UI = (() => {
       const catBody = document.createElement('div');
       catBody.className = 'mat-cat-body';
       catBody.dataset.cat = cat;
-      catBody.style.display = 'none';
       lrows.appendChild(catBody);
-      // 点大类行（非全选按钮）切换展开
+      // 点大类行（非全选按钮）独立展开/收起，不影响其他大类
       catHead.addEventListener('click', (e) => {
         if (e.target.closest('.mat-cat-btn')) return;
-        window._matSetOpenCat(openCatKey.value === cat ? null : cat);
+        const show = catBody.style.display === 'none';
+        catBody.style.display = show ? '' : 'none';
+        catHead.querySelector('.mat-tri').textContent = show ? '▼' : '▶';
       });
       for (const [m, id] of list) {
-        const row = document.createElement('label');
-        row.className = 'lrow mat-item';
+        const row = document.createElement('div');
+        row.className = 'lrow mat-item' + (map.matIds.has(id) ? ' on' : '');
         row.style.whiteSpace = 'nowrap';
         row.dataset.matid = id;
         row.dataset.cat = cat;
         row.innerHTML = `
-          <input type="checkbox" data-matid="${id}" ${map.matIds.has(id) ? 'checked' : ''}>
+          <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
           <span class="lname">${m.cn}</span>
           <span class="lprog">${m.count}</span>
           <span class="mat-fav" data-favid="${id}" title="收藏到常用" style="cursor:pointer;margin-left:auto;color:${favSet.has(id) ? '#ffd84d' : '#555'};font-size:12px;line-height:1">${favSet.has(id) ? '★' : '☆'}</span>`;
@@ -231,10 +329,11 @@ const UI = (() => {
           e.target.style.color = favSet.has(id) ? '#ffd84d' : '#555';
           refreshFavGroup();
         });
-        row.addEventListener('change', () => {
-          const cb = row.querySelector('input');
-          const mid = +cb.dataset.matid;
-          if (cb.checked) map.matIds.add(mid); else map.matIds.delete(mid);
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.mat-fav')) return;
+          const mid = +row.dataset.matid;
+          if (map.matIds.has(mid)) map.matIds.delete(mid); else map.matIds.add(mid);
+          row.classList.toggle('on', map.matIds.has(mid));
           saveMatLayers(); updateLayerList(); map.draw();
         });
         catBody.appendChild(row);
@@ -261,8 +360,8 @@ const UI = (() => {
         const allOn = ids.length > 0 && ids.every(id => map.matIds.has(id));
         ids.forEach(id => { if (allOn) map.matIds.delete(id); else map.matIds.add(id); });
         saveMatLayers(); updateLayerList(); map.draw();
-        // 同步常用区 checkbox
-        favBody.querySelectorAll('input[data-matid]').forEach(cb => { cb.checked = !allOn; });
+        // 同步常用区行状态
+        favBody.querySelectorAll('.mat-item').forEach(r => { r.classList.toggle('on', !allOn); });
         e.stopPropagation();
         return;
       }
@@ -281,17 +380,20 @@ const UI = (() => {
       for (const id of favSet) {
         const m = map.MATS.materials[id];
         if (!m) continue;
-        const row = document.createElement('label');
-        row.className = 'lrow mat-item';
+        const row = document.createElement('div');
+        row.className = 'lrow mat-item' + (map.matIds.has(id) ? ' on' : '');
         row.style.whiteSpace = 'nowrap';
+        row.dataset.matid = id;
         row.innerHTML = `
-          <input type="checkbox" data-matid="${id}" ${map.matIds.has(id) ? 'checked' : ''}>
+          <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
           <span class="lname">${m.cn}</span>
           <span class="lprog">${m.count}</span>
           <span class="mat-fav" data-favid="${id}" style="cursor:pointer;margin-left:auto;color:#ffd84d;font-size:12px">★</span>`;
-        row.querySelector('input').addEventListener('change', () => {
-          const mid = +row.querySelector('input').dataset.matid;
-          if (row.querySelector('input').checked) map.matIds.add(mid); else map.matIds.delete(mid);
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.mat-fav')) return;
+          const mid = +row.dataset.matid;
+          if (map.matIds.has(mid)) map.matIds.delete(mid); else map.matIds.add(mid);
+          row.classList.toggle('on', map.matIds.has(mid));
           saveMatLayers(); updateLayerList(); map.draw();
         });
         row.querySelector('.mat-fav').addEventListener('click', (e) => {
@@ -309,7 +411,7 @@ const UI = (() => {
     gBtn.addEventListener('click', () => {
       const all = map.matIds.size === map.MATS.materials.length;
       if (all) map.matIds.clear(); else map.MATS.materials.forEach((_, i) => map.matIds.add(i));
-      lrows.querySelectorAll('input[data-matid]').forEach(cb => cb.checked = !all);
+      lrows.querySelectorAll('.mat-item').forEach(r => r.classList.toggle('on', !all));
       saveMatLayers(); updateLayerList(); map.draw();
     });
     lrows.querySelectorAll('.mat-cat-btn').forEach(btn => {
@@ -318,9 +420,9 @@ const UI = (() => {
         const ids = map.MATS.materials.map((m, i) => [m, i]).filter(([m]) => m.cat === cat).map(([, i]) => i);
         const on = ids.every(i => map.matIds.has(i));
         ids.forEach(i => { if (on) map.matIds.delete(i); else map.matIds.add(i); });
-        lrows.querySelectorAll('input[data-matid]').forEach(cb => {
-          const m = map.MATS.materials[+cb.dataset.matid];
-          if (m.cat === cat) cb.checked = !on;
+        lrows.querySelectorAll('.mat-item').forEach(r => {
+          const m = map.MATS.materials[+r.dataset.matid];
+          if (m.cat === cat) r.classList.toggle('on', !on);
         });
         saveMatLayers(); updateLayerList(); map.draw();
       });
@@ -332,7 +434,7 @@ const UI = (() => {
   function setAllLayers(on) {
     if (on) map.data.categories.forEach(c => map.enabled.add(c.key));
     else map.enabled.clear();
-    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = on);
+    document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', on));
     saveLayers(); updateLayerList(); map.draw(); renderStats();
   }
 
@@ -355,7 +457,7 @@ const UI = (() => {
       if (!el) continue;
       // 回忆类别与统计面板同口径：有存档 counts 以存档为准，否则按标点完成
       const [done, total] = cat.key === 'memory' ? memoryDoneTotal() : catCount(cat.key);
-      el.textContent = done ? `${done}/${total}` : '';
+      el.textContent = `${done}/${total}`;  // v1.1.9：全部统一显示 done/total，不再有空行
       el.style.color = done === total ? '#7dffa0' : 'var(--text-dim)';
     }
     // 材料组按钮 + 行统计
@@ -424,7 +526,7 @@ const UI = (() => {
   }
   function renderStats() {
     const focus = ['shrine', 'tower', 'beast', 'seed', 'treasure'];
-    let html = `<h4>收集进度</h4>`;
+    let html = '';
     // 存档同步状态行：live 服务已载入存档进度 或 本会话上传过存档（离线且未上传时不显示）
     const lc = map.live && map.live.counts;
     if (lc || window.__saveUploaded) {
@@ -516,11 +618,12 @@ const UI = (() => {
         el.addEventListener('click', () => {
           const m = map.MATS.materials[+el.dataset.mat];
           if (m) {
+            if (window._applySideTab) window._applySideTab('material');  // v1.2.0：命中材料自动切到材料 tab
             if (!map.matIds.has(m.id)) { map.matIds.add(m.id); saveMatLayers(); updateLayerList(); }
             // 手风琴联动：展开对应大类 + 滚到该条目
             if (window._matSetOpenCat) window._matSetOpenCat(m.cat);
             const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + m.id + '"]');
-            if (targetRow) targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); targetRow.classList.add('on'); }
             const pts = map.matPointsBy[m.id];
             if (pts && pts.length) {
               let ax = 0, ay = 0;
@@ -794,7 +897,6 @@ const UI = (() => {
     });
     $('btnShare').addEventListener('click', share);
     wireShare();
-    wireCombos();
     $('cardClose').addEventListener('click', hideInfo);
     // 截图灯箱（v1.1.1）
     $('lbClose').addEventListener('click', closeLightbox);
@@ -900,80 +1002,7 @@ const UI = (() => {
     $('shareUrl').addEventListener('keydown', e => { if (e.key === 'Escape') $('sbClose').click(); });
   }
 
-  /* ---------- 图层组合（保存当前勾选，一键切换） ---------- */
-  const K_COMBOS = 'botwmap.combos.v1';
-  let combos = [];
-  function wireCombos() {
-    $('comboSave').addEventListener('click', () => {
-      $('comboInputWrap').classList.remove('hidden');
-      $('comboName').value = '';
-      $('comboName').focus();
-    });
-    $('comboOk').addEventListener('click', saveCombo);
-    $('comboCancel').addEventListener('click', () => $('comboInputWrap').classList.add('hidden'));
-    $('comboName').addEventListener('keydown', e => {
-      if (e.key === 'Enter') saveCombo();
-      if (e.key === 'Escape') $('comboCancel').click();
-    });
-  }
-  function saveCombo() {
-    const name = $('comboName').value.trim();
-    if (!name) { toast('请输入组合名称'); $('comboName').focus(); return; }
-    const keys = [...map.enabled];
-    const idx = combos.findIndex(c => c.name === name);
-    if (idx >= 0) combos[idx] = { name, keys };
-    else combos.push({ name, keys });
-    saveCombos();
-    renderCombos();
-    $('comboInputWrap').classList.add('hidden');
-    toast('已保存组合：' + name + '（' + keys.length + ' 个图层）');
-  }
-  function saveCombos() {
-    try { localStorage.setItem(K_COMBOS, JSON.stringify(combos)); } catch (e) {}
-  }
-  function loadCombos() {
-    try {
-      const c = JSON.parse(localStorage.getItem(K_COMBOS) || '[]');
-      combos = Array.isArray(c) ? c : [];
-    } catch (e) { combos = []; }
-  }
-  function renderCombos() {
-    const box = $('comboList');
-    if (!box) return;
-    if (!combos.length) {
-      box.innerHTML = '<div class="combo-empty">还没有组合，勾选图层后点「保存当前组合」</div>';
-      return;
-    }
-    box.innerHTML = combos.map(c =>
-      `<div class="combo-item" data-name="${esc(c.name)}">
-         <span class="combo-name">${esc(c.name)}</span>
-         <span class="combo-count">${c.keys.length} 图层</span>
-         <button class="combo-del" title="删除组合">×</button>
-       </div>`).join('');
-    box.querySelectorAll('.combo-item').forEach(row => {
-      row.addEventListener('click', e => {
-        if (e.target.closest('.combo-del')) return;
-        applyCombo(row.dataset.name);
-      });
-      row.querySelector('.combo-del').addEventListener('click', e => {
-        e.stopPropagation();
-        const n = row.dataset.name;
-        combos = combos.filter(c => c.name !== n);
-        saveCombos();
-        renderCombos();
-        toast('已删除组合：' + n);
-      });
-    });
-  }
-  function applyCombo(name) {
-    const c = combos.find(x => x.name === name);
-    if (!c) return;
-    map.enabled.clear();
-    c.keys.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
-    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
-    saveLayers(); updateLayerList(); map.draw(); renderStats();
-    toast('已应用组合：' + name);
-  }
+  /* ---------- 图层组合（v1.1.8 已移除：刷新易丢失、用处不大） ---------- */
 
   function applyHash() {
     if (!location.hash) return;
@@ -982,7 +1011,7 @@ const UI = (() => {
     if (l) {
       map.enabled.clear();
       l.split(',').forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
-      document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
+      document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
       updateLayerList(); renderStats();
     }
     const x = parseFloat(params.get('x')), y = parseFloat(params.get('y')), s = parseFloat(params.get('s'));
@@ -1019,16 +1048,14 @@ const UI = (() => {
       const ml = JSON.parse(localStorage.getItem(K_MAT_LAYERS) || '[]');
       ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
     } catch (e) {}
-    // 图层组合 + 地名显示开关
-    loadCombos();
+    // 地名显示开关
     map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
     // 克洛格轨迹开关（v1.1.4）
     map.showKorokPaths = localStorage.getItem(K_KOROK_PATHS) !== '0';
-    // 同步复选框与图层计数
-    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
-    document.querySelectorAll('#layerList input[data-matid]').forEach(cb => cb.checked = map.matIds.has(+cb.dataset.matid));
+    // 同步行状态与图层计数
+    document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
+    document.querySelectorAll('#layerList .mat-item').forEach(r => r.classList.toggle('on', map.matIds.has(+r.dataset.matid)));
     updateLayerList();
-    renderCombos();
     renderStats();
   }
   function saveDone() {
