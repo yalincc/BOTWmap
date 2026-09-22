@@ -1014,6 +1014,8 @@ const UI = (() => {
     // 图层组合 + 地名显示开关
     loadCombos();
     map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
+    // 克洛格轨迹开关（v1.1.4）
+    map.showKorokPaths = localStorage.getItem(K_KOROK_PATHS) !== '0';
     // 同步复选框与图层计数
     document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
     document.querySelectorAll('#layerList input[data-matid]').forEach(cb => cb.checked = map.matIds.has(+cb.dataset.matid));
@@ -1037,6 +1039,7 @@ const UI = (() => {
   /* ---------- 地名样式（顶栏⚙️设置弹层） ---------- */
   const K_STYLE = 'botwmap.style.v2'; // v2：新默认（米色底深褐字）+ 字号档位
   const K_REGION_SHOW = 'botwmap.regionShow.v1'; // 地名显示开关
+  const K_KOROK_PATHS = 'botwmap.korokPaths.v1'; // 克洛格轨迹开关（v1.1.4）
   const DEFAULT_STYLE = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
   const FONT_SIZES = { small: 0.85, medium: 1, large: 1.15 };
   function loadStyle() {
@@ -1077,6 +1080,8 @@ const UI = (() => {
       };
       // 地名显示
       setOpt('stShowOptions', map.showRegions ? 'show' : 'hide');
+      // 克洛格轨迹（v1.1.4）
+      setOpt('stShowPaths', map.showKorokPaths ? 'show' : 'hide');
       // 文字颜色
       const txHex = rgbToHex(st.tx);
       if (txHex === rgbToHex(DEFAULT_STYLE.tx)) setOpt('stTxOptions', 'default');
@@ -1122,6 +1127,15 @@ const UI = (() => {
         syncStyle();
       });
     });
+    // 克洛格轨迹开关（v1.1.4）
+    document.querySelectorAll('#stShowPaths .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        map.showKorokPaths = b.dataset.v === 'show';
+        try { localStorage.setItem(K_KOROK_PATHS, map.showKorokPaths ? '1' : '0'); } catch (e) {}
+        map.draw();
+        syncStyle();
+      });
+    });
     // 文字颜色
     document.querySelectorAll('#stTxOptions .st-opt[data-v]').forEach(b => {
       if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.tx = DEFAULT_STYLE.tx.slice(); }));
@@ -1153,7 +1167,9 @@ const UI = (() => {
     $('stReset').addEventListener('click', () => {
       map.regionStyle = Object.assign({}, DEFAULT_STYLE);
       map.showRegions = true;
+      map.showKorokPaths = true;
       try { localStorage.setItem(K_REGION_SHOW, '1'); } catch (e) {}
+      try { localStorage.setItem(K_KOROK_PATHS, '1'); } catch (e) {}
       saveStyle(); map.draw(); syncStyle();
       toast('地名样式已恢复默认');
     });

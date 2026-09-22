@@ -74,6 +74,11 @@ class BotwMap {
     // 地名标签样式（可由用户在“设置”面板调整，默认：米色半透明底 + 深褐色字，仿游戏内地图）
     this.regionStyle = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
     this.showRegions = true;   // 地名显示开关（设置弹层可切换，持久化到 localStorage）
+    // 克洛格轨迹（v1.1.4）：数据源 korok_paths.js（97 条多点轨迹，应用像素坐标）；开关默认开
+    this.showKorokPaths = true;
+    this.KOROK_PATHS = (typeof KOROK_PATHS !== 'undefined' && KOROK_PATHS.items) ? KOROK_PATHS.items : [];
+    this._pathById = new Map();
+    for (const p of this.KOROK_PATHS) this._pathById.set(p.id, p);
     this.tileCache = new Map();   // 瓦片 LRU 缓存：key -> HTMLImageElement
     this.tilePending = new Set(); // 正在加载的瓦片 key
     this._tileDrawPending = false;
@@ -411,6 +416,9 @@ class BotwMap {
     // 按绘制优先级排序，保证重要标记画在最上层
     vis.sort((a, b) => (CAT_CFG[a.cat]?.order || 0) - (CAT_CFG[b.cat]?.order || 0));
 
+    // 克洛格轨迹（v1.1.4）：先画折线，图标覆盖在上面
+    this._drawKorokPaths(ctx, vis);
+
     const labelList = [];
     const scale = this.view.scale;
     let drawn = 0;
@@ -454,6 +462,82 @@ class BotwMap {
       ctx.lineWidth = 2;
       ctx.stroke();
     }
+  }
+
+  /* ---------- 克洛格轨迹（v1.1.4）：黄色折线 + 起点小圆环 ---------- */
+  _drawKorokPaths(ctx, vis) {
+    const scale = this.view.scale;
+    if (!this.showKorokPaths || scale < 0.04 || !this.enabled.has('seed') || !this.KOROK_PATHS.length) return;
+    const { w, h } = this;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // 线宽随缩放 2.5~6px；缩放越大越细（放大后不再加粗）
+    const lw = Math.max(2.5, Math.min(6, 2.5 * Math.pow(scale, 0.5)));
+    for (const mk of vis) {
+      if (mk.cat !== 'seed') continue;
+      const p = this._pathById.get(mk.id);
+      if (!p || p.path.length < 2) continue;
+      // 任一轨迹点进入视口（含边距）才画
+      let inView = false;
+      for (const [x, y] of p.path) {
+        const sx = this.view.x + x * scale, sy = this.view.y + y * scale;
+        if (sx >= -80 && sy >= -80 && sx <= w + 80 && sy <= h + 80) { inView = true; break; }
+      }
+      if (!inView) continue;
+      // 折线：深色描边 + 黄色主体
+      ctx.beginPath();
+      for (let i = 0; i < p.path.length; i++) {
+        const [x, y] = p.path[i];
+        const sx = this.view.x + x * scale, sy = this.view.y + y * scale;
+        if (i === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+      }
+      ctx.strokeStyle = 'rgba(8,12,8,.8)';
+      ctx.lineWidth = lw + 2.6;
+      ctx.stroke();
+      ctx.strokeStyle = '#E8C547';
+      ctx.lineWidth = lw;
+      ctx.stroke();
+      // 起点小圆环（轨迹末点 = 挑战起点；路径短时仅起点标记即可）
+      const [ex, ey] = p.path[p.path.length - 1];
+      const esx = this.view.x + ex * scale, esy = this.view.y + ey * scale;
+      const r = Math.max(4, Math.min(8, 5 * scale * 4));
+      ctx.beginPath();
+      ctx.arc(esx, esy, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#E8C547';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(8,12,8,.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* 点击轨迹折线 → 选中对应克洛格（点到线段距离，容差 12px） */
+  _hitKorokPath(mx, my) {
+    if (!this.showKorokPaths || this.view.scale < 0.04 || !this.enabled.has('seed')) return null;
+    const tol = 12 / this.view.scale;
+    let best = null, bd = 1e18;
+    for (const p of this.KOROK_PATHS) {
+      const pts = p.path;
+      for (let i = 1; i < pts.length; i++) {
+        const d = this._segDist(mx, my, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+        if (d <= tol && d < bd) { bd = d; best = p; }
+      }
+    }
+    if (!best) return null;
+    const idx = this.byId.get(best.id);
+    return idx == null ? null : this.markers[idx];
+  }
+
+  /* 点到线段距离（地图坐标） */
+  _segDist(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((px - x1) * dx + (py - y1) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const qx = x1 + t * dx, qy = y1 + t * dy;
+    return Math.hypot(px - qx, py - qy);
   }
 
   /* ---------- 克洛格挑战起点第二标记（v1.1.1） ---------- */
@@ -844,8 +928,10 @@ class BotwMap {
     }
     const mhit = this._matHitTest(mx, my);
     if (mhit) return mhit;
-    // 克洛格挑战起点第二标记（v1.1.1）：点在起点上 → 选中该克洛格
+    // 克洛格轨迹（v1.1.4）：点在折线上 → 选中对应克洛格
     if (!best) {
+      const pathMk = this._hitKorokPath(mx, my);
+      if (pathMk) return { marker: pathMk };
     }
     return best ? { marker: best } : null;
   }
