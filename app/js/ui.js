@@ -24,7 +24,7 @@ const UI = (() => {
     });
     initCardDrag();
     initSideTabs();
-    initStatsFold();
+    initStatsCard();
     initMatSearch();
   }
 
@@ -48,25 +48,20 @@ const UI = (() => {
     tabs.forEach(t => t.addEventListener('click', () => applyTab(t.dataset.tab)));
   }
 
-  /* ---------- 探索度折叠（v1.1.8）：原收集进度，点击展开/收起，状态记忆 ---------- */
-  const K_STATS_FOLD = 'botwmap.statsFold.v1';
-  function initStatsFold() {
+  /* ---------- 探索度卡片（v1.1.9）：点击弹出完整统计，PC 居中 / 手机底部抽屉 ---------- */
+  function initStatsCard() {
     const toggle = $('statsToggle');
-    const panel = $('statsPanel');
-    if (!toggle || !panel) return;
-    let folded = false;
-    try { folded = localStorage.getItem(K_STATS_FOLD) === '1'; } catch (e) {}
-    const apply = () => {
-      panel.style.display = folded ? 'none' : '';
-      toggle.textContent = (folded ? '▶' : '▼') + ' 探索度';
-      toggle.setAttribute('aria-expanded', String(!folded));
-    };
-    apply();
+    const overlay = $('statsOverlay');
+    const close = $('statsClose');
+    if (!toggle || !overlay || !close) return;
+    const hide = () => overlay.classList.add('hidden');
     toggle.addEventListener('click', () => {
-      folded = !folded;
-      try { localStorage.setItem(K_STATS_FOLD, folded ? '1' : '0'); } catch (e) {}
-      apply();
+      renderStats();  // 打开时重渲染，保证最新
+      overlay.classList.remove('hidden');
     });
+    close.addEventListener('click', hide);
+    overlay.addEventListener('click', e => { if (e.target === overlay) hide(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
   }
 
   /* ---------- 材料 tab 搜索（v1.1.8）：仅搜 74 种材料，命中即展开大类+勾选+飞分布中心 ---------- */
@@ -456,7 +451,7 @@ const UI = (() => {
       if (!el) continue;
       // 回忆类别与统计面板同口径：有存档 counts 以存档为准，否则按标点完成
       const [done, total] = cat.key === 'memory' ? memoryDoneTotal() : catCount(cat.key);
-      el.textContent = done ? `${done}/${total}` : '';
+      el.textContent = `${done}/${total}`;  // v1.1.9：全部统一显示 done/total，不再有空行
       el.style.color = done === total ? '#7dffa0' : 'var(--text-dim)';
     }
     // 材料组按钮 + 行统计

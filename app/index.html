@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=26">
+<link rel="stylesheet" href="css/style.css?v=27">
 </head>
 <body>
 <div id="app">
@@ -59,10 +59,9 @@
 
     <div id="layerList" class="layer-list"></div>
 
-    <!-- 探索度（原收集进度，v1.1.8 可折叠） -->
+    <!-- 探索度（v1.1.9 弹卡查看，不再内嵌占位） -->
     <div id="statsCollapse">
-      <button type="button" class="collapsible-head" id="statsToggle" aria-expanded="true">▼ 探索度</button>
-      <div id="statsPanel" class="stats"></div>
+      <button type="button" class="collapsible-head" id="statsToggle">▤ 探索度</button>
     </div>
 
     <div class="save-upload">
@@ -81,10 +80,21 @@
     </div>
 
     <footer class="side-foot">
-      <p>BOTWMAP V1.1.8</p>
+      <p>BOTWMAP V1.1.9</p>
       <p>© 2026 yalin · github.com/yalincc</p>
     </footer>
   </aside>
+
+  <!-- 探索度卡片（v1.1.9）：完整统计弹层，PC 居中 / 手机底部抽屉 -->
+  <div class="stats-overlay hidden" id="statsOverlay">
+    <div class="stats-card" id="statsCard" role="dialog" aria-label="探索度">
+      <div class="stats-card-head">
+        <span>探索度</span>
+        <button type="button" class="card-close" id="statsClose" title="关闭">×</button>
+      </div>
+      <div id="statsPanel" class="stats-body"></div>
+    </div>
+  </div>
 
   <!-- 地图 -->
   <main id="mapArea">
@@ -287,7 +297,7 @@
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=17"></script>
-<script src="js/ui.js?v=30"></script>
+<script src="js/ui.js?v=31"></script>
 <script src="js/main.js?v=9"></script>
 <script src="js/live.js?v=10"></script>
 <script src="js/save_upload.js?v=5"></script>
