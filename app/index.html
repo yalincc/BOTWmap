@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🗺️</text></svg>">
-<link rel="stylesheet" href="css/style.css?v=28">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
+<link rel="stylesheet" href="css/style.css?v=35">
 </head>
 <body>
 <div id="app">
@@ -13,7 +13,6 @@
   <!-- 顶栏 -->
   <header id="topbar">
     <div class="brand">
-      <span class="logo">🗺️</span>
       <div class="brand-text">
         <h1>旷野之息 <em>互动地图</em></h1>
         <p class="sub">简体中文 · 多图层同显 · 收集进度追踪 · 自定义标记</p>
@@ -59,9 +58,10 @@
 
     <div id="layerList" class="layer-list"></div>
 
-    <!-- 探索度（v1.1.9 弹卡查看，不再内嵌占位） -->
+    <!-- 探索度（v1.2.1 内嵌折叠面板：展开完整统计，面板自身滚动不截断） -->
     <div id="statsCollapse">
       <button type="button" class="collapsible-head" id="statsToggle">▤ 探索度</button>
+      <div id="statsPanel" class="stats-body hidden"></div>
     </div>
 
     <div class="save-upload">
@@ -80,21 +80,10 @@
     </div>
 
     <footer class="side-foot">
-      <p>BOTWMAP V1.2.0</p>
+      <p>BOTWMAP V1.3.0</p>
       <p>© 2026 yalin · github.com/yalincc</p>
     </footer>
   </aside>
-
-  <!-- 探索度卡片（v1.1.9）：完整统计弹层，PC 居中 / 手机底部抽屉 -->
-  <div class="stats-overlay hidden" id="statsOverlay">
-    <div class="stats-card" id="statsCard" role="dialog" aria-label="探索度">
-      <div class="stats-card-head">
-        <span>探索度</span>
-        <button type="button" class="card-close" id="statsClose" title="关闭">×</button>
-      </div>
-      <div id="statsPanel" class="stats-body"></div>
-    </div>
-  </div>
 
   <!-- 地图 -->
   <main id="mapArea">
@@ -297,7 +286,7 @@
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
 <script src="js/map.js?v=17"></script>
-<script src="js/ui.js?v=32"></script>
+<script src="js/ui.js?v=36"></script>
 <script src="js/main.js?v=9"></script>
 <script src="js/live.js?v=10"></script>
 <script src="js/save_upload.js?v=5"></script>

@@ -24,7 +24,7 @@ const UI = (() => {
     });
     initCardDrag();
     initSideTabs();
-    initStatsCard();
+    initStatsCollapse();
     initMatSearch();
   }
 
@@ -49,20 +49,27 @@ const UI = (() => {
     window._applySideTab = applyTab;  // v1.2.0：探索搜索命中材料时联动切换
   }
 
-  /* ---------- 探索度卡片（v1.1.9）：点击弹出完整统计，PC 居中 / 手机底部抽屉 ---------- */
-  function initStatsCard() {
+  /* ---------- 探索度（v1.2.1 内嵌折叠面板）：点击展开/收起完整统计，面板自身滚动不截断 ---------- */
+  function initStatsCollapse() {
     const toggle = $('statsToggle');
-    const overlay = $('statsOverlay');
-    const close = $('statsClose');
-    if (!toggle || !overlay || !close) return;
-    const hide = () => overlay.classList.add('hidden');
+    const panel = $('statsPanel');
+    if (!toggle || !panel) return;
+    const KEY = 'botwmap.statsOpen.v1';
+    let open = true;
+    try { if (localStorage.getItem(KEY) === '0') open = false; } catch (e) {}
+    const apply = () => {
+      panel.classList.toggle('hidden', !open);
+      toggle.textContent = (open ? '▾ ' : '▸ ') + '探索度';
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
     toggle.addEventListener('click', () => {
-      renderStats();  // 打开时重渲染，保证最新
-      overlay.classList.remove('hidden');
+      open = !open;
+      try { localStorage.setItem(KEY, open ? '1' : '0'); } catch (e) {}
+      apply();
+      if (open) renderStats();
     });
-    close.addEventListener('click', hide);
-    overlay.addEventListener('click', e => { if (e.target === overlay) hide(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+    apply();
+    if (open) renderStats();
   }
 
   /* ---------- 材料 tab 搜索（v1.1.8）：仅搜 74 种材料，命中即展开大类+勾选+飞分布中心 ---------- */
@@ -212,7 +219,7 @@ const UI = (() => {
         const row = document.createElement('div');
         row.className = 'lrow' + (map.enabled.has(key) ? ' on' : '');
         row.dataset.cat = key;
-        const dispName = key === 'memory' ? '照片记忆（12+1）' : cat.cn;
+        const dispName = key === 'memory' ? '照片记忆' : cat.cn;  // v1.2.1：去掉(12+1)
         row.innerHTML = `
           ${cfg.icon ? `<img class="lg-ic" src="assets/icons/${cfg.icon}" alt="" loading="lazy">` : `<span class="dot" style="background:${cfg.color || '#888'}"></span>`}
           <span class="lname">${dispName}</span>
@@ -274,7 +281,6 @@ const UI = (() => {
     // 6 大类默认全部展开（v1.1.8：材料已独立成 tab，去掉手风琴互斥）；点大类行独立展开/收起
     window._matSetOpenCat = (cat) => {
       lrows.querySelectorAll('.mat-cat-body').forEach(b => {
-        if (b.dataset.cat === '__fav__') return;  // 常用分组独立，不随大类折叠
         if (b.dataset.cat === cat) b.style.display = '';
       });
       lrows.querySelectorAll('.mat-cat-head').forEach(h => {
@@ -291,11 +297,9 @@ const UI = (() => {
       catHead.className = 'lrow mat-cat-head';
       catHead.dataset.cat = cat;
       catHead.style.cursor = 'pointer';
-      const repIcon = list.length ? list[0][0].entry : null;
       catHead.innerHTML = `
         <span class="mat-tri" style="width:12px;display:inline-block">▼</span>
-        ${repIcon ? `<img class="lg-ic lg-ic-mat" src="assets/materials/${repIcon}.webp" alt="" loading="lazy">` : `<span class="dot" style="background:${cfg.color || '#888'}"></span>`}
-        <span class="lname" style="font-weight:600">${cat}</span>
+        <span class="lname">${cat}</span>
         <span class="lprog">${list.length}种 / ${totalCount}点</span>
         <button type="button" class="mat-cat-btn" data-cat="${cat}" style="margin-left:6px;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>`;
       lrows.appendChild(catHead);
@@ -319,18 +323,8 @@ const UI = (() => {
         row.innerHTML = `
           <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
           <span class="lname">${m.cn}</span>
-          <span class="lprog">${m.count}</span>
-          <span class="mat-fav" data-favid="${id}" title="收藏到常用" style="cursor:pointer;margin-left:auto;color:${favSet.has(id) ? '#ffd84d' : '#555'};font-size:12px;line-height:1">${favSet.has(id) ? '★' : '☆'}</span>`;
-        row.querySelector('.mat-fav').addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          if (favSet.has(id)) favSet.delete(id); else favSet.add(id);
-          saveFav();
-          e.target.textContent = favSet.has(id) ? '★' : '☆';
-          e.target.style.color = favSet.has(id) ? '#ffd84d' : '#555';
-          refreshFavGroup();
-        });
-        row.addEventListener('click', (e) => {
-          if (e.target.closest('.mat-fav')) return;
+          <span class="lprog">${m.count}</span>`;
+        row.addEventListener('click', () => {
           const mid = +row.dataset.matid;
           if (map.matIds.has(mid)) map.matIds.delete(mid); else map.matIds.add(mid);
           row.classList.toggle('on', map.matIds.has(mid));
@@ -339,75 +333,6 @@ const UI = (() => {
         catBody.appendChild(row);
       }
     }
-    // 常用材料分组（星标置顶）
-    const favGrp = document.createElement('div');
-    favGrp.className = 'lrow';
-    favGrp.style.cssText = 'margin-top:2px;color:#ffd84d;font-weight:600;';
-    favGrp.innerHTML = '<span class="mat-tri" id="matFavTri" style="width:12px;display:inline-block">▼</span><span style="color:#ffd84d">★</span><span style="margin-left:4px">常用材料</span><span class="lprog" id="matFavCount" style="margin-left:6px;color:var(--text-dim);font-weight:400"></span><button type="button" id="matFavAll" style="margin-left:auto;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>';
-    // 插到 lrows 最前：材料标题行下、第一个大类前
-    const firstCatHead = lrows.querySelector('.mat-cat-head');
-    lrows.insertBefore(favGrp, firstCatHead);
-    const favBody = document.createElement('div');
-    favBody.className = 'mat-cat-body';
-    favBody.dataset.cat = '__fav__';
-    favBody.style.display = 'none';
-    lrows.insertBefore(favBody, firstCatHead);
-    favGrp.style.cursor = 'pointer';
-    favGrp.addEventListener('click', (e) => {
-      if (e.target.closest('#matFavAll')) {
-        // 全选常用材料
-        const ids = [...favSet];
-        const allOn = ids.length > 0 && ids.every(id => map.matIds.has(id));
-        ids.forEach(id => { if (allOn) map.matIds.delete(id); else map.matIds.add(id); });
-        saveMatLayers(); updateLayerList(); map.draw();
-        // 同步常用区行状态
-        favBody.querySelectorAll('.mat-item').forEach(r => { r.classList.toggle('on', !allOn); });
-        e.stopPropagation();
-        return;
-      }
-      const show = favBody.style.display === 'none';
-      favBody.style.display = show ? '' : 'none';
-      document.getElementById('matFavTri').textContent = show ? '▼' : '▶';
-    });
-    window._refreshFavGroup = refreshFavGroup;
-    function refreshFavGroup() {
-      favBody.innerHTML = '';
-      document.getElementById('matFavCount').textContent = favSet.size ? '(' + favSet.size + ')' : '';
-      favBody.style.display = favSet.size ? '' : 'none';
-      // 标题始终显示，空时显示(0)提示用户去星标
-      favGrp.style.display = '';
-      document.getElementById('matFavTri').textContent = favSet.size ? '▼' : '▶';
-      for (const id of favSet) {
-        const m = map.MATS.materials[id];
-        if (!m) continue;
-        const row = document.createElement('div');
-        row.className = 'lrow mat-item' + (map.matIds.has(id) ? ' on' : '');
-        row.style.whiteSpace = 'nowrap';
-        row.dataset.matid = id;
-        row.innerHTML = `
-          <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
-          <span class="lname">${m.cn}</span>
-          <span class="lprog">${m.count}</span>
-          <span class="mat-fav" data-favid="${id}" style="cursor:pointer;margin-left:auto;color:#ffd84d;font-size:12px">★</span>`;
-        row.addEventListener('click', (e) => {
-          if (e.target.closest('.mat-fav')) return;
-          const mid = +row.dataset.matid;
-          if (map.matIds.has(mid)) map.matIds.delete(mid); else map.matIds.add(mid);
-          row.classList.toggle('on', map.matIds.has(mid));
-          saveMatLayers(); updateLayerList(); map.draw();
-        });
-        row.querySelector('.mat-fav').addEventListener('click', (e) => {
-          e.preventDefault(); e.stopPropagation();
-          favSet.delete(id); saveFav(); refreshFavGroup();
-          // 同步主列表里的 ☆ 显示
-          const star = document.querySelector(`#layerList .mat-fav[data-favid="${id}"]`);
-          if (star) { star.textContent = '☆'; star.style.color = '#555'; }
-        });
-        favBody.appendChild(row);
-      }
-    }
-    refreshFavGroup();
-
     gBtn.addEventListener('click', () => {
       const all = map.matIds.size === map.MATS.materials.length;
       if (all) map.matIds.clear(); else map.MATS.materials.forEach((_, i) => map.matIds.add(i));
@@ -455,10 +380,10 @@ const UI = (() => {
     for (const cat of map.data.categories) {
       const el = $('prog_' + cat.key);
       if (!el) continue;
-      // 回忆类别与统计面板同口径：有存档 counts 以存档为准，否则按标点完成
-      const [done, total] = cat.key === 'memory' ? memoryDoneTotal() : catCount(cat.key);
-      el.textContent = `${done}/${total}`;  // v1.1.9：全部统一显示 done/total，不再有空行
-      el.style.color = done === total ? '#7dffa0' : 'var(--text-dim)';
+      // v1.2.1：只显示地图标注总数，完成度看探索度卡片（gamesir 风格）
+      const [, total] = cat.key === 'memory' ? memoryDoneTotal() : catCount(cat.key);
+      el.textContent = total;
+      el.style.color = 'var(--text-dim)';
     }
     // 材料组按钮 + 行统计
     if (map.MATS) {
@@ -525,7 +450,7 @@ const UI = (() => {
     return [photo + final, m.photo[1] + m.final[1]];
   }
   function renderStats() {
-    const focus = ['shrine', 'tower', 'beast', 'seed', 'treasure'];
+    const focus = ['shrine', 'tower', 'beast', 'seed'];  // v1.2.1：探索度去掉宝箱栏（无用）
     let html = '';
     // 存档同步状态行：live 服务已载入存档进度 或 本会话上传过存档（离线且未上传时不显示）
     const lc = map.live && map.live.counts;
@@ -699,7 +624,7 @@ const UI = (() => {
       : '分布<b>' + (m.count ? '全图可采集' : '无固定刷点') + '</b>';
     let extra = '';
     if (m.count === 0) extra += '<div class="row">说明<b style="color:#e8b04a">无 MainField 固定刷点（动态生成 / 仅栖息地）</b></div>';
-    extra += '<div class="row">图层<b>' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（请勾选侧栏「材料」组）') + '</b></div>';
+    extra += '<div class="row">图层<b>' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（点击侧栏「材料」分类下的行开启）') + '</b></div>';
     $('cardExtra').innerHTML = extra;
     $('cardKorok').classList.add('hidden');
     $('cardKorok').innerHTML = '';
@@ -1026,9 +951,6 @@ const UI = (() => {
   /* ---------- 持久化 ---------- */
   const K_DONE = 'botwmap.done.v1', K_CUSTOM = 'botwmap.custom.v1', K_LAYERS = 'botwmap.layers.v2';
   const K_MAT_LAYERS = 'botwmap.matLayers.v1';
-  const K_MAT_FAV = 'botwmap.matFav.v1';
-  const favSet = new Set(JSON.parse(localStorage.getItem(K_MAT_FAV) || '[]'));
-  function saveFav() { try { localStorage.setItem(K_MAT_FAV, JSON.stringify([...favSet])); } catch (e) {} }
   function loadState() {
     try {
       const d = JSON.parse(localStorage.getItem(K_DONE) || '[]');
