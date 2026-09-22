@@ -424,16 +424,19 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 
 @media (max-width: 760px) {
   /* 椤舵爮绮剧畝锛氶殣钘忓壇鏍囬涓庡伐鍏锋枃瀛楋紝鍙暀鍥炬爣 */
-  #topbar { padding: 6px 10px; }
+  #topbar { flex-wrap: wrap; padding: 6px 10px 4px; row-gap: 3px; }
+  .brand { flex: 1 1 100%; min-width: 0; white-space: nowrap; }
+  .brand .logo { font-size: 20px; }
   .brand .sub { display: none; }
-  .brand h1 { font-size: 15px; }
-  .tool { padding: 7px 9px; }
-  .tool .label { display: none; }
+  .brand h1 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tools { flex: 1 1 100%; justify-content: space-between; gap: 4px; }
+  .tool { flex: 1 1 0; justify-content: center; padding: 8px 2px; min-width: 0; }
+  .tool .label { display: inline; font-size: 11px; }
   #btnSidebar { display: inline-flex; }
 
   /* 渚ф爮 鈫?鎶藉眽锛氶粯璁ゆ敹璧凤紝娴湪鍦板浘涓婃柟 */
   #app { position: relative; }
-  #mapArea { flex: 1 1 100%; min-width: 0; }
+  #mapArea { flex: 1 1 100%; min-width: 0; height: auto; }
   #sidebar {
     position: absolute; left: 0; top: 0; bottom: 0;
     width: 264px; flex: none; height: auto;
@@ -446,7 +449,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   .side-head { display: flex; }
   #sideMask:not(.hidden) { display: block; }
 
-  #infoCard { width: 240px; max-width: calc(100vw - 24px); }
+  #infoCard { left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; max-width: none; max-height: 55vh; overflow-y: auto; border-color: var(--accent2); box-shadow: 0 0 0 1px rgba(111,185,255,.25), var(--shadow); }
   #shareBox { width: calc(100vw - 40px); max-width: 320px; }
   #pinForm { width: 190px; }
   #zoomControls { right: 10px; bottom: 14px; }

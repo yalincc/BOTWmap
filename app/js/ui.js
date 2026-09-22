@@ -60,7 +60,8 @@ const UI = (() => {
     const head = card.querySelector('.card-head');
     if (!head) return;
     head.addEventListener('pointerdown', e => {
-      if (e.target.closest('.card-close')) return;          // 关闭按钮不触发拖拽
+      if (window.innerWidth <= 760) return;             // 手机（≤760px）：底部抽屉布局，不拖拽
+      if (e.target.closest('.card-close')) return;      // 关闭按钮不触发拖拽
       e.preventDefault();
       const r0 = card.getBoundingClientRect();
       const offX = e.clientX - r0.left, offY = e.clientY - r0.top;
@@ -735,6 +736,13 @@ const UI = (() => {
   function positionCard() {
     const card = $('infoCard');
     const vw = window.innerWidth, vh = window.innerHeight;
+    // 手机（≤760px）：底部抽屉布局，位置/高度交给 CSS（left/right/bottom 抽屉），不设 left/top
+    if (vw <= 760) {
+      card.style.left = ''; card.style.top = '';
+      card.style.right = ''; card.style.bottom = '';
+      card.style.maxHeight = ''; card.style.overflowY = '';
+      return;
+    }
     card.style.right = 'auto'; card.style.bottom = 'auto';
     card.style.maxHeight = '70%'; card.style.overflowY = 'auto';
     // 桌面侧边栏展开时避让（300px）；折叠或手机抽屉时不避让
