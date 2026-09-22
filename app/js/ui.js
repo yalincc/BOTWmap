@@ -46,6 +46,7 @@ const UI = (() => {
     try { saved = localStorage.getItem('botwmap.sideTab.v1'); } catch (e) {}
     if (saved === 'explore' || saved === 'material') applyTab(saved);
     tabs.forEach(t => t.addEventListener('click', () => applyTab(t.dataset.tab)));
+    window._applySideTab = applyTab;  // v1.2.0：探索搜索命中材料时联动切换
   }
 
   /* ---------- 探索度卡片（v1.1.9）：点击弹出完整统计，PC 居中 / 手机底部抽屉 ---------- */
@@ -91,7 +92,7 @@ const UI = (() => {
               if (!map.matIds.has(mm.id)) { map.matIds.add(mm.id); saveMatLayers(); updateLayerList(); }
               if (window._matSetOpenCat) window._matSetOpenCat(mm.cat);
               const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + mm.id + '"]');
-              if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); const cb = targetRow.querySelector('input'); if (cb) cb.checked = true; }
+              if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); targetRow.classList.add('on'); }
               const pts = map.matPointsBy[mm.id];
               if (pts && pts.length) {
                 let ax = 0, ay = 0;
@@ -208,19 +209,19 @@ const UI = (() => {
         if (!cat) continue;
         const cfg = CAT_CFG[key] || {};
         const total = map.data.markers.filter(mk => mk.cat === key).length;
-        const row = document.createElement('label');
-        row.className = 'lrow';
+        const row = document.createElement('div');
+        row.className = 'lrow' + (map.enabled.has(key) ? ' on' : '');
+        row.dataset.cat = key;
         const dispName = key === 'memory' ? '照片记忆（12+1）' : cat.cn;
-/* 副标已移除 */
         row.innerHTML = `
-          <input type="checkbox" data-cat="${key}" ${map.enabled.has(key) ? 'checked' : ''}>
-          <span class="dot" style="background:${cfg.color || '#888'}"></span>
+          ${cfg.icon ? `<img class="lg-ic" src="assets/icons/${cfg.icon}" alt="" loading="lazy">` : `<span class="dot" style="background:${cfg.color || '#888'}"></span>`}
           <span class="lname">${dispName}</span>
           <span class="lprog" id="prog_${key}"></span>
         `;
-        row.addEventListener('change', () => {
-          const cb = row.querySelector('input');
-          if (cb.checked) map.enabled.add(key); else map.enabled.delete(key);
+        row.title = '点击整行切换显示 / 隐藏';
+        row.addEventListener('click', () => {
+          if (map.enabled.has(key)) map.enabled.delete(key); else map.enabled.add(key);
+          row.classList.toggle('on', map.enabled.has(key));
           saveLayers();
           updateLayerList();
           map.draw();
@@ -236,8 +237,8 @@ const UI = (() => {
       const keys = CAT_GROUP[btn.dataset.group] || [];
       const allOn = keys.length > 0 && keys.every(k => map.enabled.has(k));
       keys.forEach(k => { if (allOn) map.enabled.delete(k); else map.enabled.add(k); });
-      wrap.querySelectorAll('input[data-cat]').forEach(cb => {
-        if (keys.includes(cb.dataset.cat)) cb.checked = !allOn;
+      wrap.querySelectorAll('.lrow[data-cat]').forEach(r => {
+        if (keys.includes(r.dataset.cat)) r.classList.toggle('on', !allOn);
       });
       saveLayers(); updateLayerList(); map.draw(); renderStats();
     });
@@ -247,7 +248,7 @@ const UI = (() => {
     updateLayerList();
   }
 
-  /* 材料追踪组（v1.1.0）：6 类分组 + 74 种材料单材料 checkbox（b 方案，按材料分别聚合） */
+  /* 材料追踪组（v1.1.0）：6 类分组 + 74 种材料单材料行（v1.2.0 起整行点击，带官方图标） */
   function buildMatLayerGroup() {
     const wrap = $('layerList');
     if (!map.MATS) return;
@@ -290,9 +291,10 @@ const UI = (() => {
       catHead.className = 'lrow mat-cat-head';
       catHead.dataset.cat = cat;
       catHead.style.cursor = 'pointer';
+      const repIcon = list.length ? list[0][0].entry : null;
       catHead.innerHTML = `
         <span class="mat-tri" style="width:12px;display:inline-block">▼</span>
-        <span class="dot" style="background:${cfg.color || '#888'}"></span>
+        ${repIcon ? `<img class="lg-ic lg-ic-mat" src="assets/materials/${repIcon}.webp" alt="" loading="lazy">` : `<span class="dot" style="background:${cfg.color || '#888'}"></span>`}
         <span class="lname" style="font-weight:600">${cat}</span>
         <span class="lprog">${list.length}种 / ${totalCount}点</span>
         <button type="button" class="mat-cat-btn" data-cat="${cat}" style="margin-left:6px;background:none;border:1px solid var(--line);color:var(--text-dim);font-size:11px;padding:1px 8px;border-radius:8px;cursor:pointer">全选</button>`;
@@ -309,13 +311,13 @@ const UI = (() => {
         catHead.querySelector('.mat-tri').textContent = show ? '▼' : '▶';
       });
       for (const [m, id] of list) {
-        const row = document.createElement('label');
-        row.className = 'lrow mat-item';
+        const row = document.createElement('div');
+        row.className = 'lrow mat-item' + (map.matIds.has(id) ? ' on' : '');
         row.style.whiteSpace = 'nowrap';
         row.dataset.matid = id;
         row.dataset.cat = cat;
         row.innerHTML = `
-          <input type="checkbox" data-matid="${id}" ${map.matIds.has(id) ? 'checked' : ''}>
+          <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
           <span class="lname">${m.cn}</span>
           <span class="lprog">${m.count}</span>
           <span class="mat-fav" data-favid="${id}" title="收藏到常用" style="cursor:pointer;margin-left:auto;color:${favSet.has(id) ? '#ffd84d' : '#555'};font-size:12px;line-height:1">${favSet.has(id) ? '★' : '☆'}</span>`;
@@ -327,10 +329,11 @@ const UI = (() => {
           e.target.style.color = favSet.has(id) ? '#ffd84d' : '#555';
           refreshFavGroup();
         });
-        row.addEventListener('change', () => {
-          const cb = row.querySelector('input');
-          const mid = +cb.dataset.matid;
-          if (cb.checked) map.matIds.add(mid); else map.matIds.delete(mid);
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.mat-fav')) return;
+          const mid = +row.dataset.matid;
+          if (map.matIds.has(mid)) map.matIds.delete(mid); else map.matIds.add(mid);
+          row.classList.toggle('on', map.matIds.has(mid));
           saveMatLayers(); updateLayerList(); map.draw();
         });
         catBody.appendChild(row);
@@ -357,8 +360,8 @@ const UI = (() => {
         const allOn = ids.length > 0 && ids.every(id => map.matIds.has(id));
         ids.forEach(id => { if (allOn) map.matIds.delete(id); else map.matIds.add(id); });
         saveMatLayers(); updateLayerList(); map.draw();
-        // 同步常用区 checkbox
-        favBody.querySelectorAll('input[data-matid]').forEach(cb => { cb.checked = !allOn; });
+        // 同步常用区行状态
+        favBody.querySelectorAll('.mat-item').forEach(r => { r.classList.toggle('on', !allOn); });
         e.stopPropagation();
         return;
       }
@@ -377,17 +380,20 @@ const UI = (() => {
       for (const id of favSet) {
         const m = map.MATS.materials[id];
         if (!m) continue;
-        const row = document.createElement('label');
-        row.className = 'lrow mat-item';
+        const row = document.createElement('div');
+        row.className = 'lrow mat-item' + (map.matIds.has(id) ? ' on' : '');
         row.style.whiteSpace = 'nowrap';
+        row.dataset.matid = id;
         row.innerHTML = `
-          <input type="checkbox" data-matid="${id}" ${map.matIds.has(id) ? 'checked' : ''}>
+          <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
           <span class="lname">${m.cn}</span>
           <span class="lprog">${m.count}</span>
           <span class="mat-fav" data-favid="${id}" style="cursor:pointer;margin-left:auto;color:#ffd84d;font-size:12px">★</span>`;
-        row.querySelector('input').addEventListener('change', () => {
-          const mid = +row.querySelector('input').dataset.matid;
-          if (row.querySelector('input').checked) map.matIds.add(mid); else map.matIds.delete(mid);
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.mat-fav')) return;
+          const mid = +row.dataset.matid;
+          if (map.matIds.has(mid)) map.matIds.delete(mid); else map.matIds.add(mid);
+          row.classList.toggle('on', map.matIds.has(mid));
           saveMatLayers(); updateLayerList(); map.draw();
         });
         row.querySelector('.mat-fav').addEventListener('click', (e) => {
@@ -405,7 +411,7 @@ const UI = (() => {
     gBtn.addEventListener('click', () => {
       const all = map.matIds.size === map.MATS.materials.length;
       if (all) map.matIds.clear(); else map.MATS.materials.forEach((_, i) => map.matIds.add(i));
-      lrows.querySelectorAll('input[data-matid]').forEach(cb => cb.checked = !all);
+      lrows.querySelectorAll('.mat-item').forEach(r => r.classList.toggle('on', !all));
       saveMatLayers(); updateLayerList(); map.draw();
     });
     lrows.querySelectorAll('.mat-cat-btn').forEach(btn => {
@@ -414,9 +420,9 @@ const UI = (() => {
         const ids = map.MATS.materials.map((m, i) => [m, i]).filter(([m]) => m.cat === cat).map(([, i]) => i);
         const on = ids.every(i => map.matIds.has(i));
         ids.forEach(i => { if (on) map.matIds.delete(i); else map.matIds.add(i); });
-        lrows.querySelectorAll('input[data-matid]').forEach(cb => {
-          const m = map.MATS.materials[+cb.dataset.matid];
-          if (m.cat === cat) cb.checked = !on;
+        lrows.querySelectorAll('.mat-item').forEach(r => {
+          const m = map.MATS.materials[+r.dataset.matid];
+          if (m.cat === cat) r.classList.toggle('on', !on);
         });
         saveMatLayers(); updateLayerList(); map.draw();
       });
@@ -428,7 +434,7 @@ const UI = (() => {
   function setAllLayers(on) {
     if (on) map.data.categories.forEach(c => map.enabled.add(c.key));
     else map.enabled.clear();
-    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = on);
+    document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', on));
     saveLayers(); updateLayerList(); map.draw(); renderStats();
   }
 
@@ -612,11 +618,12 @@ const UI = (() => {
         el.addEventListener('click', () => {
           const m = map.MATS.materials[+el.dataset.mat];
           if (m) {
+            if (window._applySideTab) window._applySideTab('material');  // v1.2.0：命中材料自动切到材料 tab
             if (!map.matIds.has(m.id)) { map.matIds.add(m.id); saveMatLayers(); updateLayerList(); }
             // 手风琴联动：展开对应大类 + 滚到该条目
             if (window._matSetOpenCat) window._matSetOpenCat(m.cat);
             const targetRow = document.querySelector('#layerList .mat-item[data-matid="' + m.id + '"]');
-            if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); const cb = targetRow.querySelector('input'); if (cb) cb.checked = true; }
+            if (targetRow) { targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); targetRow.classList.add('on'); }
             const pts = map.matPointsBy[m.id];
             if (pts && pts.length) {
               let ax = 0, ay = 0;
@@ -1004,7 +1011,7 @@ const UI = (() => {
     if (l) {
       map.enabled.clear();
       l.split(',').forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
-      document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
+      document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
       updateLayerList(); renderStats();
     }
     const x = parseFloat(params.get('x')), y = parseFloat(params.get('y')), s = parseFloat(params.get('s'));
@@ -1045,9 +1052,9 @@ const UI = (() => {
     map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
     // 克洛格轨迹开关（v1.1.4）
     map.showKorokPaths = localStorage.getItem(K_KOROK_PATHS) !== '0';
-    // 同步复选框与图层计数
-    document.querySelectorAll('#layerList input').forEach(cb => cb.checked = map.enabled.has(cb.dataset.cat));
-    document.querySelectorAll('#layerList input[data-matid]').forEach(cb => cb.checked = map.matIds.has(+cb.dataset.matid));
+    // 同步行状态与图层计数
+    document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
+    document.querySelectorAll('#layerList .mat-item').forEach(r => r.classList.toggle('on', map.matIds.has(+r.dataset.matid)));
     updateLayerList();
     renderStats();
   }
