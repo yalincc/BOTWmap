@@ -243,24 +243,20 @@ func watchShortlist(sl []ShortlistEntry) {
 				}
 			}
 		}
-top := 0
-for i := 1; i < len(moved); i++ {
-	// struct 高的组不被低 struct 组抢：真槽 struct>=6，副本组 struct=0~4
-	if sl[i].Struct > sl[top].Struct {
-		top = i // 真槽优先，不管 moved
-	} else if sl[i].Struct == sl[top].Struct {
-		if moved[i] > moved[top] || (moved[i] == moved[top] && sl[i].Hud[2] < sl[top].Hud[2]) {
-			top = i
-		}
-	} else {
-		// 低 struct 组（副本）要明显领先才换
-		if moved[i] > moved[top]+2 {
+// confirmed 后锁定组不再重算，防止副本组横跳
+// confirmed 后锁定组不再重算
+top := confirmed
+if top < 0 {
+	// sl 已按 d 小的在前排序（locate.go），选 d 最小的组
+	top = 0
+	// d 接近（<15m）的组里选 moved 最大的（活槽优先）
+	for i := 1; i < len(sl); i++ {
+		if sl[i].Dist < 15.0 && sl[i].Dist <= sl[top].Dist+15.0 && moved[i] > moved[top] {
 			top = i
 		}
 	}
 }
-		}
-		if moved[top] >= 3 && top != confirmed {
+			if moved[top] >= 3 && top != confirmed {
 			confirmed = top
 			a := sl[top].Addrs[0]
 			lock.mu.Lock()
@@ -465,11 +461,13 @@ func watchdog() {
 		time.Sleep(3 * time.Second)
 		lock.mu.RLock()
 		hasAddr := lock.addr != 0
+		src := lock.source
+		lock.mu.RUnlock()
 		state.mu.RLock()
 		ok := state.ok
 		state.mu.RUnlock()
-		lock.mu.RUnlock()
-		if hasAddr && ok {
+		// scan 来源的地址不被 watchdog 覆盖（watchShortlist 刚锁时 poll 可能还没同步）
+		if hasAddr && (ok || src == "scan") {
 			continue
 		}
 		if a, v, ok := tryOffsets(); ok {

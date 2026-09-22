@@ -1,4 +1,4 @@
-// 内存定位：以存档锚点扫描 guest RAM，找玩家坐标槽。
+﻿// 内存定位：以存档锚点扫描 guest RAM，找玩家坐标槽。
 // 策略与 Python 版完全一致：save anchor → 窗口扫描 → 分组打分（旋转矩阵
 // 结构特征优先）→ shortlist 监听确认。坐标系 (X east, Y altitude, Z south+)。
 
@@ -95,7 +95,7 @@ func rotOKBytes(buf []byte) bool {
 		return false
 	}
 	a := floats(buf[:64])
-	for st := 4; st+9 <= len(a); st++ {
+	for st := 0; st+9 <= len(a); st++ {
 		m := a[st : st+9]
 		cols := [3][3]float32{
 			{m[0], m[3], m[6]},
@@ -299,15 +299,13 @@ func groupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 	}
 	sort.Slice(top, func(i, j int) bool {
 		a, b := top[i], top[j]
-		as, bs := a.Struct > 0, b.Struct > 0
-		if as != bs {
-			return as
+		// d 小的优先（离存档锚点近，真槽在锚点附近）
+		if math.Abs(float64(a.Dist-b.Dist)) > 15.0 {
+			return a.Dist < b.Dist
 		}
+		// d 接近（<15m）：struct 高的优先（真槽 struct>=6，副本 struct=0~4）
 		if a.Struct != b.Struct {
 			return a.Struct > b.Struct
-		}
-		if a.Dist != b.Dist {
-			return a.Dist < b.Dist
 		}
 		return a.Copies > b.Copies
 	})
