@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小窗口导航</title>
+<script src="/app/js/data.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #1c2128; font-family: "Microsoft YaHei", system-ui, sans-serif; }
+  #titlebar {
+    height: 36px; display: flex; align-items: center; padding: 0 10px;
+    background: #242a31; color: #e6edf3; font-size: 14px; cursor: grab;
+    border-bottom: 1px solid #30363d;
+  }
+  #titlebar:active { cursor: grabbing; }
+  #titlebar .logo { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; margin-right: 8px; }
+  #titlebar .name { flex: 1; }
+  #titlebar .hint { font-size: 12px; color: #57606a; }
+  #close {
+    width: 26px; height: 26px; border: none; border-radius: 6px; cursor: pointer;
+    background: transparent; color: #8b949e; font-size: 14px; line-height: 26px;
+  }
+  #close:hover { background: #da3633; color: #fff; }
+  #info {
+    height: 42px; display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    background: #21262d; border-bottom: 1px solid #30363d; font-size: 13px; color: #c9d1d9;
+  }
+  #info .lbl { color: #8b949e; }
+  #info b { color: #e6edf3; }
+  #info .dist { color: #3fb950; font-weight: 700; }
+  #map { display: block; width: 420px; height: 410px; background: #101418; cursor: crosshair; }
+  #warn {
+    display: none; height: 26px; align-items: center; padding: 0 10px; cursor: pointer;
+    font-size: 12px; border-top: 1px solid #30363d;
+  }
+  #warn.warn-yellow { background: #3a2f0f; color: #e3b341; }
+  #warn.warn-red { background: #3a1d1d; color: #ff7b72; }
+  #warn .wi { margin-right: 6px; }
+  #status {
+    height: 32px; display: flex; align-items: center; gap: 12px; padding: 0 10px;
+    background: #242a31; border-top: 1px solid #30363d; font-size: 12px; color: #8b949e;
+  }
+  .ok { color: #3fb950; font-weight: 700; }
+  .off { color: #f0883e; font-weight: 700; }
+  #menu {
+    position: fixed; display: none; z-index: 99; min-width: 170px;
+    background: #21262d; border: 1px solid #30363d; border-radius: 8px;
+    padding: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+  #menu .mi {
+    padding: 7px 10px; font-size: 13px; color: #c9d1d9; border-radius: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #menu .mi:hover { background: #2d333b; }
+  #menu .mi input[type=range] { width: 80px; }
+  #menu .sep { height: 1px; background: #30363d; margin: 4px 6px; }
+  #menu .dim { color: #57606a; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="titlebar">
+  <span class="logo"></span>
+  <span class="name">小窗口导航</span>
+  <span class="hint">滚轮缩放 · 点图标设目标</span>
+  <button id="close" title="关闭">✕</button>
+</div>
+<div id="info">
+  <span class="lbl">目标</span><b id="tgt">未设目标</b>
+  <span class="lbl">距离</span><b class="dist" id="dist">-</b>
+</div>
+<canvas id="map" width="420" height="410"></canvas>
+<div id="warn"><span class="wi">⚠</span><span id="warn-text"></span></div>
+<div id="status">
+  <span>服务 <span id="svc" class="off">离线</span></span>
+  <span>缩放 <b id="zoom" style="color:#c9d1d9">-</b></span>
+  <span style="flex:1"></span>
+  <span>坐标 <b id="coord" style="color:#c9d1d9">-</b></span>
+</div>
+<div id="menu">
+  <div class="mi" id="m-reset">↺ 缩放重置</div>
+  <div class="mi">透明度 <input type="range" id="m-alpha" min="30" max="100" value="100"></div>
+  <div class="sep"></div>
+  <div class="mi dim" id="m-layers">图层：跟随网页端</div>
+  <div class="sep"></div>
+  <div class="mi" id="m-quit">✕ 退出浮窗</div>
+</div>
+<script>
+(function () {
+  // ===== 窗口控制（拖动 / 位置保存 / 关闭） =====
+  var bar = document.getElementById('titlebar');
+  var dragging = false, sx = 0, sy = 0;
+  bar.addEventListener('mousedown', function (e) {
+    dragging = true; sx = e.screenX; sy = e.screenY; e.preventDefault();
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!dragging) return;
+    var dx = e.screenX - sx, dy = e.screenY - sy;
+    if (dx === 0 && dy === 0) return;
+    fetch('/win/move', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dx: dx, dy: dy })
+    });
+    sx = e.screenX; sy = e.screenY;
+  });
+  window.addEventListener('mouseup', function () {
+    if (!dragging) return;
+    dragging = false;
+    fetch('/win/save', { method: 'POST' });
+  });
+  document.getElementById('close').onclick = function () { fetch('/win/quit', { method: 'POST' }); };
+  window.addEventListener('beforeunload', function () {
+    fetch('/win/save', { method: 'POST', keepalive: true });
+  });
+
+  // ===== 地图（24000×20000 高清底图瓦片 + 图标） =====
+  var MAPW = 24000, MAPH = 20000, OX = 4384, OY = 6384, TS = 256;
+  var MIN_SC = 420 / MAPW, MAX_SC = 1.0;
+  var DEF_SC = 0.05;
+  var SC = parseFloat(localStorage.getItem('botwmap.float.scale') || '') || DEF_SC;
+  SC = Math.max(MIN_SC, Math.min(MAX_SC, SC));
+  var canvas = document.getElementById('map');
+  var ctx = canvas.getContext('2d');
+  var cache = new Map();
+  var live = { ok: false, mx: null, my: null, gx: 0, gy: 0, gz: 0, target: null, age: 0, cats: [] };
+  var CAT_KEY = {}, markers = [], enabled = [], catColor = {};
+
+  // 类别：中文名 → key、颜色（与网页端 data.js categories 一致）
+  function initData() {
+    if (!window.BOTW_DATA || !BOTW_DATA.categories) return;
+    BOTW_DATA.categories.forEach(function (c) {
+      CAT_KEY[c.cn] = c.key;
+      catColor[c.key] = {
+        tower: '#58a6ff', shrine: '#f0883e', seed: '#3fb950', beast: '#bc8cff',
+        memory: '#d2a8ff', village: '#ff7b72', stable: '#e3b341', objective: '#79c0ff'
+      }[c.key] || '#8b949e';
+    });
+    markers = BOTW_DATA.markers || [];
+  }
+
+  // 按 config.cats（中文名）重建启用标记列表；seed 类始终加入（分级显示控制）
+  function rebuildEnabled() {
+    var keys = {};
+    (live.cats || []).forEach(function (cn) {
+      var k = CAT_KEY[cn];
+      if (k) keys[k] = true;
+    });
+    // 默认（服务未返回 config 时）显示常用类别
+    if (live.cats.length === 0) {
+      ['tower', 'shrine', 'beast', 'village', 'stable'].forEach(function (k) { keys[k] = true; });
+    }
+    enabled = markers.filter(function (m) { return keys[m.cat]; });
+  }
+
+  // 图标是否需要分级隐藏（seed 等密集类别在低缩放不画）
+  function catVisibleAtScale(cat) {
+    if (cat === 'seed') return SC >= 0.18;      // 克洛格 900+，放大才显示
+    if (cat === 'memory') return SC >= 0.08;
+    return SC >= MIN_SC;
+  }
+
+  function zoomForScale(s) {
+    var z = Math.round(7 + Math.log2(s));
+    return Math.max(1, Math.min(7, z));
+  }
+
+  function loadTile(z, tx, ty) {
+    var key = z + '_' + tx + '_' + ty;
+    if (cache.has(key)) return;
+    var img = new Image();
+    img.onload = function () { cache.set(key, img); draw(); };
+    img.src = '/app/assets/tiles/' + key + '.webp';
+  }
+
+  function draw() {
+    var w = canvas.width, h = canvas.height;
+    ctx.fillStyle = '#101418';
+    ctx.fillRect(0, 0, w, h);
+    if (live.mx == null) {
+      ctx.fillStyle = '#57606a'; ctx.font = '14px "Microsoft YaHei"'; ctx.textAlign = 'center';
+      ctx.fillText('等待导航数据…', w / 2, h / 2 - 8);
+      ctx.fillText('（BotwNavi 未连接）', w / 2, h / 2 + 14);
+      ctx.textAlign = 'start';
+      return;
+    }
+    var cx = live.mx, cy = live.my;
+    var ox = w / 2 - cx * SC, oy = h / 2 - cy * SC;
+    // 瓦片
+    var z = zoomForScale(SC);
+    var k = Math.pow(2, 7 - z);
+    var tileLog = TS * k;
+    var x0 = Math.max(0, (-ox) / SC), y0 = Math.max(0, (-oy) / SC);
+    var x1 = Math.min(MAPW, (w - ox) / SC), y1 = Math.min(MAPH, (h - oy) / SC);
+    var tx0 = Math.floor((x0 + OX) / tileLog), ty0 = Math.floor((y0 + OY) / tileLog);
+    var tx1 = Math.floor((x1 + OX) / tileLog), ty1 = Math.floor((y1 + OY) / tileLog);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    var requested = 0;
+    for (var ty = ty0; ty <= ty1; ty++) {
+      for (var tx = tx0; tx <= tx1; tx++) {
+        var key = z + '_' + tx + '_' + ty;
+        var img = cache.get(key);
+        if (img && img.complete && img.naturalWidth > 0) {
+          var lx = tx * tileLog - OX, ly = ty * tileLog - OY;
+          ctx.drawImage(img, ox + lx * SC, oy + ly * SC, tileLog * SC + 0.6, tileLog * SC + 0.6);
+        } else if (requested < 24) {
+          requested++;
+          loadTile(z, tx, ty);
+        }
+      }
+    }
+    // 图标（启用类别 + 分级）
+    var rp = (SC >= 0.12) ? 4.5 : 3;
+    var drawn = 0;
+    for (var i = 0; i < enabled.length && drawn < 600; i++) {
+      var m = enabled[i];
+      if (!catVisibleAtScale(m.cat)) continue;
+      var mxp = ox + m.px[0] * SC, myp = oy + m.px[1] * SC;
+      if (mxp < -10 || mxp > w + 10 || myp < -10 || myp > h + 10) continue;
+      ctx.fillStyle = catColor[m.cat] || '#8b949e';
+      ctx.globalAlpha = (m.cat === 'seed' && SC < 0.5) ? 0.55 : 0.9;
+      ctx.beginPath(); ctx.arc(mxp, myp, rp, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      drawn++;
+    }
+    // 目标：绿点 + 虚线连线
+    if (live.target) {
+      var txp = ox + live.target.x * SC, typ = oy + live.target.y * SC;
+      ctx.strokeStyle = 'rgba(63,185,80,0.65)';
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(w / 2, h / 2); ctx.lineTo(txp, typ); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(63,185,80,0.25)';
+      ctx.beginPath(); ctx.arc(txp, typ, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3fb950';
+      ctx.beginPath(); ctx.arc(txp, typ, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+    }
+    // 玩家：金色圆点（居中）
+    ctx.fillStyle = '#f0b429';
+    ctx.beginPath(); ctx.arc(w / 2, h / 2, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+    // 视野外目标方向箭头
+    if (live.target) {
+      var dxp = live.target.x - live.mx, dyp = live.target.y - live.my;
+      var onScreen = (txp > -12 && txp < w + 12 && typ > -12 && typ < h + 12);
+      if (!onScreen && Math.hypot(dxp, dyp) > 0) {
+        var ang = Math.atan2(dyp, dxp);
+        var ex = w / 2 + Math.cos(ang) * (w / 2 - 20), ey = h / 2 + Math.sin(ang) * (h / 2 - 20);
+        ctx.fillStyle = '#3fb950';
+        ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('➤', ex, ey);
+        ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+      }
+    }
+  }
+
+  // ===== 滚轮缩放（以玩家为中心） =====
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var factor = e.deltaY < 0 ? 1.25 : 0.8;
+    SC = Math.max(MIN_SC, Math.min(MAX_SC, SC * factor));
+    localStorage.setItem('botwmap.float.scale', String(SC));
+    draw();
+  }, { passive: false });
+
+  // ===== 点击图标 → 设目标 =====
+  // 注意：WS_EX_NOACTIVATE 窗口永不激活，WebView2 不合成 click 事件，
+  // 必须用底层 pointerdown（mousedown 亦可，但 pointer 更可靠）
+  canvas.addEventListener('pointerdown', function (e) {
+    if (e.button !== 0) return; // 仅左键
+    if (live.mx == null) return;
+    var rect = canvas.getBoundingClientRect();
+    var sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    var ox = canvas.width / 2 - live.mx * SC, oy = canvas.height / 2 - live.my * SC;
+    var best = null, bd = 14;
+    for (var i = 0; i < enabled.length; i++) {
+      var m = enabled[i];
+      if (!catVisibleAtScale(m.cat)) continue;
+      var px = ox + m.px[0] * SC, py = oy + m.px[1] * SC;
+      var d = Math.hypot(px - sx, py - sy);
+      if (d < bd) { bd = d; best = m; }
+    }
+    if (best) {
+      // 经 FloatNavi 同源代理转发（跨端口 JSON POST 会被 CORS 拦截）
+      fetch('/target', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: best.name || best.en || '', x: best.px[0], y: best.px[1], type: best.cat })
+      });
+    }
+  });
+
+  // ===== 右键菜单 =====
+  var menu = document.getElementById('menu');
+  canvas.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+    menu.style.display = 'block';
+    menu.style.left = Math.min(e.clientX, canvas.width - 180) + 'px';
+    menu.style.top = Math.min(e.clientY, canvas.height - 130) + 'px';
+  });
+  window.addEventListener('mousedown', function (e) {
+    if (e.button !== 2 && !menu.contains(e.target)) menu.style.display = 'none';
+  });
+  document.getElementById('m-reset').onclick = function () {
+    SC = DEF_SC;
+    localStorage.setItem('botwmap.float.scale', String(SC));
+    menu.style.display = 'none';
+    draw();
+  };
+  // 透明度：CSS opacity 控制整体半透明（WebView2 与 Win32 WS_EX_LAYERED 不兼容，
+  // 故不调用 /win/alpha；浮窗完全由 WebView2 覆盖，CSS opacity 效果等同窗口半透明）
+  var alpha = parseInt(localStorage.getItem('botwmap.float.alpha') || '100', 10) || 100;
+  alpha = Math.max(30, Math.min(100, alpha));
+  document.body.style.opacity = alpha / 100;
+  var alphaSlider = document.getElementById('m-alpha');
+  alphaSlider.value = alpha;
+  alphaSlider.addEventListener('input', function (e) {
+    var v = parseInt(e.target.value, 10);
+    document.body.style.opacity = v / 100;
+    localStorage.setItem('botwmap.float.alpha', String(v));
+  });
+  document.getElementById('m-quit').onclick = function () { fetch('/win/quit', { method: 'POST' }); };
+  document.getElementById('m-layers').textContent = '图层：跟随网页端（' +
+    (live.cats.length ? live.cats.join(' / ') : '等待同步…') + ')';
+
+  // ===== 数据轮询（/pos 600ms） =====
+  function updateInfo() {
+    var svc = document.getElementById('svc');
+    svc.className = live.ok ? 'ok' : 'off';
+    if (live.ok) {
+      var fresh = '';
+      if (typeof live.age === 'number') {
+        var ago = Math.max(0, Math.round(Date.now() / 1000 - live.age));
+        fresh = ' · 数据' + ago + 's前';
+      }
+      svc.textContent = '在线' + fresh;
+    } else { svc.textContent = '离线'; }
+    document.getElementById('coord').textContent =
+      (live.ok && live.mx != null) ? ('GX ' + live.gx + ' · GZ ' + live.gz) : '-';
+    document.getElementById('zoom').textContent = Math.round(SC * 100) + '%';
+    var tgt = document.getElementById('tgt'), dist = document.getElementById('dist');
+    if (live.target) {
+      tgt.textContent = live.target.name || ('(' + Math.round(live.target.x) + ',' + Math.round(live.target.y) + ')');
+      if (live.mx != null) {
+        var d = Math.hypot(live.target.x - live.mx, live.target.y - live.my) * 0.5;
+        dist.textContent = Math.round(d) + 'm';
+      } else { dist.textContent = '-'; }
+    } else { tgt.textContent = '未设目标'; dist.textContent = '-'; }
+  }
+
+  function poll() {
+    fetch('http://127.0.0.1:8766/pos?who=float&t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (p) {
+        live.ok = !!p.ok;
+        // ===== 数据异常检测（BotwNavi 锁到错误槽时坐标会 >500m 级跳变） =====
+        // 单次跳变 >500m：判定异常，不更新地图位置；连续 3 次 → 重启 BotwNavi 自愈。
+        if (live.mx != null && p.mx != null) {
+          var dJump = Math.hypot(p.mx - live.mx, p.my - live.my) * 0.5;
+          if (dJump > 500) {
+            anomalyCount++;
+            if (Date.now() - lastRestartAt > 30000) {
+              if (anomalyCount >= 3) {
+                lastRestartAt = Date.now();
+                anomalyCount = 0;
+                warn.style.display = 'flex';
+                warn.className = 'warn-red';
+                warnText.textContent = '定位数据异常，正在重启导航服务…';
+                fetch('/win/restart-navi', { method: 'POST' });
+              } else if (Date.now() - lastRescanAt > 30000) {
+                doRescan('anomaly');
+              }
+            }
+            var svc = document.getElementById('svc');
+            svc.className = 'off';
+            svc.textContent = '数据异常 ' + Math.round(dJump) + 'm';
+            draw();
+            return; // 保持原位置，不更新
+          }
+          anomalyCount = 0;
+        }
+        if (p.gx !== live.gx || p.gz !== live.gz) { lastMoveAt = Date.now(); }
+        live.mx = p.mx; live.my = p.my;
+        live.gx = p.gx; live.gy = p.gy; live.gz = p.gz;
+        live.age = p.age;
+        live.target = (p.target && typeof p.target.x === 'number') ? p.target : null;
+        var cats = (p.config && p.config.cats) || [];
+        if (cats.join(',') !== live.cats.join(',')) {
+          live.cats = cats;
+          rebuildEnabled();
+          document.getElementById('m-layers').textContent = '图层：跟随网页端（' +
+            (cats.length ? cats.join(' / ') : '空') + ')';
+        }
+        updateInfo();
+        draw();
+      })
+      .catch(function () {
+        if (live.ok) { live.ok = false; live.mx = null; updateInfo(); draw(); }
+      });
+  }
+
+  // ===== 冻结自检（BotwNavi 长跑后定位可能失效：坐标冻结不随角色移动） =====
+  // 分级：60s 弱提示 → 180s 自动 /win/rescan（限频 5min）→ 300s 强提示请游戏内保存。
+  var lastMoveAt = Date.now();
+  var lastRescanAt = 0;
+  var rescanPending = false;
+  var anomalyCount = 0;    // 数据异常（>500m 跳变）连续次数
+  var lastRestartAt = 0;   // 上次重启 BotwNavi 时间（限频 30s）
+  var warn = document.getElementById('warn');
+  var warnText = document.getElementById('warn-text');
+
+  function doRescan(reason) {
+    lastRescanAt = Date.now();
+    rescanPending = true;
+    warn.className = 'warn-yellow';
+    warnText.textContent = '正在尝试重定位…';
+    fetch('/win/rescan', { method: 'POST' })
+      .then(function () { setTimeout(function () { rescanPending = false; }, 8000); })
+      .catch(function () { rescanPending = false; warnText.textContent = '重定位失败（BotwNavi 不可达）'; });
+  }
+
+  function checkFrozen() {
+    if (!live.ok || live.mx == null) { warn.style.display = 'none'; return; }
+    var fs = (Date.now() - lastMoveAt) / 1000;
+    if (fs < 60) { warn.style.display = 'none'; return; }
+    if (fs < 180) {
+      warn.style.display = 'flex';
+      warn.className = 'warn-yellow';
+      warnText.textContent = '坐标 ' + Math.round(fs) + 's 未更新'
+        + (fs > 90 ? '（角色若在动，可能定位失效，点击重定位）' : '');
+      return;
+    }
+    if (!rescanPending && Date.now() - lastRescanAt > 300000) { doRescan('auto'); return; }
+    if (fs >= 300 && !rescanPending) {
+      warn.style.display = 'flex';
+      warn.className = 'warn-red';
+      warnText.textContent = '定位可能失效：请在游戏内保存游戏，再点此重定位';
+    }
+  }
+  // NOACTIVATE 窗口不合成 click，提示条用 pointerdown
+  warn.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (!rescanPending) doRescan('manual');
+  });
+  setInterval(checkFrozen, 1000);
+
+  initData();
+  rebuildEnabled();
+  setInterval(poll, 600);
+  poll();
+  // 瓦片/图标加载完成后的重绘兜底
+  setInterval(function () { if (live.ok) draw(); }, 1500);
+})();
+</script>
+</body>
+</html>

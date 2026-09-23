@@ -49,3 +49,8 @@ live-go/status.json
 live-go/run.log
 live-go/run.err
 live-go/*.zip
+
+# live-float 运行/编译产物与调试日志不入库；README 例外
+live-float/FloatNavi.exe
+live-float/*.log
+!live-float/README.md
