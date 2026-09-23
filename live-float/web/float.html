@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小窗口导航</title>
-<script src="/app/js/data.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #1c2128; font-family: "Microsoft YaHei", system-ui, sans-serif; }
@@ -87,6 +86,10 @@
 </div>
 <script>
 (function () {
+  // ===== 数据源基址自适应 =====
+  // 本地 app/（FloatNavi 内置 /app/ 映射，离线/开发可用）优先；无本地资源时自动切线上 botw.yalin.site。
+  var TILE_BASE = '/app/';
+  function boot() {
   // ===== 窗口控制（拖动 / 位置保存 / 关闭） =====
   var bar = document.getElementById('titlebar');
   var dragging = false, sx = 0, sy = 0;
@@ -169,7 +172,7 @@
     if (cache.has(key)) return;
     var img = new Image();
     img.onload = function () { cache.set(key, img); draw(); };
-    img.src = '/app/assets/tiles/' + key + '.webp';
+    img.src = TILE_BASE + 'assets/tiles/' + key + '.webp';
   }
 
   function draw() {
@@ -239,19 +242,6 @@
     ctx.fillStyle = '#f0b429';
     ctx.beginPath(); ctx.arc(w / 2, h / 2, 5, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
-    // 视野外目标方向箭头
-    if (live.target) {
-      var dxp = live.target.x - live.mx, dyp = live.target.y - live.my;
-      var onScreen = (txp > -12 && txp < w + 12 && typ > -12 && typ < h + 12);
-      if (!onScreen && Math.hypot(dxp, dyp) > 0) {
-        var ang = Math.atan2(dyp, dxp);
-        var ex = w / 2 + Math.cos(ang) * (w / 2 - 20), ey = h / 2 + Math.sin(ang) * (h / 2 - 20);
-        ctx.fillStyle = '#3fb950';
-        ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('➤', ex, ey);
-        ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
-      }
-    }
   }
 
   // ===== 滚轮缩放（以玩家为中心） =====
@@ -357,26 +347,26 @@
         if (live.mx != null && p.mx != null) {
           var dJump = Math.hypot(p.mx - live.mx, p.my - live.my) * 0.5;
           if (dJump > 500) {
+            // 大跳变：先接受位置（可能是正常传送，跳一次后稳定），仅累计连续次数。
+            // 只有"持续乱跳"（错误槽特征，0.1s 一跳很快到 3）才触发自愈重启。
             anomalyCount++;
-            if (Date.now() - lastRestartAt > 30000) {
-              if (anomalyCount >= 3) {
-                lastRestartAt = Date.now();
-                anomalyCount = 0;
-                warn.style.display = 'flex';
-                warn.className = 'warn-red';
-                warnText.textContent = '定位数据异常，正在重启导航服务…';
-                fetch('/win/restart-navi', { method: 'POST' });
-              } else if (Date.now() - lastRescanAt > 30000) {
-                doRescan('anomaly');
-              }
+            if (anomalyCount >= 3 && Date.now() - lastRestartAt > 30000) {
+              lastRestartAt = Date.now();
+              anomalyCount = 0;
+              warn.style.display = 'flex';
+              warn.className = 'warn-red';
+              warnText.textContent = '定位数据异常，正在重启导航服务…';
+              fetch('/win/restart-navi', { method: 'POST' });
+              var svc2 = document.getElementById('svc');
+              svc2.className = 'off';
+              svc2.textContent = '数据异常 ' + Math.round(dJump) + 'm';
+              draw();
+              return; // 持续乱跳才保持原位置
             }
-            var svc = document.getElementById('svc');
-            svc.className = 'off';
-            svc.textContent = '数据异常 ' + Math.round(dJump) + 'm';
-            draw();
-            return; // 保持原位置，不更新
+            // 单次/前几次跳变：接受新位置（传送），继续走正常更新
+          } else {
+            anomalyCount = 0; // 连续跳变中断（位置稳定）→ 传送已落定，重置
           }
-          anomalyCount = 0;
         }
         if (p.gx !== live.gx || p.gz !== live.gz) { lastMoveAt = Date.now(); }
         live.mx = p.mx; live.my = p.my;
@@ -449,6 +439,25 @@
   poll();
   // 瓦片/图标加载完成后的重绘兜底
   setInterval(function () { if (live.ok) draw(); }, 1500);
+  }
+  // ===== 数据源加载：本地 app/ 优先（离线/开发），404 → 自动切线上 botw.yalin.site =====
+  function loadScript(src, ok, fail) {
+    var s = document.createElement('script');
+    s.src = src;
+    s.onload = ok;
+    s.onerror = fail;
+    document.head.appendChild(s);
+  }
+  loadScript('/app/js/data.js', function () { boot(); }, function () {
+    loadScript('https://botw.yalin.site/js/data.js', function () {
+      TILE_BASE = 'https://botw.yalin.site/';
+      boot();
+    }, function () {
+      var w = document.getElementById('warn');
+      w.style.display = 'flex'; w.className = 'warn-red';
+      document.getElementById('warn-text').textContent = '地图数据加载失败（本地与线上均不可用）';
+    });
+  });
 })();
 </script>
 </body>

@@ -74,6 +74,11 @@ func startServer(win *floatWindow) {
 		}
 	}
 	appDir := filepath.Clean(filepath.Join(webDir, "..", "..", "app"))
+	// 可选覆盖：FLOATNAVI_APP_DIR 指定地图资源目录（默认 exe 上级 app/）。
+	// 测试"无本地资源走线上"时置为空目录；正常使用无需设置。
+	if env := os.Getenv("FLOATNAVI_APP_DIR"); env != "" {
+		appDir = filepath.Clean(env)
+	}
 
 	mux := http.NewServeMux()
 	mux.Handle("/app/", http.StripPrefix("/app/", http.FileServer(http.Dir(appDir))))
