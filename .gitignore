@@ -54,3 +54,12 @@ live-go/*.zip
 live-float/FloatNavi.exe
 live-float/*.log
 !live-float/README.md
+
+# live-npcs 运行/编译产物不入库（源码与数据文件入库）
+live-npcs/live-npcs.exe
+live-npcs/live-npcs.exe~
+live-npcs/run.log
+live-npcs/run.err
+live-npcs/data/*
+!live-npcs/README.md
+!live-npcs/REVERSE-NOTES.md

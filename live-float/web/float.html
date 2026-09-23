@@ -53,6 +53,7 @@
   }
   #menu .mi:hover { background: #2d333b; }
   #menu .mi input[type=range] { width: 80px; }
+  #menu .mi input[type=checkbox] { accent-color: #3fb950; }
   #menu .sep { height: 1px; background: #30363d; margin: 4px 6px; }
   #menu .dim { color: #57606a; font-size: 12px; }
 </style>
@@ -74,6 +75,7 @@
   <span>服务 <span id="svc" class="off">离线</span></span>
   <span>缩放 <b id="zoom" style="color:#c9d1d9">-</b></span>
   <span style="flex:1"></span>
+  <span>NPC <b id="npc-count" style="color:#c9d1d9">-</b> <span id="npc-hint" style="color:#8b949e"></span></span>
   <span>坐标 <b id="coord" style="color:#c9d1d9">-</b></span>
 </div>
 <div id="menu">
@@ -81,6 +83,9 @@
   <div class="mi">透明度 <input type="range" id="m-alpha" min="30" max="100" value="100"></div>
   <div class="sep"></div>
   <div class="mi dim" id="m-layers">图层：跟随网页端</div>
+  <div class="sep"></div>
+  <div class="mi" id="m-npcs-toggle">显示实体 <input type="checkbox" id="m-npcs" checked></div>
+  <div class="mi" id="m-npcs-move">仅移动中 <input type="checkbox" id="m-npcs-move" checked></div>
   <div class="sep"></div>
   <div class="mi" id="m-quit">✕ 退出浮窗</div>
 </div>
@@ -127,6 +132,13 @@
   var cache = new Map();
   var live = { ok: false, mx: null, my: null, gx: 0, gy: 0, gz: 0, target: null, age: 0, cats: [] };
   var CAT_KEY = {}, markers = [], enabled = [], catColor = {};
+
+  // ===== 实体（live-npcs /npcs 数据，M3'：带名字的 NPC） =====
+  var npc = { ok: false, list: [], updated: 0, prev: [], seq: 0 };
+  var npcShow = localStorage.getItem('botwmap.float.npcs') !== '0';
+  var npcMoveOnly = localStorage.getItem('botwmap.float.npcsmove') === '1'; // 默认显示全部 NPC（数量少）
+  var npcTrails = [];   // 轨迹数组（最近 N 个位置）
+  var npcTrailN = 10;
 
   // 类别：中文名 → key、颜色（与网页端 data.js categories 一致）
   function initData() {
@@ -225,6 +237,64 @@
       ctx.globalAlpha = 1;
       drawn++;
     }
+    // 实体（NPC/怪物/动物）：红点 + 移动轨迹（M3）
+    // moving=红点；静止=灰点（仅当不限制"仅移动中"时显示）；轨迹=最近 N 个位置连点
+    if (npcShow && npc.ok) {
+      // 更新轨迹：按坐标最近邻匹配上一帧实体（实体无稳定 ID，地址会变）
+      var lastById = {}, newTrails = [];
+      for (var ti = 0; ti < npcTrails.length; ti++) lastById[npcTrails[ti].id] = npcTrails[ti];
+      for (var ni = 0; ni < npc.list.length; ni++) {
+        var ne = npc.list[ni];
+        var bestId = null, bestD = 3;
+        for (var oi = 0; oi < npc.prev.length; oi++) {
+          var po = npc.prev[oi];
+          var dd = Math.hypot(po.mx - ne.MX, po.my - ne.MY);
+          if (dd < bestD) { bestD = dd; bestId = po.id; }
+        }
+        var tr = bestId != null ? lastById[bestId] : null;
+        if (!tr) { tr = { id: 't' + (npc.seq++), pts: [] }; }
+        tr.pts.push({ mx: ne.MX, my: ne.MY });
+        if (tr.pts.length > npcTrailN) tr.pts.shift();
+        newTrails.push(tr);
+      }
+      npcTrails = newTrails;
+      npc.prev = npc.list.map(function (e, i) { return { mx: e.MX, my: e.MY, id: npcTrails[i].id }; });
+
+      for (var ti = 0; ti < npcTrails.length; ti++) {
+        var tr = npcTrails[ti], e = npc.list[ti];
+        if (!e) continue;
+        if (npcMoveOnly && !e.moving) continue;
+        // 轨迹线（仅移动实体画线）
+        if (e.moving && tr.pts.length > 1) {
+          ctx.strokeStyle = 'rgba(248,81,73,0.45)';
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          for (var pi = 0; pi < tr.pts.length; pi++) {
+            var px = ox + tr.pts[pi].mx * SC, py = oy + tr.pts[pi].my * SC;
+            if (pi === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+          ctx.lineWidth = 1;
+        }
+        // 红点（移动中） / 灰点（静止）
+        var mxp = ox + e.MX * SC, myp = oy + e.MY * SC;
+        if (mxp < -6 || mxp > w + 6 || myp < -6 || myp > h + 6) continue;
+        ctx.fillStyle = e.moving ? '#f85149' : 'rgba(139,148,158,0.5)';
+        ctx.beginPath(); ctx.arc(mxp, myp, e.moving ? 3.2 : 2, 0, Math.PI * 2); ctx.fill();
+        // 名字标签（放大到一定比例才显示，避免糊成一团；NPC 静止也显示）
+        if (e.name && SC >= 0.22) {
+          ctx.font = '11px "Microsoft YaHei"';
+          var nm = e.label || e.name.replace(/^Npc_HatenoVillage/, 'NPC ').replace(/^Npc_/, 'NPC ');
+          ctx.fillStyle = 'rgba(13,17,23,0.75)';
+          ctx.fillRect(mxp + 4, myp - 9, ctx.measureText(nm).width + 6, 14);
+          ctx.fillStyle = '#e6edf3';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(nm, mxp + 7, myp - 1);
+          ctx.textBaseline = 'alphabetic';
+        }
+      }
+    }
+
     // 目标：绿点 + 虚线连线
     if (live.target) {
       var txp = ox + live.target.x * SC, typ = oy + live.target.y * SC;
@@ -388,6 +458,52 @@
       });
   }
 
+  // ===== 实体轮询（/npcs 3000ms，live-npcs 8778，M3'） =====
+  function pollNpcs() {
+    fetch('http://127.0.0.1:8778/npcs', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (p) {
+        if (!p.ok) return;
+        npc.ok = true;
+        npc.list = p.list || [];
+        npc.updated = Date.now();
+        var movingN = npc.list.filter(function (e) { return e.moving; }).length;
+        // 状态栏：NPC 总数 + 最近 NPC 名
+        var nearest = null, nd = 1e18;
+        if (p.player && npc.list.length) {
+          for (var i = 0; i < npc.list.length; i++) {
+            var d = Math.hypot(npc.list[i].MX - p.player.MX, npc.list[i].MY - p.player.MY);
+            if (d < nd) { nd = d; nearest = npc.list[i]; }
+          }
+        }
+        document.getElementById('npc-count').textContent = movingN + '/' + npc.list.length;
+        var hint = document.getElementById('npc-hint');
+        if (hint) {
+          hint.textContent = nearest
+            ? (nearest.label || nearest.name || '').replace(/^Npc_HatenoVillage/, '').replace(/^Npc_/, '') + ' ' + Math.round(nd / 2) + 'm'
+            : '-';
+        }
+        draw();
+      })
+      .catch(function () {
+        if (npc.ok) { npc.ok = false; npc.list = []; document.getElementById('npc-count').textContent = '-'; draw(); }
+      });
+  }
+  // 实体显示开关（右键菜单）
+  var npcCb = document.getElementById('m-npcs'), npcMoveCb = document.getElementById('m-npcs-move');
+  npcCb.checked = npcShow;
+  npcMoveCb.checked = npcMoveOnly;
+  npcCb.addEventListener('change', function () {
+    npcShow = npcCb.checked;
+    localStorage.setItem('botwmap.float.npcs', npcShow ? '1' : '0');
+    draw();
+  });
+  npcMoveCb.addEventListener('change', function () {
+    npcMoveOnly = npcMoveCb.checked;
+    localStorage.setItem('botwmap.float.npcsmove', npcMoveOnly ? '1' : '0');
+    draw();
+  });
+
   // ===== 冻结自检（BotwNavi 长跑后定位可能失效：坐标冻结不随角色移动） =====
   // 分级：60s 弱提示 → 180s 自动 /win/rescan（限频 5min）→ 300s 强提示请游戏内保存。
   var lastMoveAt = Date.now();
@@ -437,6 +553,8 @@
   rebuildEnabled();
   setInterval(poll, 600);
   poll();
+  setInterval(pollNpcs, 3000);
+  pollNpcs();
   // 瓦片/图标加载完成后的重绘兜底
   setInterval(function () { if (live.ok) draw(); }, 1500);
   }
