@@ -161,3 +161,16 @@ host 地址 = guest 地址 + 0x016ADCA00000
 | 命令 | 用途 |
 |---|---|
 | `--probeafe=006,020,018` | 同一 actor 名的全部 hash 引用点 dump（跳动诊断；纯数字自动补 HatenoVillage 前缀） |
+
+## 13. ActorInfo 全内存缓存（M5，2026-09-24 实机验证）
+
+**症状**：部分 NPC 地图不显示（如茨琪米 014——玩家站她面前也缺失），其余 NPC 正常。
+
+**根因**：NPC 名字对象（ActorInfo，字符串 +0x4C=hash）大多驻留在 **0x016A/0x020C 等资源区**（`--nameregions`：0x016A 桶 26305 命中、0x020C 桶 25080 命中），而 0x016B 运行时区只是**实例区**（hash 引用点）。旧代码只在 0x016B12~0x016B20 扫名字对象 → 名字对象不在该区的 NPC（014 等）hash 未知 → 无法反查 → 缺失。且曾出现 `refresh: 0 hashes` 的次生 bug：`seen` 去重在读 hash **之前**，第一个命中（普通内嵌字符串，+0x4C 非合法 hash）占坑后跳过真正的 ActorInfo 副本。
+
+**修复（actorinfo.go）**：
+1. **全内存收集**：`refreshActorInfo()` 扫全部已提交块（guestBlocks），收集 Npc_ 名字对象 hash（hash 校验通过才 `seen` 占坑）；
+2. **低频缓存**：启动即后台 goroutine 收集（~7s），此后每 60s 自动刷新（玩家换区域最多 1 分钟延迟，可接受）；`actorHashSnapshot()` 读锁快照供每帧扫描用；
+3. 每帧扫描仍只反查 0x016B 实例区（~2s/帧 不变，不卡）。
+
+**实测**：`[actorinfo] refreshed: 46 Npc hashes in 7.2s`；玩家在旅店，茨琪米 (3466.2,2097.3) 距玩家 0.6m 命中，浮窗标签"茨琪米" + 状态栏"NPC 0/14 茨琪米 1m"。

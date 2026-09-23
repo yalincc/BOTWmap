@@ -15,7 +15,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"strings"
 	"time"
 	"unsafe"
 )
@@ -86,37 +85,16 @@ func scanNpcInstances(h uintptr) *npcScan {
 	res.player = player
 	px, py, pz := player.X, player.Y, player.Z
 
-	// 2) 扫已提交块内 Npc_ 名字对象，取 hash
-	type nameInfo struct {
-		name string
-		hash uint32
+	// 2) 用全局 ActorInfo 缓存取 Npc_ hash 集合
+	//    （名字对象全内存低频收集见 actorinfo.go；0x016B 区只是实例区，
+	//    名字对象大多驻留 0x016A/0x020C 等资源区，只扫 0x016B 会漏 NPC）
+	hashName, ready := actorHashSnapshot()
+	if !ready {
+		return res // 首次全内存收集未完成，等下一帧
 	}
-	infos := make([]nameInfo, 0, 64)
-	hashSet := make(map[uint32]bool)
-	seen := map[string]bool{}
-	for _, b := range blocks {
-		for _, n := range scanActorStringsRange(h, b.Base, b.Base+b.Size) {
-			if !strings.HasPrefix(n.Name, "Npc_") {
-				continue // 只要 NPC
-			}
-			if strings.ContainsAny(n.Name, ":/") {
-				continue
-			}
-			buf := readMem(h, n.Addr, 0x60)
-			if buf == nil {
-				continue
-			}
-			hv := *(*uint32)(unsafe.Pointer(&buf[0x4C]))
-			if hv < 0x34400000 || hv >= 0x34500000 {
-				continue
-			}
-			if seen[n.Name] {
-				continue
-			}
-			seen[n.Name] = true
-			infos = append(infos, nameInfo{name: n.Name, hash: hv})
-			hashSet[hv] = true
-		}
+	hashSet := make(map[uint32]bool, len(hashName))
+	for hv := range hashName {
+		hashSet[hv] = true
 	}
 
 	// 3) 已提交块内反查 hash
@@ -154,10 +132,6 @@ func scanNpcInstances(h uintptr) *npcScan {
 	//    十几份坐标副本（真位置）；而 hash 偶尔落在其他实例对象体内，+0x80 会读出
 	//    相邻对象的坐标（伪点，如 Amira @0x016B16D48958 读出 Village003 的坐标）。
 	//    取最近实例会让伪点/多候选互相切换 → 位置跳动；聚类主簇可压制孤立伪点。
-	hashName := map[uint32]string{}
-	for _, in := range infos {
-		hashName[in.hash] = in.name
-	}
 	coordsByName := map[string][][3]float32{}
 	seenRef := map[uintptr]bool{}
 	for _, hh := range hits {
@@ -312,7 +286,11 @@ func majorityCluster(coords [][3]float32, eps float64) (float32, float32, float3
 // trackNpcsV2 服务循环：用 scanNpcInstances 替换启发式扫描（M3'）。
 func trackNpcsV2(h uintptr) {
 	prev := map[string][3]float32{} // name → 上一帧坐标
+	go refreshActorInfo(h) // 启动即全内存收集（后台，~15s），此后每 60s 自动刷新
 	for {
+		if needActorInfoRefresh() {
+			go refreshActorInfo(h) // 后台刷新，不阻塞主扫描
+		}
 		t0 := time.Now()
 		scan := scanNpcInstances(h)
 		if scan.player == nil {
