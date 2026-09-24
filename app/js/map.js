@@ -359,7 +359,7 @@ class BotwMap {
       let alpha = 1;
       if (lv === 'r3' && showR4) alpha = 0.8;
       if (lv === 'r4' && showR5) alpha = 0.75;
-      ctx.font = '600 ' + fs + 'px "PingFang SC","Microsoft YaHei","SimSun",sans-serif';
+      ctx.font = '600 ' + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
       if (st.bgA > 0) {
         const tw = ctx.measureText(rg.n).width;
         const padX = fs * 0.55, padY = fs * 0.28;
