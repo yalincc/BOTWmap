@@ -340,7 +340,7 @@ class BotwMap {
     const showR5 = view.scale >= this.maxScale * 0.95 && z >= 7; // r5（城堡内部房间）：缩放到最大且最高清瓦片才显示
     const st = this.regionStyle || { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
     const fsz = st.fsz || 1;
-    const kMax = { r1: 1.5, r2: 1.7, r3: 1.7, r4: 2.0, r5: 2.2 }; // 各层字号上限：低层封顶弱化，r4/r5 细节可继续放大
+    const kMax = { r1: 1.0, r2: 1.2, r3: 1.3, r4: 1.4, r5: 1.5 }; // Canvas 小字号(<17px)会被 Chrome GDI 替换成宋体，收紧 kMax 让 fs 稳定在 17-20px
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const rg of this.regions) {
@@ -352,7 +352,7 @@ class BotwMap {
       if (lv === 'r5' && !showR5) continue;                         // 城堡内部房间：最大缩放才显示
       const [sx, sy] = this.m2s(rg.px);
       if (sx < -140 || sy < -140 || sx > w + 140 || sy > h + 140) continue;
-      const base = lv === 'r1' ? 13 : lv === 'r2' ? 11 : lv === 'r3' ? 9.5 : lv === 'r4' ? 8 : 7;  // 层级字号：r1 大区 > r2 地形区 > r3 细地名 > r4 更细 > r5 房间
+      const base = lv === 'r1' ? 20 : lv === 'r2' ? 15 : lv === 'r3' ? 14 : lv === 'r4' ? 13 : 12;  // 层级字号：整体上调确保 fs>=17px 避免 Canvas 字体 fallback 到宋体
       const k = Math.min(view.scale / f, kMax[lv] || 2.2);
       const fs = base * k * fsz;
       // 弱化保留：r3 在 r4 出现后、r4 在 r5 出现后透明度降低，聚焦更细层级
