@@ -994,10 +994,10 @@ const UI = (() => {
   }
 
   /* ---------- 地名样式（顶栏⚙️设置弹层） ---------- */
-  const K_STYLE = 'botwmap.style.v2'; // v2：新默认（米色底深褐字）+ 字号档位
+  const K_STYLE = 'botwmap.style.v3'; // v3：v1.3.1 新默认（无底金褐字深褐描边）；升级 key 强制丢弃老 v2 缓存
   const K_REGION_SHOW = 'botwmap.regionShow.v1'; // 地名显示开关
   const K_KOROK_PATHS = 'botwmap.korokPaths.v1'; // 克洛格轨迹开关（v1.1.4）
-  const DEFAULT_STYLE = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
+  const DEFAULT_STYLE = { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
   const FONT_SIZES = { small: 0.85, medium: 1, large: 1.15 };
   function loadStyle() {
     try {

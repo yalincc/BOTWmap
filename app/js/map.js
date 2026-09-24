@@ -71,8 +71,8 @@ class BotwMap {
     this._viewApplied = false; // 是否已应用外部（分享链接）视图
     this.regions = (typeof BOTW_REGIONS !== 'undefined') ? BOTW_REGIONS : []; // 主要地形/区域名
     this._regionScale = 0.05;  // 全图适配 scale（fit 时更新），用于地名分级切换
-    // 地名标签样式（可由用户在“设置”面板调整，默认：米色半透明底 + 深褐色字，仿游戏内地图）
-    this.regionStyle = { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
+    // 地名标签样式（v1.3.1：无底块 + 金褐实色字 #bfae68 + 深褐描边 #3f3010 + 暖褐投影，贴合游戏地图；详见 地名规范.md）
+    this.regionStyle = { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
     this.showRegions = true;   // 地名显示开关（设置弹层可切换，持久化到 localStorage）
     // 克洛格轨迹（v1.1.4）：数据源 korok_paths.js（97 条多点轨迹，应用像素坐标）；开关默认开
     this.showKorokPaths = true;
@@ -338,7 +338,7 @@ class BotwMap {
     const showR3 = view.scale >= g2;                 // r3：4x 起显（弱化保留）
     const showR4 = view.scale >= g3 && z >= 6;       // r4：8x 且瓦片至少 z6（确保最细地名在清晰瓦片上）
     const showR5 = view.scale >= this.maxScale * 0.95 && z >= 7; // r5（城堡内部房间）：缩放到最大且最高清瓦片才显示
-    const st = this.regionStyle || { bg: [242, 232, 213], bgA: 0.6, tx: [92, 58, 30], txA: 0.92, fsz: 1, sc: [0, 0, 0], sw: 0 };
+    const st = this.regionStyle || { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
     const fsz = st.fsz || 1;
     const kMax = { r1: 1.5, r2: 1.7, r3: 1.7, r4: 2.0, r5: 2.2 }; // 各层字号上限：低层封顶弱化，r4/r5 细节可继续放大
     ctx.textAlign = 'center';
@@ -359,14 +359,13 @@ class BotwMap {
       let alpha = 1;
       if (lv === 'r3' && showR4) alpha = 0.8;
       if (lv === 'r4' && showR5) alpha = 0.75;
-      ctx.font = (lv === 'r1' ? '700 ' : '600 ') + fs + 'px "PingFang SC","Microsoft YaHei",sans-serif';
-      const tw = ctx.measureText(rg.n).width;
-      const padX = fs * 0.55, padY = fs * 0.28;
-      const bw = tw + padX * 2, bh = fs + padY * 2;
-      const x = sx - bw / 2, y = sy - bh / 2;
+      ctx.font = '600 ' + fs + 'px "PingFang SC","Microsoft YaHei","SimSun",sans-serif';
       if (st.bgA > 0) {
+        const tw = ctx.measureText(rg.n).width;
+        const padX = fs * 0.55, padY = fs * 0.28;
+        const bw = tw + padX * 2, bh = fs + padY * 2;
         ctx.fillStyle = `rgba(${st.bg[0]},${st.bg[1]},${st.bg[2]},${st.bgA * alpha})`;
-        this._roundRect(ctx, x, y, bw, bh, 4);
+        this._roundRect(ctx, sx - bw / 2, sy - bh / 2, bw, bh, 4);
         ctx.fill();
       }
       const sw = st.sw || 0;
@@ -377,6 +376,14 @@ class BotwMap {
         ctx.strokeText(rg.n, sx, sy + 0.5);
       }
       ctx.fillStyle = `rgba(${st.tx[0]},${st.tx[1]},${st.tx[2]},${st.txA * alpha})`;
+      // v1.3.1：金褐字三层 shadow（下方投影 + 近/远暖褐泛光），对齐 TOTKmap 地名规范
+      ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.shadowColor = 'rgba(30,20,0,.75)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 0;
+      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.shadowColor = 'rgba(30,20,0,.55)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 0;
+      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
       ctx.fillText(rg.n, sx, sy + 0.5);
     }
   }
