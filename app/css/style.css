@@ -31,6 +31,18 @@
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
+
+/* 材料图标悬停提示（v1.4.0） */
+.map-tip {
+  position: fixed; z-index: 60; pointer-events: none;
+  max-width: 220px; padding: 5px 10px;
+  background: rgba(10, 16, 12, .94); border: 1px solid var(--gold-dim); border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 12.5px; line-height: 1.45; color: var(--text);
+  white-space: nowrap; text-align: center;
+}
+.map-tip b { color: var(--gold); font-weight: 600; }
+.map-tip span { display: block; color: var(--text-dim); font-size: 11px; }
 body {
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", system-ui, sans-serif;
   font-feature-settings: "tnum" 0;
@@ -415,6 +427,21 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .card-close:hover { color: var(--text); }
 #cardName { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
 #cardEn { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; word-break: break-all; }
+
+/* 材料卡片（TOTK 风格，v1.4.0）：图鉴图 + 区域/坐标/位置 meta + 用途 */
+.card-img {
+  display: block; width: 150px; height: 150px; margin: 6px auto 4px;
+  object-fit: contain; background: rgba(255,255,255,.06);
+  border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  cursor: zoom-in;
+}
+.card-meta { margin: 8px 0 2px; }
+.meta-row { display: flex; align-items: center; margin: 3px 0; font-size: 12.5px; }
+.meta-label { color: var(--text-dim); flex: 0 0 44px; }
+.meta-val { color: var(--text); word-break: break-all; }
+.card-usage { margin: 8px 0 2px; font-size: 12.5px; }
+.usage-label { color: var(--text-dim); margin-right: 6px; }
+#cardUsageVal { color: var(--gold); }
 .card-body .row { margin: 3px 0; color: var(--text-dim); }
 .card-body .row b { color: var(--text); font-weight: 500; margin-left: 4px; }
 .card-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }

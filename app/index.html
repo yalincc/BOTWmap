@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/style.css?v=37">
 </head>
 <body>
 <div id="app">
@@ -70,17 +70,17 @@
         <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里">?</span>
       </div>
       <div class="su-tip hidden" id="suTip">
-        <b>存档文件：game_data.sav</b>
+        <b>存档文件：game_data.sav（Switch 与 Wii U·Cemu 同名，上传自动识别端序）</b>
         <div>Ryujinx（Switch 模拟器）：<br><code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code></div>
-        <div class="su-tip-sub">找不到时：Win+R 输入 <code>%APPDATA%\Ryujinx\bis\user\save</code>，进入游戏对应的 ID 目录找 <code>game_data.sav</code>。</div>
-        <div>Cemu（Wii U）：<br><code>mlc01\usr\save\00050000\101c9400\user\80000001\game_data.sav</code></div>
-        <div class="su-tip-sub">把文件拖进左侧面板，或点「从存档加载进度…」选择文件即可，文件不会上传。</div>
+        <div class="su-tip-sub">进入游戏 ID 目录 <code>0000000000000008\0</code> 后还有一层存档槽文件夹（0、1、2…），挑文件修改时间最新的 <code>game_data.sav</code>；找不到时 Win+R 输入 <code>%APPDATA%\Ryujinx\bis\user\save</code> 逐步进入。</div>
+        <div>Cemu（Wii U）：<br><code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\1\game_data.sav</code></div>
+        <div class="su-tip-sub">同样先进入存档槽文件夹（0、1、2…）再挑 <code>game_data.sav</code>；<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。文件只在浏览器内解析，不会上传。</div>
       </div>
       <input type="file" id="saveFile" accept=".sav" hidden>
     </div>
 
     <footer class="side-foot">
-      <p>BOTWMAP V1.3.2</p>
+      <p>BOTWMAP V1.4.0</p>
       <p>© 2026 yalin · github.com/yalincc</p>
     </footer>
   </aside>
@@ -89,6 +89,7 @@
   <main id="mapArea">
     <button id="sideCollapse" class="side-collapse" title="收起侧栏" aria-label="收起侧栏">‹</button>
     <canvas id="mapCanvas"></canvas>
+    <div id="mapTip" class="map-tip hidden"></div>
 
     <div id="sideMask" class="hidden"></div>
 
@@ -146,13 +147,14 @@
       </div>
       <div class="hq">
         <h4>📂 加载存档进度</h4>
-        <p>存档文件：<code>game_data.sav</code>，拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
+        <p>存档文件：<code>game_data.sav</code>（Switch 与 Wii U·Cemu 同名，上传后自动识别端序），拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
         <p>Ryujinx（Switch 模拟器）：</p>
         <code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code>
-        <p class="hq-note">找不到时：按 <code>Win + R</code>，粘贴下面路径回车，进入游戏对应的 ID 目录找 game_data.sav：</p>
+        <p class="hq-note">游戏 ID 目录 <code>0000000000000008\0</code> 下还有一层存档槽文件夹（0、1、2…），挑文件修改时间最新的 game_data.sav；找不到时按 <code>Win + R</code> 粘贴下面路径回车，逐步进入：</p>
         <code>%APPDATA%\Ryujinx\bis\user\save</code>
-        <p>Cemu（Wii U）：</p>
-        <code>mlc01\usr\save\00050000\101c9400\user\80000001\game_data.sav</code>
+        <p>Cemu（Wii U 模拟器）：</p>
+        <code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\1\game_data.sav</code>
+        <p class="hq-note">进入后同样先找存档槽文件夹（0、1、2…）再挑 game_data.sav；<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。</p>
         <hr>
         <h4>🔄 进度是怎么同步的</h4>
         <p>上传存档后，浏览器本地解析出神庙 / 塔 / 克洛格 / 主线回忆 / 神兽的收集状态，写进本机浏览器，<b>离线再打开也保留</b>。</p>
@@ -260,6 +262,14 @@
       </div>
       <h3 id="cardName"></h3>
       <div id="cardEn" class="card-en"></div>
+      <!-- 材料卡片（TOTK 风格，v1.4.0）：图鉴图 + 区域/坐标/位置 meta + 用途 -->
+      <img id="cardImg" class="card-img hidden" src="" alt="">
+      <div id="cardMeta" class="card-meta hidden">
+        <div class="meta-row"><span class="meta-label">区域</span><span class="meta-val" id="cardMetaRegion"></span></div>
+        <div class="meta-row"><span class="meta-label">坐标</span><span class="meta-val" id="cardMetaCoord"></span></div>
+        <div class="meta-row"><span class="meta-label">位置</span><span class="meta-val" id="cardMetaPos"></span></div>
+      </div>
+      <div id="cardUsage" class="card-usage hidden"><span class="usage-label">用途</span><span id="cardUsageVal"></span></div>
       <div class="card-body">
         <div id="cardRegion" class="row"></div>
         <div id="cardTower" class="row"></div>
@@ -285,11 +295,11 @@
 <script src="js/supercluster.min.js"></script>
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
-<script src="js/map.js?v=21"></script>
-<script src="js/ui.js?v=38"></script>
+<script src="js/map.js?v=23"></script>
+<script src="js/ui.js?v=39"></script>
 <script src="js/main.js?v=9"></script>
-<script src="js/live.js?v=10"></script>
-<script src="js/save_upload.js?v=5"></script>
+<script src="js/live.js?v=11"></script>
+<script src="js/save_upload.js?v=7"></script>
 </body>
 </html>
 

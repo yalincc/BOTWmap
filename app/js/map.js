@@ -63,6 +63,8 @@ class BotwMap {
     this.measurePoints = [];    // 测量点 (map px)
     this.mode = 'browse';       // browse | measure | pin
     this.hover = null;          // hover 标记
+    this.hoverMat = null;       // hover 材料点（v1.4.0，悬停名字提示用）
+    this.tipEl = null;          // 材料悬停提示浮层 #mapTip
     this.selected = null;       // 选中标记
 
     this.view = { x: 0, y: 0, scale: 0.3 };
@@ -313,7 +315,7 @@ class BotwMap {
     this._drawMeasure(ctx);
     this._drawMaterials(ctx); // 材料追踪层（下层：不遮挡神庙/塔等主标记）
     this._drawMarkers(ctx);
-    this._drawMatSel(ctx);    // 材料选中高亮（最上层）
+    // v1.4.0：移除材料选中白色描边环（原 _drawMatSel）；选中材料仅图标略微放大作为点击反馈
     this._drawCustom(ctx);
     // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入；live.js 加载前的早期 draw 可能未挂载，防御）
     if (typeof this._drawLive === 'function') this._drawLive(ctx);
@@ -1108,6 +1110,7 @@ class BotwMap {
         this.view.x += (e.clientX - lastX);
         this.view.y += (e.clientY - lastY);
         lastX = e.clientX; lastY = e.clientY;
+        this._updateMatTip(null);
         this.draw();
       } else {
         // 悬停 + 坐标读数
@@ -1115,6 +1118,10 @@ class BotwMap {
         if (this._onCoord) this._onCoord(this.gameCoord(m), m);
         const hit = this.mode === 'browse' ? this.hitTest(sx, sy) : null;
         this.hover = hit && hit.marker ? hit.marker : null;
+        // v1.4.0：材料悬停名字提示（聚合簇不提示；hit.material 是材料 id，需解析成材料对象）
+        this.hoverMat = (hit && hit.material != null && hit.cluster == null && this.MATS)
+          ? (this.MATS.materials[hit.material] || null) : null;
+        this._updateMatTip(this.hoverMat, e.clientX, e.clientY);
         if (this._onHover) this._onHover(this.hover);
         if (this.mode === 'browse') this.draw();
       }
@@ -1335,32 +1342,7 @@ class BotwMap {
     }
   }
 
-  /* 选中材料高亮：该材料所有点加白色描边环（画在最上层） */
-  _drawMatSel(ctx) {
-    if (this.matSel == null) return;
-    const pts = this.matPointsBy[this.matSel];
-    if (!pts || !pts.length) return;
-    const pad = 24;
-    const x0 = (-pad - this.view.x) / this.view.scale;
-    const y0 = (-pad - this.view.y) / this.view.scale;
-    const x1 = (this.w + pad - this.view.x) / this.view.scale;
-    const y1 = (this.h + pad - this.view.y) / this.view.scale;
-    for (let i = 0; i < pts.length; i++) {
-      const px = pts[i][0], py = pts[i][1];
-      if (px < x0 || py < y0 || px > x1 || py > y1) continue;
-      const [sx, sy] = this.m2s([px, py]);
-      ctx.beginPath();
-      ctx.arc(sx, sy, 15, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,.95)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(sx, sy, 19, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(0,0,0,.45)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-  }
+  /* 选中材料高亮（v1.4.0 移除）：不再绘制白色描边环，仅图标放大（见 _drawMaterials size 36） */
 
   /* 材料层命中测试（Supercluster）：查各启用材料当前 zoom 的簇/点，屏幕距离最近者 */
   _matHitTest(mx, my) {
@@ -1391,5 +1373,28 @@ class BotwMap {
       this._onSelect(id != null ? { material: this.MATS.materials[id], matPx: matPx || null } : null);
     }
     this.draw();
+  }
+
+  /* 材料悬停名字提示（v1.4.0）：#mapTip 跟随光标，命中材料单点才显示 */
+  _updateMatTip(mat, x, y) {
+    if (!this.tipEl) this.tipEl = document.getElementById('mapTip');
+    if (!this.tipEl) return;
+    if (mat == null) { this.tipEl.classList.add('hidden'); return; }
+    this.tipEl.textContent = '';
+    const b = document.createElement('b');
+    b.textContent = mat.cn || mat.name || '';
+    this.tipEl.appendChild(b);
+    if (mat.en) {
+      const s = document.createElement('span');
+      s.textContent = mat.en;
+      this.tipEl.appendChild(s);
+    }
+    this.tipEl.classList.remove('hidden');
+    const tw = this.tipEl.offsetWidth || 120;
+    let left = x + 16, top = y - 18;
+    if (left + tw > window.innerWidth - 8) left = x - tw - 16;
+    if (top < 8) top = y + 24;
+    this.tipEl.style.left = Math.max(4, left) + 'px';
+    this.tipEl.style.top = top + 'px';
   }
 }

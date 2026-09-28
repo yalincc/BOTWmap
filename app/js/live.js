@@ -210,12 +210,15 @@ const LIVE = (() => {
   }
 
   /* ---------- 导航目标 ---------- */
+  let navTgt = null;   // v1.4.0：本地记录的手动导航目标（用于再次点击停止导航）
+
   function navigate(mk) {
     if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
     // 收集模式中导航其他类别标注 → 退出收集模式（当前引导线保留）
     if (mode && mk.cat !== mode.cat) stopCollectMode();
     curId = mk.id;
     if (mode) { mode.arrivedShown = false; renderCollectBar(); }
+    navTgt = { x: mk.px[0], y: mk.px[1], name: mk.name || mk.en || '' };
     postTarget(mk, '已设置导航：' + (mk.name || mk.en || '目标'));
   }
 
@@ -224,7 +227,23 @@ const LIVE = (() => {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clear: true }),
     }).catch(() => {});
+    navTgt = null;
   }
+
+  /* v1.4.0：导航/停止切换 —— 同一目标再次点击 = 停止导航（标记与材料点通用） */
+  function toggleNav(mk) {
+    if (!mk || !mk.px) return;
+    if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
+    const x = mk.px[0], y = mk.px[1];
+    if (navTgt && navTgt.x === x && navTgt.y === y) {
+      clearNav();
+      UI.toast('已停止导航：' + (mk.name || mk.en || '目标'));
+    } else {
+      navigate(mk);
+    }
+    if (UI && UI.refreshNavButton) UI.refreshNavButton();
+  }
+  function currentTarget() { return navTgt; }
 
   /* ---------- 收集模式（回忆 / 克洛格 连续自动导航） ----------
    * 点回忆 / 克洛格标注的「导航」时，由标注卡上的「收集」按钮开启：
@@ -316,6 +335,7 @@ const LIVE = (() => {
     if (cat === 'seed' && mk && !map._mkDone(mk)) first = mk;      // 克洛格：点哪个导航哪个
     if (!first) first = nearestIn(pool);                           // 回忆：最近的未收集
     mode = { cat, arrivedShown: false };
+    navTgt = null;   // 进入收集模式：手动导航目标让位于自动队列
     curId = first.id;
     UI.toast('🧭 收集模式开启 · 目标：' + first.name + '（剩余 ' + pool.length + ' 个）');
     postTarget(first, '');
@@ -463,7 +483,7 @@ const LIVE = (() => {
     BotwMap.prototype._drawLive = drawLive;
   }
 
-  return { init, navigate, clearNav, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive };
+  return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive };
 })();
 
 (function () {

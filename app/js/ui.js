@@ -589,10 +589,13 @@ const UI = (() => {
 
   /* ---------- 信息卡片 ---------- */
   let currentMarker = null;
+  let navMk = null;   // v1.4.0：当前卡片对应的导航目标（标记或材料点），用于导航/停止切换
+
   function onSelect(hit) {
-    if (!hit) { currentMarker = null; hideInfo(); return; }
+    if (!hit) { currentMarker = null; navMk = null; hideInfo(); return; }
     if (hit.custom) {
       currentMarker = null;
+      navMk = null;
       showCustomInfo(hit.custom);
       return;
     }
@@ -609,7 +612,69 @@ const UI = (() => {
     renderCard();
   }
 
-  /* 材料详情卡（v1.1.0）：复用信息卡 DOM，隐藏收集类按钮 */
+  /* 基础行（区域/塔域/坐标）与材料专属块（图鉴图/meta/用途）互斥显隐（v1.4.0） */
+  function showBaseRows() {
+    $('cardRegion').classList.remove('hidden');
+    $('cardTower').classList.remove('hidden');
+    $('cardCoord').classList.remove('hidden');
+  }
+  function hideBaseRows() {
+    $('cardRegion').classList.add('hidden');
+    $('cardTower').classList.add('hidden');
+    $('cardCoord').classList.add('hidden');
+  }
+  function hideMaterialOnly() {
+    $('cardImg').classList.add('hidden');
+    $('cardMeta').classList.add('hidden');
+    $('cardUsage').classList.add('hidden');
+  }
+
+  /* 最近区域：取 BOTW_REGIONS（r1-r3 地名层级）中距该点最近者 */
+  function nearestRegion(px) {
+    if (!px || !map.regions || !map.regions.length) return '—';
+    let best = null, bd = Infinity;
+    for (const r of map.regions) {
+      if (!r || !r.px || (r.lv && +r.lv > 3)) continue;
+      const dx = r.px[0] - px[0], dy = r.px[1] - px[1];
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = r; }
+    }
+    return best ? (best.n || '—') : '—';
+  }
+  /* 材料分布中心（无点击点时作导航/区域兜底） */
+  function matCenter(pts) {
+    let ax = 0, ay = 0;
+    const n = Math.min(pts.length, 2000);
+    for (let i = 0; i < n; i++) { ax += pts[i][0]; ay += pts[i][1]; }
+    return [Math.round(ax / n), Math.round(ay / n)];
+  }
+  /* 点击点在全部点位中的序号（第 N / total 个位置） */
+  function posLabel(m, pts, matPx) {
+    if (!pts.length) return '无固定刷点';
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const d = (pts[i][0] - matPx[0]) * (pts[i][0] - matPx[0]) + (pts[i][1] - matPx[1]) * (pts[i][1] - matPx[1]);
+      if (d < bd) { bd = d; best = i; }
+    }
+    return '第 ' + (best + 1) + ' / ' + pts.length + ' 个位置';
+  }
+  /* 材料用途（v1.4.0 仿 TOTK）：类目标签 + 特例 */
+  const MAT_UPGRADE_FISH = ['潜行鳟鱼', '铠甲鳟鱼', '大剑鳟鱼', '精力鲈鱼', '远昔骨舌鱼'];
+  const MAT_SPECIAL_USAGE = {
+    '精灵': '特殊道具（回复生命 / 护身）',
+    '静谧公主': '特殊材料（任务 / 防具升级）',
+    '毅力胡萝卜': '料理材料（补充精力圈）'
+  };
+  function matUsage(m) {
+    const sp = MAT_SPECIAL_USAGE[m.cn];
+    if (sp) return sp;
+    if (m.cat === '昆虫') return '防具升级素材';
+    if (m.cat === '矿物') return '强化材料（防具 / 珠宝）';
+    if (m.cat === '鱼' && MAT_UPGRADE_FISH.indexOf(m.cn) >= 0) return '防具升级素材';
+    return '料理材料';
+  }
+
+  /* 材料详情卡（v1.4.0 TOTK 风格）：图鉴图 + 区域/坐标/位置 meta + 用途 + 导航（可停止） */
   function showMaterialCard(m, matPx) {
     const cfg = MAT_CAT_CFG[m.cat] || {};
     $('cardCat').textContent = m.cat;
@@ -617,12 +682,28 @@ const UI = (() => {
     $('cardCat').style.color = cfg.color;
     $('cardName').textContent = m.cn;
     $('cardEn').textContent = m.en || '';
-    $('cardRegion').innerHTML = '图鉴编号<b>' + esc(m.entry) + '</b>';
-    $('cardTower').innerHTML = '全图点位<b>' + m.count + ' 个</b>';
-    $('cardCoord').innerHTML = matPx
-      ? '游戏坐标<b>X ' + map.gameCoord(matPx)[0] + ' · Z ' + map.gameCoord(matPx)[1] + '</b>'
-      : '分布<b>' + (m.count ? '全图可采集' : '无固定刷点') + '</b>';
+    // 图鉴图（webp；加载失败则隐藏，点击放大灯箱）
+    const img = $('cardImg');
+    img.src = 'assets/materials/' + m.entry + '.webp';
+    img.alt = m.cn;
+    img.onerror = () => img.classList.add('hidden');
+    img.onclick = () => openLightbox(img.src, img.alt);
+    img.classList.remove('hidden');
+    // meta：区域 / 坐标 / 位置
+    const pts = map.matPointsBy[m.id] || [];
+    const navPoint = matPx || (pts.length ? matCenter(pts) : null);
+    $('cardMetaRegion').textContent = matPx ? nearestRegion(matPx) : '全图分布';
+    $('cardMetaCoord').textContent = matPx
+      ? 'X ' + map.gameCoord(matPx)[0] + ' · Z ' + map.gameCoord(matPx)[1]
+      : '—';
+    $('cardMetaPos').textContent = matPx ? posLabel(m, pts, matPx) : (m.count ? '全图 ' + m.count + ' 个点位' : '无固定刷点');
+    $('cardMeta').classList.remove('hidden');
+    // 用途
+    $('cardUsageVal').textContent = matUsage(m);
+    $('cardUsage').classList.remove('hidden');
+    hideBaseRows();
     let extra = '';
+    extra += '<div class="row">图鉴编号<b>' + esc(m.entry) + '</b></div>';
     if (m.count === 0) extra += '<div class="row">说明<b style="color:#e8b04a">无 MainField 固定刷点（动态生成 / 仅栖息地）</b></div>';
     extra += '<div class="row">图层<b>' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（点击侧栏「材料」分类下的行开启）') + '</b></div>';
     $('cardExtra').innerHTML = extra;
@@ -631,8 +712,18 @@ const UI = (() => {
     $('cardDone').classList.add('hidden');
     $('cardUndone').classList.add('hidden');
     $('cardDelPin').classList.add('hidden');
-    $('cardNav').classList.add('hidden');
     $('cardCollect').classList.add('hidden');
+    // 导航（v1.4.0：材料点可导航；再次点击同一目标 = 停止导航）
+    const navBtn = $('cardNav');
+    if (navPoint) {
+      navBtn.classList.remove('hidden');
+      navMk = { px: navPoint, name: m.cn, en: m.en || '', cat: 'material' };
+      navBtn.onclick = () => LIVE.toggleNav(navMk);
+      refreshNavButton();
+    } else {
+      navBtn.classList.add('hidden');
+      navMk = null;
+    }
     positionCard();
     $('infoCard').classList.remove('hidden');
   }
@@ -671,6 +762,8 @@ const UI = (() => {
     $('cardCat').style.color = cfg.color;
     $('cardName').textContent = mk.name;
     $('cardEn').textContent = mk.en || '';
+    showBaseRows();
+    hideMaterialOnly();
     $('cardRegion').innerHTML = '区域<b>' + (mk.region || '—') + '</b>';
     $('cardTower').innerHTML = '塔域<b>' + (mk.tower || '—') + '</b>';
     $('cardCoord').innerHTML = '游戏坐标<b>X ' + gx + ' · Z ' + gz + '</b>';
@@ -699,9 +792,11 @@ const UI = (() => {
     $('cardDone').classList.toggle('hidden', done);
     $('cardUndone').classList.toggle('hidden', !done);
     $('cardDelPin').classList.add('hidden');
-    // 导航按钮（live 层；离线时给出提示）
+    // 导航按钮（v1.4.0：同一目标再次点击 = 停止导航）
     $('cardNav').classList.remove('hidden');
-    $('cardNav').onclick = () => LIVE.navigate(mk);
+    navMk = mk;
+    $('cardNav').onclick = () => LIVE.toggleNav(mk);
+    refreshNavButton();
     // 收集按钮（仅回忆 / 克洛格 显示；live 层注入）
     syncCollectBtn();
     $('cardDone').onclick = () => {
@@ -723,6 +818,8 @@ const UI = (() => {
     $('cardCat').style.color = c.color;
     $('cardName').textContent = c.name;
     $('cardEn').textContent = '';
+    showBaseRows();
+    hideMaterialOnly();
     $('cardRegion').innerHTML = '区域<b>自定义</b>';
     $('cardTower').innerHTML = '坐标<b>X ' + gx + ' · Z ' + gz + '</b>';
     $('cardCoord').innerHTML = '';
@@ -759,6 +856,15 @@ const UI = (() => {
       else LIVE.startCollectMode(mk.cat, mk);
       syncCollectBtn();
     };
+  }
+
+  /* 导航按钮文案刷新（v1.4.0）：当前卡片目标 == 进行中的导航目标 → 「停止导航」 */
+  function refreshNavButton() {
+    const btn = $('cardNav');
+    if (!btn || btn.classList.contains('hidden')) return;
+    const t = (typeof LIVE !== 'undefined' && LIVE.currentTarget) ? LIVE.currentTarget() : null;
+    const cur = navMk && navMk.px && t && t.x === navMk.px[0] && t.y === navMk.px[1];
+    btn.textContent = cur ? '停止导航' : '导航';
   }
 
   function positionCard() {
@@ -1142,5 +1248,5 @@ const UI = (() => {
     toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
   }
 
-  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn };
+  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn, refreshNavButton };
 })();
