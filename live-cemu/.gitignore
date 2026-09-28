@@ -1,0 +1,14 @@
+# 运行时生成，不入库
+known_addrs.json
+navi_out.txt
+navi_err.txt
+status.json
+data/map_config.json
+
+# go:embed 构建依赖（progress_points.json）需入库，data/ 其余排除
+data/*
+!data/progress_points.json
+
+# 本地开发文档（不入库，与 BOTWmap 惯例一致）
+live-cemu V0.1.0开发计划.md
+live-cemu V1.1.0开发计划-全自动进度同步.md
