@@ -71,3 +71,14 @@ xnavi/status.json
 xnavi/known_*.json
 xnavi/data/*
 !xnavi/data/progress_points.json
+# xnavi / xnavi-gui 一次性脚本与编译产物（不入库；2026-09-29 清理时补）
+xnavi/_*.py
+xnavi/xnavi-core.exe
+xnavi/diagnostics/
+xnavi-gui/_*.py
+xnavi-gui/xnavi-gui.exe
+xnavi-v2.1.0.zip
+_changelog.py
+
+# 发布版本归档（本地留底，不入库）
+RELEASE/
