@@ -199,6 +199,7 @@ const (
 var (
 	rescanCh     chan struct{}
 	lastScanAt   time.Time
+	lastFixedTry time.Time
 	lastMoveAt   time.Time
 	lastVerifyAt time.Time
 	useSaveScan  = true
@@ -304,7 +305,8 @@ func stateMachine() {
 		// ---- UNLOCKED：固定偏移优先，失败再扫描 ----
 		if !inLocked {
 			// 1) 先试平台已知固定偏移（秒锁，不扫描）
-			if offsets := p.KnownOffsets(); len(offsets) > 0 {
+			if offsets := p.KnownOffsets(); len(offsets) > 0 && time.Since(lastFixedTry) > 2*time.Second {
+				lastFixedTry = time.Now()
 				blks := p.Blocks(512.0) // 和扫描用同一组 guest 块
 				fmt.Printf("  [sm] trying fixed offsets on %d blocks:\n", len(blks))
 				for i, blk := range blks {
