@@ -101,8 +101,10 @@ func reopenProcess() bool {
 	return true
 }
 
-// guestRamBase 返回 known 偏移的锚点基址 = 最大已提交 RW 块（每次必可找到）。
-// 社区链需要精确 memory_base（见 findCemuBase），但 known 快路径只需稳定锚点。
+// guestRamBase 返回 known 偏移的锚点基址 = 最大已提交 RW 块的 **AllocationBase**（每次必可找到）。
+// ⚠️ 必须用 AllocationBase 而非 BaseAddress：本机两者差 0x2000000（_情报-社区固定针位.md）。
+// 社区链需要精确 memory_base（见 findCemuBase，同样锚 AllocationBase）；known 快路径锚与之一致，
+// 固定针位偏移（0x1055300C）也落在同一锚下，三者自洽。
 func guestRamBase() uintptr {
 	procMu.Lock()
 	h := procHandle
@@ -110,8 +112,8 @@ func guestRamBase() uintptr {
 	if h == 0 {
 		return 0
 	}
-	base, _ := largestRWBlock(h)
-	return base
+	_, alloc, _ := largestRWAlloc(h)
+	return alloc
 }
 
 // decodePosF 校验并转换内存序 (X, alt, Z) → 展示序 (gx, gz, alt)。无效返回 nil。
@@ -121,6 +123,38 @@ func decodePosF(v [3]float32) []float32 {
 		return nil
 	}
 	return []float32{gx, gz, alt}
+}
+
+// 社区固定针位（确定性、零扫描、版本内稳定）：
+// 来源 koko-yl/BotWRamWatch（ram_dll/dllmain.cpp），BotW JP v208 在本机跨实例实测有效。
+// base = Cemu 进程最大 RW 块的 AllocationBase（不是 BaseAddress！）；
+// X=base+0x1055300C  Y(高度)=base+0x10553010  Z=base+0x10553014（PPC 大端 f32）。
+const (
+	fixedPosXOff = 0x1055300C
+	fixedPosYOff = 0x10553010
+	fixedPosZOff = 0x10553014
+)
+
+// tryFixedPos 确定性快路径：直接读 AllocationBase + 固定偏移，无需任何扫描/走动。
+func tryFixedPos() (uintptr, [3]float32, bool) {
+	if !reopenProcess() {
+		return 0, [3]float32{}, false
+	}
+	procMu.Lock()
+	h := procHandle
+	procMu.Unlock()
+	_, alloc, _ := largestRWAlloc(h)
+	if alloc == 0 {
+		return 0, [3]float32{}, false
+	}
+	guestBase.Store(alloc) // known 偏移锚 = AllocationBase（固定偏移 0x1055300C 同锚，自洽）
+	a := alloc + fixedPosXOff
+	if p, ok := readPosBE(h, a); ok {
+		if d := decodePosF([3]float32{p[0], p[1], p[2]}); d != nil {
+			return a, [3]float32{d[0], d[1], d[2]}, true
+		}
+	}
+	return 0, [3]float32{}, false
 }
 
 // tryOffsets known fast path：把记住的偏移 rebase 到当前 memory_base 并读取。
@@ -191,6 +225,7 @@ var (
 	pendingDelta float32
 	driftN       int
 	shrineMode   bool
+	shrinePin    [3]float32 // 进入神庙前最后一个世界坐标（红点固定点）
 	preJump      [3]float32 // 最近一次 accept 传送/跳变前的位置
 	lastJumpAt   time.Time  // 最近一次 accept 传送的时间（回跳撤销窗口）
 )
@@ -219,17 +254,25 @@ func poll() {
 		if v != nil {
 			gx, gz, alt := v[0], v[1], v[2]
 
-			// ---- 神庙模式：红点固定神庙入口，忽略内部坐标 ----
+			// ---- 进入神庙识别（坐标尺度法）：世界尺度(|x|,|z|>300) → 内部尺度(<300) 单 poll 大跳变 ----
+			// 确定性判定：不依赖"目标是否匹配神庙入口坐标"，任何此类跳变都判进入
+			// （覆盖直接走门进入、传送进内部等；旧 matchShrine 入口保留作传送补充）
+			if !shrineMode && lastPollGx != 0 &&
+				abs32(gx) < pollShrineExit && abs32(gz) < pollShrineExit &&
+				(abs32(lastPollGx) > pollShrineExit || abs32(lastPollGz) > pollShrineExit) &&
+				dist3(gx, alt, gz, lastPollGx, lastPollGy, lastPollGz) > 50 {
+				shrineMode = true
+				shrinePin = [3]float32{lastPollGx, lastPollGy, lastPollGz}
+				fmt.Printf("  [shrine] entered shrine (interior %.0f, %.0f) -> pin dot to entrance\n", gx, gz)
+			}
+
+			// ---- 神庙模式：红点固定神庙入口（shrinePin），忽略内部坐标 ----
 			if shrineMode {
 				if abs32(gx) > pollShrineExit || abs32(gz) > pollShrineExit {
 					fmt.Printf("  [shrine] left shrine (world %.0f, %.0f) -> normal tracking\n", gx, gz)
 					shrineMode = false
 				} else {
-					state.age = 0
-					state.lastSeen = float64(time.Now().UnixNano()) / 1e9
-					state.mu.Unlock()
-					time.Sleep(100 * time.Millisecond)
-					continue
+					gx, alt, gz = shrinePin[0], shrinePin[1], shrinePin[2]
 				}
 			}
 
@@ -257,6 +300,7 @@ func poll() {
 							fmt.Printf("  [poll] teleport %.1fm x%d -> accept\n", pendingDelta, pendingN)
 							if p := matchShrine(gx, alt, gz); p != nil {
 								shrineMode = true
+								shrinePin = [3]float32{gx, alt, gz}
 								fmt.Printf("  [shrine] entered %s -> pin red dot to shrine\n", p.Cn)
 							}
 							pendingN = 0
@@ -541,28 +585,34 @@ func verifyKnown(addr uintptr) {
 		}
 		prev = cur
 		if time.Since(staleSince) >= staleGap {
-			// 死槽/坏槽保护：未验证的锁长时间无任何移动 → 重扫换真槽。
-			// （玩家真站着时重扫失败并保持原锁，等移动信号；成功则换到真槽。）
-			fmt.Printf("  [verify] no movement for %.0fs at 0x%X -> re-locating\n", staleGap.Seconds(), addr)
-			relocalize("no movement: stale or bad slot")
+			// 死槽/坏槽保护：**未验证**的锁长时间无任何移动 → 重扫换真槽。
+			// （已验证的真锁站定不算死槽：玩家站着不动是合法状态，不应触发重扫；
+			//   真锁变坏由 bad 计数与 poll 漂移兜底。）
 			lock.mu.RLock()
-			still := lock.addr
+			stillVerified := lock.verified
 			lock.mu.RUnlock()
-			if still != addr {
-				return // 已换槽，新 verify 在跑
-			}
-			// 未换槽：先验锁定的可能还是冻结槽 → 强制差分监听找真正在动的槽
-			fmt.Println("  [verify] prior lock unchanged -> forcing motion diff scan")
-			if a := locateByMotion(h, guestRamBase(), false); a != 0 && a != addr {
-				lock.mu.Lock()
-				lock.addr = a
-				lock.verified = false
-				lock.copies = 0
-				lock.source = "motion"
-				lock.mu.Unlock()
-				fmt.Printf("  [verify] diff scan locked moving slot -> 0x%X\n", a)
-				go verifyKnown(a)
-				return
+			if !stillVerified {
+				fmt.Printf("  [verify] no movement for %.0fs at 0x%X -> re-locating\n", staleGap.Seconds(), addr)
+				relocalize("no movement: stale or bad slot")
+				lock.mu.RLock()
+				still := lock.addr
+				lock.mu.RUnlock()
+				if still != addr {
+					return // 已换槽，新 verify 在跑
+				}
+				// 未换槽：先验锁定的可能还是冻结槽 → 强制差分监听找真正在动的槽
+				fmt.Println("  [verify] prior lock unchanged -> forcing motion diff scan")
+				if a := locateByMotion(h, guestRamBase(), false); a != 0 && a != addr {
+					lock.mu.Lock()
+					lock.addr = a
+					lock.verified = false
+					lock.copies = 0
+					lock.source = "motion"
+					lock.mu.Unlock()
+					fmt.Printf("  [verify] diff scan locked moving slot -> 0x%X\n", a)
+					go verifyKnown(a)
+					return
+				}
 			}
 			staleSince = time.Now()
 			if staleGap < 60*time.Second {
@@ -596,6 +646,20 @@ func relocalize(reason string) bool {
 	h := procHandle
 	procMu.Unlock()
 
+	// 0) 社区固定针位（确定性、零扫描）：本机已验证跟随玩家，首选
+	if a, v, ok := tryFixedPos(); ok {
+		lock.mu.Lock()
+		lock.addr = a
+		lock.verified = false
+		lock.copies = 0
+		lock.source = "fixed"
+		lock.mu.Unlock()
+		go verifyKnown(a)
+		fmt.Printf("  [relocate] %s -> fixed offset 0x%X mem=(%.1f, %.1f, %.1f)\n",
+			reason, a, v[0], v[1], v[2])
+		return true
+	}
+
 	// 1) 社区链：仅当 memory_base 可锚定时尝试
 	if base, _, ok := findCemuBase(h); ok {
 		guestBase.Store(base)
@@ -622,11 +686,11 @@ func relocalize(reason string) bool {
 	if a := locateByMotion(h, guestRamBase(), true); a != 0 {
 		lock.mu.Lock()
 		lock.addr = a
-		lock.verified = true
+		lock.verified = false // 不立即 verified：交 verifyKnown（首读 sane 才验证），防垃圾槽对外服务/写库
 		lock.copies = 0
 		lock.source = "motion"
 		lock.mu.Unlock()
-		if p, ok := readPosBE(h, a); ok { _ = p; saveKnown([]uintptr{a}, guestRamBase(), [3]float32{}) } // motion lock: 只记偏移
+		go verifyKnown(a)
 		return true
 	}
 	fmt.Println("  [relocate] no luck yet - will retry; walk a few steps in-game to help lock")

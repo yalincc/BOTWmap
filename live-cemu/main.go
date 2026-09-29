@@ -78,8 +78,18 @@ func main() {
 	fmt.Printf("  API -> http://%s/pos\n", addr)
 	go http.Serve(ln, &server{})
 
-	fmt.Println("  stage 1: remembered offsets (no scan needed) ...")
-	if a, v, ok := tryOffsets(); ok {
+	fmt.Println("  stage 1: fixed offset (deterministic) -> remembered offsets ...")
+	if a, v, ok := tryFixedPos(); ok {
+		lock.mu.Lock()
+		lock.addr = a
+		lock.verified = false
+		lock.copies = 0
+		lock.source = "fixed"
+		lock.mu.Unlock()
+		fmt.Printf("  address 0x%X -> mem=(%.1f, %.1f, %.1f)   [fixed path, zero scan]\n", a, v[0], v[1], v[2])
+		fmt.Println("  it is verified as soon as the value reads sane.")
+		go verifyKnown(a)
+	} else if a, v, ok := tryOffsets(); ok {
 		lock.mu.Lock()
 		lock.addr = a
 		lock.verified = false
@@ -140,7 +150,18 @@ func dumpDiagnostics() {
 	}
 	base, mem2, ok := findCemuBase(h)
 	anchor, anchorSize := largestRWBlock(h)
+	_, alloc, _ := largestRWAlloc(h)
 	fmt.Printf("  [dump] anchor (largest RW block) = 0x%012X  (%8.0f MB)\n", anchor, float64(anchorSize)/1048576.0)
+	if alloc != 0 && alloc != anchor {
+		fmt.Printf("  [dump] largest block AllocationBase = 0x%012X  (diff 0x%X <- 固定针位锚)\n", alloc, anchor-alloc)
+	}
+	if alloc != 0 {
+		if p, rok := readPosBE(h, alloc+fixedPosXOff); rok {
+			fmt.Printf("  [dump] fixed offset +0x1055300C -> mem=(%.1f, %.1f, %.1f)\n", p[0], p[1], p[2])
+		} else {
+			fmt.Println("  [dump] fixed offset +0x1055300C -> unreadable")
+		}
+	}
 	if !ok {
 		fmt.Println("  [dump] memory_base NOT found (chains will be skipped; motion scan still works)")
 	} else {

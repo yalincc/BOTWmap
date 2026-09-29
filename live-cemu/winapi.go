@@ -202,6 +202,62 @@ func largestRWBlock(h uintptr) (uintptr, uintptr) {
 	return best, bestSize
 }
 
+// rwBlockT 带 AllocationBase 的块描述。
+// ⚠️ Cemu 2.x 本机实测：最大 RW 块（3616MB）的 BaseAddress 与 AllocationBase 相差 0x2000000，
+//    真正的 memory_base / 固定针位锚 = AllocationBase（见 _情报-社区固定针位.md）。
+type rwBlockT struct {
+	Base  uintptr // 首个已提交区域的 BaseAddress
+	Alloc uintptr // 所在分配的 AllocationBase（= 真 memory_base）
+	Size  uintptr
+}
+
+// rwBlocksAlloc 同 rwBlocks，但每个合并块附带首个区域的 AllocationBase。
+func rwBlocksAlloc(h uintptr, minMB float64) []rwBlockT {
+	minSize := uintptr(minMB * 1048576.0)
+	var out []rwBlockT
+	addr := uintptr(0)
+	const limit = uintptr(0x7FFFFFFFFFFF)
+	for addr < limit {
+		var mbi MemoryBasicInformation
+		if virtualQueryEx(h, addr, &mbi) == 0 {
+			break
+		}
+		base, size := mbi.BaseAddress, mbi.RegionSize
+		p := mbi.Protect & 0xFF
+		if mbi.State == memCommit && (p == 0x02 || p == 0x04) && (mbi.Protect&pageGuard) == 0 {
+			if n := len(out); n > 0 && base == out[n-1].Base+out[n-1].Size {
+				out[n-1].Size += size
+			} else {
+				out = append(out, rwBlockT{base, mbi.AllocationBase, size})
+			}
+		}
+		nxt := base + size
+		if nxt > addr {
+			addr = nxt
+		} else {
+			addr += 0x1000
+		}
+	}
+	var filtered []rwBlockT
+	for _, b := range out {
+		if b.Size >= minSize {
+			filtered = append(filtered, b)
+		}
+	}
+	return filtered
+}
+
+// largestRWAlloc 返回最大 RW 块的 (BaseAddress, AllocationBase, Size)。
+func largestRWAlloc(h uintptr) (uintptr, uintptr, uintptr) {
+	best, bestA, bestS := uintptr(0), uintptr(0), uintptr(0)
+	for _, b := range rwBlocksAlloc(h, 1.0) {
+		if b.Size > bestS {
+			best, bestA, bestS = b.Base, b.Alloc, b.Size
+		}
+	}
+	return best, bestA, bestS
+}
+
 // hasCommittedRW 检查 addr 起始的连续已提交可读区域合计是否 ≥ want 字节。
 // addr 可能落在某个大区域内部：从 addr 所在区域起向后累计，不要求区域正好从 addr 开始。
 // 允许 Exec 类保护（0x20/0x40/0x80），供校验用。

@@ -129,6 +129,9 @@ func (w *progressWatcher) refresh() {
 	copy(pts, w.refs)
 	var doneN, totalN [5]int
 	for i := range pts {
+		// 参考表若带历史状态（旧快照的 done/entered），一律以当前存档为准：
+		// done 现算，entered 显式清零（存档无进入判定字段，不再外传旧快照残留）
+		pts[i].Entered = false
 		key := pts[i].Hash
 		if pts[i].DoneHash != 0 {
 			key = pts[i].DoneHash

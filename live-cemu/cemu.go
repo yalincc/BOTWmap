@@ -80,37 +80,48 @@ func abs32(v float32) float32 {
 // findCemuBase 反推 Cemu 的 memory_base。两条路线：
 // 1) 区域结构校验：MEM2（≥512MB @ +0x10000000）反推 → 校验 TEXT（+0x02000000，≥64MB）。
 //    （不要求 MEM1——Cemu 2.x 实测 MEM1 区可能未提交。）
-// 2) 链探针法（不依赖区域布局假设）：把每个大块当作 TEXT/MEM2/整空间 的候选基址，
+//    ⚠️ Cemu 2.x 本机实测：最大块 = MEM2+TEXT 整块（3616MB），其 BaseAddress 比
+//    AllocationBase 大 0x2000000；真 memory_base = **AllocationBase**（_情报-社区固定针位.md）。
+//    旧代码用 BaseAddress 反推导致三条路线全算错 → 本机 memory_base 永远锚定失败。
+// 2) 链探针法（不依赖区域布局假设）：把每个大块的 AllocationBase/BaseAddress 当作候选基址，
 //    直接试解社区指针链（值必须落在合理 guest 地址区间），解通即确认。
 // 返回 (base, mem2HostBase, ok)。
 func findCemuBase(h uintptr) (uintptr, uintptr, bool) {
-	blocks := rwBlocks(h, 64.0)
+	blocks := rwBlocksAlloc(h, 64.0)
+	// 1) 大块（MEM2+TEXT 合体）：base = AllocationBase
 	for _, b := range blocks {
-		if b.Size >= 512<<20 {
-			base := b.Base - 0x10000000
+		if b.Size >= 512<<20 && b.Alloc != 0 {
+			base := b.Alloc
 			if hasCommittedRW(h, base+0x02000000, 64<<20) {
-				return base, b.Base, true
+				return base, base + 0x10000000, true
 			}
 		}
 	}
+	// 1b) 旧版 Cemu 独立小布局：MEM2 块（128-512MB）→ base = Alloc - 0x02000000（TEXT 起）
 	for _, b := range blocks {
-		if b.Size >= 128<<20 && b.Size < 512<<20 && b.Base < 0x10000000 {
-			base := b.Base - 0x02000000
+		if b.Size >= 128<<20 && b.Size < 512<<20 && b.Alloc < 0x10000000 {
+			base := b.Alloc - 0x02000000
 			if hasCommittedRW(h, base+0x10000000, 512<<20) {
 				return base, base + 0x10000000, true
 			}
 		}
 	}
+	// 2) 链探针：候选基址 = 每个大块的 AllocationBase 与 BaseAddress
 	for _, b := range blocks {
-		for _, delta := range []uintptr{0x02000000, 0x10000000, 0} {
-			cand := b.Base - delta
-			if cand == 0 || cand > b.Base {
+		for _, cand := range []uintptr{b.Alloc, b.Base} {
+			if cand == 0 {
 				continue
 			}
-			for _, c := range cemuChains {
-				if va, ok := resolveChain(h, cand, c); ok {
-					if len(slotScanAround(h, cand, va)) > 0 {
-						return cand, cand + 0x10000000, true
+			for _, delta := range []uintptr{0x02000000, 0x10000000, 0} {
+				c := cand - delta
+				if c == 0 || c > cand {
+					continue
+				}
+				for _, ch := range cemuChains {
+					if va, ok := resolveChain(h, c, ch); ok {
+						if len(slotScanAround(h, c, va)) > 0 {
+							return c, c + 0x10000000, true
+						}
 					}
 				}
 			}

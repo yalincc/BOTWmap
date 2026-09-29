@@ -2,6 +2,8 @@
 known_addrs.json
 navi_out.txt
 navi_err.txt
+navi_new_out.txt
+navi_new_err.txt
 status.json
 data/map_config.json
 
