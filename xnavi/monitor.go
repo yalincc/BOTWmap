@@ -34,29 +34,30 @@ var (
 	evFile *os.File
 )
 
-const evLogMax = 2 << 20 // 2MB 轮转
+const evLogMax = 5 << 20 // 5MB 轮转 ×3 份（.1/.2/.3，最旧丢弃）
 
 func evLogPath() string {
 	exe, _ := os.Executable()
 	return filepath.Join(filepath.Dir(exe), "run-events.log")
 }
 
+// rotateEvLog 滚动轮转：run-events.log → .1 → .2 → .3（丢弃最旧）。
+func rotateEvLog() {
+	os.Rename(evLogPath()+".2", evLogPath()+".3")
+	os.Rename(evLogPath()+".1", evLogPath()+".2")
+	os.Rename(evLogPath(), evLogPath()+".1")
+}
+
 func openEvLog() {
 	if evFile != nil {
 		return
 	}
+	if fi, err := os.Stat(evLogPath()); err == nil && fi.Size() > evLogMax {
+		rotateEvLog()
+	}
 	f, err := os.OpenFile(evLogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return
-	}
-	if fi, err := f.Stat(); err == nil && fi.Size() > evLogMax {
-		f.Close()
-		os.Rename(evLogPath(), evLogPath()+".1")
-		if f2, err := os.OpenFile(evLogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
-			f = f2
-		} else {
-			return
-		}
 	}
 	evFile = f
 }

@@ -92,11 +92,14 @@ func main() {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		fmt.Printf("  listen %s failed: %v\n", addr, err)
-		os.Exit(1)
+		// 端口占用/防火墙拦截：不阻塞定位（ds 双入口原则——GUI 与网页端独立）。
+		// 定位与状态照常，仅网页端不可用；GUI/日志仍可经 status.json + run-events.log 工作。
+		fmt.Printf("  !! HTTP %s failed: %v\n", addr, err)
+		fmt.Println("  !! HTTP 端口被占用：网页端不可用，定位导航照常运行")
+	} else {
+		fmt.Printf("  API -> http://%s/pos\n", addr)
+		go http.Serve(ln, &server{})
 	}
-	fmt.Printf("  API -> http://%s/pos\n", addr)
-	go http.Serve(ln, &server{})
 
 	// 单一状态机：唯一写 lock.addr 的 goroutine
 	go stateMachine()
