@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,6 +76,43 @@ func (a *App) startup(ctx context.Context) {
 	a.cfg = a.loadConfig()
 	a.tailInit()
 	go a.eventBridge(ctx)
+	go a.checkUpdate()
+	// 手动检查更新
+	runtime.EventsOn(ctx, "update:check", func(data ...interface{}) {
+		go a.checkUpdate()
+	})
+}
+
+// checkUpdate 启动时查 GitHub tags 列表，找最新 xnavi- 开头的 tag，有新版弹窗。
+func (a *App) checkUpdate() {
+	defer func() { recover() }()
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get("https://api.github.com/repos/yalincc/BOTWmap/tags?per_page=30")
+	if err != nil { return }
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var tags []struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(body, &tags) != nil { return }
+	found := false
+	for _, t := range tags {
+		if !strings.HasPrefix(t.Name, "xnavi-") { continue }
+		latest := strings.TrimPrefix(t.Name, "xnavi-")
+		if latest != guiVersion {
+			runtime.EventsEmit(a.ctx, "update:available", map[string]string{
+				"latest": latest,
+				"url":    "https://github.com/yalincc/BOTWmap/releases/tag/" + t.Name,
+			})
+		} else {
+			runtime.EventsEmit(a.ctx, "update:latest", nil)
+		}
+		found = true
+		break
+	}
+	if !found {
+		runtime.EventsEmit(a.ctx, "update:latest", nil)
+	}
 }
 
 func (a *App) PickDir(title string) string {
@@ -224,12 +263,8 @@ func (a *App) lastLog() string {
 
 // tailInit 首次加载 xnavi-gui-core.log 末尾（最多 2000 行）。
 func (a *App) tailInit() {
-	buf, err := os.ReadFile(filepath.Join(a.workDir, "xnavi-gui-core.log"))
-	if err != nil {
-		return
-	}
-	lines := strings.Split(strings.ReplaceAll(string(buf), "\r\n", "\n"), "\n")
-	a.appendLines(lines)
+	os.WriteFile(filepath.Join(a.workDir, "xnavi-gui-core.log"), nil, 0644)
+	a.logMarker = ""
 }
 
 // appendLines 追加日志到环形缓冲（2000 行上限，ds 提醒 2）。

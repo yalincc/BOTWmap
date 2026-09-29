@@ -13,7 +13,6 @@
         </div>
         <button class="text-slate-400 hover:text-white transition" @click="showSettings = true">⚙ 设置</button>
         <button class="text-slate-400 hover:text-white transition" @click="openMap">🌐 地图</button>
-        <button class="text-slate-400 hover:text-white transition" @click="showSettings = true">⚙ 设置</button>
         <button class="text-slate-400 hover:text-white transition" @click="showAbout = true">ℹ 关于</button>
       </div>
     </header>
@@ -120,6 +119,16 @@
         </div>
       </div>
     </div>
+    <div v-if="updateInfo" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="updateInfo = null">
+      <div class="bg-[#161b22] border border-emerald-500/50 rounded-lg p-5 w-96">
+        <div class="text-sm font-bold text-emerald-400 mb-2">有新版本可用</div>
+        <div class="text-xs text-slate-300">当前：{{ ver }} → 最新：{{ updateInfo.latest }}</div>
+        <div class="flex justify-end gap-2 mt-4">
+          <button class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs" @click="updateInfo = null">稍后</button>
+          <button class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 rounded text-xs text-white" @click="rt.BrowserOpenURL(updateInfo.url); updateInfo = null">下载</button>
+        </div>
+      </div>
+    </div>
     <div v-if="showAbout" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showAbout = false">
       <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-96 text-xs space-y-2">
         <div class="text-sm font-bold text-white mb-2">关于 xnavi</div>
@@ -128,7 +137,8 @@
         <div class="text-slate-400">地图：<a href="https://botw.yalin.site/" class="text-blue-400 hover:underline">botw.yalin.site</a></div>
         <div class="text-slate-400">GitHub：<a href="https://github.com/yalincc/BOTWmap" class="text-blue-400 hover:underline">yalincc/BOTWmap</a></div>
         <div class="text-slate-400 mt-2">只读内存，不注入，不修改游戏。</div>
-        <div class="flex justify-end mt-3">
+        <div class="flex justify-end gap-2 mt-3">
+          <button class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs" @click="checkUpdate">检查更新</button>
           <button class="bg-slate-700 hover:bg-slate-600 px-4 py-1.5 rounded text-xs text-white" @click="showAbout = false">关闭</button>
         </div>
       </div>
@@ -146,6 +156,8 @@ const syncDot = ref('bg-slate-600')
 const syncClass = computed(() => coreRunning.value ? 'text-emerald-400' : 'text-slate-500')
 const showSettings = ref(false)
 const showAbout = ref(false)
+const updateInfo = ref(null)
+let isInitLog = true
 const paths = reactive({ cemu: 'H:\\Cemu', ryujinx: 'G:\\YUZU\\ryujinx-canary-1.3.351-win_x64', saveDir: '' })
 const env = reactive({ emulator: 'auto', version: 'auto' })
 const envDetect = reactive({ cemu: false, ryujinx: false })
@@ -208,14 +220,20 @@ function pushLogs(lines) {
   logs.value = logs.value.concat(items)
   if (logs.value.length > 2000) logs.value = logs.value.slice(logs.value.length - 2000)
   nextTick(() => { if (logBox.value) logBox.value.scrollTop = logBox.value.scrollHeight })
-  const last = items[items.length - 1].text
-  parseState(last)
+  // 遍历所有新行找状态变化（不只是最后一行）
+  if (!isInitLog) {
+    for (const it of items) { parseState(it.text) }
+  }
 }
 async function pickCemu() { const d = await api.PickDir("选择 Cemu 目录"); if (d) paths.cemu = d }
 async function pickRyujinx() { const d = await api.PickDir("选择 Ryujinx 目录"); if (d) paths.ryujinx = d }
 async function pickSave() { const d = await api.PickDir("选择存档目录"); if (d) paths.saveDir = d }
 async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator }); showSettings.value = false }
 function clearLogs() { logs.value = [] }
+function checkUpdate() {
+  rt.EventsOn("update:latest", () => { alert("已经是最新版") });
+  rt.EventsEmit("update:check");
+}
 async function openMap() { rt.BrowserOpenURL("https://botw.yalin.site/") }
 async function openLogDir() { await api.OpenLogDir() }
 function parseState(line) {
@@ -236,6 +254,12 @@ function parseState(line) {
 }
 let offLogs
 onMounted(async () => {
+  logs.value = []
+  stateText.value = '就绪'
+  scanPercent.value = 0
+  profileText.value = '本地自动档案'
+  profileNote.value = '等待定位...'
+  steps.value.forEach(s => s.state = (s.name === '就绪' ? 'done' : 'idle'))
   ver.value = await api.Version()
   const cfg = await api.LoadConfig()
   if (cfg.cemuDir) paths.cemu = cfg.cemuDir
@@ -247,7 +271,9 @@ onMounted(async () => {
   envDetect.ryujinx = det.ryujinx
   const initial = await api.TailLog()
   pushLogs(initial)
+  isInitLog = false
   offLogs = rt.EventsOn('log:append', pushLogs)
+  rt.EventsOn('update:available', (info) => { updateInfo.value = info })
   rt.EventsOn('status:update', (st) => {
     coreRunning.value = st.running
     if (st.running && st.ok) {

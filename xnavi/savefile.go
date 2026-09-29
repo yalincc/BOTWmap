@@ -112,9 +112,17 @@ func findSaveFiles(root string) []string {
 	return out
 }
 
+// saveDirOverride 由 --save-dir= 命令行参数指定（GUI 设置），优先于自动探测。
+var saveDirOverride string
+
+func setSaveDirOverride(d string) { saveDirOverride = d }
+
 // allSaveFiles 遍历当前平台所有存档根候选（去重、排序）。
 func allSaveFiles(p Platform) []string {
 	var out []string
+	if saveDirOverride != "" {
+		out = append(out, findSaveFiles(saveDirOverride)...)
+	}
 	for _, root := range p.SaveRoots() {
 		out = append(out, findSaveFiles(root)...)
 	}

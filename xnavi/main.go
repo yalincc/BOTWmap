@@ -31,6 +31,7 @@ func main() {
 	useSave := true
 	emu := "auto"
 	dump := false
+	saveDirOverride := ""
 	for _, a := range os.Args[1:] {
 		switch {
 		case a == "--no-open":
@@ -41,6 +42,9 @@ func main() {
 			dump = true
 		case strings.HasPrefix(a, "--emu="):
 			emu = strings.TrimPrefix(a, "--emu=")
+		case strings.HasPrefix(a, "--save-dir="):
+			saveDirOverride = strings.TrimPrefix(a, "--save-dir=")
+			setSaveDirOverride(saveDirOverride)
 		case strings.HasPrefix(a, "--"):
 			// ignore
 		default:
