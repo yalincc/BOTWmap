@@ -85,10 +85,10 @@ func (p *ryujinxPlatform) SaveRoots() []string {
 }
 
 // KnownOffsets Ryujinx BOTW 已知坐标偏移。
-// 0x97FA3FC0 实测不是玩家坐标（读出来 alt 为负 / 离存档点 2000+m），暂禁。
-// 等重新用"移动验证法"找到真正的偏移再开。
+// 0xA77FCBBC: 5次重启样本验证，player = block_base + 0xA77FCBBC 恒成立。
+// 块基址在两个 3GB guest 块间切换，但偏移固定。
 func (p *ryujinxPlatform) KnownOffsets() []uintptr {
-	return nil // []uintptr{0x97FA3FC0}
+	return []uintptr{0xA77FCBBC}
 }
 
 // ---- 内存枚举（Ryujinx 专属，原 live-go winapi.go）----

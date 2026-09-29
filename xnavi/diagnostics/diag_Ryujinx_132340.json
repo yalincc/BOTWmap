@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-09-29 13:23:36",
+  "platform": "Ryujinx",
+  "block_base": 7662365048832,
+  "player_addr": 7665175219132,
+  "offset_in_block": 2810170300,
+  "coords": [
+    4558.1978,
+    -3057.7927,
+    326.85168
+  ],
+  "nearby_pointers": null,
+  "pointers_to_player": null
+}

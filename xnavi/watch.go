@@ -334,7 +334,17 @@ func stateMachine() {
 						for _, off := range offsets {
 							addr := blk.Base + off
 							d := decodeTripleAt(h, addr)
-							if d == nil || !gameValidTriple(d[0], d[1], d[2]) {
+							if d == nil {
+								continue
+							}
+							// 对 Ryujinx 小端，d=(X, Z, alt)；对 Cemu 大端，d=(X, alt, Z)
+							var ok bool
+							if p.LittleEndian() {
+								ok = gameValidTriple(d[0], d[2], d[1])
+							} else {
+								ok = gameValidTriple(d[0], d[1], d[2])
+							}
+							if !ok {
 								continue
 							}
 							// 对 Ryujinx：d=(X, Z, alt)；对 Cemu：d=(X, alt, Z)
@@ -358,7 +368,7 @@ func stateMachine() {
 							}
 						}
 					}
-					if bestAddr != 0 && bestDist < 500 {
+					if bestAddr != 0 {
 						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) dist=%.0fm [confirmed]\n",
 							bestAddr, bestD[0], bestD[1], bestD[2], bestDist)
 						setLock(bestAddr, true, 0, "fixed-offset")
@@ -464,12 +474,14 @@ func stateMachine() {
 				if bestGi >= 0 {
 					adr := probeGroups[bestGi].Addrs[0]
 					if d := decodeTripleAt(h, adr); d != nil {
-						setLock(adr, true, probeGroups[bestGi].Copies, "probe")
-						saveKnown([]uintptr{adr}, guestRamBase(), [3]float32{})
+						// 哪个在动就切到哪个（不限制距离，因为锁的位置可能本身就是错的静态候选）
+						// 切到后不直接 verified，等移动确认
+						setLock(adr, false, probeGroups[bestGi].Copies, "probe")
 						probing = false
 						resetFollow()
 						a = adr
-						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X mem=(%.1f,%.1f,%.1f)\n",
+						lockSince = time.Now()
+						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X mem=(%.1f,%.1f,%.1f) [pending move confirm]\n",
 							bestGi, probeGroups[bestGi].Copies, adr, d[0], d[1], d[2])
 					}
 				}
@@ -570,6 +582,7 @@ func stateMachine() {
 				if !savedKnown {
 					savedKnown = true
 					saveKnown([]uintptr{a}, guestRamBase(), [3]float32{cur[0], cur[2], cur[1]})
+					dumpDiagnostic(a, cur)
 				}
 			}
 		} else {
