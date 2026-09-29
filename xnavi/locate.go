@@ -4,8 +4,8 @@
 //   - 有存档锚点：锚点 ±120/±400 窗口扫描（快，与 live-go 一致）
 //   - 无存档锚点：退回全量结构扫描（坐标合法 + 后随正交旋转矩阵，与 live-cemu 一致）
 //   - 端序：按平台分流（小端零拷贝视图 / 大端 toF32BE 转换）
-//   - 排序：ds 文档唯一规则（TOTK V1.8.7 已验证）——struct>0 门槛 → copies 降序 →
-//     dist 升序；不比较 struct 大小（struct 大小无意义）
+//   - 排序：struct>0 门槛 → dist 升序（传送后玩家就在锚点旁）→ copies 降序；
+//     shortlist 先按 dist 取近 50 个候选做 struct 检测，避免 copies 高的存档数据淹没玩家
 //   - struct 计数：检查组内前 64 个地址（BOTW 布局已验证；TOTK 曾遇并发截断漏矩阵槽，
 //     故此处保留 64 上限与 TOTK"检查全部"折中——见 watch.go 探针复核兜底）
 
@@ -384,15 +384,17 @@ func groupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 			g.Dist, g.Ri = hit.Dist, hit.Ri
 		}
 	}
-	var byCopies []*Group
+	var byDist []*Group
 	for _, g := range groups {
 		g.Copies = len(g.Addrs)
-		byCopies = append(byCopies, g)
+		byDist = append(byDist, g)
 	}
-	sort.Slice(byCopies, func(i, j int) bool { return byCopies[i].Copies > byCopies[j].Copies })
-	top := byCopies
-	if len(top) > 30 {
-		top = top[:30]
+	// 先按距离锚点升序取近的候选做 struct 检测：
+	// 传送后存档锚点=传送点，玩家一定在锚点附近；copies 高的往往是环境/存档数据副本。
+	sort.Slice(byDist, func(i, j int) bool { return byDist[i].Dist < byDist[j].Dist })
+	top := byDist
+	if len(top) > 50 {
+		top = top[:50]
 	}
 	for _, g := range top {
 		n := g.Addrs
@@ -411,10 +413,11 @@ func groupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 		if al != bl {
 			return al // struct>0 门槛
 		}
-		if a.Copies != b.Copies {
-			return a.Copies > b.Copies
+		// struct>0 后优先距离锚点近（传送后玩家就在传送点旁），再 copies 降序。
+		if a.Dist != b.Dist {
+			return a.Dist < b.Dist
 		}
-		return a.Dist < b.Dist
+		return a.Copies > b.Copies
 	})
 	shortlist := make([]ShortlistEntry, 0, len(top))
 	for _, g := range top {

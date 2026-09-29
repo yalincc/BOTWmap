@@ -491,8 +491,12 @@ func stateMachine() {
 						dist3([3]float32{d[0], d[1], d[2]}, probeRefPos) < probeNearDist {
 						setLock(adr, false, probeGroups[bestGi].Copies, "probe")
 						saveKnown([]uintptr{adr}, guestRamBase(), [3]float32{}) // 只记偏移，pos 待移动确认
-						probing = false
+						// 不立即停 probing：继续观察 shortlist，若当前锁不是玩家会再切；
+						// confirmed live（连续3次位移）后才正式停。换锁后重置计数。
 						resetFollow()
+						probeMoved = make([]int, len(probeGroups))
+						probeBase = map[uintptr][3]float32{}
+						probeLockGi = bestGi
 						a = adr
 						probeRefPos = [3]float32{d[0], d[1], d[2]}
 						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X\n",
