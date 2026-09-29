@@ -372,6 +372,8 @@ func stateMachine() {
 						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) dist=%.0fm [confirmed]\n",
 							bestAddr, bestD[0], bestD[1], bestD[2], bestDist)
 						setLock(bestAddr, true, 0, "fixed-offset")
+						inLocked = true
+						resetFollow()
 						fixedOK = true
 					}
 				}
