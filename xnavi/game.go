@@ -56,6 +56,10 @@ func gameValidTriple(x, alt, z float32) bool {
 		alt <= gameMinAlt || alt >= gameMaxAlt {
 		return false
 	}
+	// BOTW 地图坐标在千位级，排除 (30,80,100) 这种引擎内部小向量
+	if abs32(x) < 200 || abs32(z) < 200 {
+		return false
+	}
 	return true
 }
 

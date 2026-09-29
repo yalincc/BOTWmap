@@ -411,6 +411,11 @@ func groupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 		if al != bl {
 			return al // struct>0 门槛
 		}
+		// 离存档锚点近的优先（<100m），避免 copies 高的静态对象压过真玩家
+		an, bn := a.Dist < 100, b.Dist < 100
+		if an != bn {
+			return an
+		}
 		if a.Copies != b.Copies {
 			return a.Copies > b.Copies
 		}

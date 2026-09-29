@@ -258,7 +258,6 @@ func stateMachine() {
 	var probeMoved []int
 	var probeStart, probeLast time.Time
 	probeLockGi := -1
-	var probeRefPos [3]float32
 	lockSince := time.Now()
 
 	resetFollow := func() {
@@ -289,28 +288,8 @@ func stateMachine() {
 		procPID = p.PID()
 
 		genN++
-		if genN >= 15 {
-			genN = 0
-			if blks := p.Blocks(minBlockMB); len(blks) > 0 {
-				if newOnes := detectNewBlocks(blks); newOnes != nil {
-					fmt.Printf("  [sm] %d NEW memory block(s) (game restart) -> rescan\n", len(newOnes))
-					bestBase, bestSize := uintptr(0), uintptr(0)
-					for _, b := range blks {
-						for _, nb := range newOnes {
-							if b.Base == nb && b.Size > bestSize {
-								bestBase, bestSize = b.Base, b.Size
-							}
-						}
-					}
-					currentSessionBase = bestBase
-					lastScanAt = time.Time{}
-					if inLocked {
-						inLocked = false
-						goUnlocked("game restart (new blocks)")
-					}
-				}
-			}
-		}
+		// Ryujinx guest 块动态重映射，新块检测不可靠，禁用
+		_ = genN
 
 		select {
 		case <-rescanCh:
@@ -391,21 +370,37 @@ func stateMachine() {
 				}
 				fmt.Printf("  [sm] fixed offset not valid on %d guest blocks, falling back to scan\n", len(blks))
 			}
-			// 2) 固定偏移失败，走全量扫描
+			// 2) 固定偏移失败，走全量结构扫描（不依赖存档锚点）
 			if useSaveScan && time.Since(lastScanAt) >= scanCooldown {
 				lastScanAt = time.Now()
-				res := locate(procPID, 1000.0, sessionBlocks(h), func(s string) { fmt.Println("    " + s) })
-				if res != nil {
-					setLock(res.Addr, false, res.Copies, "scan")
+				blocks := sessionBlocks(h)
+				logf := func(s string) { fmt.Println("    " + s) }
+				fmt.Println("  [sm] structural scan (no anchor window)...")
+				hits := structuralScan(h, blocks, logf)
+				if len(hits) > 0 {
+					ranked, shortlist := groupAndRank(h, hits)
+					for i := 0; i < len(ranked) && i < 10; i++ {
+						g := ranked[i]
+						logf(fmt.Sprintf("    rank %d: x%-5d struct %2d  mem=(%.1f, %.1f, %.1f)",
+							i+1, g.Copies, g.Struct, g.X, g.Y, g.Z))
+					}
+					best := ranked[0]
+					addr := best.Addrs[0]
+					setLock(addr, false, best.Copies, "scan")
 					inLocked = true
 					resetFollow()
 					lockSince = time.Now()
-					probing = false
-					probeGroups = nil
-					fmt.Printf("  [sm] scan -> lock 0x%X copies=%d struct=%d mem=(%.1f, %.1f, %.1f) [waiting move confirm]\n",
-						res.Addr, res.Copies, res.Struct, res.Hud[0], res.Hud[1], res.Hud[2])
+					probing = true
+					probeGroups = shortlist
+					probeMoved = make([]int, len(shortlist))
+					probeBase = map[uintptr][3]float32{}
+					probeStart = time.Now()
+					probeLast = time.Now()
+					probeLockGi = 0
+					fmt.Printf("  [sm] scan -> lock 0x%X copies=%d [probing top %d, waiting move confirm]\n",
+						addr, best.Copies, len(shortlist))
 				} else {
-					fmt.Println("  [sm] scan found nothing - retrying")
+					fmt.Println("  [sm] structural scan found nothing - retrying")
 				}
 				continue
 			}
@@ -468,16 +463,14 @@ func stateMachine() {
 				}
 				if bestGi >= 0 {
 					adr := probeGroups[bestGi].Addrs[0]
-					if d := decodeTripleAt(h, adr); d != nil &&
-						dist3([3]float32{d[0], d[1], d[2]}, probeRefPos) < probeNearDist {
-						setLock(adr, false, probeGroups[bestGi].Copies, "probe")
+					if d := decodeTripleAt(h, adr); d != nil {
+						setLock(adr, true, probeGroups[bestGi].Copies, "probe")
 						saveKnown([]uintptr{adr}, guestRamBase(), [3]float32{})
 						probing = false
 						resetFollow()
 						a = adr
-						probeRefPos = [3]float32{d[0], d[1], d[2]}
-						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X\n",
-							bestGi, probeGroups[bestGi].Copies, adr)
+						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X mem=(%.1f,%.1f,%.1f)\n",
+							bestGi, probeGroups[bestGi].Copies, adr, d[0], d[1], d[2])
 					}
 				}
 			}
@@ -602,21 +595,9 @@ func stateMachine() {
 		prev = cur
 		hasPrev = true
 
-		if time.Since(lastVerifyAt) >= verifyEvery && time.Since(lastMoveAt) >= verifyEvery {
-			lastVerifyAt = time.Now()
-			res := locate(procPID, 400.0, sessionBlocks(h), nil)
-			if res != nil {
-				vd := dist3(cur, res.Hud)
-				if vd > consensusDist {
-					fmt.Printf("  [sm] verify: idle scan found player %.0fm away -> rescan\n", vd)
-					inLocked = false
-					goUnlocked("verify: better candidate")
-					continue
-				}
-			}
-			fmt.Printf("  [sm] verify: idle %.0fs scan clean (keep lock)\n",
-				verifyEvery.Seconds())
-		}
+		// verified 后不做站桩核对：玩家站着不动时全量扫描会找到其他 Actor，误杀正确锁
+		// 只有读数失效才重扫（上面 invalidN 逻辑已处理）
+		_ = lastVerifyAt
 	}
 }
 
