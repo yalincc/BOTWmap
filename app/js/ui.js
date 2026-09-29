@@ -1073,11 +1073,17 @@ const UI = (() => {
     try {
       map.customMarkers = JSON.parse(localStorage.getItem(K_CUSTOM) || '[]');
     } catch (e) { map.customMarkers = []; }
-    const def = ['shrine', 'tower'];
+    const def = ['shrine', 'tower', 'dragon'];  // V1.4.3b：龙特殊怪分类默认勾选（显示龙轨迹）
     try {
       const l = JSON.parse(localStorage.getItem(K_LAYERS) || 'null');
-      if (Array.isArray(l) && l.length) l.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
-      else def.forEach(k => map.enabled.add(k));
+      if (Array.isArray(l) && l.length) {
+        l.forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
+        // V1.4.3b 一次性迁移：老缓存无 dragon 时自动补上并保存（保证龙轨迹默认可见）
+        if (CAT_CFG.dragon && !map.enabled.has('dragon')) {
+          map.enabled.add('dragon');
+          saveLayers();
+        }
+      } else def.forEach(k => map.enabled.add(k));
     } catch (e) { def.forEach(k => map.enabled.add(k)); }
     // 材料追踪图层恢复（v1.1.0，单材料 id 数组）
     try {
@@ -1207,6 +1213,7 @@ const UI = (() => {
         syncStyle();
       });
     });
+    // V1.4.3b：龙轨迹开关移除（改由图层面板「龙」分类勾选控制）
     // 文字颜色
     document.querySelectorAll('#stTxOptions .st-opt[data-v]').forEach(b => {
       if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.tx = DEFAULT_STYLE.tx.slice(); }));

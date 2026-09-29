@@ -27,6 +27,17 @@ const CAT_CFG = {
   lynel:      { color:'#ff6b5e', shape:'lynel',     order:2, lz:0.7,  icon:'icons_24.png', isz:[26,30] },
   molduga:    { color:'#f2d45c', shape:'molduga',   order:2, lz:0.8,  icon:'icons_17.png', isz:[29,30] },
   guardian:   { color:'#e05e5e', shape:'guardian',  order:2, lz:0.8,  icon:'icons_35.png', isz:[32,26] },
+  /* V1.4.3 新增敌人（数据源 enemies.js，图标 = romfs 官方图鉴缩略） */
+  bokoblin:   { color:'#c98a4a', shape:'dot',       order:2, lz:0.8,  icon:'icons_36.png', isz:[28,28] },
+  moblin:     { color:'#a05050', shape:'dot',       order:2, lz:0.8,  icon:'icons_37.png', isz:[28,28] },
+  lizalfos:   { color:'#5fa86a', shape:'dot',       order:2, lz:0.8,  icon:'icons_38.png', isz:[28,28] },
+  keese:      { color:'#7a6aa8', shape:'dot',       order:2, lz:0.9,  icon:'icons_39.png', isz:[28,28] },
+  chuchu:     { color:'#6fc7ff', shape:'dot',       order:2, lz:0.9,  icon:'icons_40.png', isz:[28,28] },
+  octorok:    { color:'#8d99a6', shape:'dot',       order:2, lz:0.9,  icon:'icons_41.png', isz:[28,28] },
+  wizzrobe:   { color:'#c9a2ff', shape:'dot',       order:2, lz:0.9,  icon:'icons_42.png', isz:[28,28] },
+  yiga:       { color:'#ff6b6b', shape:'dot',       order:2, lz:0.9,  icon:'icons_43.png', isz:[28,28] },
+  dragon:     { color:'#f2d45c', shape:'dot',       order:2, lz:0.8,  icon:'icons_46.png' },  // 特殊怪分类：无点位，勾选显示龙飞行轨迹
+  pebblit:    { color:'#8d99a6', shape:'dot',       order:2, lz:0.9,  icon:'icons_45.png', isz:[26,28] },
   mainquest:  { color:'#ffd166', shape:'star',      order:1, lz:0.6,  icon:'icons_31.png', isz:[50,30] },
   shrinequest:{ color:'#ffb347', shape:'qmark',     order:1, lz:0.6,  icon:'icons_30.png', isz:[30,30] },
   sidequest:  { color:'#6fc7ff', shape:'star',      order:1, lz:0.7,  icon:'icons_05.png', isz:[28,39] },
@@ -35,7 +46,7 @@ const CAT_CFG = {
 const CAT_GROUP = {
   '探索收集': ['shrine','tower','beast','seed','memory','treasure'],
   '设施地点': ['village','stable','inn','store','armor','dye','jewelry','lab','fountain','statue','pot','raft','settlement'],
-  '敌人':     ['lynel','hinox','talus','molduga','guardian'],
+  '敌人':     ['lynel','hinox','talus','molduga','guardian','bokoblin','moblin','lizalfos','keese','chuchu','octorok','wizzrobe','yiga','dragon','pebblit'],
   '任务':     ['mainquest','shrinequest','sidequest','objective'],
 };
 
@@ -57,7 +68,7 @@ class BotwMap {
     this.MW = data.meta.mapW;   // 6000
     this.MH = data.meta.mapH;   // 5000
 
-    this.enabled = new Set();   // 启用的类别 key
+    this.enabled = new Set();   // 启用的类别 key（dragon 特殊怪分类勾选 → 显示龙飞行轨迹）
     this.doneSet = new Set();   // 已完成标记 id
     this.customMarkers = [];    // 自定义标记 {id,name,color,px,note}
     this.measurePoints = [];    // 测量点 (map px)
@@ -81,6 +92,8 @@ class BotwMap {
     this.KOROK_PATHS = (typeof KOROK_PATHS !== 'undefined' && KOROK_PATHS.items) ? KOROK_PATHS.items : [];
     this._pathById = new Map();
     for (const p of this.KOROK_PATHS) this._pathById.set(p.id, p);
+    // 龙飞行轨迹（v1.4.3）：数据源 dragon_paths.js（DragonDropItemTarget 488 点聚类还原 3 龙路线）
+    this.DRAGON_PATHS = (typeof DRAGON_PATHS !== 'undefined' && DRAGON_PATHS.items) ? DRAGON_PATHS.items : [];
     this.tileCache = new Map();   // 瓦片 LRU 缓存：key -> HTMLImageElement
     this.tilePending = new Set(); // 正在加载的瓦片 key
     this._tileDrawPending = false;
@@ -124,10 +137,17 @@ class BotwMap {
   _loadIcons() {
     this.icons = {};
     const seen = new Set();
+    const want = [];
     for (const key in CAT_CFG) {
       const ic = CAT_CFG[key].icon;
       if (!ic || seen.has(ic)) continue;
-      seen.add(ic);
+      seen.add(ic); want.push(ic);
+    }
+    // V1.4.3b：龙轨迹起点图标（官方图鉴 Fire/Ice/Electric 透明抠图）
+    for (const ic of ['icons_46.png', 'icons_47.png', 'icons_48.png']) {
+      if (!seen.has(ic)) { seen.add(ic); want.push(ic); }
+    }
+    for (const ic of want) {
       const img = new Image();
       img.onload = () => this.draw();
       img.src = 'assets/icons/' + ic;
@@ -291,6 +311,7 @@ class BotwMap {
         if (cell) for (const idx of cell) {
           const mk = this.markers[idx];
         if (!this.enabled.has(mk.cat)) continue;
+        // V1.4.3：小岩石人默认隐藏（hide 标记，设置里可开启）
         // 回忆：地图上只标注 13 个照片回忆点（照片12 + 最终1）；主线自动 / DLC 回忆随任务触发，不标注
         if (mk.cat === 'memory' && !(mk.extra && (mk.extra.tier === 'photo' || mk.extra.tier === 'final'))) continue;
         out.push(mk);
@@ -400,6 +421,21 @@ class BotwMap {
     ctx.closePath();
   }
 
+  /* 小怪图标分级（v1.4.3）：仅新增 10 类小怪参与分级；强力怪（人马/独眼/石头/莫尔德/守护）固定原尺寸不走这里
+     scale < 0.12  全图~省区级 → 7px 色点
+     0.12~0.25     地区级     → 28px 图标
+     >= 0.25       详查级     → 36px 图标 */
+  _enemyIconScale(cat) {
+    if (!this._enemyCats) {
+      this._enemyCats = new Set(['bokoblin','moblin','lizalfos','keese','chuchu','octorok','wizzrobe','yiga','dragon','pebblit']);
+    }
+    if (!this._enemyCats.has(cat)) return null;
+    const s = this.view.scale;
+    if (s < 0.12) return { dot: 7 };
+    if (s < 0.25) return { px: 28 };
+    return { px: 36 };
+  }
+
   _markerScreenSize(mk) {
     const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
     // 游戏内图标：固定屏幕尺寸（不随地图缩放变化）
@@ -434,8 +470,9 @@ class BotwMap {
     // 按绘制优先级排序，保证重要标记画在最上层
     vis.sort((a, b) => (CAT_CFG[a.cat]?.order || 0) - (CAT_CFG[b.cat]?.order || 0));
 
-    // 克洛格轨迹（v1.1.4）：先画折线，图标覆盖在上面
+    // 克洛格轨迹（v1.1.4）+ 龙飞行轨迹（v1.4.3）：先画折线，图标覆盖在上面
     this._drawKorokPaths(ctx, vis);
+    this._drawDragonPaths(ctx);
 
     const labelList = [];
     const scale = this.view.scale;
@@ -537,6 +574,86 @@ class BotwMap {
   }
 
   /* 点击轨迹折线 → 选中对应克洛格（点到线段距离，容差 12px） */
+  /* 龙飞行轨迹（v1.4.3）：3 条龙路线平滑曲线，颜色按 data color 字段；任意缩放显示（含全图 100%） */
+  _drawDragonPaths(ctx) {
+    const scale = this.view.scale;
+    if (!this.enabled.has('dragon') || !this.DRAGON_PATHS.length) return;
+    const { w, h } = this;
+    const COLORS = { farosh: 'rgba(232,190,64,.92)', dinraal: 'rgba(232,96,64,.92)', naydra: 'rgba(88,168,240,.92)' };
+    const EDGE = { farosh: 'rgba(110,85,20,.65)', dinraal: 'rgba(110,40,20,.65)', naydra: 'rgba(30,80,140,.65)' };
+    const ICONS = { farosh: this.icons['icons_48.png'], dinraal: this.icons['icons_46.png'], naydra: this.icons['icons_47.png'] };
+    const lw = Math.max(2.5, Math.min(6, 2.5 * Math.pow(scale, 0.5)));
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const p of this.DRAGON_PATHS) {
+      const segs = p.segments || (p.points ? [p.points] : []);
+      if (!segs.length) continue;
+      const col = COLORS[p.color] || COLORS.farosh;
+      const edge = EDGE[p.color] || EDGE.farosh;
+      const toS = (q) => [this.view.x + q[0] * scale, this.view.y + q[1] * scale];
+      for (let si = 0; si < segs.length; si++) {
+        const pts = segs[si];
+        if (!pts || pts.length < 2) continue;
+        let inView = false;
+        for (const [x, y] of pts) {
+          const sx = this.view.x + x * scale, sy = this.view.y + y * scale;
+          if (sx >= -80 && sy >= -80 && sx <= w + 80 && sy <= h + 80) { inView = true; break; }
+        }
+        if (!inView) continue;
+        // Catmull-Rom → 三次贝塞尔平滑（贴合龙的飞行动线）
+        ctx.beginPath();
+        const [s0x, s0y] = toS(pts[0]);
+        ctx.moveTo(s0x, s0y);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+          const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+          const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+          const [c1x, c1y] = toS(c1), [c2x, c2y] = toS(c2), [p2x, p2y] = toS(p2);
+          ctx.bezierCurveTo(c1x, c1y, c2x, c2y, p2x, p2y);
+        }
+        ctx.strokeStyle = edge;
+        ctx.lineWidth = lw + 2.6;
+        ctx.stroke();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = lw;
+        ctx.stroke();
+        // 终点圆点：仅最后一段末尾（同色 + 深色描边）
+        if (si === segs.length - 1) {
+          const [ex, ey] = pts[pts.length - 1];
+          const [esx, esy] = toS([ex, ey]);
+          const r = Math.max(3.5, Math.min(7, 4 * scale * 5));
+          ctx.beginPath();
+          ctx.arc(esx, esy, r, 0, Math.PI * 2);
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(8,12,8,.85)';
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+        }
+      }
+      // 起点图标：刷新点（start）画官方龙图标，固定 30px（参考强力怪固定尺寸）
+      const st = p.start;
+      if (st) {
+        const [sx, sy] = this.m2s(st);
+        const img = ICONS[p.color];
+        const sz = 30;
+        if (img && img.complete && img.naturalWidth > 0) {
+          ctx.drawImage(img, sx - sz / 2, sy - sz / 2, sz, sz);
+        } else {
+          ctx.beginPath();
+          ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+          ctx.fillStyle = col;
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(8,12,8,.85)';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   _hitKorokPath(mx, my) {
     if (!this.showKorokPaths || this.view.scale < this._korokPathMinScale() || !this.enabled.has('seed')) return null;
     const tol = 12 / this.view.scale;
@@ -652,11 +769,23 @@ class BotwMap {
     const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
     const isFinalMem = mk.cat === 'memory' && mk.extra && mk.extra.tier === 'final';
     const img = (cfg.icon && !isFinalMem) ? this.icons[cfg.icon] : null;
+    // 敌人图标分级（v1.4.3）：全图/省区用色点，放大后逐步显示全尺寸图标，避免密集重叠
+    const _e = this._enemyIconScale(mk.cat);
     ctx.save();
+    if (_e && _e.dot) {
+      ctx.globalAlpha = done ? .45 : .92;
+      ctx.fillStyle = cfg.color;
+      ctx.beginPath();
+      ctx.arc(x, y, _e.dot / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
     if (done) ctx.globalAlpha = .45;
     if (img && img.complete && img.naturalWidth > 0) {
-      const iw = cfg.isz ? cfg.isz[0] : size;
-      const ih = cfg.isz ? cfg.isz[1] : size;
+      let iw = cfg.isz ? cfg.isz[0] : size;
+      let ih = cfg.isz ? cfg.isz[1] : size;
+      if (_e) { iw = ih = _e.px; }   // 敌人分级尺寸
       ctx.drawImage(img, x - iw / 2, y - ih / 2, iw, ih);
       ctx.restore();
       if (done) {
