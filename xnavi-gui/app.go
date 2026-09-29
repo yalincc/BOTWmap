@@ -16,18 +16,52 @@ import (
 )
 
 // guiVersion 导航程序版本（与地图网页版本解耦，见 BOTWmap 项目规则第 3 条）。
-const guiVersion = "v2.0.0"
+const guiVersion = "v2.1.0"
 
-// App Wails 后端：管理核心子进程 + 读 status.json / run-events.log + 网页端端口探测。
-// 与核心的通信完全走文件（status.json、run-events.log），不依赖 8766 HTTP——
+// App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
+// 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
 // 保证 GUI 与网页端两个入口相互独立（ds 双入口原则）：8766 被占时 GUI 照常工作。
 type App struct {
 	ctx       context.Context
 	mu        sync.Mutex
 	cmd       *exec.Cmd
-	workDir   string // 核心 exe 所在目录（status.json / run-events.log 同目录）
+	workDir   string
 	logBuf    []string
-	logMarker string // 日志增量读已消费偏移（文件内容前缀）
+	logMarker string
+	cfg       *Config
+}
+
+// Config GUI 持久化配置（xnavi-gui-config.json）。
+type Config struct {
+	CemuDir    string `json:"cemuDir"`
+	RyujinxDir string `json:"ryujinxDir"`
+	SaveDir    string `json:"saveDir"`
+	Emulator   string `json:"emulator"` // auto | cemu | ryujinx
+}
+
+func (a *App) configPath() string { return filepath.Join(a.workDir, "xnavi-gui-config.json") }
+
+func (a *App) loadConfig() *Config {
+	cfg := &Config{Emulator: "auto"}
+	buf, err := os.ReadFile(a.configPath())
+	if err == nil {
+		json.Unmarshal(buf, cfg)
+	}
+	return cfg
+}
+
+func (a *App) SaveConfig(c Config) string {
+	a.cfg = &c
+	buf, _ := json.MarshalIndent(c, "", "  ")
+	os.WriteFile(a.configPath(), buf, 0644)
+	return "已保存"
+}
+
+func (a *App) LoadConfig() Config {
+	if a.cfg == nil {
+		a.cfg = a.loadConfig()
+	}
+	return *a.cfg
 }
 
 func NewApp() *App {
@@ -37,10 +71,19 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.cfg = a.loadConfig()
 	a.tailInit()
-	// 事件桥：轮询 status.json / run-events.log 增量，EventsEmit 推给前端
-	//（核心是子进程，事件源头是文件；体验与同进程实时推送一致）
 	go a.eventBridge(ctx)
+}
+
+func (a *App) PickDir(title string) string {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+	if err != nil { return "" }
+	return dir
+}
+
+func (a *App) onShutdown(ctx context.Context) {
+	a.stopCoreLocked()
 }
 
 // eventBridge 每 800ms 推一次状态与日志增量（Wails Runtime 事件流）。
@@ -79,7 +122,17 @@ func (a *App) StartCore(emu string) string {
 	if _, err := os.Stat(exe); err != nil {
 		return "找不到核心程序 xnavi-core.exe（应放在本程序同目录）"
 	}
-	cmd := exec.Command(exe, "--emu="+emu, "--no-open")
+	args := []string{"--emu=" + emu, "--no-open"}
+	if a.cfg.CemuDir != "" {
+		args = append(args, "--cemu-dir="+a.cfg.CemuDir)
+	}
+	if a.cfg.RyujinxDir != "" {
+		args = append(args, "--ryujinx-dir="+a.cfg.RyujinxDir)
+	}
+	if a.cfg.SaveDir != "" {
+		args = append(args, "--save-dir="+a.cfg.SaveDir)
+	}
+	cmd := exec.Command(exe, args...)
 	cmd.Dir = a.workDir
 	f, err := os.OpenFile(filepath.Join(a.workDir, "xnavi-gui-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
@@ -169,9 +222,9 @@ func (a *App) lastLog() string {
 	return strings.Join(a.logBuf[len(a.logBuf)-n:], "\n")
 }
 
-// tailInit 首次加载 run-events.log 末尾（最多 2000 行）。
+// tailInit 首次加载 xnavi-gui-core.log 末尾（最多 2000 行）。
 func (a *App) tailInit() {
-	buf, err := os.ReadFile(filepath.Join(a.workDir, "run-events.log"))
+	buf, err := os.ReadFile(filepath.Join(a.workDir, "xnavi-gui-core.log"))
 	if err != nil {
 		return
 	}
@@ -195,9 +248,9 @@ func (a *App) appendLines(lines []string) {
 	}
 }
 
-// PollLogs 前端轮询：返回 run-events.log 新增行（增量读）。
+// PollLogs 前端轮询：返回 xnavi-gui-core.log 新增行（增量读）。
 func (a *App) PollLogs() []string {
-	path := filepath.Join(a.workDir, "run-events.log")
+	path := filepath.Join(a.workDir, "xnavi-gui-core.log")
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return nil

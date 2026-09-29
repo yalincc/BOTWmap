@@ -14,12 +14,24 @@ export function EnvDetect() {
   return window['go']['main']['App']['EnvDetect']();
 }
 
+export function LoadConfig() {
+  return window['go']['main']['App']['LoadConfig']();
+}
+
 export function OpenLogDir() {
   return window['go']['main']['App']['OpenLogDir']();
 }
 
+export function PickDir(arg1) {
+  return window['go']['main']['App']['PickDir'](arg1);
+}
+
 export function PollLogs() {
   return window['go']['main']['App']['PollLogs']();
+}
+
+export function SaveConfig(arg1) {
+  return window['go']['main']['App']['SaveConfig'](arg1);
 }
 
 export function StartCore(arg1) {

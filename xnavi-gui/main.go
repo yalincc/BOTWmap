@@ -20,12 +20,13 @@ func main() {
 		Height:    680,
 		MinWidth:  720,
 		MinHeight: 560,
-		Frameless: true, // 无边框：前端自绘标题栏（去壳化，拖拽区 --wails-draggable）
+		Frameless: false, // 无边框：前端自绘标题栏（去壳化，拖拽区 --wails-draggable）
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 13, G: 17, B: 23, A: 1},
 		OnStartup:        app.startup,
+		OnShutdown:       app.onShutdown,
 		Bind: []interface{}{
 			app,
 		},

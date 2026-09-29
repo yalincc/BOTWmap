@@ -307,79 +307,67 @@ func stateMachine() {
 			// 1) 先试平台已知固定偏移（秒锁，不扫描）
 			if offsets := p.KnownOffsets(); len(offsets) > 0 && time.Since(lastFixedTry) > 2*time.Second {
 				lastFixedTry = time.Now()
-				blks := p.Blocks(512.0) // 和扫描用同一组 guest 块
+				blks := p.Blocks(256.0)
 				fmt.Printf("  [sm] trying fixed offsets on %d blocks:\n", len(blks))
-				for i, blk := range blks {
-					fmt.Printf("    block[%d] base=0x%X size=%d MB\n", i, blk.Base, blk.Size/1048576)
+				type cand struct {
+					addr uintptr
+					d    [3]float32
 				}
-				fixedOK := false
+				var cands []cand
 				for _, blk := range blks {
 					for _, off := range offsets {
 						addr := blk.Base + off
 						d := decodeTripleAt(h, addr)
-						fmt.Printf("    try base=0x%X+0x%X=0x%X -> ", blk.Base, off, addr)
-						if d != nil {
-							fmt.Printf("(%.1f, %.1f, %.1f)\n", d[0], d[1], d[2])
+						if d == nil {
+							fmt.Printf("    try base=0x%X+0x%X -> read failed\n", blk.Base, off)
+							continue
+						}
+						var ok bool
+						if p.LittleEndian() {
+							ok = gameValidTriple(d[0], d[2], d[1])
 						} else {
-							fmt.Println("read failed")
+							ok = gameValidTriple(d[0], d[1], d[2])
+						}
+						fmt.Printf("    try base=0x%X+0x%X -> (%.1f, %.1f, %.1f) valid=%v\n", blk.Base, off, d[0], d[1], d[2], ok)
+						if ok {
+							cands = append(cands, cand{addr, [3]float32{d[0], d[1], d[2]}})
 						}
 					}
 				}
-				// 选离存档锚点最近的那个
-				anchors := readSaveAnchors(p)
-				if len(anchors) > 0 {
-					savePt := anchors[0].Pos // (X, alt, Z)
-					bestDist := float32(1e9)
-					bestAddr := uintptr(0)
-					var bestD [3]float32
-					for _, blk := range blks {
-						for _, off := range offsets {
-							addr := blk.Base + off
-							d := decodeTripleAt(h, addr)
-							if d == nil {
-								continue
-							}
-							// 对 Ryujinx 小端，d=(X, Z, alt)；对 Cemu 大端，d=(X, alt, Z)
-							var ok bool
-							if p.LittleEndian() {
-								ok = gameValidTriple(d[0], d[2], d[1])
-							} else {
-								ok = gameValidTriple(d[0], d[1], d[2])
-							}
-							if !ok {
-								continue
-							}
-							// 对 Ryujinx：d=(X, Z, alt)；对 Cemu：d=(X, alt, Z)
+				if len(cands) > 0 {
+					best := cands[0]
+					anchors := readSaveAnchors(p)
+					if len(anchors) > 0 {
+						savePt := anchors[0].Pos
+						bestDist := float32(1e9)
+						for _, cd := range cands {
 							var dd float32
 							if p.LittleEndian() {
-								ddx := d[0] - savePt[0]
-								ddalt := d[2] - savePt[1]
-								ddz := d[1] - savePt[2]
+								ddx := cd.d[0] - savePt[0]
+								ddalt := cd.d[2] - savePt[1]
+								ddz := cd.d[1] - savePt[2]
 								dd = float32(math.Sqrt(float64(ddx*ddx + ddalt*ddalt + ddz*ddz)))
 							} else {
-								ddx := d[0] - savePt[0]
-								ddalt := d[1] - savePt[1]
-								ddz := d[2] - savePt[2]
+								ddx := cd.d[0] - savePt[0]
+								ddalt := cd.d[1] - savePt[1]
+								ddz := cd.d[2] - savePt[2]
 								dd = float32(math.Sqrt(float64(ddx*ddx + ddalt*ddalt + ddz*ddz)))
 							}
-							fmt.Printf("    score base=0x%X dist=%.0fm\n", blk.Base, dd)
 							if dd < bestDist {
 								bestDist = dd
-								bestAddr = addr
-								bestD = [3]float32{d[0], d[1], d[2]}
+								best = cd
 							}
 						}
-					}
-					if bestAddr != 0 {
 						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) dist=%.0fm [confirmed]\n",
-							bestAddr, bestD[0], bestD[1], bestD[2], bestDist)
-						setLock(bestAddr, true, 0, "fixed-offset")
-						inLocked = true
-						resetFollow()
-						fixedOK = true
+							best.addr, best.d[0], best.d[1], best.d[2], bestDist)
+					} else {
+						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) [confirmed]\n",
+							best.addr, best.d[0], best.d[1], best.d[2])
 					}
-				}
-				if fixedOK {
+					setLock(best.addr, true, 0, "fixed-offset")
+					inLocked = true
+					resetFollow()
+					fmt.Printf("  [sm] fixed offset locked OK\n")
 					continue
 				}
 				fmt.Printf("  [sm] fixed offset not valid on %d guest blocks, falling back to scan\n", len(blks))

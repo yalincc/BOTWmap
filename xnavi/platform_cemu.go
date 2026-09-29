@@ -162,16 +162,12 @@ func cemuRWBlocks(h uintptr, minMB float64) []MemBlock {
 		if virtualQueryEx(h, addr, &mbi) == 0 {
 			break
 		}
-		base, size := mbi.BaseAddress, mbi.RegionSize
+		size := mbi.RegionSize
 		p := mbi.Protect & 0xFF
 		if mbi.State == memCommit && (p == 0x02 || p == 0x04) && (mbi.Protect&pageGuard) == 0 {
-			if n := len(out); n > 0 && base == out[n-1].Base+out[n-1].Size {
-				out[n-1].Size += size
-			} else {
-				out = append(out, MemBlock{base, size})
-			}
+			out = append(out, MemBlock{mbi.AllocationBase, size})
 		}
-		nxt := base + size
+		nxt := mbi.BaseAddress + size
 		if nxt > addr {
 			addr = nxt
 		} else {
@@ -197,13 +193,13 @@ func cemuLargestRWBlock(h uintptr) (uintptr, uintptr) {
 		if virtualQueryEx(h, addr, &mbi) == 0 {
 			break
 		}
-		base, size := mbi.BaseAddress, mbi.RegionSize
+		size := mbi.RegionSize
 		if mbi.State == memCommit &&
 			((mbi.Protect&0xFF) == 0x02 || (mbi.Protect&0xFF) == 0x04) &&
 			(mbi.Protect&pageGuard) == 0 && size > bestSize {
-			best, bestSize = base, size
+			best, bestSize = mbi.AllocationBase, size
 		}
-		nxt := base + size
+		nxt := mbi.BaseAddress + size
 		if nxt > addr {
 			addr = nxt
 		} else {
