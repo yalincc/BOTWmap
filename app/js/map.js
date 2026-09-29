@@ -419,9 +419,10 @@ class BotwMap {
 
   /* 是否已完成：本地标记完成 或 存档进度（live.js 注入的 liveDone） */
   _mkDone(mk) {
-    // 回忆类别与统计面板同口径：已载入存档进度时以存档为准（忽略本地手动标记），
-    // 避免手动标记的回忆点与面板统计/地图图标不一致（照片/主线/DLC 逐点 flag）
-    if (mk.cat === "memory" && this.saveLoaded()) {
+    // 已载入存档进度（live /progress 或手动上传）时，所有可收集类别以存档为准：
+    // liveDone 由 live.js 每次按当前存档重建；本地 doneSet 仅作离线兜底，
+    // 避免历史存档的累计完成标记掩盖当前档真实进度（仅增不减的吸收式合并问题）
+    if (this.saveLoaded()) {
       return !!(this.liveDone && this.liveDone.has(mk.id));
     }
     return this.doneSet.has(mk.id) ||

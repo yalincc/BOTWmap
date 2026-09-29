@@ -42,6 +42,29 @@ const SAVE_UPLOAD = (() => {
     });
     btn.addEventListener('click', () => input.click());
 
+    // 清空本地探索度记录（v1.4.2）：清除 localStorage 累计的完成标记（历史存档累计与手动勾选），
+    // 自定义标记与在线存档同步不受影响；navi 在线时面板仍以存档权威 counts 为准
+    const clearBtn = document.getElementById('btnClearDone');
+    if (clearBtn) {
+      // 悬停提示（v1.4.2）：原生 title 在部分浏览器不显示，用自定义气泡替代
+      const clearTip = document.getElementById('suClearTip');
+      if (clearTip) {
+        clearBtn.addEventListener('mouseenter', () => clearTip.classList.remove('hidden'));
+        clearBtn.addEventListener('mouseleave', () => clearTip.classList.add('hidden'));
+        clearBtn.addEventListener('focus', () => clearTip.classList.remove('hidden'));
+        clearBtn.addEventListener('blur', () => clearTip.classList.add('hidden'));
+      }
+      clearBtn.addEventListener('click', () => {
+        if (!confirm('确定清空本地探索度记录？\n将清除本机保存的完成标记（历史存档累计与手动勾选）。\n自定义标记与在线存档同步不受影响。')) return;
+        map.doneSet = new Set();
+        try { localStorage.removeItem('botwmap.done.v1'); } catch (e) {}
+        map.draw();
+        UI.renderStats();
+        UI.updateLayerList();
+        UI.toast('已清空本地探索度记录');
+      });
+    }
+
     // 存档位置提示：悬停显示小气泡；点击打开完整帮助弹窗（内容可复制）
     const help = document.getElementById('suHelp');
     const tip = document.getElementById('suTip');

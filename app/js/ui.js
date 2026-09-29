@@ -460,7 +460,11 @@ const UI = (() => {
     for (const key of focus) {
       const cat = map.data.categories.find(c => c.key === key);
       if (!cat) continue;
-      const [d, t] = catCount(key);
+      // 有存档 counts 以存档为准（live /progress 或上传），否则按本地标点完成统计
+      // （v1.4.1：神庙/塔/神兽/克洛格与回忆行同口径，修复历史存档累计值掩盖当前档进度）
+      const lck = key === 'seed' ? 'korok' : key;
+      const saved = (lc && lc[lck]) ? lc[lck] : null;
+      const [d, t] = saved ? saved : catCount(key);
       if (!t) continue;
       html += `<div class="stat-row"><span class="k">${cat.cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
@@ -801,11 +805,15 @@ const UI = (() => {
     syncCollectBtn();
     $('cardDone').onclick = () => {
       if (mk.cat === 'memory' && map.saveLoaded()) { toast('回忆以存档为准：游戏中收集后自动同步，无需手动标记'); return; }
-      map.doneSet.add(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name);
+      map.doneSet.add(mk.id);
+      if (map.saveLoaded()) map.liveDone.add(mk.id);
+      saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name);
     };
     $('cardUndone').onclick = () => {
       if (mk.cat === 'memory' && map.saveLoaded()) { toast('回忆以存档为准：请以游戏内收集状态为准'); return; }
-      map.doneSet.delete(mk.id); saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name);
+      map.doneSet.delete(mk.id);
+      if (map.saveLoaded()) map.liveDone.delete(mk.id);
+      saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name);
     };
     positionCard();
     $('infoCard').classList.remove('hidden');

@@ -283,6 +283,18 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .stat-bar { height: 4px; background: #20301f; border-radius: 2px; margin: 2px 0 8px; overflow: hidden; }
 .stat-bar > i { display: block; height: 100%; background: var(--gold-soft); border-radius: 2px; transition: width .3s; }
 .side-foot { padding: 8px 14px; border-top: 1px solid var(--border); font-size: 10.5px; color: var(--text-dim); line-height: 1.5; }
+.side-foot .foot-version { color: #d8d3c5; font-weight: 500; }
+.side-foot a { color: var(--text-dim); text-decoration: underline; text-underline-offset: 2px; }
+.side-foot a:hover { color: var(--gold); }
+/* 存档区：清空旧探索度按钮（v1.4.2）：圆形扫把，样式与 ? 帮助一致，置于行尾 */
+.save-upload .su-clear-wrap { position: relative; flex: 0 0 auto; }
+.save-upload .su-clear { display: block; width: 18px; height: 18px; padding: 0; line-height: 16px; text-align: center;
+  font-size: 11px; font-weight: 700; color: var(--gold); background: transparent;
+  border: 1px solid rgba(242,201,76,.4); border-radius: 50%; cursor: pointer; user-select: none; }
+.save-upload .su-clear:hover { background: rgba(192,57,43,.32); border-color: rgba(192,57,43,.6); }
+.su-clear-tip { position: absolute; bottom: calc(100% + 6px); right: 0; white-space: nowrap;
+  background: #1d1a10; border: 1px solid rgba(242,201,76,.3); border-radius: 6px; padding: 4px 9px;
+  font-size: 11px; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,.45); z-index: 30; }
 
 /* ---------- 鍦板浘鎺т欢 ---------- */
 #zoomControls { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
