@@ -507,12 +507,11 @@ func stateMachine() {
 			invalidN++
 			state.mu.Lock()
 			state.ok = false
-			state.source = "address lost"
+			state.source = "address lost (waiting for restore)"
 			state.mu.Unlock()
-			if invalidN >= invalidMax {
-				inLocked = false
-				goUnlocked(fmt.Sprintf("readings invalid x%d", invalidMax))
-			}
+			// 进神庙/骑乘时地址暂时读不到，永远保持最后位置不飘，等游戏恢复
+			// 不重扫，不飘红点
+			_ = invalidMax
 			continue
 		}
 		invalidN = 0
