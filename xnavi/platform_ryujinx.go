@@ -84,6 +84,13 @@ func (p *ryujinxPlatform) SaveRoots() []string {
 	return []string{filepath.Join(appdata, "Ryujinx", "bis", "user", "save")}
 }
 
+// KnownOffsets Ryujinx BOTW 已知坐标偏移。
+// 0x97FA3FC0 实测不是玩家坐标（读出来 alt 为负 / 离存档点 2000+m），暂禁。
+// 等重新用"移动验证法"找到真正的偏移再开。
+func (p *ryujinxPlatform) KnownOffsets() []uintptr {
+	return nil // []uintptr{0x97FA3FC0}
+}
+
 // ---- 内存枚举（Ryujinx 专属，原 live-go winapi.go）----
 
 // ryuGuestBlocks 枚举所有足够大的 RW MEM_MAPPED 提交区域（去掉 32GB 高的镜像块）。
@@ -125,8 +132,11 @@ func ryuGuestBlocks(h uintptr, minMB float64) []MemBlock {
 }
 
 // ryuLargestGuestBlock 返回最大的一块 guest DRAM（供 known offsets 重定位）。
+// 过滤镜像块：和 ryuGuestBlocks 一样排除 base+0x800000000 也存在的块。
 func ryuLargestGuestBlock(h uintptr, minMB float64) (uintptr, uintptr) {
-	best, bestSize := uintptr(0), uintptr(0)
+	const mirrorStep = uintptr(0x800000000)
+	type block struct{ base, size uintptr }
+	var candidates []block
 	addr := uintptr(0)
 	const limit = uintptr(0x7FFFFFFFFFFF)
 	for addr < limit {
@@ -137,8 +147,8 @@ func ryuLargestGuestBlock(h uintptr, minMB float64) (uintptr, uintptr) {
 		base, size := mbi.BaseAddress, mbi.RegionSize
 		if mbi.State == memCommit && mbi.Type == memMapped &&
 			((mbi.Protect&0xFF) == 0x02 || (mbi.Protect&0xFF) == 0x04) &&
-			(mbi.Protect&pageGuard) == 0 && size > bestSize {
-			best, bestSize = base, size
+			(mbi.Protect&pageGuard) == 0 && size >= uintptr(minMB*1048576.0) {
+			candidates = append(candidates, block{base, size})
 		}
 		nxt := base + size
 		if nxt > addr {
@@ -147,8 +157,20 @@ func ryuLargestGuestBlock(h uintptr, minMB float64) (uintptr, uintptr) {
 			addr += 0x1000
 		}
 	}
-	if bestSize < uintptr(minMB*1048576.0) {
-		return 0, 0
+	for _, c := range candidates {
+		isMirror := false
+		for _, c2 := range candidates {
+			if c2.base == c.base+mirrorStep {
+				isMirror = true
+				break
+			}
+		}
+		if !isMirror {
+			return c.base, c.size
+		}
 	}
-	return best, bestSize
+	if len(candidates) > 0 {
+		return candidates[0].base, candidates[0].size
+	}
+	return 0, 0
 }

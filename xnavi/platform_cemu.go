@@ -143,6 +143,12 @@ func (p *cemuPlatform) SaveRoots() []string {
 	return roots
 }
 
+// KnownOffsets Cemu BOTW 已知坐标偏移（相对最大 RW 块 AllocationBase）。
+// 社区公开针位（koko-yl/BotWRamWatch），本机 Cemu 2.6 + JP v208 实测有效。
+func (p *cemuPlatform) KnownOffsets() []uintptr {
+	return []uintptr{0x1055300C, 0xC1F8BF4}
+}
+
 // ---- 内存枚举（Cemu 专属）----
 
 // cemuRWBlocks 枚举所有"已提交 + 可读写"的连续区域（相邻同保护区合并），返回 ≥minMB 的块。

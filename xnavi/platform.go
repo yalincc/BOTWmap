@@ -48,6 +48,10 @@ type Platform interface {
 
 	// SaveRoots 存档根候选目录（递归找 game_data.sav 的起点）。
 	SaveRoots() []string
+
+	// KnownOffsets 返回该平台已知的玩家坐标偏移候选（相对 LargestBlock 基址），
+	// 按优先级排序。启动时优先用这些偏移直接读，失败再回退全量扫描。
+	KnownOffsets() []uintptr
 }
 
 // ---- 当前平台管理 ----
