@@ -149,7 +149,7 @@
         <div class="text-sm font-bold text-white mb-2">关于 xnavi</div>
         <div class="text-slate-300">BOTW 通用定位导航（Cemu + Ryujinx）</div>
         <div class="text-slate-400">版本：{{ ver }}</div>
-        <div class="text-slate-400">地图：<a href="https://botw.yalin.site/" class="text-blue-400 hover:underline">botw.yalin.site</a></div>
+        <div class="text-slate-400">地图：<a :href="mapUrl" class="text-blue-400 hover:underline">{{ mapUrl.replace('https://','').replace('/','') }}</a></div>
         <div class="text-slate-400">GitHub：<a href="https://github.com/yalincc/BOTWmap" class="text-blue-400 hover:underline">yalincc/BOTWmap</a></div>
         <div class="text-slate-400 mt-2">只读内存，不注入，不修改游戏。</div>
         <div class="flex justify-end gap-2 mt-3">
@@ -226,6 +226,12 @@ const emuLabel = computed(() => {
 })
 const gameVerLabel = computed(() => '') // BOTW 版本识别（存档版本号）P2b 后接入
 const detectedGame = ref('') // core status.json 上报的实际识别游戏（botw/totk）
+const statusMapUrl = ref('') // core status.json 上报的地图地址（V2.2.0 Q1）
+const mapUrl = computed(() => {
+  if (statusMapUrl.value) return statusMapUrl.value
+  const g = detectedGame.value || 'botw'
+  return g === 'totk' ? 'https://totk.yalin.site/' : 'https://botw.yalin.site/'
+})
 const gameDisplayName = computed(() => {
   const g = detectedGame.value || env.game
   return { 'botw': '旷野之息 (BOTW)', 'totk': '王国之泪 (TOTK)', 'auto': '自动识别' }[g] || g
@@ -275,13 +281,13 @@ function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
   rt.EventsEmit("update:check");
 }
-async function openMap() { rt.BrowserOpenURL("https://botw.yalin.site/") }
+async function openMap() { rt.BrowserOpenURL(mapUrl.value) }
 async function openLogDir() { await api.OpenLogDir() }
 async function exportDiag() { await api.ExportDiagnostics() }
 function onFirstVerified() {
   if (mapAutoOpened.value) return
   mapAutoOpened.value = true
-  rt.BrowserOpenURL("https://botw.yalin.site/")
+  rt.BrowserOpenURL(mapUrl.value)
 }
 function parseState(line) {
   const s = line
@@ -329,6 +335,7 @@ onMounted(async () => {
     }
     if (st.emuVer) emuVer.value = st.emuVer
     if (st.game) detectedGame.value = st.game
+    if (st.map_url) statusMapUrl.value = st.map_url
     if (st.running && st.ok) {
       syncText.value = '坐标流同步中'
       syncDot.value = 'bg-emerald-400'

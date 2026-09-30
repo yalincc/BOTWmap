@@ -127,6 +127,7 @@ func statusLoop() {
 			"time":     time.Now().Format(time.RFC3339),
 			"pid":      procPID,
 			"game":     currentGame.Name(),
+			"map_url":  currentGame.MapURL(), // V2.2.0 Q1：GUI 按识别游戏打开对应地图
 			"emulator": platName,
 			"emuVer":   emulatorExeVersion(),
 			"ok":       ok,
