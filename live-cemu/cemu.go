@@ -1,282 +1,277 @@
-// Cemu 内存模型层。
-//
-// Cemu（Wii U 模拟器）在宿主进程里用 MMU 预留一块连续 4GB 虚拟地址空间模拟 Wii U 内存，
-// guest 地址 = memory_base + 偏移；memory_base 每次启动由系统分配（不稳定），偏移稳定。
-// 关键区域（guest 偏移，Cemu 源码 src/Cafe/HW/MMU/MMU.cpp）：
-//
-//	mmuRange_TEXT_AREA { 0x02000000, 0x0C000000 }  ← 192MB 程序/静态数据
-//	mmuRange_MEM2      { 0x10000000, 0x40000000 }  ← 1GB 主数据堆（玩家对象在这里）
-//	mmuRange_MEM1      { 0xF4000000, 0x02000000 }  ← 32MB 低内存
-//
-// ★ 字节序：Wii U 是 PowerPC 大端。Cemu 的 memory_readU64/readFloat 全部 swapEndian，
-//   所以外部读内存时 u64 指针、f32 坐标一律按大端解释。
-// ★ 指针值语义：游戏内存里存的指针是 guest 虚拟地址（cheat 码 580F 链即此语义），
-//   外部读取 host 地址 = memory_base + guestVA。比 Ryujinx 的 guest↔host 换算简单得多。
-
+// Cemu 进程内存 접근层：多实例择优 + guest base 定位 + Link 坐标读取 + 自愈。
 package main
 
 import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
+	"syscall"
+	"time"
+	"unsafe"
 )
 
-// ---- 大端读取 ----
+// 已知的 Link 坐标偏移候选（相对 guest base），按优先级排序。
+// 1) 0x1055300C —— 社区公开针位（koko-yl/BotWRamWatch），本机实测有效，
+//    版本内固定，可零扫描直接命中，这是本方案相对"全空间 motion 扫描"的核心优势。
+// 2) 0xC1F8BF4  —— motion 扫描得到的另一份副本，作为 fallback。
+var coordOffsets = []uintptr{0x1055300C, 0xC1F8BF4}
 
-func beU64(b []byte) uint64 { return binary.BigEndian.Uint64(b) }
-func beU32(b []byte) uint32 { return binary.BigEndian.Uint32(b) }
+const (
+	processQueryInformation = 0x0400
+	processVMRead           = 0x0010
+	th32csSnapprocess       = 0x00000002
+	memCommit               = 0x1000
+	memPrivate              = 0x20000
+	pageGuard               = 0x100
+)
 
-func readU64BE(h uintptr, addr uintptr) (uint64, bool) {
-	d := readMem(h, addr, 8)
-	if len(d) < 8 {
-		return 0, false
-	}
-	return beU64(d), true
+var (
+	kernel32 = syscall.NewLazyDLL("kernel32.dll")
+
+	procOpenProcess        = kernel32.NewProc("OpenProcess")
+	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
+	procVirtualQueryEx     = kernel32.NewProc("VirtualQueryEx")
+	procCloseHandle        = kernel32.NewProc("CloseHandle")
+	procCreateToolhelpSnap = kernel32.NewProc("CreateToolhelp32Snapshot")
+	procProcess32FirstW    = kernel32.NewProc("Process32FirstW")
+	procProcess32NextW     = kernel32.NewProc("Process32NextW")
+)
+
+type ProcessEntry32W struct {
+	Size            uint32
+	Usage           uint32
+	ProcessID       uint32
+	DefaultHeapID   uintptr
+	ModuleID        uint32
+	Threads         uint32
+	ParentProcessID uint32
+	PriClassBase    int32
+	Flags           uint32
+	ExeFile         [260]uint16
 }
 
-func readF32BE(h uintptr, addr uintptr) (float32, bool) {
-	d := readMem(h, addr, 4)
-	if len(d) < 4 {
-		return 0, false
+// findAllPid 列出所有匹配进程名的 pid
+func findAllPid(name string) []uint32 {
+	var out []uint32
+	snap, _, _ := procCreateToolhelpSnap.Call(th32csSnapprocess, 0)
+	if snap == 0 || snap == uintptr(^uintptr(0)) {
+		return out
 	}
-	return math.Float32frombits(beU32(d)), true
-}
-
-// readPosBE 读 12 字节坐标槽 (X, alt, Z)，大端。
-func readPosBE(h uintptr, addr uintptr) ([]float32, bool) {
-	d := readMem(h, addr, 12)
-	if len(d) < 12 {
-		return nil, false
-	}
-	return []float32{
-		math.Float32frombits(beU32(d[0:4])),
-		math.Float32frombits(beU32(d[4:8])),
-		math.Float32frombits(beU32(d[8:12])),
-	}, true
-}
-
-// toF32BE 把大端字节 buffer 转为 float32 写入 dst（复用缓冲，避免每块 GC），返回有效长度。
-func toF32BE(buf []byte, dst []float32) int {
-	n := len(buf) / 4
-	if n > len(dst) {
-		n = len(dst)
-	}
-	for i := 0; i < n; i++ {
-		o := i * 4
-		dst[i] = math.Float32frombits(uint32(buf[o])<<24 | uint32(buf[o+1])<<16 | uint32(buf[o+2])<<8 | uint32(buf[o+3]))
-	}
-	return n
-}
-
-func abs32(v float32) float32 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
-// ---- memory_base 锚定 ----
-
-// findCemuBase 反推 Cemu 的 memory_base。两条路线：
-// 1) 区域结构校验：MEM2（≥512MB @ +0x10000000）反推 → 校验 TEXT（+0x02000000，≥64MB）。
-//    （不要求 MEM1——Cemu 2.x 实测 MEM1 区可能未提交。）
-//    ⚠️ Cemu 2.x 本机实测：最大块 = MEM2+TEXT 整块（3616MB），其 BaseAddress 比
-//    AllocationBase 大 0x2000000；真 memory_base = **AllocationBase**（_情报-社区固定针位.md）。
-//    旧代码用 BaseAddress 反推导致三条路线全算错 → 本机 memory_base 永远锚定失败。
-// 2) 链探针法（不依赖区域布局假设）：把每个大块的 AllocationBase/BaseAddress 当作候选基址，
-//    直接试解社区指针链（值必须落在合理 guest 地址区间），解通即确认。
-// 返回 (base, mem2HostBase, ok)。
-func findCemuBase(h uintptr) (uintptr, uintptr, bool) {
-	blocks := rwBlocksAlloc(h, 64.0)
-	// 1) 大块（MEM2+TEXT 合体）：base = AllocationBase
-	for _, b := range blocks {
-		if b.Size >= 512<<20 && b.Alloc != 0 {
-			base := b.Alloc
-			if hasCommittedRW(h, base+0x02000000, 64<<20) {
-				return base, base + 0x10000000, true
-			}
+	defer procCloseHandle.Call(snap)
+	var e ProcessEntry32W
+	e.Size = uint32(unsafe.Sizeof(e))
+	r, _, _ := procProcess32FirstW.Call(snap, uintptr(unsafe.Pointer(&e)))
+	for r != 0 {
+		n := 0
+		for n < 260 && e.ExeFile[n] != 0 {
+			n++
 		}
-	}
-	// 1b) 旧版 Cemu 独立小布局：MEM2 块（128-512MB）→ base = Alloc - 0x02000000（TEXT 起）
-	for _, b := range blocks {
-		if b.Size >= 128<<20 && b.Size < 512<<20 && b.Alloc < 0x10000000 {
-			base := b.Alloc - 0x02000000
-			if hasCommittedRW(h, base+0x10000000, 512<<20) {
-				return base, base + 0x10000000, true
-			}
+		s := string(utf16Decode(e.ExeFile[:n]))
+		if strings.EqualFold(s, name+".exe") || strings.EqualFold(s, name) {
+			out = append(out, e.ProcessID)
 		}
-	}
-	// 2) 链探针：候选基址 = 每个大块的 AllocationBase 与 BaseAddress
-	for _, b := range blocks {
-		for _, cand := range []uintptr{b.Alloc, b.Base} {
-			if cand == 0 {
-				continue
-			}
-			for _, delta := range []uintptr{0x02000000, 0x10000000, 0} {
-				c := cand - delta
-				if c == 0 || c > cand {
-					continue
-				}
-				for _, ch := range cemuChains {
-					if va, ok := resolveChain(h, c, ch); ok {
-						if len(slotScanAround(h, c, va)) > 0 {
-							return c, c + 0x10000000, true
-						}
-					}
-				}
-			}
-		}
-	}
-	return 0, 0, false
-}
-
-// ---- 社区指针链（guest 偏移，Cemu 版本无关）----
-// 来源：Cemu 社区 cheat 码 580F 指针链。BotW v1.x 实测。
-// 链 A（月亮跳/速度同源）：[[0x02D1EA00]+0x198]+0x2D18 → 当前玩家 actor 对象
-// 链 B（更深的稳定链）：[[[[0x02CC5DE8]+0x30]+0x10]+0x8]+0x10
-
-type cemuChain struct {
-	Name    string
-	Root    uintptr
-	Offsets []uintptr
-}
-
-var cemuChains = []cemuChain{
-	{"playerA", 0x02D1EA00, []uintptr{0x198, 0x2D18}},
-	{"playerB", 0x02CC5DE8, []uintptr{0x30, 0x10, 0x8, 0x10}},
-}
-
-// resolveChain 从根 guest 偏移沿链解出最终 guest 地址。每级指针值 = guest 虚拟地址。
-func resolveChain(h uintptr, base uintptr, c cemuChain) (uintptr, bool) {
-	cur := base + c.Root
-	for _, off := range c.Offsets {
-		v, ok := readU64BE(h, cur)
-		if !ok || v < 0x01000000 || v > 0x4FFFFFFF {
-			return 0, false // 指针必须落在合理 guest 地址区间
-		}
-		cur = base + uintptr(v) + off
-	}
-	return cur, true
-}
-
-// posRangeOK 坐标合理性（与 BotwNavi decodePos 同口径）：(X, alt, Z)。
-// Fix 5 / 5b：剔除近零残留与单轴 denormal 垃圾。
-// Fix 6（踩坑 #6）：NaN 必须单独判——它与任何数比较都是 false，范围检查抓不住。
-// Fix 7：失效偏移常读到"按钮/未初始化槽"——单轴近零(≈0)且高度贴地(<5)，玩家坐标不会这样。
-func posRangeOK(x, alt, z float32) bool {
-	if x != x || alt != alt || z != z {
-		return false // NaN
-	}
-	if x == 0 && alt == 0 && z == 0 {
-		return false // 标题/加载画面槽未初始化
-	}
-	if abs32(x) < 5 && abs32(z) < 5 {
-		return false // 近零簇（原点残留）
-	}
-	if (abs32(x) < 5 && alt < 5) || (abs32(z) < 5 && alt < 5) {
-		return false // 未初始化/按钮槽：单轴近零且高度贴地（如 (0.0, 1.0, 1523.4)）
-	}
-	if abs32(x) < 1e-20 || abs32(z) < 1e-20 {
-		return false // 单轴 denormal
-	}
-	if x <= -7000 || x >= 7000 || z <= -7000 || z >= 7000 ||
-		alt <= -600 || alt >= 5000 {
-		return false
-	}
-	return true
-}
-
-// rotOKF 检查 9 个 float 是否构成正交归一 3×3 旋转矩阵（BotW ActorBase 特征）。
-// NaN 矩阵必须拒绝（与任何数比较都是 false，会导致全内存假命中）。
-func rotOKF(m []float32) bool {
-	if len(m) < 9 {
-		return false
-	}
-	for _, v := range m[:9] {
-		if v != v {
-			return false
-		}
-	}
-	cols := [3][3]float32{
-		{m[0], m[3], m[6]},
-		{m[1], m[4], m[7]},
-		{m[2], m[5], m[8]},
-	}
-	for i := 0; i < 3; i++ {
-		n := math.Sqrt(float64(cols[i][0]*cols[i][0] + cols[i][1]*cols[i][1] + cols[i][2]*cols[i][2]))
-		if math.Abs(n-1.0) >= 0.05 {
-			return false
-		}
-	}
-	for i := 0; i < 3; i++ {
-		for j := i + 1; j < 3; j++ {
-			dot := cols[i][0]*cols[j][0] + cols[i][1]*cols[j][1] + cols[i][2]*cols[j][2]
-			if math.Abs(float64(dot)) >= 0.08 {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// slotScanAround 在 actor 对象 guest 地址附近窗口内找 [坐标(3f)+正交矩阵(9f)] 结构。
-// 返回候选槽 host 地址（内存序 X, alt, Z）。
-func slotScanAround(h uintptr, base uintptr, actorVA uintptr) []Hit {
-	const lo, hi = 0x200, 0x600
-	start := actorVA - lo
-	var out []Hit
-	buf := make([]byte, 48)
-	fl := make([]float32, 12)
-	for off := uintptr(0); off < lo+hi; off += 4 {
-		addr := base + start + off
-		d := readMem(h, addr, 48)
-		if len(d) < 48 {
-			continue
-		}
-		copy(buf, d[:48])
-		n := toF32BE(buf[:48], fl)
-		if n < 12 {
-			continue
-		}
-		x, y, z := fl[0], fl[1], fl[2]
-		if !posRangeOK(x, y, z) {
-			continue
-		}
-		if !rotOKF(fl[3:12]) {
-			continue
-		}
-		out = append(out, Hit{Addr: addr, X: x, Y: y, Z: z})
+		r, _, _ = procProcess32NextW.Call(snap, uintptr(unsafe.Pointer(&e)))
 	}
 	return out
 }
 
-// chainLocate 用社区链定位坐标槽（确定性，无需用户走动）。
-func chainLocate(h uintptr, base uintptr) *LocateResult {
-	for _, c := range cemuChains {
-		actorVA, ok := resolveChain(h, base, c)
-		if !ok {
-			fmt.Printf("  [chain] %s: resolve failed\n", c.Name)
-			continue
+func utf16Decode(u []uint16) []rune {
+	out := make([]rune, 0, len(u))
+	for i := 0; i < len(u); i++ {
+		var r rune
+		if u[i] < 0xD800 || u[i] > 0xDFFF {
+			r = rune(u[i])
+		} else if i+1 < len(u) {
+			r = 0x10000 + (rune(u[i]-0xD800) << 10) + rune(u[i+1]-0xD800)
+			i++
+		} else {
+			r = 0xFFFD
 		}
-		hits := slotScanAround(h, base, actorVA)
-		fmt.Printf("  [chain] %s: actor=0x%012X  %d slot candidates\n", c.Name, actorVA, len(hits))
-		if len(hits) == 0 {
-			continue
+		out = append(out, r)
+	}
+	return out
+}
+
+func openProc(pid uint32) uintptr {
+	h, _, _ := procOpenProcess.Call(processQueryInformation|processVMRead, 0, uintptr(pid))
+	return h
+}
+
+func readMem(h uintptr, addr uintptr, size int) ([]byte, bool) {
+	if h == 0 || addr == 0 {
+		return nil, false
+	}
+	buf := make([]byte, size)
+	var got uintptr
+	r, _, _ := procReadProcessMemory.Call(h, addr, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), uintptr(unsafe.Pointer(&got)))
+	if r == 0 || int(got) != size {
+		return nil, false
+	}
+	return buf, true
+}
+
+// f32BE 读 PowerPC 大端 float
+func f32BE(h uintptr, addr uintptr) (float64, bool) {
+	b, ok := readMem(h, addr, 4)
+	if !ok {
+		return 0, false
+	}
+	return float64(math.Float32frombits(binary.BigEndian.Uint32(b))), true
+}
+
+// MemoryBasicInformation 与 Windows x64 结构一致（48 字节）
+type MemoryBasicInformation struct {
+	BaseAddress       uintptr
+	AllocationBase    uintptr
+	AllocationProtect uint32
+	PartitionId       uint16
+	RegionSize        uintptr
+	State             uint32
+	Protect           uint32
+	Type              uint32
+}
+
+func init() {
+	if unsafe.Sizeof(MemoryBasicInformation{}) != 48 {
+		panic("MBI size mismatch")
+	}
+}
+
+// rwBlocks 枚举进程内所有 >= minMB 的可读写私有提交块，返回 AllocationBase 去重列表（按块大小降序）
+func rwBlocks(h uintptr, minMB int) []struct {
+	Base uintptr
+	Size uintptr
+} {
+	type pair struct {
+		Base uintptr
+		Size uintptr
+	}
+	var raw []pair
+	if minMB <= 0 {
+		minMB = 256
+	}
+	minSize := uintptr(minMB) * 1024 * 1024
+	addr := uintptr(0)
+	const limit = uintptr(0x7FFFFFFFFFFF)
+	for addr < limit {
+		var mbi MemoryBasicInformation
+		rr, _, _ := procVirtualQueryEx.Call(h, addr, uintptr(unsafe.Pointer(&mbi)), unsafe.Sizeof(mbi))
+		if rr == 0 {
+			break
 		}
-		best := hits[0]
-		for _, hh := range hits[1:] {
-			// 优先取坐标更大的（远离原点残留）
-			if abs32(hh.X)+abs32(hh.Z) > abs32(best.X)+abs32(best.Z) {
-				best = hh
-			}
+		b, sz := mbi.BaseAddress, mbi.RegionSize
+		p := mbi.Protect & 0xFF
+		if mbi.State == memCommit && mbi.Type == memPrivate &&
+			(mbi.Protect&pageGuard) == 0 && (p == 0x02 || p == 0x04) && sz >= minSize {
+			raw = append(raw, pair{mbi.AllocationBase, sz})
 		}
-		return &LocateResult{
-			Addr:   best.Addr,
-			Copies: len(hits),
-			Struct: 1,
-			Hud:    [3]float32{best.X, best.Z, best.Y},
-			Log:    []string{fmt.Sprintf("chain %s -> 0x%012X", c.Name, best.Addr)},
+		nxt := b + sz
+		if nxt > addr {
+			addr = nxt
+		} else {
+			addr += 0x1000
 		}
 	}
-	return nil
+	sort.Slice(raw, func(i, j int) bool { return raw[i].Size > raw[j].Size })
+	// 去重（保留最大）
+	var out []struct {
+		Base uintptr
+		Size uintptr
+	}
+	seen := map[uintptr]bool{}
+	for _, r := range raw {
+		if r.Base == 0 || seen[r.Base] {
+			continue
+		}
+		seen[r.Base] = true
+		out = append(out, struct {
+			Base uintptr
+			Size uintptr
+		}{r.Base, r.Size})
+	}
+	return out
+}
+
+// plausible 坐标合理性自检
+func plausible(x, y, z float64) bool {
+	if math.IsNaN(x) || math.IsNaN(y) || math.IsNaN(z) {
+		return false
+	}
+	if math.IsInf(x, 0) || math.IsInf(y, 0) || math.IsInf(z, 0) {
+		return false
+	}
+	// 世界 X/Z ∈ ±6000，留余量到 8000；Y ∈ -1000..6000
+	if math.Abs(x) > 8000 || math.Abs(z) > 8000 {
+		return false
+	}
+	if y < -1000 || y > 6000 {
+		return false
+	}
+	// 全零 = 未加载
+	if x == 0 && z == 0 {
+		return false
+	}
+	return true
+}
+
+// tryLocate 在给定进程句柄上定位玩家坐标槽
+func tryLocate(h uintptr) (uintptr, uintptr, float64, float64, float64, bool) {
+	blocks := rwBlocks(h, 256)
+	for _, b := range blocks {
+		for _, off := range coordOffsets {
+			x, o1 := f32BE(h, b.Base+off)
+			y, o2 := f32BE(h, b.Base+off+4)
+			z, o3 := f32BE(h, b.Base+off+8)
+			if o1 && o2 && o3 && plausible(x, y, z) {
+				return b.Base, off, x, y, z, true
+			}
+		}
+	}
+	return 0, 0, 0, 0, 0, false
+}
+
+// ---------- 会话（Seat） ----------
+
+type Seat struct {
+	Pid   uint32
+	H     uintptr
+	Base  uintptr
+	Off   uintptr
+	Since time.Time
+}
+
+func (s *Seat) Close() {
+	if s.H != 0 {
+		procCloseHandle.Call(s.H)
+	}
+	s.H = 0
+}
+
+// acquireSeat 在所有 Cemu 进程里挑一个能读到坐标的（多实例场景关键）
+func acquireSeat() (*Seat, string) {
+	pids := findAllPid("Cemu")
+	if len(pids) == 0 {
+		return nil, "Cemu not running"
+	}
+	// 新进程优先（老大手动重开时通常新实例才是有效实例）
+	sort.Slice(pids, func(i, j int) bool { return pids[i] > pids[j] })
+	tried := []string{}
+	for _, pid := range pids {
+		h := openProc(pid)
+		if h == 0 {
+			tried = append(tried, fmt.Sprintf("pid=%d:open-failed", pid))
+			continue
+		}
+		base, off, x, y, z, ok := tryLocate(h)
+		if !ok {
+			procCloseHandle.Call(h)
+			tried = append(tried, fmt.Sprintf("pid=%d:no-slot", pid))
+			continue
+		}
+		s := &Seat{Pid: pid, H: h, Base: base, Off: off, Since: time.Now()}
+		return s, fmt.Sprintf("pid=%d base=0x%X off=0x%X pos=(%.1f,%.1f,%.1f)", pid, base, off, x, y, z)
+	}
+	return nil, "no Cemu instance readable; " + strings.Join(tried, ", ")
 }

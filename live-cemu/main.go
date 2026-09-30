@@ -1,245 +1,267 @@
-// CemuNavi（live-cemu）：为《旷野之息》互动地图 https://botw.yalin.site/ 提供
-// Cemu（Wii U 模拟器）版实时角色追踪。
+// CemuNavi（navicemu）—— Cemu 模拟器上《旷野之息》实时定位 + 进度同步。
 //
-// 原理：读 Cemu 进程内存（guest 地址 = memory_base + 偏移，PowerPC 大端），
-// 用社区指针链/结构扫描定位玩家坐标 → HTTP API（127.0.0.1:8766）
-// → 在线地图页跨域连接显示红点/轨迹/导航。
+// v1.3.0 收尾版：以 GameTools/cmunavi 的简单 trackLoop 为底座，
+// 去掉旧版 poll/verify/watchdog 三 goroutine 竞态，固定偏移多块试读，
+// 读 5 次失败才重找，站定不重定位。
 //
-// 用法：navicemu.exe [port] [--no-open] [--no-scan] [--dump]
+// 用法：先开 Cemu 进游戏，再运行 navicemu.exe（默认 :8766，自动开在线地图）。
 
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
-	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-const mapURL = "https://botw.yalin.site/"
+const buildVer = "v1.3.0"
 
-func main() {
-	setConsoleTitle("CemuNavi · BOTW Live (Cemu)")
+const onlineMapURL = "https://botw.yalin.site/"
 
-	port := 8766
-	autoOpen := true
-	allowScan := true
-	dump := false
-	for _, a := range os.Args[1:] {
-		switch {
-		case a == "--no-open":
-			autoOpen = false
-		case a == "--no-scan":
-			allowScan = false
-		case a == "--dump":
-			dump = true
-		case strings.HasPrefix(a, "--"):
-			// ignore
-		default:
-			if n, err := strconv.Atoi(a); err == nil {
-				port = n
+// 地图像素：mx = 2*gx + 12000, my = 2*gz + 10000
+func gameToMap(gx, gz float64) (float64, float64) {
+	return 2*gx + 12000, 2*gz + 10000
+}
+
+const (
+	mapW       = 24000.0
+	mapH       = 20000.0
+	minTileMB  = 256
+	shrineExit = 300.0 // |gx| 或 |gz| 超过此值 = 世界尺度，小于 = 神庙内部
+)
+
+type Target struct {
+	Name string  `json:"name,omitempty"`
+	X    float64 `json:"x"`
+	Y    float64 `json:"y"`
+	Type string  `json:"type,omitempty"`
+}
+
+type Diag struct {
+	Pid       uint32 `json:"pid"`
+	Base      string `json:"base"`
+	Off       string `json:"off"`
+	Since     int64  `json:"sinceSec"`
+	Reads     int64  `json:"reads"`
+	Fails     int64  `json:"fails"`
+	Relocates int64  `json:"relocates"`
+	LastError string `json:"lastError"`
+	UptimeSec int64  `json:"uptimeSec"`
+	Version   string `json:"version"`
+}
+
+type State struct {
+	mu        sync.Mutex
+	OK        bool
+	Verified  bool
+	GX, GY, GZ float64 // GX=东, GY=高, GZ=南
+	MX, MY    float64
+	Target    *Target
+	Source    string
+	Diag      Diag
+}
+
+var (
+	st        State
+	rescanReq int32
+	bootAt    = time.Now()
+)
+
+func setOffline(err string) {
+	st.mu.Lock()
+	st.OK = false
+	st.Verified = false
+	st.Source = "offline"
+	if err != "" {
+		st.Diag.LastError = err
+	}
+	st.mu.Unlock()
+}
+
+func trackLoop() {
+	var seat *Seat
+	fails := 0
+	st.mu.Lock()
+	st.Diag.Version = buildVer
+	st.mu.Unlock()
+
+	// 神庙模式：进神庙内部时把红点固定在入口（最后一个世界坐标），不追内部坐标。
+	var shrineMode bool
+	var shrinePin [3]float64 // (gx, alt, gz)
+	var prevX, prevY, prevZ float64
+	hasPrev := false
+
+	for {
+		if atomic.SwapInt32(&rescanReq, 0) == 1 {
+			if seat != nil {
+				seat.Close()
+				seat = nil
+			}
+			fmt.Println("  [rescan] manual request, dropping current connection")
+		}
+
+		if seat == nil {
+			s, msg := acquireSeat()
+			if s == nil {
+				setOffline(msg)
+				fmt.Printf("  [wait] %s\n", msg)
+				time.Sleep(2 * time.Second)
+				continue
+			}
+			seat = s
+			fails = 0
+			st.mu.Lock()
+			st.Diag.Pid = s.Pid
+			st.Diag.Base = fmt.Sprintf("0x%X", s.Base)
+			st.Diag.Off = fmt.Sprintf("0x%X", s.Off)
+			st.Diag.Since = 0
+			st.Diag.Relocates++
+			st.Diag.LastError = ""
+			st.Source = "fixed-offset"
+			st.mu.Unlock()
+			fmt.Printf("  [lock] %s\n", msg)
+		}
+
+		// Cemu 进程还在？
+		alive := false
+		for _, p := range findAllPid("Cemu") {
+			if p == seat.Pid {
+				alive = true
+				break
 			}
 		}
+		if !alive {
+			fmt.Println("  [detach] Cemu exited, waiting for a new instance")
+			seat.Close()
+			seat = nil
+			setOffline("Cemu exited")
+			continue
+		}
+
+		x, o1 := f32BE(seat.H, seat.Base+seat.Off)
+		y, o2 := f32BE(seat.H, seat.Base+seat.Off+4)
+		z, o3 := f32BE(seat.H, seat.Base+seat.Off+8)
+		if !o1 || !o2 || !o3 || !plausible(x, y, z) {
+			fails++
+		} else {
+			fails = 0
+
+			// ---- 神庙内部识别：世界尺度(|x|,|z|>300) 单步跳到内部尺度(<300) ----
+			if !shrineMode && hasPrev &&
+				abs64(x) < shrineExit && abs64(z) < shrineExit &&
+				(abs64(prevX) > shrineExit || abs64(prevZ) > shrineExit) {
+				shrineMode = true
+				shrinePin = [3]float64{prevX, prevY, prevZ}
+				fmt.Printf("  [shrine] entered interior (%.0f, %.0f) -> pin dot to entrance\n", x, z)
+			}
+			// 神庙模式：红点固定入口，忽略内部坐标
+			if shrineMode {
+				if abs64(x) > shrineExit || abs64(z) > shrineExit {
+					fmt.Printf("  [shrine] back to world (%.0f, %.0f) -> normal tracking\n", x, z)
+					shrineMode = false
+				} else {
+					x, y, z = shrinePin[0], shrinePin[1], shrinePin[2]
+				}
+			}
+
+			mx, my := gameToMap(x, z)
+			st.mu.Lock()
+			was := st.OK
+			st.OK = true
+			st.Verified = true
+			st.GX, st.GY, st.GZ = x, y, z
+			st.MX, st.MY = mx, my
+			st.Diag.Reads++
+			st.Diag.LastError = ""
+			st.mu.Unlock()
+			if !was {
+				fmt.Printf("  [move] X=%.1f Y=%.1f Z=%.1f -> map(%.0f,%.0f)\n", x, y, z, mx, my)
+			}
+		}
+
+		if fails > 0 {
+			st.mu.Lock()
+			st.Diag.Fails++
+			st.mu.Unlock()
+			if fails >= 5 {
+				fmt.Println("  [relocate] reads failing x5 -> re-locking (cutscene/loading?)")
+				seat.Close()
+				seat = nil
+				fails = 0
+				setOffline("read failed x5")
+				time.Sleep(400 * time.Millisecond)
+				continue
+			}
+			setOffline("read failed")
+		}
+
+		st.mu.Lock()
+		st.Diag.Since = int64(time.Since(seat.Since).Seconds())
+		st.Diag.UptimeSec = int64(time.Since(bootAt).Seconds())
+		st.mu.Unlock()
+
+		prevX, prevY, prevZ = x, y, z
+		hasPrev = true
+		time.Sleep(200 * time.Millisecond)
 	}
+}
 
-	fmt.Println("=" + strings.Repeat("=", 61))
-	fmt.Println(" CemuNavi · BOTW Live (Cemu emulator)")
-	fmt.Println("=" + strings.Repeat("=", 61))
-
-	pid, h := findLiveCemu()
-	if pid != 0 && h != 0 {
-		procHandle, procPID = h, pid
-		fmt.Printf("  pid = %d\n", pid)
-	} else {
-		fmt.Println("  Cemu not running yet - the watchdog attaches as soon as it appears.")
+func abs64(v float64) float64 {
+	if v < 0 {
+		return -v
 	}
+	return v
+}
 
-	// ---- --dump 诊断模式：只打印内存信息与定位结果，不启服务 ----
-	if dump {
-		dumpDiagnostics()
-		return
+func pickPort(start int) (net.Listener, int) {
+	for p := start; p < start+15; p++ {
+		l, err := net.Listen("tcp", fmt.Sprintf(":%d", p))
+		if err == nil {
+			return l, p
+		}
 	}
+	return nil, 0
+}
 
-	loadConfig()
-	progress = newProgressWatcher()
-	go progress.loop()
+func main() {
+	fmt.Println("==================================================")
+	fmt.Printf("  CemuNavi %s - Breath of the Wild (Cemu) live tracker\n", buildVer)
+	fmt.Println("==================================================")
 
-		addr := fmt.Sprintf("127.0.0.1:%d", port)
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		fmt.Printf("  listen %s failed: %v\n", addr, err)
+	go trackLoop()
+	startProgress()
+
+	l, port := pickPort(8766)
+	if l == nil {
+		fmt.Println("[err] no free port in 8766..8780")
+		time.Sleep(4 * time.Second)
 		os.Exit(1)
 	}
-	fmt.Printf("  API -> http://%s/pos\n", addr)
-	go http.Serve(ln, &server{})
+	url := fmt.Sprintf("http://127.0.0.1:%d", port)
 
-	fmt.Println("  stage 1: fixed offset (deterministic) -> remembered offsets ...")
-	if a, v, ok := tryFixedPos(); ok {
-		lock.mu.Lock()
-		lock.addr = a
-		lock.verified = false
-		lock.copies = 0
-		lock.source = "fixed"
-		lock.mu.Unlock()
-		fmt.Printf("  address 0x%X -> mem=(%.1f, %.1f, %.1f)   [fixed path, zero scan]\n", a, v[0], v[1], v[2])
-		fmt.Println("  it is verified as soon as the value reads sane.")
-		go verifyKnown(a)
-	} else if a, v, ok := tryOffsets(); ok {
-		lock.mu.Lock()
-		lock.addr = a
-		lock.verified = false
-		lock.copies = 0
-		lock.source = "known"
-		lock.mu.Unlock()
-		fmt.Printf("  address 0x%X -> mem=(%.1f, %.1f, %.1f)   [fast path, no scan]\n", a, v[0], v[1], v[2])
-		fmt.Println("  it is verified as soon as the value reads sane.")
-		go verifyKnown(a)
-	} else if reopenProcess() && allowScan {
-		fmt.Println("  stage 2: community chain -> motion scan fallback ...")
-		if !relocalize("remembered addresses unusable") {
-			fmt.Println("  no luck yet - serving anyway, the watchdog keeps trying.")
-		}
-	} else {
-		fmt.Println("  Cemu is not running yet - serving anyway.")
-		fmt.Println("  Map works now; the live dot starts as soon as the emulator")
-		fmt.Println("  appears (watchdog, no restart needed).")
+	fmt.Printf("  API: %s/pos\n", url)
+	if port != 8766 {
+		fmt.Println("  note: 8766 taken, using spare port (online map expects 8766)")
 	}
+	fmt.Println("  Close this window to stop")
+	fmt.Println("--------------------------------------------------")
 
-	go poll()
-	go watchdog()
-	go statusLoop()
+	mux := newMux()
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(l) }()
 
-	time.Sleep(500 * time.Millisecond)
-
-	state.mu.RLock()
-	st, _ := json.Marshal(map[string]any{
-		"ok": state.ok, "gx": state.gx, "gy": state.gy, "gz": state.gz,
-		"mx": state.mx, "my": state.my, "layer": state.layer,
-		"age": state.age, "verified": state.verified, "copies": state.copies,
-		"source": state.source,
-	})
-	state.mu.RUnlock()
-	fmt.Println("")
-	fmt.Printf("  serving -> %s\n", st)
-	fmt.Printf("  live map -> %s\n", mapURL)
-	fmt.Println("  (Ctrl+C to stop)")
-
-	if autoOpen {
-		openBrowser(mapURL)
+	time.Sleep(800 * time.Millisecond)
+	if port == 8766 {
+		fmt.Printf("  [ui] opening %s\n", onlineMapURL)
+		exec.Command("cmd", "/c", "start", "", onlineMapURL).Start()
+	} else {
+		fmt.Printf("  [ui] spare port, open %s manually\n", url)
 	}
 
 	select {}
-}
-
-// dumpDiagnostics 打印 Cemu 进程/内存/定位诊断信息（联调用，不开服务器）。
-func dumpDiagnostics() {
-	if procHandle == 0 {
-		fmt.Println("  [dump] Cemu not running - nothing to dump")
-		return
-	}
-	h := procHandle
-	fmt.Println("  --- memory blocks (committed RW, >=16MB) ---")
-	blocks := rwBlocks(h, 16.0)
-	for _, b := range blocks {
-		fmt.Printf("    block 0x%012X  %8.0f MB\n", b.Base, float64(b.Size)/1048576.0)
-	}
-	base, mem2, ok := findCemuBase(h)
-	anchor, anchorSize := largestRWBlock(h)
-	_, alloc, _ := largestRWAlloc(h)
-	fmt.Printf("  [dump] anchor (largest RW block) = 0x%012X  (%8.0f MB)\n", anchor, float64(anchorSize)/1048576.0)
-	if alloc != 0 && alloc != anchor {
-		fmt.Printf("  [dump] largest block AllocationBase = 0x%012X  (diff 0x%X <- 固定针位锚)\n", alloc, anchor-alloc)
-	}
-	if alloc != 0 {
-		if p, rok := readPosBE(h, alloc+fixedPosXOff); rok {
-			fmt.Printf("  [dump] fixed offset +0x1055300C -> mem=(%.1f, %.1f, %.1f)\n", p[0], p[1], p[2])
-		} else {
-			fmt.Println("  [dump] fixed offset +0x1055300C -> unreadable")
-		}
-	}
-	if !ok {
-		fmt.Println("  [dump] memory_base NOT found (chains will be skipped; motion scan still works)")
-	} else {
-		fmt.Printf("  [dump] memory_base = 0x%012X  MEM2 host = 0x%012X\n", base, mem2)
-		guestBase.Store(base)
-		for _, c := range cemuChains {
-			va, rok := resolveChain(h, base, c)
-			fmt.Printf("  [dump] chain %-8s root=0x%012X resolve=%v", c.Name, c.Root, rok)
-			if rok {
-				fmt.Printf("  actor=0x%012X (host 0x%012X)\n", va, base+va)
-			} else {
-				fmt.Println()
-			}
-		}
-		if res := chainLocate(h, base); res != nil {
-			fmt.Printf("  [dump] chainLocate -> slot 0x%012X mem=(%.1f, %.1f, %.1f)\n",
-				res.Addr, res.Hud[0], res.Hud[1], res.Hud[2])
-		} else {
-			fmt.Println("  [dump] chainLocate: no slot candidate")
-		}
-	}
-
-	// 链根探针：候选基址 × 社区根地址，校准本 build 的链（版本差异排查用）
-	fmt.Println("  [dump] chain-root probe (candidate bases x roots) ...")
-	probeBlocks := rwBlocks(h, 64.0)
-	roots := []uintptr{0x02D1EA00, 0x02CA6D48, 0x02CC5DE8}
-	for _, b := range probeBlocks {
-		for _, delta := range []uintptr{0x02000000, 0x10000000, 0xF4000000, 0} {
-			cand := b.Base - delta
-			if cand == 0 || cand > b.Base {
-				continue
-			}
-			line := fmt.Sprintf("    cand=0x%012X (blk 0x%012X -0x%X)", cand, b.Base, delta)
-			any := false
-			for _, r := range roots {
-				if v, rok := readU64BE(h, cand+r); rok && (v >= 0x01000000 && v <= 0x4FFFFFFF) {
-					line += fmt.Sprintf("  r0x%08X->0x%012X", r, v)
-					any = true
-				}
-			}
-			if !any {
-				continue
-			}
-			for _, c := range cemuChains {
-				if va, rok := resolveChain(h, cand, c); rok {
-					n := len(slotScanAround(h, cand, va))
-					line += fmt.Sprintf("  [%s ok, %d slots]", c.Name, n)
-				}
-			}
-			fmt.Println(line)
-		}
-	}
-
-	fmt.Println("  [dump] structural scan (top groups, NaN-filtered) ...")
-	sb := rwBlocks(h, 64.0)
-	hits := structuralScan(h, sb, nil)
-	groups, _ := groupAndRank(h, hits)
-	for i := 0; i < len(groups) && i < 10; i++ {
-		g := groups[i]
-		fmt.Printf("    copies=%d  mem=(%.1f, %.1f, %.1f)  ex0x%012X\n",
-			g.Copies, g.X, g.Y, g.Z, g.Addrs[0])
-	}
-
-	// remembered offsets 当前是否可用（锚 = 最大块）
-	off := loadOffsets()
-	for _, o := range off {
-		if v, rok := readPosBE(h, anchor+o); rok {
-			fmt.Printf("  [dump] known offset 0x%012X -> mem=(%.1f, %.1f, %.1f)\n", o, v[0], v[1], v[2])
-		} else {
-			fmt.Printf("  [dump] known offset 0x%012X -> unreadable\n", o)
-		}
-	}
-	fmt.Println("  [dump] done")
-}
-
-func openBrowser(url string) {
-	cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("  (could not open browser: %v)\n", err)
-	}
 }

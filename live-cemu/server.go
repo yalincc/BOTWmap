@@ -1,10 +1,4 @@
-// HTTP API：供在线地图页（https://botw.yalin.site/）跨域连接，协议与 BotwNavi 完全一致。
-// 端点：GET /pos、GET/POST /target、POST /config、GET /rescan、GET /progress。
-// 所有响应带 CORS 头 + Private Network Access 预检头。
-//
-// v1.1.0 全自动进度同步：/progress 由 Cemu 存档实时计算（progress_cemu.go），
-// /pos 附带 progressGen，前端 live.js 检测变化即拉取；无存档时 503 降级。
-
+// HTTP 层：定位 API + 自带地图页静态托管 + BOTWmap 资产代理。
 package main
 
 import (
@@ -13,249 +7,203 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
-type targetT struct {
-	Name string  `json:"name"`
-	X    float64 `json:"x"`
-	Y    float64 `json:"y"`
-	Type string  `json:"type"`
-	Ts   float64 `json:"ts"`
+// BOTWmap 资产候选位置（存在即自动接管，缺失不影响核心导航）
+var botwRoots = []string{
+	`E:\WorkSpace\BOTWmap\app`,
+	`..\BOTWmap\app`,
+	`..\..\BOTWmap\app`,
 }
 
-var (
-	targetMu sync.Mutex
-	target   *targetT
-)
-
-type configT struct {
-	Cats       []string `json:"cats"`
-	DoneFilter string   `json:"doneFilter"`
-	ShowAreas  bool     `json:"showAreas"`
-}
-
-var (
-	configMu sync.Mutex
-	cfg      = defaultConfig()
-)
-
-func defaultConfig() configT {
-	return configT{Cats: []string{"神庙", "希卡塔", "克洛格果实"}, DoneFilter: "all", ShowAreas: true}
-}
-
-func configPath() string {
-	exe, _ := os.Executable()
-	return filepath.Join(filepath.Dir(exe), "data", "map_config.json")
-}
-
-func loadConfig() {
-	configMu.Lock()
-	defer configMu.Unlock()
-	cfg = defaultConfig()
-	if buf, err := os.ReadFile(configPath()); err == nil {
-		var c configT
-		if json.Unmarshal(buf, &c) == nil {
-			merged := defaultConfig()
-			if c.Cats != nil {
-				merged.Cats = c.Cats
-			}
-			if c.DoneFilter != "" {
-				merged.DoneFilter = c.DoneFilter
-			}
-			merged.ShowAreas = c.ShowAreas
-			cfg = merged
-		}
-	}
-}
-
-func saveConfig() {
-	configMu.Lock()
-	c := cfg
-	configMu.Unlock()
-	os.MkdirAll(filepath.Dir(configPath()), 0755)
-	buf, _ := json.MarshalIndent(c, "", " ")
-	os.WriteFile(configPath(), buf, 0644)
-}
-
-// corsHeaders 写入跨域 + PNA 头。
-func corsHeaders(w http.ResponseWriter) {
+func cors(w http.ResponseWriter) {
 	h := w.Header()
 	h.Set("Access-Control-Allow-Origin", "*")
+	h.Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+	h.Set("Access-Control-Allow-Headers", "Content-Type")
 	h.Set("Access-Control-Allow-Private-Network", "true")
 	h.Set("Cache-Control", "no-store")
 }
 
-func writeJSON(w http.ResponseWriter, obj any) {
+func jsonOut(w http.ResponseWriter, v interface{}) {
+	cors(w)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	corsHeaders(w)
-	buf, _ := json.Marshal(obj)
-	w.Write(buf)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
-type server struct{}
-
-func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	if path == "" {
-		path = "/"
-	}
-	if r.Method == http.MethodOptions {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Private-Network", "true")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	switch path {
-	case "/pos":
-		s.handlePos(w, r)
-	case "/target":
-		if r.Method == http.MethodPost {
-			s.handleTargetPost(w, r)
-		} else {
-			writeJSON(w, map[string]any{"ok": false})
-		}
-	case "/config":
-		if r.Method == http.MethodPost {
-			s.handleConfigPost(w, r)
-		} else {
-			configMu.Lock()
-			c := cfg
-			configMu.Unlock()
-			writeJSON(w, c)
-		}
-	case "/rescan":
-		if r.Method == http.MethodGet {
-			go relocalize("/rescan requested")
-			writeJSON(w, map[string]any{"started": true})
-		} else {
-			writeJSON(w, map[string]any{"ok": false})
-		}
-	case "/progress":
-		s.handleProgress(w, r)
-	default:
-		writeJSON(w, map[string]any{"ok": false, "error": "unknown endpoint"})
-	}
-}
-
-func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
-	state.mu.RLock()
-	payload := map[string]any{
-		"ok":       state.ok,
-		"gx":       state.gx,
-		"gy":       state.gy,
-		"gz":       state.gz,
-		"mx":       state.mx,
-		"my":       state.my,
-		"layer":    state.layer,
-		"age":      state.age,
-		"verified": state.verified,
-		"copies":   state.copies,
-		"source":   state.source,
-	}
-	state.mu.RUnlock()
-	targetMu.Lock()
-	payload["target"] = target
-	targetMu.Unlock()
-	configMu.Lock()
-	payload["config"] = cfg
-	configMu.Unlock()
-	if progress != nil {
-		_, _, gen := progress.snapshot()
-		payload["progressGen"] = gen
-	}
-	writeJSON(w, payload)
-}
-
-// handleProgress 返回最新收集进度（前端 live.js 吸收）。无存档/无表时 503 降级。
-func (s *server) handleProgress(w http.ResponseWriter, r *http.Request) {
-	if progress == nil {
-		writeJSON(w, map[string]any{"ok": false})
-		return
-	}
-	ok, body, _ := progress.snapshot()
-	if !ok || len(body) == 0 {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		corsHeaders(w)
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"ok":false}`))
-		return
-	}
+// jsonOutRaw 直接吐预序列化好的 JSON（进度数据大，避免二次编解码）
+func jsonOutRaw(w http.ResponseWriter, body []byte) {
+	cors(w)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	corsHeaders(w)
-	w.Write(body)
+	_, _ = w.Write(body)
 }
 
-func (s *server) handleTargetPost(w http.ResponseWriter, r *http.Request) {
-	var obj map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-		obj = map[string]any{}
-	}
-	if clear, _ := obj["clear"].(bool); clear {
-		clearTarget()
-		writeJSON(w, map[string]any{"ok": true, "target": nil})
-		return
-	}
-	t := &targetT{
-		Name: str(obj["name"]),
-		X:    flt(obj["x"]),
-		Y:    flt(obj["y"]),
-		Type: str(obj["type"]),
-		Ts:   float64(time.Now().UnixNano()) / 1e9,
-	}
-	setTarget(t)
-	writeJSON(w, map[string]any{"ok": true, "target": t})
-}
+func newMux() *http.ServeMux {
+	mux := http.NewServeMux()
 
-func (s *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
-	var obj map[string]any
-	if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-		obj = map[string]any{}
-	}
-	configMu.Lock()
-	if v, ok := obj["cats"].([]any); ok {
-		var cats []string
-		for _, c := range v {
-			if s, ok := c.(string); ok {
-				cats = append(cats, s)
+	mux.HandleFunc("/pos", func(w http.ResponseWriter, r *http.Request) {
+		cors(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(204)
+			return
+		}
+		st.mu.Lock()
+		var t *Target
+		if st.Target != nil {
+			cp := *st.Target
+			t = &cp
+		}
+		resp := map[string]interface{}{
+			"ok":          st.OK,
+			"verified":    st.Verified,
+			"gx":          st.GX,
+			"gy":          st.GY,
+			"gz":          st.GZ,
+			"mx":          st.MX,
+			"my":          st.MY,
+			"target":      t,
+			"source":      st.Source,
+			"progressGen": "",
+		}
+		st.mu.Unlock()
+		jsonOut(w, resp)
+	})
+
+	mux.HandleFunc("/target", func(w http.ResponseWriter, r *http.Request) {
+		cors(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(204)
+			return
+		}
+		st.mu.Lock()
+		defer st.mu.Unlock()
+		var in struct {
+			Clear bool    `json:"clear"`
+			Name  string  `json:"name"`
+			X     float64 `json:"x"`
+			Y     float64 `json:"y"`
+			Type  string  `json:"type"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		if in.Clear {
+			st.Target = nil
+			fmt.Println("  [target] 已清除目标")
+		} else {
+			st.Target = &Target{Name: in.Name, X: in.X, Y: in.Y, Type: in.Type}
+			name := in.Name
+			if name == "" {
+				name = "(未命名)"
 			}
+			fmt.Printf("  [target] %s (%s) map(%.0f,%.0f)\n", name, in.Type, in.X, in.Y)
 		}
-		if cats != nil {
-			cfg.Cats = cats
+		jsonOut(w, map[string]interface{}{"ok": true})
+	})
+
+	mux.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
+		cors(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(204)
+			return
+		}
+		jsonOut(w, map[string]interface{}{"ok": true})
+	})
+
+	mux.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		cors(w)
+		st.mu.Lock()
+		d := st.Diag
+		d.Version = buildVer
+		d.UptimeSec = int64(time.Since(bootAt).Seconds())
+		st.mu.Unlock()
+		jsonOut(w, map[string]interface{}{
+			"ok": st.OK, "source": st.Source,
+			"diag": d,
+		})
+	})
+
+	mux.HandleFunc("/rescan", func(w http.ResponseWriter, r *http.Request) {
+		cors(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(204)
+			return
+		}
+		atomic.StoreInt32(&rescanReq, 1)
+		jsonOut(w, map[string]interface{}{"ok": true, "msg": "rescan scheduled"})
+	})
+
+	// 收集进度：Cemu 存档解析（无存档时返回空集合，前端静默降级）
+	mux.HandleFunc("/progress", func(w http.ResponseWriter, r *http.Request) {
+		cors(w)
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(204)
+			return
+		}
+		ok, body, _ := progress.snapshot()
+		if !ok || len(body) == 0 {
+			jsonOut(w, map[string]interface{}{
+				"ok":        false,
+				"points":    []interface{}{},
+				"counts":    nil,
+				"generated": "",
+			})
+			return
+		}
+		jsonOutRaw(w, body)
+	})
+
+	// BOTWmap 资产代理（存在才注册）
+	var root string
+	for _, c := range botwRoots {
+		if abs, err := filepath.Abs(c); err == nil {
+			c = abs
+		}
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			root = c
+			break
 		}
 	}
-	if v, ok := obj["doneFilter"].(string); ok && v != "" {
-		cfg.DoneFilter = v
+	if root != "" {
+		fs := http.FileServer(http.Dir(root))
+		mux.Handle("/botw/", http.StripPrefix("/botw/", fs))
+		fmt.Printf("  [asset] BOTWmap assets mounted: %s\n", root)
+	} else {
+		mux.HandleFunc("/botw/", func(w http.ResponseWriter, r *http.Request) {
+			cors(w)
+			w.WriteHeader(404)
+		})
+		fmt.Println("  [asset] BOTWmap not found - using grid basemap (navigation unaffected)")
 	}
-	if v, ok := obj["showAreas"].(bool); ok {
-		cfg.ShowAreas = v
+
+	// 自研地图页
+	webDir := locateWebDir()
+	if webDir != "" {
+		mux.Handle("/", http.FileServer(http.Dir(webDir)))
+		fmt.Printf("  [web]   map page dir: %s\n", webDir)
+	} else {
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			cors(w)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(`<meta charset="utf-8"><h3>CemuNavi 运行中</h3>
+<p>未找到地图页目录（web/）。请保证 CemuNavi.exe 与 web/ 同级。</p>
+<p>API 可用：<a href="/pos">/pos</a> · <a href="/status">/status</a></p>`))
+		})
 	}
-	c := cfg
-	configMu.Unlock()
-	saveConfig()
-	fmt.Printf("  [config] cats=%d doneFilter=%s showAreas=%v\n", len(c.Cats), c.DoneFilter, c.ShowAreas)
-	writeJSON(w, map[string]any{"ok": true, "config": c})
+	return mux
 }
 
-func str(v any) string {
-	if s, ok := v.(string); ok {
-		return s
+// locateWebDir 定位自带地图页：优先 exe 同级 web/，再源码目录
+func locateWebDir() string {
+	cands := []string{}
+	if exe, err := os.Executable(); err == nil {
+		cands = append(cands, filepath.Join(filepath.Dir(exe), "web"))
+	}
+	cands = append(cands, "web", "cemunavi/web", `E:\WorkSpace\GameTools\live-cemu\cemunavi\web`)
+	for _, c := range cands {
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			return c
+		}
 	}
 	return ""
-}
-
-func flt(v any) float64 {
-	switch n := v.(type) {
-	case float64:
-		return n
-	case float32:
-		return float64(n)
-	case int:
-		return float64(n)
-	}
-	return 0
 }

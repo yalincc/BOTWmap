@@ -2,6 +2,27 @@
 
 本项目遵循语义化版本（SemVer）：`主版本.次版本.修订号`。
 
+## navicemu v1.3.0（2026-09-30）最终版
+
+### 重构
+- **简化为单 trackLoop 状态机**：删掉旧版 poll/verifyKnown/watchdog/relocalize/locateByMotion 五 goroutine 架构（~7000 行 → ~2700 行）。新循环 200ms 一读锁定位址，连续 5 次读失败才重找，站定不重扫。
+- **多块固定偏移试读**：遍历所有 ≥256MB RW 私有块，试 `AllocationBase+0x1055300C`（备用 `+0xC1F8BF4`）。旧版只试最大块 AllocationBase，在 Cemu 1.26 上 miss。
+
+### 修复
+- **红点冻死**：旧版"站定 8 秒无移动 → 重定位"误判，重定位时 Cemu 1.26 上固定偏移/社区链全失效，结构扫描锁到静态副本（存档预览/暂停菜单残影/NPC）后永久冻结。新版站定根本不触发重扫。
+- **看门狗竞态**：旧版 watchdog 在 state.ok 瞬时 false 时用 tryOffsets 重锁同一地址，把 verified 打回 false，再触发误重定位。新版单 goroutine 无竞态。
+- **多 Cemu 实例**：自动挑能读到坐标的那个 pid。
+
+### 保留
+- 神庙内部坐标尺度法（红点固定入口）
+- 全自动存档进度同步（/progress，内嵌 1078 参考点）
+- HTTP :8766 API（/pos /progress /target /config），CORS 已配置
+- 单文件 exe（go:embed 参考表）
+
+### 兼容
+- Cemu 1.26 及以上；游戏 Wii U 日版 101c9300 + 中文补丁
+- 此为 navicemu 收尾版，后续 Cemu 定位请迁移到 xnavi-gui（双模拟器通用）
+
 ## v1.4.3（2026-09-30）敌人全量标注
 
 ### 新增

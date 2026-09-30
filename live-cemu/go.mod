@@ -1,3 +1,3 @@
-module live-cemu
+module navicemu
 
 go 1.21
