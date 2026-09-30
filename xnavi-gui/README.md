@@ -1,19 +1,93 @@
-# README
+# xnavi · 旷野之息实时定位导航
 
-## About
+《塞尔达传说：旷野之息》（BOTW）实时定位工具，在网页地图上显示你在游戏里的位置，走路跟随。支持 **Cemu** 和 **Ryujinx** 两个模拟器。
 
-This is the official Wails Vanilla template.
+网页地图：<https://botw.yalin.site>
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+![platform](https://img.shields.io/badge/platform-Windows-blue) ![emulator](https://img.shields.io/badge/emulator-Cemu%20%2F%20Ryujinx-success)
 
-## Live Development
+---
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+## 功能
 
-## Building
+- **实时跟随**：只读模拟器内存，在网页地图上显示玩家坐标，随走路实时移动
+- **双平台**：Cemu（Wii U 版，大端）和 Ryujinx（Switch 版，小端）自动识别
+- **秒锁优先**：已知版本内存偏移直接定位，几秒钟出坐标；偏移失效时自动全内存结构扫描兜底
+- **存档进度看板**：自动读游戏存档，在工具界面显示神庙/塔/呀哈哈/回忆/神兽/游玩时长
+- **深色 GUI**：Wails 写的 Windows 桌面界面，状态一目了然
+- **一键诊断**：出问题时点"导出诊断包"，把系统信息和日志打包发给开发者
+- **只读内存**：不注入、不修改游戏、不联网上传任何数据
 
-To build a redistributable, production mode package, use `wails build`.
+## 下载与使用
+
+1. 从 [Releases](https://github.com/yalincc/BOTWmap/releases) 下载最新版 `xnavi-vX.Y.Z.zip`
+2. 解压到任意目录（路径不要有中文/空格更稳妥）
+3. 先启动 Cemu 或 Ryujinx，进入游戏（站在海拉鲁大地上，别开菜单）
+4. 双击 `xnavi.exe`
+5. 点 **▶ 开始定位**
+6. 第一次定位可能需要在游戏里走两步（让程序确认坐标是活的），成功后会自动打开网页地图
+7. 在网页地图上就能看到自己的红点，跟着走就行
+
+> 首次运行 Windows 可能弹防火墙提示，点允许——它只在本机 `127.0.0.1:8766` 起 HTTP 服务给网页读坐标，不对外暴露。
+
+## 界面说明
+
+```
+┌──────────────────────────────────────────────────────┐
+│ xnavi · BOTW 定位导航                    设置 地图 关于│
+├──────────────┬──────┬──────────────────────────────┤
+│ 运行环境配置  │ ▶开始│ ? 存档信息                   │
+│ 模拟器/版本   │ 定位  │ Cemu · v2.6.0 · BOTW 1.6.0  │
+│              │      │ 神庙 104/136  塔 15/15       │
+│              │      │ 呀哈哈 166/900 回忆 17/23    │
+│              │      │ 神兽 4/4     时长 86h24m     │
+├──────────────┴──────┴──────────────────────────────┤
+│      ● 就绪 ── ● 扫描中 ── ● 验证移动 ── ● 已锁定    │
+│                   已验证 · 跟随中                     │
+├──────────────────────────────────────────────────────┤
+│ 实时日志                              清屏 导出诊断包│
+│ [info] fixed offset -> lock ... confirmed           │
+└──────────────────────────────────────────────────────┘
+```
+
+- **开始/停止**：启动或停止定位核心
+- **设置**：手动指定 Cemu / Ryujinx / 存档目录（不填也能自动探测）
+- **存档信息卡片**：实时读取你正在玩的存档进度
+- **状态条**：定位阶段，正常应该走到"已锁定"
+- **实时日志**：定位过程的详细输出，框选可复制
+- **导出诊断包**：出 bug 时一键打包，zip 里有系统信息、status.json、core 日志
+
+## 常见问题
+
+**Q: 点开始后一直"等待模拟器进程"？**
+A: 确认 Cemu/Ryujinx 已经启动并且游戏已经进到大地图（在主菜单里不行）。工具按进程名 `Cemu.exe` / `Ryujinx.exe` 探测，别把模拟器改名。
+
+**Q: 一直"扫描中"不出坐标？**
+A: 在游戏里随便走几步，让程序确认坐标是活的。第一次扫需要 5-15 秒。
+
+**Q: 网页地图看不到红点？**
+A: 确认工具顶栏显示"坐标流同步中"，然后刷新网页 https://botw.yalin.site 。本地端口 8766 不能被别的程序占用。
+
+**Q: Cemu 和 Ryujinx 都开着会怎样？**
+A: 工具按设置里选的优先级找，Auto 模式会两个都试。建议只开一个。
+
+**Q: 进度数字不对？**
+A: 工具自动读主存档（Ryujinx 取游玩时间最长的槽，Cemu 取最近修改的槽）。如果你最近玩的是别的槽，进度会不对。
+
+## 数据与隐私
+
+- 所有操作都在你本机进行：读模拟器内存、读本地存档、起一个 localhost HTTP 服务
+- 不收集任何数据，不上传任何信息
+- "打开地图"按钮只是用浏览器打开公开网页 <https://botw.yalin.site>
+
+## 要求
+
+- Windows 10 / 11（64 位）
+- Cemu（任意版本，1.27+ 推荐）或 Ryujinx（任意 Canary 版）
+- BOTW 游戏本体（Wii U 版或 Switch 版均可）
+- 网页地图需要联网（https://botw.yalin.site）
+
+## 反馈
+
+遇到 bug 请点"导出诊断包"，连同你看到的现象一起提 issue：
+<https://github.com/yalincc/BOTWmap/issues>
