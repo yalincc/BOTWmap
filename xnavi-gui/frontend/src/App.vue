@@ -30,15 +30,16 @@
               </select>
             </div>
             <div>
-              <label class="block text-xs text-slate-400 mb-1">游戏版本：</label>
-              <select v-model="env.version" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
-                <option value="auto">自动检测</option>
-                <option value="1.6.0_us">1.6.0 (美版)</option>
-                <option value="1.6.0_jp">1.6.0 (日版)</option>
+              <label class="block text-xs text-slate-400 mb-1">游戏：</label>
+              <select v-model="env.game" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
+                <option value="auto">自动识别</option>
+                <option value="botw">旷野之息 (BOTW)</option>
+                <option value="totk">王国之泪 (TOTK)</option>
               </select>
             </div>
           </div>
           <div class="text-[11px] font-mono mt-2" :class="hitClass">{{ hitText }}</div>
+          <div class="text-[11px] font-mono mt-1 text-slate-500">已识别游戏：<span class="text-slate-300">{{ gameDisplayName }}</span><span v-if="detectedGame" class="text-emerald-400">（core 上报）</span></div>
         </section>
         <section class="col-span-12 md:col-span-2 flex">
           <button @click="toggleLocating"
@@ -58,7 +59,7 @@
             <div class="text-[11px] text-emerald-400 font-medium">存档信息</div>
             <div v-if="progressData.save" class="text-[10px] text-slate-500 font-mono truncate ml-1" :title="progressData.save">{{ saveBasename }}</div>
           </div>
-          <div class="text-xs text-slate-300 mt-1">{{ emuLabel }}<span v-if="emuVer"> · v{{ emuVer }}</span> · BOTW {{ gameVerLabel }}</div>
+          <div class="text-xs text-slate-300 mt-1">{{ emuLabel }}<span v-if="emuVer"> · v{{ emuVer }}</span> · {{ gameDisplayName }}<span v-if="gameVerLabel"> {{ gameVerLabel }}</span></div>
           <div v-if="progressData.counts" class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 font-mono">
             <div class="text-[12px] text-slate-400">神庙 <span class="text-white font-bold">{{ progressData.counts.shrine[0] }}<span class="text-slate-500">/{{ progressData.counts.shrine[1] }}</span></span></div>
             <div class="text-[12px] text-slate-400">塔 <span class="text-white font-bold">{{ progressData.counts.tower[0] }}<span class="text-slate-500">/{{ progressData.counts.tower[1] }}</span></span></div>
@@ -173,7 +174,7 @@ const showAbout = ref(false)
 const updateInfo = ref(null)
 let isInitLog = true
 const paths = reactive({ cemu: '', ryujinx: '', saveDir: '' })
-const env = reactive({ emulator: 'auto', version: 'auto' })
+const env = reactive({ emulator: 'auto', game: 'auto' })
 const envDetect = reactive({ cemu: false, ryujinx: false })
 const hitText = computed(() => {
   if (envDetect.cemu && envDetect.ryujinx) return '✓ Cemu + Ryujinx 路径已配置'
@@ -223,8 +224,11 @@ const emuLabel = computed(() => {
   if (!progressData.value || !progressData.value.save) return '未连接模拟器'
   return progressData.value.save.toLowerCase().includes('ryujinx') ? 'Ryujinx' : 'Cemu'
 })
-const gameVerLabel = computed(() => {
-  return { 'auto': '自动检测', '1.6.0_us': '1.6.0 美版', '1.6.0_jp': '1.6.0 日版' }[env.version] || env.version
+const gameVerLabel = computed(() => '') // BOTW 版本识别（存档版本号）P2b 后接入
+const detectedGame = ref('') // core status.json 上报的实际识别游戏（botw/totk）
+const gameDisplayName = computed(() => {
+  const g = detectedGame.value || env.game
+  return { 'botw': '旷野之息 (BOTW)', 'totk': '王国之泪 (TOTK)', 'auto': '自动识别' }[g] || g
 })
 const playtimeText = computed(() => {
   const secs = progressData.value?.playtime || 0
@@ -265,7 +269,7 @@ function pushLogs(lines) {
 async function pickCemu() { const d = await api.PickDir("选择 Cemu 目录"); if (d) paths.cemu = d }
 async function pickRyujinx() { const d = await api.PickDir("选择 Ryujinx 目录"); if (d) paths.ryujinx = d }
 async function pickSave() { const d = await api.PickDir("选择存档目录"); if (d) paths.saveDir = d }
-async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx }
+async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator, game: env.game }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx }
 function clearLogs() { logs.value = [] }
 function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
@@ -309,6 +313,7 @@ onMounted(async () => {
   if (cfg.ryujinxDir) paths.ryujinx = cfg.ryujinxDir
   if (cfg.saveDir) paths.saveDir = cfg.saveDir
   if (cfg.emulator) env.emulator = cfg.emulator
+  if (cfg.game) env.game = cfg.game
   const det = await api.EnvDetect()
   envDetect.cemu = det.cemu
   envDetect.ryujinx = det.ryujinx
@@ -323,6 +328,7 @@ onMounted(async () => {
       progressData.value = st.progress
     }
     if (st.emuVer) emuVer.value = st.emuVer
+    if (st.game) detectedGame.value = st.game
     if (st.running && st.ok) {
       syncText.value = '坐标流同步中'
       syncDot.value = 'bg-emerald-400'

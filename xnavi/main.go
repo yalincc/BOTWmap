@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -59,7 +60,7 @@ func main() {
 		}
 	}
 
-	// 平台选择：显式指定 or 自动探测（Ryujinx 优先，BOTW 主模拟器；其次 Cemu）
+	// 平台选择：显式指定 or 自动探测（先全平台选，游戏识别后再做 TOTK 平台修正）
 	var rp ryujinxPlatform
 	var cp cemuPlatform
 	switch emu {
@@ -86,15 +87,27 @@ func main() {
 		}
 	}
 
-	// 游戏选择：显式指定 or 自动识别。auto 规则见 detectGame（P2 随 TOTK 落地）。
+	// 游戏选择：显式指定 or 游戏感知自动识别（auto 时读当前平台内存试固定偏移，
+	// BOTW/TOTK 偏移互斥——用户实测 BOTW 偏移在 TOTK 内存全 invalid）
 	switch gameName {
 	case "totk":
-		fmt.Println("  !! --game=totk：TOTK 适配尚未完成（开发计划 P2 阶段），本轮按 BOTW 运行")
-		currentGame = &gameBotw{}
+		fmt.Println("  [game] explicit: totk")
+		currentGame = &gameTotk{}
 	case "botw":
+		fmt.Println("  [game] explicit: botw")
 		currentGame = &gameBotw{}
 	default:
-		currentGame = detectGame()
+		currentGame = detectGame(currentPlatform())
+	}
+
+	// TOTK 平台修正：TOTK 仅 Ryujinx（Wii U 无 TOTK）。
+	// auto 检测到 TOTK 时平台必为 Ryujinx（TOTK 偏移只存在于 Ryujinx 内存），此分支
+	// 覆盖显式 --game=totk 配 auto 平台选中 Cemu（如 Cemu 正跑 BOTW）的情况。
+	if currentGame.Name() == "totk" {
+		if p := currentPlatform(); p != nil && p.Name() == "Cemu" {
+			fmt.Println("  !! TOTK 仅 Ryujinx：平台强制切换 Ryujinx")
+			setPlatform(&rp)
+		}
 	}
 
 	setConsoleTitle("xnavi · " + strings.ToUpper(currentGame.Name()) + " Live")
@@ -157,11 +170,58 @@ func main() {
 }
 
 // detectGame 自动识别当前游戏（--game=auto）。
-// P1 阶段恒返回 BOTW；P2 随 TOTK 适配落地完整规则：
-//   - Cemu 平台 → 恒 BOTW（Wii U 无 TOTK）
-//   - Ryujinx → 按存档目录判定：存在 game_data.sav → BOTW；存在 progress.sav → TOTK；
-//     两者都有 → 配置偏好 + 最近 mtime
-func detectGame() Game {
+// 两步判定：
+//   1) 游戏感知（当前平台内存）：试读固定偏移——BOTW 偏移有效 → BOTW；
+//      TOTK 偏移多副本共识 ≥2 → TOTK。两游戏偏移互斥（实测 BOTW 偏移在 TOTK 内存全 invalid），
+//      识别可靠，且玩家在两个存档并存时不会被存档目录误导。
+//   2) 存档兜底（游戏未运行时）：存在 TOTK 存档且无 BOTW 存档 → TOTK，否则 BOTW。
+func detectGame(p Platform) Game {
+	if p != nil && p.Attach() {
+		h := p.Handle()
+		blks := p.Blocks(256.0)
+		if len(blks) > 0 {
+			// BOTW：Ryujinx 0xA77FCBBC / Cemu 0x1055300C（0xC1F8BF4 备用）
+			botwOffs := []uintptr{0xA77FCBBC, 0x1055300C, 0xC1F8BF4}
+			gb := &gameBotw{}
+			for _, blk := range blks {
+				for _, off := range botwOffs {
+					if d := gb.DecodeAt(h, blk.Base+off); d != nil {
+						fmt.Printf("  [game] auto-detected: botw (fixed offset live @0x%X)\n", blk.Base+off)
+						return gb
+					}
+				}
+			}
+			// TOTK：10 偏移共识 ≥2（PickOffset 拒绝杂散）
+			gt := &gameTotk{}
+			var hits []OffsetCand
+			for _, off := range gt.KnownOffsets(p) {
+				for _, blk := range blks {
+					addr := blk.Base + off
+					if d := gt.DecodeAt(h, addr); d != nil {
+						hits = append(hits, OffsetCand{addr, [3]float32{d[0], d[1], d[2]}})
+					}
+				}
+			}
+			if _, _, ok := gt.PickOffset(hits, p); ok {
+				fmt.Printf("  [game] auto-detected: totk (fixed offset consensus)\n")
+				return gt
+			}
+		}
+	}
+	// 存档兜底
+	root := ""
+	if app := os.Getenv("APPDATA"); app != "" {
+		root = filepath.Join(app, "Ryujinx", "bis", "user", "save")
+	}
+	if root != "" {
+		totk := len(findSaveFiles(root, []string{"progress.sav", "caption.sav"})) > 0
+		botw := len(findSaveFiles(root, []string{"game_data.sav"})) > 0
+		if totk && !botw {
+			fmt.Println("  [game] auto-detected: totk (save dir)")
+			return &gameTotk{}
+		}
+	}
+	fmt.Println("  [game] auto-detected: botw")
 	return &gameBotw{}
 }
 

@@ -42,12 +42,13 @@ type Config struct {
 	RyujinxDir string `json:"ryujinxDir"`
 	SaveDir    string `json:"saveDir"`
 	Emulator   string `json:"emulator"` // auto | cemu | ryujinx
+	Game       string `json:"game"`     // auto | botw | totk（V2.2.0 双游戏）
 }
 
 func (a *App) configPath() string { return filepath.Join(a.workDir, "xnavi-gui-config.json") }
 
 func (a *App) loadConfig() *Config {
-	cfg := &Config{Emulator: "auto"}
+	cfg := &Config{Emulator: "auto", Game: "auto"}
 	buf, err := os.ReadFile(a.configPath())
 	if err == nil {
 		json.Unmarshal(buf, cfg)
@@ -154,8 +155,9 @@ func (a *App) corePath() string {
 	return filepath.Join(a.workDir, "xnavi-core.exe")
 }
 
-// StartCore 启动核心子进程（xnavi-core.exe --emu=<emu> --no-open）。
-// emu: auto | ryujinx | cemu。重复调用会先停掉旧进程。
+// StartCore 启动核心子进程（xnavi-core.exe --emu=<emu> [--game=<game>] --no-open）。
+// emu: auto | ryujinx | cemu；game 从已保存配置读取（auto | botw | totk，auto 时不传让 core 自动识别）。
+// 重复调用会先停掉旧进程。
 func (a *App) StartCore(emu string) string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -165,6 +167,13 @@ func (a *App) StartCore(emu string) string {
 		return "找不到核心程序 xnavi-core.exe（应放在本程序同目录）"
 	}
 	args := []string{"--emu=" + emu, "--no-open"}
+	game := ""
+	if a.cfg != nil {
+		game = a.cfg.Game
+	}
+	if game != "" && game != "auto" {
+		args = append(args, "--game="+game)
+	}
 	if a.cfg.CemuDir != "" {
 		args = append(args, "--cemu-dir="+a.cfg.CemuDir)
 	}
@@ -189,7 +198,11 @@ func (a *App) StartCore(emu string) string {
 	}
 	a.cmd = cmd
 	go func() { cmd.Wait(); a.mu.Lock(); if a.cmd == cmd { a.cmd = nil }; a.mu.Unlock() }()
-	return "核心已启动（" + emu + "）"
+	msg := "核心已启动（" + emu + "）"
+	if game != "" && game != "auto" {
+		msg += " · 游戏 " + game
+	}
+	return msg
 }
 
 // StopCore 停止核心子进程。

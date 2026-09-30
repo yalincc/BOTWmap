@@ -145,6 +145,7 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 	state.mu.RLock()
 	payload := map[string]any{
 		"ok":       state.ok,
+		"game":     currentGame.Name(),
 		"gx":       state.gx,
 		"gy":       state.gy,
 		"gz":       state.gz,

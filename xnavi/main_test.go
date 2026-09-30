@@ -27,12 +27,12 @@ func f32BE(v float32) []byte {
 // ---- gameHud / 坐标校验 ----
 
 func TestGameHud(t *testing.T) {
-	// 内存序 (X=1794.6, alt=220.3, Z=1046.1) → 展示序 (gx, gz, alt)
+	// 内存序 (X=1794.6, alt=220.3, Z=1046.1) → 展示序 (gx=X, gy=alt, gz=Z)
 	v := gameHud(1794.6, 220.3, 1046.1)
 	if v == nil {
 		t.Fatal("expected valid pos")
 	}
-	if math.Abs(float64(v[0]-1794.6)) > 0.01 || math.Abs(float64(v[1]-1046.1)) > 0.01 || math.Abs(float64(v[2]-220.3)) > 0.01 {
+	if math.Abs(float64(v[0]-1794.6)) > 0.01 || math.Abs(float64(v[1]-220.3)) > 0.01 || math.Abs(float64(v[2]-1046.1)) > 0.01 {
 		t.Fatalf("hud mismatch: %v", v)
 	}
 	// 全零 → 无效
@@ -206,6 +206,41 @@ func TestParseSaveReal(t *testing.T) {
 	}
 	if entries[korokCounterHash] == 0 {
 		t.Log("korok counter = 0 (new save?)")
+	}
+}
+
+// ---- TOTK 固定偏移共识仲裁 ----
+
+func TestTotkPickOffset(t *testing.T) {
+	g := &gameTotk{}
+	mk := func(addr uintptr, x, y, z float32) OffsetCand {
+		return OffsetCand{Addr: addr, Pos: [3]float32{x, y, z}}
+	}
+	// 多副本共识：两个偏移读到几乎相同坐标 → 锁定共识组
+	cands := []OffsetCand{
+		mk(0x100, 681.0, -1443.6, 1488.7),
+		mk(0x200, 248.9, -820.2, 1443.9),
+		mk(0x300, 681.4, -1444.1, 1488.2), // 与 0x100 共识
+	}
+	best, detail, ok := g.PickOffset(cands, nil)
+	if !ok {
+		t.Fatalf("expected consensus lock, got ok=false detail=%s", detail)
+	}
+	if best.Addr != 0x100 && best.Addr != 0x300 {
+		t.Fatalf("expected consensus candidate, got addr=0x%X", best.Addr)
+	}
+	// 无共识：三个坐标都不同 → 拒绝锁定（避免锁错 NPC/静态数据）
+	noise := []OffsetCand{
+		mk(0x100, 681.0, -1443.6, 1488.7),
+		mk(0x200, 248.9, -820.2, 1443.9),
+		mk(0x300, 709.2, -1381.7, 1585.3),
+	}
+	if _, detail, ok := g.PickOffset(noise, nil); ok {
+		t.Fatalf("expected refusal without consensus, got ok=true detail=%s", detail)
+	}
+	// 单候选（单偏移单块）：live-go 允许 bestN=1
+	if _, _, ok := g.PickOffset(noise[:1], nil); !ok {
+		t.Fatal("single candidate should lock")
 	}
 }
 

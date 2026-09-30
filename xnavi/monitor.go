@@ -126,6 +126,7 @@ func statusLoop() {
 		obj := map[string]any{
 			"time":     time.Now().Format(time.RFC3339),
 			"pid":      procPID,
+			"game":     currentGame.Name(),
 			"emulator": platName,
 			"emuVer":   emulatorExeVersion(),
 			"ok":       ok,

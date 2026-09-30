@@ -30,6 +30,12 @@ type lockT struct {
 
 var lock = lockT{}
 
+// TOTK layer 日志（验证天空/地底位面）：layer 变化或超 30s 打一次。
+var (
+	lastLayerLog    int
+	lastLayerLogAt  time.Time
+)
+
 type stateT struct {
 	mu         sync.RWMutex
 	ok         bool
@@ -345,11 +351,7 @@ func stateMachine() {
 				lastFixedTry = time.Now()
 				blks := p.Blocks(256.0)
 				fmt.Printf("  [sm] trying fixed offsets on %d blocks:\n", len(blks))
-				type cand struct {
-					addr uintptr
-					d    [3]float32
-				}
-				var cands []cand
+				var cands []OffsetCand
 				for _, blk := range blks {
 					for _, off := range offsets {
 						addr := blk.Base + off
@@ -367,45 +369,22 @@ func stateMachine() {
 						ok := currentGame.ValidRaw(d, p.LittleEndian())
 						fmt.Printf("    try base=0x%X+0x%X -> (%.1f, %.1f, %.1f) valid=%v\n", blk.Base, off, d[0], d[1], d[2], ok)
 						if ok {
-							cands = append(cands, cand{addr, [3]float32{d[0], d[1], d[2]}})
+							cands = append(cands, OffsetCand{addr, [3]float32{d[0], d[1], d[2]}})
 						}
 					}
 				}
 				if len(cands) > 0 {
-					best := cands[0]
-					anchors := currentGame.SaveAnchors(p)
-					if len(anchors) > 0 {
-						savePt := anchors[0].Pos
-						bestDist := float32(1e9)
-						for _, cd := range cands {
-							var dd float32
-							if p.LittleEndian() {
-								ddx := cd.d[0] - savePt[0]
-								ddalt := cd.d[2] - savePt[1]
-								ddz := cd.d[1] - savePt[2]
-								dd = float32(math.Sqrt(float64(ddx*ddx + ddalt*ddalt + ddz*ddz)))
-							} else {
-								ddx := cd.d[0] - savePt[0]
-								ddalt := cd.d[1] - savePt[1]
-								ddz := cd.d[2] - savePt[2]
-								dd = float32(math.Sqrt(float64(ddx*ddx + ddalt*ddalt + ddz*ddz)))
-							}
-							if dd < bestDist {
-								bestDist = dd
-								best = cd
-							}
-						}
-						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) dist=%.0fm [confirmed]\n",
-							best.addr, best.d[0], best.d[1], best.d[2], bestDist)
-					} else {
-						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) [confirmed]\n",
-							best.addr, best.d[0], best.d[1], best.d[2])
+					best, detail, ok := currentGame.PickOffset(cands, p)
+					if ok {
+						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) %s\n",
+							best.Addr, best.Pos[0], best.Pos[1], best.Pos[2], detail)
+						setLock(best.Addr, true, 0, "fixed-offset")
+						inLocked = true
+						resetFollow()
+						fmt.Printf("  [sm] fixed offset locked OK\n")
+						continue
 					}
-					setLock(best.addr, true, 0, "fixed-offset")
-					inLocked = true
-					resetFollow()
-					fmt.Printf("  [sm] fixed offset locked OK\n")
-					continue
+					fmt.Printf("  [sm] fixed offset rejected: %s\n", detail)
 				}
 				fmt.Printf("  [sm] fixed offset not valid on %d guest blocks, falling back to scan\n", len(blks))
 				if time.Since(lastDataHintAt) > 15*time.Second {
@@ -564,7 +543,8 @@ func stateMachine() {
 		}
 
 		if shrineMode {
-			if abs32(cur[0]) > currentGame.ShrineExit() || abs32(cur[1]) > currentGame.ShrineExit() {
+			// 统一序：cur 为展示序 (X, alt, Z)，出神庙判定用水平轴 X/Z
+			if abs32(cur[0]) > currentGame.ShrineExit() || abs32(cur[2]) > currentGame.ShrineExit() {
 				fmt.Printf("  [shrine] left shrine -> normal tracking\n")
 				shrineMode = false
 			} else {
@@ -588,7 +568,7 @@ func stateMachine() {
 				frozenN = 0
 				preJump = prev
 				lastJumpAt = time.Now()
-				if pnt := currentGame.MatchShrine(cur[0], cur[2], cur[1]); pnt != nil {
+				if pnt := currentGame.MatchShrine(cur[0], cur[1], cur[2]); pnt != nil {
 					shrineMode = true
 					fmt.Printf("  [shrine] entered %s\n", pnt.Cn)
 				}
@@ -620,7 +600,7 @@ func stateMachine() {
 				probing = false
 				if !savedKnown {
 					savedKnown = true
-					saveKnown([]uintptr{a}, guestRamBase(), [3]float32{cur[0], cur[2], cur[1]})
+					saveKnown([]uintptr{a}, guestRamBase(), [3]float32{cur[0], cur[1], cur[2]})
 					dumpDiagnostic(a, cur)
 				}
 			}
@@ -647,6 +627,16 @@ func stateMachine() {
 		state.mu.Unlock()
 		prev = cur
 		hasPrev = true
+
+		// TOTK layer 日志（天空20/地面18/地底19）：变化或超 30s 打一次
+		if currentGame.Name() == "totk" {
+			lay := currentGame.LayerOf(gx, gy, gz)
+			if lay != lastLayerLog || time.Since(lastLayerLogAt) > 30*time.Second {
+				lastLayerLog = lay
+				lastLayerLogAt = time.Now()
+				fmt.Printf("  [layer] %d (%s) @ (%.0f, %.0f, %.0f)\n", lay, totkLayerName(lay), gx, gy, gz)
+			}
+		}
 
 		// verified 后不做站桩核对：玩家站着不动时全量扫描会找到其他 Actor，误杀正确锁
 		// 只有读数失效才重扫（上面 invalidN 逻辑已处理）

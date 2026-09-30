@@ -12,6 +12,12 @@ package main
 
 import "time"
 
+// OffsetCand 固定偏移试读后通过校验的候选（展示序 (gx, gy, gz)）。
+type OffsetCand struct {
+	Addr uintptr
+	Pos  [3]float32
+}
+
 // Game 描述一个游戏的定位语义。实现必须只读、不注入、不修改游戏内存。
 // 同一时刻只有一个游戏生效（启动时由 --game 确定，切换需重启程序）。
 type Game interface {
@@ -35,6 +41,14 @@ type Game interface {
 	// KnownOffsets 该游戏在指定平台上的已知固定偏移（相对锚块基址，按优先级排序）。
 	// 启动时优先用这些偏移直接读，失败再回退全量扫描。
 	KnownOffsets(p Platform) []uintptr
+
+	// PickOffset 从固定偏移候选（已通过 ValidRaw）仲裁出要锁定的候选。
+	// 策略因游戏而异：
+	//   - BOTW：存档锚点距离最近（单偏移多块镜像，距离仅辅助确认）
+	//   - TOTK：多副本共识（多个偏移读到几乎相同坐标才算数；无共识拒绝锁定，
+	//     避免把 NPC/静态数据等杂散合法三元组锁成玩家——live-go tryOffsets 同口径）
+	// detail 为日志后缀（如 "dist=9m" / "consensus=3 copies"）；ok=false 时调用方回退扫描。
+	PickOffset(cands []OffsetCand, p Platform) (OffsetCand, string, bool)
 
 	// 神庙/特殊场景钩子（BOTW 用；TOTK 返回零值/禁用）。
 	ShrineExit() float32

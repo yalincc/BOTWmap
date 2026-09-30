@@ -16,6 +16,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"sort"
@@ -77,12 +78,13 @@ func gameValidTriple(x, alt, z float32) bool {
 	return true
 }
 
-// gameHud 校验并转换内存序 (X, alt, Z) → 展示序 (gx=X, gz=Z, alt)。无效返回 nil。
+// gameHud 校验并转换内存序 (X, alt, Z) → 展示序 (gx=X, gy=alt, gz=Z)。无效返回 nil。
+// V2.2.0 P2 统一序：DecodeAt 直接返回展示序，Display 恒等（原先返回 (X,Z,alt) 由 Display 再交换）。
 func gameHud(x, alt, z float32) []float32 {
 	if !gameValidTriple(x, alt, z) {
 		return nil
 	}
-	return []float32{x, z, alt}
+	return []float32{x, alt, z}
 }
 
 // ---- 地图换算 ----
@@ -130,7 +132,7 @@ func (g *gameBotw) Name() string    { return "botw" }
 func (g *gameBotw) MapURL() string  { return "https://botw.yalin.site/" }
 
 // DecodeAt = 原 decodeTripleAt（locate.go）逻辑原样平移：
-// 按当前平台端序解码 12 字节 → gameHud 校验 → 返回展示序三元组 (X, Z, alt)。
+// 按当前平台端序解码 12 字节 → gameHud 校验 → 返回展示序三元组 (X, alt, Z)。
 func (g *gameBotw) DecodeAt(h uintptr, addr uintptr) []float32 {
 	d := readMem(h, addr, 12)
 	if len(d) < 12 {
@@ -149,10 +151,9 @@ func (g *gameBotw) DecodeAt(h uintptr, addr uintptr) []float32 {
 	return gameHud(x, alt, z)
 }
 
-// Display 平台内存三元组 → 展示序 (gx=X, gy=alt, gz=Z)。
-// 原 watch.go 的 state 赋值口径：state = (mem[0], mem[2], mem[1])。
+// Display 恒等：DecodeAt 已返回展示序 (gx=X, gy=alt, gz=Z)。
 func (g *gameBotw) Display(mem [3]float32) (gx, gy, gz float32) {
-	return mem[0], mem[2], mem[1]
+	return mem[0], mem[1], mem[2]
 }
 
 func (g *gameBotw) ToMap(gx, gy, gz float32) (mx, my float32) {
@@ -161,11 +162,9 @@ func (g *gameBotw) ToMap(gx, gy, gz float32) (mx, my float32) {
 
 func (g *gameBotw) LayerOf(gx, gy, gz float32) int { return gameLayer }
 
-// ValidRaw 第二道校验（兼容现有端序相关参数序差异，原 watch.go 固定偏移路径逻辑）。
+// ValidRaw 第二道校验（固定偏移候选）：DecodeAt 已给展示序，统一按 (x, alt, z) 校验，
+// 顺带修正原 Cemu 大端路径的 (mem0, mem1, mem2) 参数错位。
 func (g *gameBotw) ValidRaw(mem []float32, littleEndian bool) bool {
-	if littleEndian {
-		return gameValidTriple(mem[0], mem[2], mem[1])
-	}
 	return gameValidTriple(mem[0], mem[1], mem[2])
 }
 
@@ -181,6 +180,28 @@ func (g *gameBotw) KnownOffsets(p Platform) []uintptr {
 }
 
 func (g *gameBotw) ShrineExit() float32 { return gameShrineExit }
+
+// PickOffset BOTW：存档锚点距离最近（单偏移多块镜像，距离仅辅助确认 + 日志）。
+func (g *gameBotw) PickOffset(cands []OffsetCand, p Platform) (OffsetCand, string, bool) {
+	best := cands[0]
+	anchors := g.SaveAnchors(p)
+	if len(anchors) > 0 {
+		savePt := anchors[0].Pos
+		bestDist := float32(1e9)
+		for _, cd := range cands {
+			ddx := cd.Pos[0] - savePt[0]
+			ddalt := cd.Pos[1] - savePt[1]
+			ddz := cd.Pos[2] - savePt[2]
+			dd := float32(math.Sqrt(float64(ddx*ddx + ddalt*ddalt + ddz*ddz)))
+			if dd < bestDist {
+				bestDist = dd
+				best = cd
+			}
+		}
+		return best, fmt.Sprintf("dist=%.0fm [confirmed]", bestDist), true
+	}
+	return best, "[confirmed]", true
+}
 
 func (g *gameBotw) MatchShrine(gx, gy, gz float32) *ProgressPoint {
 	return matchShrine(gx, gy, gz)
