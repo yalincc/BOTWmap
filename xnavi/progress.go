@@ -37,14 +37,17 @@ type ProgressPoint struct {
 }
 
 type progressWatcher struct {
-	mu   sync.RWMutex
-	ok   bool
-	refs []ProgressPoint
-	body []byte
-	gen  string
-	save string
-	modT time.Time
-	init bool
+	mu       sync.RWMutex
+	ok       bool
+	refs     []ProgressPoint
+	body     []byte
+	gen      string
+	save     string
+	modT     time.Time
+	init     bool
+	counts   map[string][2]int
+	playtime uint32
+	koroks   uint32
 }
 
 var progress *progressWatcher
@@ -197,6 +200,9 @@ func (w *progressWatcher) refresh() {
 	w.body = buf
 	w.gen = gen
 	w.save = primary.Path
+	w.counts = counts
+	w.playtime = primary.Playtime
+	w.koroks = primary.Koroks
 	if fi, err := os.Stat(primary.Path); err == nil {
 		w.modT = fi.ModTime()
 	}
@@ -240,4 +246,23 @@ func (w *progressWatcher) snapshot() (bool, []byte, string) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	return w.ok, w.body, w.gen
+}
+
+// summarize 返回给 GUI 状态面板用的轻量摘要（不含 points 全表）。
+func (w *progressWatcher) summarize() (bool, map[string]any) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if !w.ok {
+		return false, nil
+	}
+	c := map[string]any{}
+	for k, v := range w.counts {
+		c[k] = v
+	}
+	return true, map[string]any{
+		"save":     w.save,
+		"playtime": w.playtime,
+		"koroks":   w.koroks,
+		"counts":   c,
+	}
 }

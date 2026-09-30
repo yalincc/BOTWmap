@@ -118,9 +118,16 @@ func statusLoop() {
 		if age > 0 {
 			ageSec = float64(time.Now().UnixNano())/1e9 - age
 		}
+		plat := currentPlatform()
+		platName := ""
+		if plat != nil {
+			platName = plat.Name()
+		}
 		obj := map[string]any{
 			"time":     time.Now().Format(time.RFC3339),
 			"pid":      procPID,
+			"emulator": platName,
+			"emuVer":   emulatorExeVersion(),
 			"ok":       ok,
 			"pos":      map[string]any{"gx": gx, "gy": gy, "gz": gz, "mx": mx, "my": my},
 			"source":   src,
@@ -134,6 +141,11 @@ func statusLoop() {
 				"jumps":     cntJumps.Load(),
 				"scans":     cntScans.Load(),
 			},
+		}
+		if progress != nil {
+			if pok, psum := progress.summarize(); pok {
+				obj["progress"] = psum
+			}
 		}
 		buf, err := json.MarshalIndent(obj, "", " ")
 		if err != nil {

@@ -42,32 +42,45 @@
         </section>
         <section class="col-span-12 md:col-span-2 flex">
           <button @click="toggleLocating"
-            :disabled="!coreRunning && !emulatorFound"
-            :class="isLocating ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600'"
+            :class="isLocating ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500'"
             class="w-full rounded flex items-center justify-center font-bold text-sm text-white shadow-lg transition active:scale-95">
             {{ isLocating ? '■ 停止' : '▶ 开始定位' }}
           </button>
         </section>
-        <section class="col-span-12 md:col-span-5 bg-gradient-to-r from-emerald-950/30 to-[#161b22] border border-emerald-500/30 rounded-md p-3 flex flex-col justify-center">
-          <div class="text-[11px] text-emerald-400 font-medium">快路径档案</div>
-          <div class="text-sm font-bold text-white mt-0.5">{{ profileText }}</div>
-          <div class="text-[11px] text-slate-400 mt-1 font-mono">{{ profileNote }}</div>
+        <section class="col-span-12 md:col-span-5 bg-gradient-to-r from-emerald-950/30 to-[#161b22] border border-emerald-500/30 rounded-md p-3">
+          <div class="flex items-center gap-1.5">
+            <div class="relative group">
+              <span class="text-slate-500 cursor-help text-xs select-none leading-none">?</span>
+              <div class="absolute left-0 top-full mt-1 hidden group-hover:block w-60 p-2 bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-300 z-30 shadow-xl">
+                主档自动识别：Ryujinx 取游玩时间最长的槽，Cemu 取最近修改的槽。游戏内保存后约 2 秒自动刷新。
+              </div>
+            </div>
+            <div class="text-[11px] text-emerald-400 font-medium">存档信息</div>
+            <div v-if="progressData.save" class="text-[10px] text-slate-500 font-mono truncate ml-1" :title="progressData.save">{{ saveBasename }}</div>
+          </div>
+          <div class="text-xs text-slate-300 mt-1">{{ emuLabel }}<span v-if="emuVer"> · v{{ emuVer }}</span> · BOTW {{ gameVerLabel }}</div>
+          <div v-if="progressData.counts" class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 font-mono">
+            <div class="text-[12px] text-slate-400">神庙 <span class="text-white font-bold">{{ progressData.counts.shrine[0] }}<span class="text-slate-500">/{{ progressData.counts.shrine[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">塔 <span class="text-white font-bold">{{ progressData.counts.tower[0] }}<span class="text-slate-500">/{{ progressData.counts.tower[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">呀哈哈 <span class="text-white font-bold">{{ progressData.counts.korok[0] }}<span class="text-slate-500">/{{ progressData.counts.korok[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">回忆 <span class="text-white font-bold">{{ progressData.counts.memory[0] }}<span class="text-slate-500">/{{ progressData.counts.memory[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">神兽 <span class="text-white font-bold">{{ progressData.counts.beast[0] }}<span class="text-slate-500">/{{ progressData.counts.beast[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">时长 <span class="text-white font-bold">{{ playtimeText }}</span></div>
+          </div>
+          <div v-else class="mt-2 text-[11px] text-slate-500">等待读取存档...</div>
         </section>
       </div>
       <section class="bg-[#161b22] border border-slate-800 rounded-md p-3 shrink-0">
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex items-center space-x-2 flex-1">
-            <template v-for="(s, i) in steps" :key="s.name">
-              <div class="flex items-center space-x-1.5" :class="stepClass(s.state)">
-                <span class="w-2 h-2 rounded-full" :class="stepDot(s.state)"></span>
-                <span class="text-xs font-mono">{{ s.name }}</span>
-              </div>
-              <div v-if="i < steps.length - 1" class="w-6 h-px bg-slate-700"></div>
-            </template>
-          </div>
-          <div v-if="scanPercent > 0" class="text-xl font-bold font-mono" :class="percentClass">{{ scanPercent }}%</div>
+        <div class="flex items-center justify-center gap-4">
+          <template v-for="(s, i) in steps" :key="s.name">
+            <div class="flex items-center space-x-1.5" :class="stepClass(s.state)">
+              <span class="w-2 h-2 rounded-full" :class="stepDot(s.state)"></span>
+              <span class="text-xs font-mono">{{ s.name }}</span>
+            </div>
+            <div v-if="i < steps.length - 1" class="w-6 h-px bg-slate-700"></div>
+          </template>
         </div>
-        <div class="text-xs mt-2">
+        <div class="text-xs mt-2 text-center">
           <span :class="stateTextClass">{{ stateText }}</span>
           <span v-if="scanInfo" class="text-slate-400 ml-2">{{ scanInfo }}</span>
         </div>
@@ -77,10 +90,11 @@
           <span>实时日志</span>
           <div class="space-x-3">
             <button class="hover:text-slate-200" @click="clearLogs">清屏</button>
+            <button class="hover:text-slate-200" @click="exportDiag">导出诊断包</button>
             <button class="hover:text-slate-200" @click="openLogDir">打开目录</button>
           </div>
         </div>
-        <div ref="logBox" class="flex-1 overflow-y-auto space-y-0.5 leading-relaxed text-slate-400 min-h-0">
+        <div ref="logBox" class="flex-1 overflow-y-auto space-y-0.5 leading-relaxed text-slate-400 min-h-0 select-text">
           <div v-for="(log, idx) in logs" :key="idx" :class="log.color">
             <span class="text-slate-500">[{{ log.time }}]</span>
             <span class="mr-1" :class="log.levelColor">{{ log.level }}</span>{{ log.text }}
@@ -158,17 +172,16 @@ const showSettings = ref(false)
 const showAbout = ref(false)
 const updateInfo = ref(null)
 let isInitLog = true
-const paths = reactive({ cemu: 'H:\\Cemu', ryujinx: 'G:\\YUZU\\ryujinx-canary-1.3.351-win_x64', saveDir: '' })
+const paths = reactive({ cemu: '', ryujinx: '', saveDir: '' })
 const env = reactive({ emulator: 'auto', version: 'auto' })
 const envDetect = reactive({ cemu: false, ryujinx: false })
 const hitText = computed(() => {
-  if (envDetect.cemu && envDetect.ryujinx) return '✓ H:/Cemu + Ryujinx'
-  if (envDetect.cemu) return '✓ H:/Cemu'
-  if (envDetect.ryujinx) return '✓ Ryujinx'
-  return '未检测到模拟器'
+  if (envDetect.cemu && envDetect.ryujinx) return '✓ Cemu + Ryujinx 路径已配置'
+  if (envDetect.cemu) return '✓ Cemu 路径已配置'
+  if (envDetect.ryujinx) return '✓ Ryujinx 路径已配置'
+  return '未配置模拟器路径（点开始后自动探测进程）'
 })
 const hitClass = computed(() => (envDetect.cemu || envDetect.ryujinx) ? 'text-emerald-400' : 'text-amber-400')
-const emulatorFound = computed(() => envDetect.cemu || envDetect.ryujinx)
 const isLocating = ref(false)
 async function toggleLocating() {
   if (isLocating.value) { await api.StopCore(); isLocating.value = false }
@@ -177,6 +190,7 @@ async function toggleLocating() {
 const stateText = ref('就绪')
 const scanInfo = ref('')
 const scanPercent = ref(0)
+const progressText = ref('')
 const percentClass = computed(() => stateText.value.includes('已验证') ? 'text-emerald-400' : 'text-amber-400')
 const stateTextClass = computed(() => {
   const t = stateText.value
@@ -201,6 +215,28 @@ function setStep(doneCount, activeName) {
 }
 const profileText = ref('本地自动档案')
 const profileNote = ref('等待定位...')
+const progressData = ref({})
+const emuVer = ref('')
+const mapAutoOpened = ref(false)
+const saveTip = '主档自动识别：Ryujinx 取游玩时间最长的槽，Cemu 取最近修改的槽。游戏内保存后约 2 秒自动刷新。'
+const emuLabel = computed(() => {
+  if (!progressData.value || !progressData.value.save) return '未连接模拟器'
+  return progressData.value.save.toLowerCase().includes('ryujinx') ? 'Ryujinx' : 'Cemu'
+})
+const gameVerLabel = computed(() => {
+  return { 'auto': '自动检测', '1.6.0_us': '1.6.0 美版', '1.6.0_jp': '1.6.0 日版' }[env.version] || env.version
+})
+const playtimeText = computed(() => {
+  const secs = progressData.value?.playtime || 0
+  if (!secs) return '-'
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60)
+  return `${h}h${String(m).padStart(2,'0')}m`
+})
+const saveBasename = computed(() => {
+  const s = progressData.value?.save
+  if (!s) return ''
+  return s.split(/[\\/]/).slice(-2).join('\\')
+})
 const logs = ref([])
 const logBox = ref(null)
 function pushLogs(lines) {
@@ -228,7 +264,7 @@ function pushLogs(lines) {
 async function pickCemu() { const d = await api.PickDir("选择 Cemu 目录"); if (d) paths.cemu = d }
 async function pickRyujinx() { const d = await api.PickDir("选择 Ryujinx 目录"); if (d) paths.ryujinx = d }
 async function pickSave() { const d = await api.PickDir("选择存档目录"); if (d) paths.saveDir = d }
-async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator }); showSettings.value = false }
+async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx }
 function clearLogs() { logs.value = [] }
 function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
@@ -236,21 +272,27 @@ function checkUpdate() {
 }
 async function openMap() { rt.BrowserOpenURL("https://botw.yalin.site/") }
 async function openLogDir() { await api.OpenLogDir() }
+async function exportDiag() { await api.ExportDiagnostics() }
+function onFirstVerified() {
+  if (mapAutoOpened.value) return
+  mapAutoOpened.value = true
+  rt.BrowserOpenURL("https://botw.yalin.site/")
+}
 function parseState(line) {
   const s = line
   if (/fixed offset.*confirmed/.test(s)) {
     stateText.value = '已验证 · 跟随中'
     setStep(3, '已锁定'); scanPercent.value = 100
-    profileText.value = '本地固定偏移档案'
-    profileNote.value = '快路径秒锁'
+    onFirstVerified()
   }
   else if (/confirmed live/.test(s)) {
     stateText.value = '已验证 · 跟随中'; setStep(3, '已锁定'); scanPercent.value = 100
+    onFirstVerified()
   }
-  else if (/probe -> switched/.test(s)) { stateText.value = '已锁定 · 探针换活组'; setStep(2, '验证移动') }
-  else if (/scan -> lock/.test(s)) { stateText.value = '已锁定 · 待移动确认'; setStep(2, '验证移动') }
+  else if (/probe -> switched/.test(s)) { stateText.value = '已锁定 · 探针换活组'; setStep(2, '验证移动'); scanPercent.value = 80 }
+  else if (/scan -> lock/.test(s)) { stateText.value = '已锁定 · 待移动确认'; setStep(2, '验证移动'); scanPercent.value = 70 }
   else if (/structural scan|trying fixed/.test(s)) { stateText.value = '定位中...'; setStep(1, '扫描中'); scanPercent.value = 30 }
-  else if (/UNLOCKED/.test(s)) { stateText.value = '未锁定'; setStep(0, '就绪'); scanPercent.value = 0 }
+  else if (/UNLOCKED/.test(s)) { stateText.value = '未锁定'; setStep(0, '就绪'); scanPercent.value = 0; mapAutoOpened.value = false }
 }
 let offLogs
 onMounted(async () => {
@@ -276,11 +318,15 @@ onMounted(async () => {
   rt.EventsOn('update:available', (info) => { updateInfo.value = info })
   rt.EventsOn('status:update', (st) => {
     coreRunning.value = st.running
+    if (st.progress && st.progress.counts) {
+      progressData.value = st.progress
+    }
+    if (st.emuVer) emuVer.value = st.emuVer
     if (st.running && st.ok) {
       syncText.value = '坐标流同步中'
       syncDot.value = 'bg-emerald-400'
     } else if (st.running) {
-      syncText.value = '定位中...'
+      syncText.value = (st.pid && st.pid > 0) ? `已附加 pid=${st.pid}，定位中...` : '等待模拟器进程...'
       syncDot.value = 'bg-amber-400 animate-pulse'
     } else {
       syncText.value = '等待坐标流'

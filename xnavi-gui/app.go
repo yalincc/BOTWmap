@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,15 +11,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	stdruntime "runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // guiVersion 导航程序版本（与地图网页版本解耦，见 BOTWmap 项目规则第 3 条）。
-const guiVersion = "v2.1.0"
+const guiVersion = "v2.1.1"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -173,6 +176,9 @@ func (a *App) StartCore(emu string) string {
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = a.workDir
+	// core 是控制台程序，但 GUI 已经在日志面板实时显示它的输出，
+	// 这里把它的控制台窗口隐藏，避免弹一个黑窗且里面空白（stdout 重定向到了文件）。
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 	f, err := os.OpenFile(filepath.Join(a.workDir, "xnavi-gui-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
 		cmd.Stdout = f
@@ -327,6 +333,70 @@ func (a *App) OpenLogDir() string {
 	return "已打开日志目录"
 }
 
+// hostname returns machine name (best effort).
+func hostname() string {
+	h, err := os.Hostname()
+	if err != nil {
+		return "unknown"
+	}
+	return h
+}
+
+// ExportDiagnostics 一键导出诊断包（zip）：系统信息 + status.json + core 日志 + 事件日志。
+// 用户在反馈问题前点这个，选保存位置，把 zip 发回来即可。
+func (a *App) ExportDiagnostics() string {
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "导出诊断包",
+		DefaultFilename: fmt.Sprintf("xnavi-diag-%s.zip", time.Now().Format("20060102-150405")),
+		Filters:         []runtime.FileFilter{{DisplayName: "ZIP 压缩包", Pattern: "*.zip"}},
+	})
+	if err != nil || path == "" {
+		return "已取消"
+	}
+	if !strings.HasSuffix(strings.ToLower(path), ".zip") {
+		path += ".zip"
+	}
+	zipFile, err := os.Create(path)
+	if err != nil {
+		return "创建失败: " + err.Error()
+	}
+	defer zipFile.Close()
+	w := zip.NewWriter(zipFile)
+	defer w.Close()
+
+	// 1) 系统信息
+	info := fmt.Sprintf(
+		"xnavi diagnostics\n===================\nGUI version: %s\nOS: %s/%s\nArch: %s\nCPU cores: %d\nHostname: %s\nTime: %s\nEmulator setting: %s\nCemuDir configured: %q\nRyujinxDir configured: %q\nSaveDir override: %q\n\n",
+		guiVersion, stdruntime.GOOS, stdruntime.GOARCH, stdruntime.GOARCH,
+		stdruntime.NumCPU(), hostname(),
+		time.Now().Format("2006-01-02 15:04:05"),
+		func() string {
+			if a.cfg != nil {
+				return a.cfg.Emulator
+			}
+			return "auto"
+		}(),
+		func() string { if a.cfg != nil { return a.cfg.CemuDir }; return "" }(),
+		func() string { if a.cfg != nil { return a.cfg.RyujinxDir }; return "" }(),
+		func() string { if a.cfg != nil { return a.cfg.SaveDir }; return "" }(),
+	)
+	if bw, e := w.Create("info.txt"); e == nil {
+		bw.Write([]byte(info))
+	}
+
+	// 2) 工作目录下的日志/状态文件（core 写的）
+	for _, name := range []string{"status.json", "xnavi-gui-core.log", "run-events.log"} {
+		buf, err := os.ReadFile(filepath.Join(a.workDir, name))
+		if err != nil {
+			continue
+		}
+		if bw, e := w.Create(name); e == nil {
+			bw.Write(buf)
+		}
+	}
+	return "已导出: " + path
+}
+
 // portInUse 探测端口是否被占用。
 func portInUse(port int) bool {
 	c, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", port), 400*time.Millisecond)
@@ -337,11 +407,21 @@ func portInUse(port int) bool {
 	return true
 }
 
-// EnvDetect 探测本机模拟器路径（给前端展示"已检测到"）。
+// EnvDetect 探测"已配置的"模拟器路径是否存在（仅给前端做提示，不挡开始按钮）。
+// 真实"是否附加到运行中的模拟器进程"由 core 经 status.json 的 pid 上报，
+// 这里不再硬编码开发机盘符——任何用户机器上都不该因为路径猜不到而点不了开始。
 func (a *App) EnvDetect() map[string]any {
-	res := map[string]any{
-		"ryujinx": pathExists("G:/YUZU/ryujinx-canary-1.3.351-win_x64"),
-		"cemu":    pathExists("H:/Cemu"),
+	a.mu.Lock()
+	cfg := a.cfg
+	a.mu.Unlock()
+	res := map[string]any{"ryujinx": false, "cemu": false}
+	if cfg != nil {
+		if cfg.CemuDir != "" && pathExists(cfg.CemuDir) {
+			res["cemu"] = true
+		}
+		if cfg.RyujinxDir != "" && pathExists(cfg.RyujinxDir) {
+			res["ryujinx"] = true
+		}
 	}
 	return res
 }

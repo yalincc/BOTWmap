@@ -8,6 +8,8 @@ export function CoreStatus():Promise<Record<string, any>>;
 
 export function EnvDetect():Promise<Record<string, any>>;
 
+export function ExportDiagnostics():Promise<string>;
+
 export function LoadConfig():Promise<main.Config>;
 
 export function OpenLogDir():Promise<string>;

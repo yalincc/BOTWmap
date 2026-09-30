@@ -14,6 +14,10 @@ export function EnvDetect() {
   return window['go']['main']['App']['EnvDetect']();
 }
 
+export function ExportDiagnostics() {
+  return window['go']['main']['App']['ExportDiagnostics']();
+}
+
 export function LoadConfig() {
   return window['go']['main']['App']['LoadConfig']();
 }

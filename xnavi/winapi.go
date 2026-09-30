@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"syscall"
 	"unicode/utf16"
@@ -150,4 +151,77 @@ func readMem(h uintptr, addr uintptr, size int) []byte {
 func setConsoleTitle(title string) {
 	p, _ := syscall.UTF16PtrFromString(title)
 	procSetConsoleTitleW.Call(uintptr(unsafe.Pointer(p)))
+}
+
+// ---- 模拟器 exe 版本号（诊断用）----
+
+var (
+	versionDll                     = syscall.NewLazyDLL("version.dll")
+	procGetFileVersionInfoSizeW    = versionDll.NewProc("GetFileVersionInfoSizeW")
+	procGetFileVersionInfoW        = versionDll.NewProc("GetFileVersionInfoW")
+	procVerQueryValueW             = versionDll.NewProc("VerQueryValueW")
+	procQueryFullProcessImageNameW = kernel32.NewProc("QueryFullProcessImageNameW")
+)
+
+// processExePath 返回 pid 对应进程的完整 exe 路径。
+func processExePath(pid uint32) string {
+	h, err := openProcessLimited(pid)
+	if err != nil || h == 0 {
+		return ""
+	}
+	defer closeHandle(h)
+	buf := make([]uint16, 32768)
+	n := uint32(len(buf))
+	r, _, _ := procQueryFullProcessImageNameW.Call(h, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&n)))
+	if r == 0 {
+		return ""
+	}
+	return utf16ToString(buf[:n])
+}
+
+func openProcessLimited(pid uint32) (uintptr, error) {
+	// PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+	r, _, e := procOpenProcess.Call(0x1000, 0, uintptr(pid))
+	if r == 0 {
+		return 0, e
+	}
+	return r, nil
+}
+
+// fileVersion 返回 exe 的文件版本号（如 "1.2.3.4"），失败返回空。
+// 用 VS_FIXEDFILEINFO 固定结构，不依赖字符串表语言码，兼容性最好。
+func fileVersion(path string) string {
+	if path == "" {
+		return ""
+	}
+	pathW, _ := syscall.UTF16PtrFromString(path)
+	size, _, _ := procGetFileVersionInfoSizeW.Call(uintptr(unsafe.Pointer(pathW)), 0)
+	if size == 0 {
+		return ""
+	}
+	buf := make([]byte, size)
+	r, _, _ := procGetFileVersionInfoW.Call(uintptr(unsafe.Pointer(pathW)), 0, size, uintptr(unsafe.Pointer(&buf[0])))
+	if r == 0 {
+		return ""
+	}
+	var pp uintptr
+	var pu uintptr
+	backslash := []uint16{'\\', 0}
+	r, _, _ = procVerQueryValueW.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&backslash[0])),
+		uintptr(unsafe.Pointer(&pp)), uintptr(unsafe.Pointer(&pu)))
+	if r == 0 || pp == 0 {
+		return ""
+	}
+	// VS_FIXEDFILEINFO: dwFileVersionMS (offset 8), dwFileVersionLS (offset 12)
+	ms := *(*uint32)(unsafe.Pointer(pp + 8))
+	ls := *(*uint32)(unsafe.Pointer(pp + 12))
+	return fmt.Sprintf("%d.%d.%d.%d", uint16(ms>>16), uint16(ms), uint16(ls>>16), uint16(ls))
+}
+
+// emulatorExeVersion 返回当前附加模拟器的版本号字符串（诊断用，失败返回空）。
+func emulatorExeVersion() string {
+	if procPID == 0 {
+		return ""
+	}
+	return fileVersion(processExePath(procPID))
 }
