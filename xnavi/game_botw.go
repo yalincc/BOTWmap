@@ -179,6 +179,18 @@ func (g *gameBotw) KnownOffsets(p Platform) []uintptr {
 	return []uintptr{0xA77FCBBC}
 }
 
+// FixedNeedsMoveConfirm BOTW 偏移已跨重启验证，保持秒锁 + 直接 verified（不改已验证行为）。
+func (g *gameBotw) FixedNeedsMoveConfirm() bool { return false }
+
+// PreferScanOnUnlock BOTW 偏移已验证，解锁后固定偏移优先秒锁。
+func (g *gameBotw) PreferScanOnUnlock() bool { return false }
+
+// UnverifiedRescanAfter BOTW 保持 15s 快速自愈（原行为）。
+func (g *gameBotw) UnverifiedRescanAfter() time.Duration { return 15 * time.Second }
+
+// FrozenRescanAfter BOTW 保持 30s（live-go 原口径）。
+func (g *gameBotw) FrozenRescanAfter() time.Duration { return 30 * time.Second }
+
 func (g *gameBotw) ShrineExit() float32 { return gameShrineExit }
 
 // PickOffset BOTW：存档锚点距离最近（单偏移多块镜像，距离仅辅助确认 + 日志）。

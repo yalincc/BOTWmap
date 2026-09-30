@@ -42,6 +42,31 @@ type Game interface {
 	// 启动时优先用这些偏移直接读，失败再回退全量扫描。
 	KnownOffsets(p Platform) []uintptr
 
+	// FixedNeedsMoveConfirm 固定偏移锁定是否需要"移动确认"才算 verified。
+	//   - BOTW：偏移经 5 次重启样本验证（player = block_base + 偏移恒成立），直接 verified（秒锁不降级）
+	//   - TOTK：偏移未经跨重启验证（live-go 会话快照，可能指向陈旧副本），必须移动确认，
+	//     僵锁由既有"unverified 15s → 重扫"保险丝踢掉（V2.2.0 Q7 修复）
+	FixedNeedsMoveConfirm() bool
+
+	// PreferScanOnUnlock 解锁后是否优先"全量扫描 + 探针选活组"（固定偏移退为扫描失败备胎）。
+	//   - BOTW=false：偏移已验证，秒锁优先
+	//   - TOTK=true：10 条偏移全是会话快照，无一持续跟随（2026-10-01 实测：
+	//     0xD049C4B0 分钟级才更新一次），只有扫描能找到本会话的活坐标（live-go 同策略）
+	PreferScanOnUnlock() bool
+
+	// UnverifiedRescanAfter 未验证锁定超过该时长强制重扫（0=禁用）。
+	//   - BOTW=15s：固定偏移锁错时快速自愈
+	//   - TOTK=0：禁用——15s 会抢先杀掉探针的 60s 观察窗口（probeLife），
+	//     探针永远来不及切到活组；TOTK 的僵尸由冻结兜底（30s 无共识 → 重扫）处理
+	UnverifiedRescanAfter() time.Duration
+
+	// FrozenRescanAfter 已验证锁读数冻结多久后触发"共识兜底/重扫"。
+	//   - BOTW=30s（live-go 原口径）
+	//   - TOTK=90s：TOTK 的已知副本全是周期快照（实测 30s~分钟级更新节奏），
+	//     30s 阈值和副本节奏打架——刚要更新就被判冻结重扫，造成"锁定后不停扫描"；
+	//     放宽到 90s（覆盖 30s~分钟级节奏），代价是真传送后位置最长滞后 90s
+	FrozenRescanAfter() time.Duration
+
 	// PickOffset 从固定偏移候选（已通过 ValidRaw）仲裁出要锁定的候选。
 	// 策略因游戏而异：
 	//   - BOTW：存档锚点距离最近（单偏移多块镜像，距离仅辅助确认）

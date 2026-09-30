@@ -109,6 +109,47 @@ func tryOffsets() (uintptr, [3]float32, bool) {
 	return best.addr, best.pos, true
 }
 
+// consensusCopy 冻结共识兜底（V2.2.0 Q7 自 live-go 1.8.7 移植）：
+// 在锚块上的 known 偏移里找与当前锁（exclude）不同、≥consensusMin 成员一致
+// （两两欧氏距离 <2m）的簇作候选。调用方要求候选"动了"（活副本证明）才换锁，
+// 玩家站桩绝不误换。仅锚块（live-go currentSessionBase 同口径）。
+func consensusCopy(h uintptr, exclude uintptr) (uintptr, [3]float32, bool) {
+	base := guestRamBase()
+	if base == 0 {
+		return 0, [3]float32{}, false
+	}
+	type val struct {
+		addr uintptr
+		pos  [3]float32
+	}
+	var vals []val
+	for _, o := range currentGame.KnownOffsets(currentPlatform()) {
+		adr := base + o
+		if adr == exclude {
+			continue
+		}
+		if d := currentGame.DecodeAt(h, adr); d != nil {
+			vals = append(vals, val{adr, [3]float32{d[0], d[1], d[2]}})
+		}
+	}
+	best, bestN := val{}, 0
+	for _, x := range vals {
+		n := 0
+		for _, y := range vals {
+			if dist3(x.pos, y.pos) < 2 {
+				n++
+			}
+		}
+		if n > bestN {
+			best, bestN = x, n
+		}
+	}
+	if bestN < consensusMin {
+		return 0, [3]float32{}, false
+	}
+	return best.addr, best.pos, true
+}
+
 var (
 	knownBlocks        []uintptr
 	currentSessionBase uintptr
@@ -269,10 +310,27 @@ func stateMachine() {
 	unverifiedN := 0
 	lastDataHintAt := time.Now().Add(-time.Minute)
 
+	// 冻结共识兜底状态（V2.2.0 Q7 自 live-go 1.8.7 移植）
+	lastConsensusAt := time.Time{}
+	consensusCand := uintptr(0) // 冻结共识候选（需"动了"才换锁）
+	var consensusCandPos [3]float32
+	frozenLimit := int(currentGame.FrozenRescanAfter() / smTick) // 冻结重扫阈值（按游戏策略：BOTW 30s / TOTK 90s）
+	// Q10 根治：冻结 → 后台重扫（不解锁、不清显示）。站立不动时副本无写入属正常
+	// （TOTK 只在移动时写位置），解锁重扫会把红点甩到副本数最多的静态结构上。
+	// 后台扫描+探针：玩家真移动时探针自动切活副本（mv≥3），站立时什么都不变。
+	bgScan := false
+	var lastBgScanAt time.Time
+
+	// 探针逐地址移动计数（V2.2.0 Q7）：位置历史是环形缓冲，同一组里 Addrs[0]
+	// 可能是冻结的旧条目，实时条目在其他下标——换锁必须锁"组内动得最多的地址"，
+	// 否则锁到旧槽位（每 ~30s 环回写一次才更新，表现为红点 10~30s 才跳一次）
+	probeAddrMoves := map[uintptr]int{}
+
 	resetFollow := func() {
 		prev, hasPrev = [3]float32{}, false
 		moveN, invalidN, frozenN = 0, 0, 0
 		savedKnown = false
+		consensusCand = 0
 	}
 
 	tick := time.NewTicker(smTick)
@@ -344,10 +402,12 @@ func stateMachine() {
 		default:
 		}
 
-		// ---- UNLOCKED：固定偏移优先，失败再扫描 ----
+		// ---- UNLOCKED：解锁策略因游戏而异 ----
 		if !inLocked {
-			// 1) 先试平台已知固定偏移（秒锁，不扫描）
-			if offsets := currentGame.KnownOffsets(p); len(offsets) > 0 && time.Since(lastFixedTry) > 2*time.Second {
+			// 1) 固定偏移秒锁（仅 BOTW：偏移跨重启验证过。TOTK 走扫描优先——
+			//    偏移是会话快照无一持续跟随，秒锁只会锁到僵尸，见 PreferScanOnUnlock）
+			if !currentGame.PreferScanOnUnlock() && len(currentGame.KnownOffsets(p)) > 0 && time.Since(lastFixedTry) > 2*time.Second {
+				offsets := currentGame.KnownOffsets(p)
 				lastFixedTry = time.Now()
 				blks := p.Blocks(256.0)
 				fmt.Printf("  [sm] trying fixed offsets on %d blocks:\n", len(blks))
@@ -376,12 +436,18 @@ func stateMachine() {
 				if len(cands) > 0 {
 					best, detail, ok := currentGame.PickOffset(cands, p)
 					if ok {
+						needConfirm := currentGame.FixedNeedsMoveConfirm()
 						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) %s\n",
 							best.Addr, best.Pos[0], best.Pos[1], best.Pos[2], detail)
-						setLock(best.Addr, true, 0, "fixed-offset")
+						setLock(best.Addr, !needConfirm, 0, "fixed-offset")
 						inLocked = true
 						resetFollow()
-						fmt.Printf("  [sm] fixed offset locked OK\n")
+						lockSince = time.Now() // 新锁重新计时，否则 15s unverified 保险丝用旧时间戳秒杀新锁
+						if needConfirm {
+							fmt.Printf("  [sm] fixed offset locked OK [pending move confirm]\n")
+						} else {
+							fmt.Printf("  [sm] fixed offset locked OK\n")
+						}
 						continue
 					}
 					fmt.Printf("  [sm] fixed offset rejected: %s\n", detail)
@@ -416,6 +482,7 @@ func stateMachine() {
 					probeGroups = shortlist
 					probeMoved = make([]int, len(shortlist))
 					probeBase = map[uintptr][3]float32{}
+					probeAddrMoves = map[uintptr]int{}
 					probeStart = time.Now()
 					probeLast = time.Now()
 					probeLockGi = 0
@@ -432,6 +499,7 @@ func stateMachine() {
 					setLock(a, false, 0, "known")
 					inLocked = true
 					resetFollow()
+					lockSince = time.Now() // 同固定偏移路径：新锁重新计时
 					probing = false
 					probeGroups = nil
 					fmt.Printf("  [sm] known offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) [pending move confirm]\n",
@@ -468,38 +536,66 @@ func stateMachine() {
 					probeBase[adr] = v
 					if ok && dist3(v, b) > moveDist {
 						probeMoved[gi]++
+						probeAddrMoves[adr]++
 					}
 				}
 			}
 			lock.mu.RLock()
 			ver := lock.verified
 			lock.mu.RUnlock()
-			if ver {
-				probing = false
-			} else {
-				bestGi, bestMv := -1, 0
+			_ = ver
+			// Q10：verified 锁也允许探针切换（后台重扫后的自愈通道）——
+			// 切换后走 pending move confirm 重新验证，误切会被移动确认淘汰
+			bestGi, bestMv := -1, 0
 				for gi, mv := range probeMoved {
 					if mv >= probeMoveN && gi != probeLockGi && mv > bestMv {
 						bestGi, bestMv = gi, mv
 					}
 				}
 				if bestGi >= 0 {
+					// Q7：锁"组内移动最多的地址"而非 Addrs[0]——位置历史环形缓冲里
+					// Addrs[0] 可能是冻结旧条目（每 ~30s 环回才更新），实时条目在其他下标
 					adr := probeGroups[bestGi].Addrs[0]
+					bestAdrMv := probeAddrMoves[adr]
+					nCap := len(probeGroups[bestGi].Addrs)
+					if nCap > probeAddrCap {
+						nCap = probeAddrCap
+					}
+					for i := 0; i < nCap; i++ {
+						ad := probeGroups[bestGi].Addrs[i]
+						if m := probeAddrMoves[ad]; m > bestAdrMv {
+							bestAdrMv, adr = m, ad
+						}
+					}
 					if d := currentGame.DecodeAt(h, adr); d != nil {
 						// 哪个在动就切到哪个（不限制距离，因为锁的位置可能本身就是错的静态候选）
 						// 切到后不直接 verified，等移动确认
 						setLock(adr, false, probeGroups[bestGi].Copies, "probe")
 						probing = false
 						resetFollow()
+						probeAddrMoves = map[uintptr]int{}
 						a = adr
 						lockSince = time.Now()
-						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X mem=(%.1f,%.1f,%.1f) [pending move confirm]\n",
-							bestGi, probeGroups[bestGi].Copies, adr, d[0], d[1], d[2])
+						fmt.Printf("  [sm] probe -> switched to moving group #%d copies=%d addr=0x%X (addrMv=%d) mem=(%.1f,%.1f,%.1f) [pending move confirm]\n",
+							bestGi, probeGroups[bestGi].Copies, adr, bestAdrMv, d[0], d[1], d[2])
 					}
 				}
-			}
 			if probing && time.Since(probeStart) > probeLife {
 				probing = false
+				// Q7 诊断：探针到期仍没切组——打印有移动计数的组，判断活组是否在观察名单
+				moved := 0
+				for gi, mv := range probeMoved {
+					if mv > 0 && gi < len(probeGroups) {
+						moved++
+						if d := currentGame.DecodeAt(h, probeGroups[gi].Addrs[0]); d != nil {
+							fmt.Printf("  [sm] probe expired: group #%d mv=%d copies=%d mem=(%.1f,%.1f,%.1f)\n",
+								gi, mv, probeGroups[gi].Copies, d[0], d[1], d[2])
+						}
+					}
+				}
+				if moved == 0 {
+					fmt.Printf("  [sm] probe expired: %d groups watched, none moved\n", len(probeGroups))
+				}
 			}
 		}
 
@@ -510,6 +606,35 @@ func stateMachine() {
 			inLocked = false
 			continue
 		}
+
+		// Q10：冻结后台重扫——保持当前锁和位置显示，只跑扫描+探针。
+		// 玩家真移动时活副本组 mv≥3 自动切换；站立不动时扫描无果、什么都不变。
+		if bgScan && time.Since(lastBgScanAt) >= 60*time.Second {
+			bgScan = false
+			lastBgScanAt = time.Now()
+			logf := func(s string) { fmt.Println("    " + s) }
+			fmt.Println("  [sm] frozen -> background rescan (lock kept)...")
+			hits := structuralScan(h, sessionBlocks(h), logf)
+			if len(hits) > 0 {
+				_, shortlist := groupAndRank(h, hits)
+				probing = true
+				probeGroups = shortlist
+				probeMoved = make([]int, len(shortlist))
+				probeBase = map[uintptr][3]float32{}
+				probeAddrMoves = map[uintptr]int{}
+				probeStart = time.Now()
+				probeLast = time.Now()
+				probeLockGi = -1
+				for gi := range shortlist {
+					if len(shortlist[gi].Addrs) > 0 && shortlist[gi].Addrs[0] == a {
+						probeLockGi = gi // 当前锁自己的组：探针不切到自己
+						break
+					}
+				}
+				fmt.Printf("  [sm] background rescan done, probing top %d (lock kept)\n", len(shortlist))
+			}
+		}
+
 		v := currentGame.DecodeAt(h, a)
 		if v == nil {
 			invalidN++
@@ -529,7 +654,7 @@ func stateMachine() {
 		lock.mu.RLock()
 		ver := lock.verified
 		lock.mu.RUnlock()
-		if !ver && time.Since(lockSince) > 15*time.Second {
+		if ua := currentGame.UnverifiedRescanAfter(); ua > 0 && !ver && time.Since(lockSince) > ua {
 			unverifiedN++
 			fmt.Printf("  [sm] lock 0x%X unverified after 15s -> rescan\n", a)
 			if unverifiedN >= 3 {
@@ -635,6 +760,39 @@ func stateMachine() {
 				lastLayerLog = lay
 				lastLayerLogAt = time.Now()
 				fmt.Printf("  [layer] %d (%s) @ (%.0f, %.0f, %.0f)\n", lay, totkLayerName(lay), gx, gy, gz)
+			}
+		}
+
+		// 冻结共识兜底（V2.2.0 Q7 自 live-go 1.8.7 移植，零扫描）：锁读数停滞 ≥30s
+		// （frozenN≥frozenTicks）时，在锚块 known 偏移里找与本锁差 >15m 的
+		// ≥consensusMin 成员一致簇作候选；候选在下一次检查"动了"（活副本证明）
+		// 才换锁——玩家站桩绝不误换，玩家一动 1~2s 内自愈。
+		if frozenN >= frozenLimit && time.Since(lastConsensusAt) >= consensusEvery {
+			lastConsensusAt = time.Now()
+			a2, v2, ok := consensusCopy(h, a)
+			if !ok {
+				consensusCand = 0
+				// Q10：冻结且无共识候选 → 后台重扫（不解锁）。
+				// 站立不动时副本无写入属正常；玩家真移动时探针会找到活副本并切换。
+				// 节流：与上次后台重扫间隔 ≥60s 才再次置位（防日志每秒刷屏）
+				if time.Since(lastBgScanAt) >= 60*time.Second {
+					fmt.Printf("  [sm] lock frozen %.0fs -> background rescan (lock kept)\n",
+						float64(frozenN)*smTick.Seconds())
+					bgScan = true
+				}
+				continue
+			} else if a2 != consensusCand {
+				consensusCand, consensusCandPos = a2, v2
+				fmt.Printf("  [sm] lock frozen %.0fs, consensus candidate 0x%X (%.0fm away) - watching\n",
+					float64(frozenLimit)*smTick.Seconds(), a2, dist3(v2, cur))
+			} else if dist3(v2, consensusCandPos) > moveDist {
+				// 候选位置变了 = 活副本在跟随玩家 → 换锁
+				fmt.Printf("  [sm] frozen lock 0x%X -> relock to live consensus copy 0x%X\n", a, a2)
+				setLock(a2, false, 0, "consensus")
+				resetFollow()
+				probing = false
+				probeGroups = nil
+				continue
 			}
 		}
 

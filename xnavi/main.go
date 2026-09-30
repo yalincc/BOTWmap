@@ -170,28 +170,35 @@ func main() {
 }
 
 // detectGame 自动识别当前游戏（--game=auto）。
-// 两步判定：
-//   1) 游戏感知（当前平台内存）：试读固定偏移——BOTW 偏移有效 → BOTW；
-//      TOTK 偏移多副本共识 ≥2 → TOTK。两游戏偏移互斥（实测 BOTW 偏移在 TOTK 内存全 invalid），
-//      识别可靠，且玩家在两个存档并存时不会被存档目录误导。
-//   2) 存档兜底（游戏未运行时）：存在 TOTK 存档且无 BOTW 存档 → TOTK，否则 BOTW。
+// 两步判定（V2.2.0 Q7 修订：误判 BOTW 修复）：
+//   1) 游戏感知（当前平台内存，重试 3 次）：TOTK 偏移共识/任两候选相距 <5m → TOTK；
+//      BOTW 偏移任一 valid → BOTW。TOTK 先判（严格共识受杂散影响小），
+//      读数有瞬时性（传送/加载瞬间全 invalid），一次失败不能下结论。
+//   2) 存档兜底（内存感知连续失败/游戏未运行）：只有一边有存档 → 直接判；
+//      两边都有（本机现状）→ 按最近修改时间猜当前在玩的游戏——
+//      原实现硬编码 BOTW，用户玩 TOTK 时整场会话按 BOTW 解码 + 打开 BOTW 地图。
 func detectGame(p Platform) Game {
 	if p != nil && p.Attach() {
 		h := p.Handle()
-		blks := p.Blocks(256.0)
-		if len(blks) > 0 {
-			// BOTW：Ryujinx 0xA77FCBBC / Cemu 0x1055300C（0xC1F8BF4 备用）
-			botwOffs := []uintptr{0xA77FCBBC, 0x1055300C, 0xC1F8BF4}
-			gb := &gameBotw{}
-			for _, blk := range blks {
-				for _, off := range botwOffs {
-					if d := gb.DecodeAt(h, blk.Base+off); d != nil {
-						fmt.Printf("  [game] auto-detected: botw (fixed offset live @0x%X)\n", blk.Base+off)
-						return gb
-					}
-				}
+		for attempt := 0; attempt < 3; attempt++ {
+			if attempt > 0 {
+				time.Sleep(time.Second)
 			}
-			// TOTK：10 偏移共识 ≥2（PickOffset 拒绝杂散）
+			// 0) 窗口标题判定（Q8 主判定）：Ryujinx 游戏窗口标题自带游戏名 + Title ID，
+			//    模拟器自报的硬标识，零内存扫描、无假阳性（Cemu 不匹配 TID，走原逻辑）
+			if game := detectGameByTitle(p.PID()); game != "" {
+				fmt.Printf("  [game] auto-detected: %s (window title TID)\n", game)
+				if game == "totk" {
+					return &gameTotk{}
+				}
+				return &gameBotw{}
+			}
+			blks := p.Blocks(256.0)
+			if len(blks) == 0 {
+				continue
+			}
+			// TOTK：共识优先，另加宽松口径——任两候选相距 <5m 也算命中
+			// （EA24 快照对相差恰 ~2m，PickOffset 的逐轴 <2 聚类可能漏掉）
 			gt := &gameTotk{}
 			var hits []OffsetCand
 			for _, off := range gt.KnownOffsets(p) {
@@ -202,9 +209,32 @@ func detectGame(p Platform) Game {
 					}
 				}
 			}
+			totkHit := false
 			if _, _, ok := gt.PickOffset(hits, p); ok {
-				fmt.Printf("  [game] auto-detected: totk (fixed offset consensus)\n")
+				totkHit = true
+			} else {
+				for i := 0; i < len(hits) && !totkHit; i++ {
+					for j := i + 1; j < len(hits); j++ {
+						if dist3(hits[i].Pos, hits[j].Pos) < 5 {
+							totkHit = true
+						}
+					}
+				}
+			}
+			if totkHit {
+				fmt.Println("  [game] auto-detected: totk (fixed offset consensus)")
 				return gt
+			}
+			// BOTW：任一偏移 valid → BOTW
+			gb := &gameBotw{}
+			botwOffs := []uintptr{0xA77FCBBC, 0x1055300C, 0xC1F8BF4}
+			for _, blk := range blks {
+				for _, off := range botwOffs {
+					if d := gb.DecodeAt(h, blk.Base+off); d != nil {
+						fmt.Printf("  [game] auto-detected: botw (fixed offset live @0x%X)\n", blk.Base+off)
+						return gb
+					}
+				}
 			}
 		}
 	}
@@ -214,15 +244,44 @@ func detectGame(p Platform) Game {
 		root = filepath.Join(app, "Ryujinx", "bis", "user", "save")
 	}
 	if root != "" {
-		totk := len(findSaveFiles(root, []string{"progress.sav", "caption.sav"})) > 0
-		botw := len(findSaveFiles(root, []string{"game_data.sav"})) > 0
-		if totk && !botw {
+		totkFiles := findSaveFiles(root, []string{"progress.sav", "caption.sav"})
+		botwFiles := findSaveFiles(root, []string{"game_data.sav"})
+		totk, botw := len(totkFiles) > 0, len(botwFiles) > 0
+		switch {
+		case totk && !botw:
 			fmt.Println("  [game] auto-detected: totk (save dir)")
 			return &gameTotk{}
+		case botw && !totk:
+			fmt.Println("  [game] auto-detected: botw (save dir)")
+			return &gameBotw{}
+		case totk && botw:
+			// 双存档并存：最近修改的存档 = 当前在玩的游戏
+			nt, _ := newestSaveMtime(totkFiles)
+			nb, _ := newestSaveMtime(botwFiles)
+			if nt.After(nb) {
+				fmt.Printf("  [game] auto-detected: totk (save mtime: totk %s > botw %s)\n",
+					nt.Format("01-02 15:04"), nb.Format("01-02 15:04"))
+				return &gameTotk{}
+			}
+			fmt.Printf("  [game] auto-detected: botw (save mtime: botw %s > totk %s)\n",
+				nb.Format("01-02 15:04"), nt.Format("01-02 15:04"))
+			return &gameBotw{}
 		}
 	}
 	fmt.Println("  [game] auto-detected: botw")
 	return &gameBotw{}
+}
+
+// newestSaveMtime 返回存档文件里最新的修改时间（及对应路径）。
+func newestSaveMtime(files []string) (time.Time, string) {
+	var newest time.Time
+	path := ""
+	for _, f := range files {
+		if fi, err := os.Stat(f); err == nil && fi.ModTime().After(newest) {
+			newest, path = fi.ModTime(), f
+		}
+	}
+	return newest, path
 }
 
 // dumpDiagnostics 打印当前平台进程/内存/定位诊断信息（联调用，不开服务器）。

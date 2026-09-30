@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -92,26 +93,102 @@ func (g *gameTotk) ValidRaw(mem []float32, littleEndian bool) bool {
 }
 
 // KnownOffsets TOTK 仅 Ryujinx（TOTK 无 Wii U 版）。
-// 偏移来自 TOTKmap known_addrs.json（1.8.7 实测积累，含 0x35DA00 低偏移条目），
-// P2a 先硬编码 10 条，P4 扫描回写联动后转为 known_totk_ryujinx.json 持久化。
+// = known_totk_ryujinx.json 动态积累（移动确认后 saveKnown 写入，最新验证针位优先）
+//   + 硬编码种子 10 条（live-go 1.8.7 会话快照，未跨重启验证，仅作冷启动兜底）。
+// 偏移未经跨重启验证前锁定需移动确认（见 FixedNeedsMoveConfirm）。
 func (g *gameTotk) KnownOffsets(p Platform) []uintptr {
-	if p != nil && p.Name() == "Ryujinx" {
-		return []uintptr{
-			0xEA24E3C0, 0xD049C4B0, 0xEA2479C0, 0xEA2474C0, 0xD8696F04,
-			0xFC9C7714, 0xEDB1CAF0, 0xFC9C80B4, 0x35DA00, 0xEE86CFB0,
+	if p == nil || p.Name() != "Ryujinx" {
+		return nil
+	}
+	seen := map[uintptr]bool{}
+	var out []uintptr
+	add := func(v uintptr) {
+		if v > 0 && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
 		}
 	}
-	return nil
+	for _, v := range loadOffsets() { // 动态积累的验证针位优先
+		add(v)
+	}
+	for _, v := range []uintptr{ // 冷启动种子
+		0xEA24E3C0, 0xD049C4B0, 0xEA2479C0, 0xEA2474C0, 0xD8696F04,
+		0xFC9C7714, 0xEDB1CAF0, 0xFC9C80B4, 0x35DA00, 0xEE86CFB0,
+	} {
+		add(v)
+	}
+	return out
 }
 
-// PickOffset TOTK：多副本共识仲裁（live-go tryOffsets 同口径）。
-// 收集所有通过校验的偏移候选，统计"坐标几乎相同（<2）"的副本数，取共识最多的；
-// 共识 <2 且候选 >1 时拒绝锁定——TOTK 内存里存在多个合法但非玩家的三元组
-// （NPC/静态数据/旧会话残留），无共识即锁错对象（症状：锁定后不跟随、漂移卡死）。
+// FixedNeedsMoveConfirm TOTK 偏移未经跨重启验证，锁定后须移动确认才 verified，
+// 僵锁由冻结兜底处理（见下）。
+func (g *gameTotk) FixedNeedsMoveConfirm() bool { return true }
+
+// PreferScanOnUnlock TOTK 偏移全是会话快照、无一持续跟随（2026-10-01 实测），
+// 解锁后必须扫描+探针找本会话活副本（live-go 同策略），固定偏移退为备胎。
+func (g *gameTotk) PreferScanOnUnlock() bool { return true }
+
+// UnverifiedRescanAfter TOTK 禁用 15s 超时：它会抢先杀掉探针的 60s 观察窗口
+// （probeLife），探针永远切不到活组；僵尸由冻结兜底（90s 无共识 → 重扫）处理。
+func (g *gameTotk) UnverifiedRescanAfter() time.Duration { return 0 }
+
+// FrozenRescanAfter TOTK 已知副本是周期快照（实测 30s~分钟级更新），30s 阈值
+// 和副本节奏打架（刚要更新就被判冻结重扫 = "锁定后不停扫描"），放宽到 90s。
+// 代价：真传送后位置最长滞后 90s，由传送跳变逻辑（preJump）平滑。
+func (g *gameTotk) FrozenRescanAfter() time.Duration { return 90 * time.Second }
+
+// totkLiveness 上一轮仲裁的候选坐标（展示序），用于活性判定：
+// 值在两次仲裁之间变过 = 活副本（跟随玩家）；冻结副本（旧会话快照）票数再多
+// 也不跟随玩家，不能锁。实测（2026-09-30 日志）：0xD049C4B0 持续变化 = 活，
+// 0xEA2479C0/0xEA2474C0 冻结在出生点 = 僵尸，但僵尸 2 票 > 活 1 票导致锁错。
+var (
+	totkPrevMu  sync.Mutex
+	totkPrevPos = map[uintptr][3]float32{}
+)
+
+// PickOffset TOTK：活性优先 + 多副本共识仲裁。
+// 1) 有"活副本"（与上一轮比较位移 >1m）：活副本优先，取其中副本数最多者——
+//    值在变 = 在跟随玩家，这是比票数强的证据；
+// 2) 无活副本（首轮/玩家站桩）：退回多副本共识（<2 差值聚类取共识最多者，
+//    共识 <2 且候选 >1 拒绝锁定）。锁统一 pending move confirm（FixedNeedsMoveConfirm），
+//    僵尸由"unverified 15s → 重扫"兜底，活副本经移动确认后 saveKnown 积累为跨会话针位。
 func (g *gameTotk) PickOffset(cands []OffsetCand, p Platform) (OffsetCand, string, bool) {
 	if len(cands) == 0 {
 		return OffsetCand{}, "", false
 	}
+	totkPrevMu.Lock()
+	defer totkPrevMu.Unlock()
+
+	// 活性判定：与上一轮记录比较，位移 >1m 视为活副本
+	alive := make([]OffsetCand, 0, len(cands))
+	for _, c := range cands {
+		if prev, ok := totkPrevPos[c.Addr]; ok {
+			dx, dy, dz := c.Pos[0]-prev[0], c.Pos[1]-prev[1], c.Pos[2]-prev[2]
+			if dx*dx+dy*dy+dz*dz > 1.0 {
+				alive = append(alive, c)
+			}
+		}
+	}
+	for _, c := range cands { // 无论走哪条分支都更新记录，供下一轮比较
+		totkPrevPos[c.Addr] = c.Pos
+	}
+
+	if len(alive) > 0 {
+		best, bestN := alive[0], -1
+		for _, a := range alive {
+			n := 0
+			for _, b := range alive {
+				if abs32(a.Pos[0]-b.Pos[0]) < 2 && abs32(a.Pos[1]-b.Pos[1]) < 2 && abs32(a.Pos[2]-b.Pos[2]) < 2 {
+					n++
+				}
+			}
+			if n > bestN {
+				best, bestN = a, n
+			}
+		}
+		return best, fmt.Sprintf("live copy moved >1m, %d alive - [pending confirm]", bestN), true
+	}
+
 	best, bestN := cands[0], -1
 	for _, a := range cands {
 		n := 0
@@ -127,7 +204,7 @@ func (g *gameTotk) PickOffset(cands []OffsetCand, p Platform) (OffsetCand, strin
 	if bestN < 2 && len(cands) > 1 {
 		return OffsetCand{}, fmt.Sprintf("no consensus (%d copies max, want >=2) - refusing to lock", bestN), false
 	}
-	return best, fmt.Sprintf("consensus=%d copies [confirmed]", bestN), true
+	return best, fmt.Sprintf("consensus=%d copies [pending confirm]", bestN), true
 }
 
 // TOTK 无神庙回跳语义（live-go 无 shrine 逻辑）：空实现，状态机不会进入 shrineMode。
