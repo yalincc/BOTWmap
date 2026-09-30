@@ -670,6 +670,24 @@ class BotwMap {
     return idx == null ? null : this.markers[idx];
   }
 
+  /* 龙轨迹命中（v1.4.3）：鼠标距离轨迹折线 ≤ 阈值即命中，返回龙对象 */
+  _hitDragonPath(mx, my) {
+    if (!this.enabled.has('dragon') || !this.DRAGON_PATHS.length) return null;
+    const tol = 10 / this.view.scale;   // 屏幕 10px 阈值（≈线宽+余量），换算成地图距离
+    let best = null, bd = 1e18;
+    for (const p of this.DRAGON_PATHS) {
+      const segs = p.segments || (p.points ? [p.points] : []);
+      for (const pts of segs) {
+        if (!pts || pts.length < 2) continue;
+        for (let i = 1; i < pts.length; i++) {
+          const d = this._segDist(mx, my, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+          if (d <= tol && d < bd) { bd = d; best = p; }
+        }
+      }
+    }
+    return best;
+  }
+
   /* 点到线段距离（地图坐标） */
   _segDist(px, py, x1, y1, x2, y2) {
     const dx = x2 - x1, dy = y2 - y1;
@@ -1241,6 +1259,7 @@ class BotwMap {
         this.view.y += (e.clientY - lastY);
         lastX = e.clientX; lastY = e.clientY;
         this._updateMatTip(null);
+        this._updateDragonTip(null);
         this.draw();
       } else {
         // 悬停 + 坐标读数
@@ -1251,7 +1270,10 @@ class BotwMap {
         // v1.4.0：材料悬停名字提示（聚合簇不提示；hit.material 是材料 id，需解析成材料对象）
         this.hoverMat = (hit && hit.material != null && hit.cluster == null && this.MATS)
           ? (this.MATS.materials[hit.material] || null) : null;
+        // v1.4.3：龙轨迹悬停名字提示（标记/材料命中时不干扰）
+        this.hoverDragon = (!this.hover && !this.hoverMat) ? this._hitDragonPath(m[0], m[1]) : null;
         this._updateMatTip(this.hoverMat, e.clientX, e.clientY);
+        this._updateDragonTip(this.hoverDragon, e.clientX, e.clientY);
         if (this._onHover) this._onHover(this.hover);
         if (this.mode === 'browse') this.draw();
       }
@@ -1519,6 +1541,29 @@ class BotwMap {
       s.textContent = mat.en;
       this.tipEl.appendChild(s);
     }
+    this.tipEl.classList.remove('hidden');
+    const tw = this.tipEl.offsetWidth || 120;
+    let left = x + 16, top = y - 18;
+    if (left + tw > window.innerWidth - 8) left = x - tw - 16;
+    if (top < 8) top = y + 24;
+    this.tipEl.style.left = Math.max(4, left) + 'px';
+    this.tipEl.style.top = top + 'px';
+  }
+
+  /* v1.4.3：龙轨迹悬停名字气泡（颜色圆点 + 龙名；材料气泡优先） */
+  _updateDragonTip(dragon, x, y) {
+    if (this.hoverMat) return;                 // 材料气泡优先，不覆盖
+    if (!this.tipEl) this.tipEl = document.getElementById('mapTip');
+    if (!this.tipEl) return;
+    if (dragon == null) { this.tipEl.classList.add('hidden'); return; }
+    this.tipEl.textContent = '';
+    const DOT = { farosh: '#e8be40', dinraal: '#e86040', naydra: '#58a8f0' };
+    const c = document.createElement('span');
+    c.style.cssText = 'display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;background:' + (DOT[dragon.color] || '#888') + ';box-shadow:0 0 0 1px rgba(0,0,0,.35)';
+    this.tipEl.appendChild(c);
+    const b = document.createElement('b');
+    b.textContent = dragon.name || '';
+    this.tipEl.appendChild(b);
     this.tipEl.classList.remove('hidden');
     const tw = this.tipEl.offsetWidth || 120;
     let left = x + 16, top = y - 18;
