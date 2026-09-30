@@ -83,7 +83,7 @@ A: 工具自动读主存档（Ryujinx 取游玩时间最长的槽，Cemu 取最�
 ## 要求
 
 - Windows 10 / 11（64 位）
-- Cemu（任意版本，1.27+ 推荐）或 Ryujinx（任意 Canary 版）
+- Cemu（任意版本，1.27+or 2.6 测试推荐）或 Ryujinx（任意 Canary 版）
 - BOTW 游戏本体（Wii U 版或 Switch 版均可）
 - 网页地图需要联网（https://botw.yalin.site）
 

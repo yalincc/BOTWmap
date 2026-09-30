@@ -184,12 +184,12 @@ func TestParseGameDataEndian(t *testing.T) {
 
 func TestParseSaveReal(t *testing.T) {
 	root := filepath.Join(os.Getenv("APPDATA"), "Ryujinx", "bis", "user", "save")
-	files := findSaveFiles(root)
+	files := findSaveFiles(root, currentGame.SaveFileNames())
 	if len(files) == 0 {
 		t.Skip("no save files found")
 	}
 	rp := &ryujinxPlatform{}
-	anchors := readSaveAnchors(rp)
+	anchors := currentGame.SaveAnchors(rp)
 	if len(anchors) == 0 {
 		t.Fatal("no usable anchors")
 	}

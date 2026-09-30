@@ -1,122 +1,48 @@
-// game.go — 游戏层配置（BOTW）。
+// game.go — 游戏适配层接口。
 //
-// 平台只负责"端序解码 + 内存访问"，坐标是否可信、展示顺序、地图换算、
-// 位面（layer）这些是"游戏语义"，集中在这里。未来接入 TOTK 时新增
-// game_totk.go，替换本文件的实现即可，状态机/扫描/服务端不用动。
+// 平台负责"端序解码 + 内存访问"，游戏负责"坐标语义"：
+//   坐标是否可信、展示序、地图换算、位面（layer）、神庙/特殊场景钩子、
+//   存档解析、已知偏移。
 //
-// 本文件坐标口径（与 live-go/live-cemu 一致）：
-//   内存序 = (X 东, alt 高, Z 南+)
-//   展示序 = (gx=X, gz=Z, alt)  —— state.gx/gy/gz 中的 gy 即高度
+// 设计依据：ds 文档五层架构"游戏语义层"；Xnavi V2.2.0 双游戏合并开发计划。
+// 接入新游戏 = 新增 game_xxx.go 实现本接口（game_totk.go 见 P2）。
+// 红线：BOTW 实现（game_botw.go）只做提取平移，不改变任何已验证行为。
 
 package main
 
-import "math"
+import "time"
 
-// abs32 float32 绝对值。
-func abs32(v float32) float32 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
+// Game 描述一个游戏的定位语义。实现必须只读、不注入、不修改游戏内存。
+// 同一时刻只有一个游戏生效（启动时由 --game 确定，切换需重启程序）。
+type Game interface {
+	// Name 游戏标识："botw" / "totk"（用于 known 文件命名、日志、契约附加字段）。
+	Name() string
+	// MapURL 打开的地图地址。
+	MapURL() string
 
-// ---- 坐标校验（合并 live-go decodePos 与 live-cemu posRangeOK 的判据）----
+	// DecodeAt 读取 addr 处 12 字节并解码为"平台内存三元组"（平台端序已解、
+	// 已做第一道坐标校验），无效返回 nil。BOTW 实现 = 原 decodeTripleAt 逻辑。
+	DecodeAt(h uintptr, addr uintptr) []float32
+	// Display 平台内存三元组 → 展示序 (gx, gy, gz)（直接写入 /pos 的口径）。
+	Display(mem [3]float32) (gx, gy, gz float32)
+	// ToMap 展示序 → 地图像素 (mx, my)。
+	ToMap(gx, gy, gz float32) (mx, my float32)
+	// LayerOf 展示序 → 位面号（BOTW 恒 0；TOTK 18 地面/19 地底/20 天空）。
+	LayerOf(gx, gy, gz float32) int
+	// ValidRaw 第二道坐标校验（兼容现有端序相关参数序差异；DecodeAt 已校验过一道）。
+	ValidRaw(mem []float32, littleEndian bool) bool
 
-const (
-	gameMinX, gameMaxX = -7000.0, 7000.0
-	gameMinZ, gameMaxZ = -7000.0, 7000.0
-	gameMinAlt, gameMaxAlt = -600.0, 5000.0
-)
+	// KnownOffsets 该游戏在指定平台上的已知固定偏移（相对锚块基址，按优先级排序）。
+	// 启动时优先用这些偏移直接读，失败再回退全量扫描。
+	KnownOffsets(p Platform) []uintptr
 
-// gameValidTriple 校验内存序三元组 (X, alt, Z) 是否为合法玩家坐标。
-// 判据（两平台踩坑固化，勿删任何一条）：
-//   - NaN 单独判（与任何数比较都是 false，范围检查抓不住）
-//   - 全零 = 标题/加载画面槽未初始化
-//   - 近零簇（原点残留）
-//   - 单轴近零且高度贴地（<5）= 失效偏移常读到的按钮/未初始化槽
-//   - 单轴 denormal 垃圾
-//   - 地图范围
-func gameValidTriple(x, alt, z float32) bool {
-	if x != x || alt != alt || z != z {
-		return false // NaN
-	}
-	if x == 0 && alt == 0 && z == 0 {
-		return false
-	}
-	if abs32(x) < 5 && abs32(z) < 5 {
-		return false // 近零簇（原点残留）
-	}
-	if (abs32(x) < 5 && alt < 5) || (abs32(z) < 5 && alt < 5) {
-		return false // 未初始化/按钮槽
-	}
-	if abs32(x) < 1e-20 || abs32(z) < 1e-20 {
-		return false // 单轴 denormal
-	}
-	if x <= gameMinX || x >= gameMaxX || z <= gameMinZ || z >= gameMaxZ ||
-		alt <= gameMinAlt || alt >= gameMaxAlt {
-		return false
-	}
-	// BOTW 地图坐标在千位级，排除 (30,80,100) 这种引擎内部小向量
-	if abs32(x) < 100 || abs32(z) < 100 {
-		return false
-	}
-	return true
-}
+	// 神庙/特殊场景钩子（BOTW 用；TOTK 返回零值/禁用）。
+	ShrineExit() float32
+	MatchShrine(gx, gy, gz float32) *ProgressPoint
+	ShrineReturn() (window time.Duration, dist float32)
 
-// gameHud 校验并转换内存序 (X, alt, Z) → 展示序 (gx=X, gz=Z, alt)。无效返回 nil。
-func gameHud(x, alt, z float32) []float32 {
-	if !gameValidTriple(x, alt, z) {
-		return nil
-	}
-	return []float32{x, z, alt}
-}
-
-// ---- 地图换算 ----
-
-// gameToMap BOTW: 游戏坐标 → 地图像素（live-go poll 与 Cemu poll 同款换算）。
-func gameToMap(gx, alt, gz float32) (mx, my float32) {
-	return 2*gx + 12000, 2*gz + 10000
-}
-
-// gameLayer BOTW 无多层位面，恒 0。
-const gameLayer = 0
-
-// gameMatchShrineRadius 传送跳变目标与神庙坐标的像素匹配半径（px）。
-const gameMatchShrineRadius = 80.0
-
-// gameShrineExit 神庙内部坐标上限：|gx|,|gz| 超此判定已离开神庙。
-const gameShrineExit = 300.0
-
-// gameShrineReturnWindow 回跳撤销窗口：accept 跳变后 N 秒内读数回到跳变前
-// 位置附近（<gameShrineReturnDist 米）→ 动画假传送（对话/克洛格等），回滚。
-const (
-	gameShrineReturnWindow = 3 * 1000 // ms（与 live-cemu poll 3s 一致）
-	gameShrineReturnDist   = 50.0     // 米
-)
-
-// gameDist3 三维欧氏距离。
-func gameDist3(a1, a2, a3, b1, b2, b3 float32) float32 {
-	dx, dy, dz := a1-b1, a2-b2, a3-b3
-	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
-}
-
-// matchShrine 跳变目标（展示序 gx, alt, gz）是否落在某神庙入口附近（像素坐标）。
-func matchShrine(gx, alt, gz float32) *ProgressPoint {
-	if progress == nil {
-		return nil
-	}
-	px, py := gameToMap(gx, alt, gz)
-	progress.mu.RLock()
-	defer progress.mu.RUnlock()
-	for i := range progress.refs {
-		p := &progress.refs[i]
-		if p.T != "shrine" {
-			continue
-		}
-		dx, dy := px-float32(p.X), py-float32(p.Y)
-		if dx*dx+dy*dy < gameMatchShrineRadius*gameMatchShrineRadius {
-			return p
-		}
-	}
-	return nil
+	// SaveAnchors 该游戏在指定平台上的存档锚点（内存序三元组，主档在前）。
+	SaveAnchors(p Platform) []*SaveAnchor
+	// SaveFileNames 该游戏的存档文件名列表（存档发现用，如 ["game_data.sav"]）。
+	SaveFileNames() []string
 }

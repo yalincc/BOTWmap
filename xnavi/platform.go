@@ -60,6 +60,9 @@ var (
 	platMu    sync.Mutex
 	curPlat   Platform
 	probeList []Platform
+
+	// autoPlatform 是否允许平台自动切换（--emu=auto 时 true；显式指定则不切换）。
+	autoPlatform bool
 )
 
 // registerPlatform 注册一个平台驱动（init 阶段调用）。
@@ -106,6 +109,7 @@ func probePlatform() Platform {
 }
 
 // ensureAttach 确保当前平台已附加；未附加则重试探测。
+// 句柄存在但已失效（进程退出后句柄作废）时也会重开，防止死句柄 0 块卡死。
 func ensureAttach() bool {
 	p := currentPlatform()
 	if p == nil {
@@ -114,8 +118,31 @@ func ensureAttach() bool {
 			return false
 		}
 	}
-	if p.Handle() != 0 {
+	if p.Handle() != 0 && hLive(p.Handle()) {
 		return true
 	}
 	return p.Attach()
+}
+
+// platformWithGame 找"进程在跑且已加载游戏大块内存（≥256MB）"的注册平台，
+// 用于当前平台 0 块卡死（游戏未加载/切换模拟器）时的自动切换。
+// 按名字排除当前平台（curPlat 与 probeList 里的实例可能是不同指针）。
+func platformWithGame(exclude Platform) Platform {
+	exName := ""
+	if exclude != nil {
+		exName = exclude.Name()
+	}
+	for _, p := range probeList {
+		if p.Name() == exName {
+			continue
+		}
+		if !p.Attach() {
+			continue
+		}
+		if len(p.Blocks(256.0)) > 0 {
+			fmt.Printf("  [platform] %s has game memory (>=256MB block)\n", p.Name())
+			return p
+		}
+	}
+	return nil
 }

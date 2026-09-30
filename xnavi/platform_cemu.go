@@ -72,14 +72,17 @@ func findLiveCemu() (uint32, uintptr) {
 func (p *cemuPlatform) Attach() bool {
 	pid, h := findLiveCemu()
 	if pid == 0 || h == 0 {
+		if p.h != 0 {
+			closeHandle(p.h)
+		}
 		p.h, p.pid = 0, 0
 		return false
 	}
-	if pid == p.pid && p.h != 0 {
-		closeHandle(h)
-		return true
-	}
 	if p.h != 0 {
+		if pid == p.pid && hLive(p.h) {
+			closeHandle(h) // 新开探测句柄弃用，沿用旧句柄
+			return true
+		}
 		closeHandle(p.h)
 	}
 	p.h, p.pid = h, pid
@@ -157,11 +160,18 @@ func cemuRWBlocks(h uintptr, minMB float64) []MemBlock {
 	var out []MemBlock
 	addr := uintptr(0)
 	const limit = uintptr(0x7FFFFFFFFFFF)
+	consecFails := 0
 	for addr < limit {
 		var mbi MemoryBasicInformation
-		if virtualQueryEx(h, addr, &mbi) == 0 {
-			break
+		if !vqRetry(h, addr, &mbi) {
+			consecFails++
+			if consecFails > 64 {
+				break // 句柄失效等持续失败：放弃本轮，避免空转
+			}
+			addr += 0x1000
+			continue
 		}
+		consecFails = 0
 		size := mbi.RegionSize
 		p := mbi.Protect & 0xFF
 		if mbi.State == memCommit && (p == 0x02 || p == 0x04) && (mbi.Protect&pageGuard) == 0 {
@@ -188,11 +198,18 @@ func cemuLargestRWBlock(h uintptr) (uintptr, uintptr) {
 	best, bestSize := uintptr(0), uintptr(0)
 	addr := uintptr(0)
 	const limit = uintptr(0x7FFFFFFFFFFF)
+	consecFails := 0
 	for addr < limit {
 		var mbi MemoryBasicInformation
-		if virtualQueryEx(h, addr, &mbi) == 0 {
-			break
+		if !vqRetry(h, addr, &mbi) {
+			consecFails++
+			if consecFails > 64 {
+				break // 句柄失效等持续失败：放弃本轮，避免空转
+			}
+			addr += 0x1000
+			continue
 		}
+		consecFails = 0
 		size := mbi.RegionSize
 		if mbi.State == memCommit &&
 			((mbi.Protect&0xFF) == 0x02 || (mbi.Protect&0xFF) == 0x04) &&

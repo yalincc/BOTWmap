@@ -3,7 +3,8 @@
 //
 // 格式带 Pos（上次锁定坐标，内存序 X, alt, Z）——坐标先验锚，Cemu 结构扫描就近选槽用。
 // 已知偏移只在平滑/移动确认后写入，防漂移坐标污染。
-// 文件按平台分开（known_ryujinx.json / known_cemu.json）：不同模拟器的偏移不混用。
+// 文件按 (游戏,平台) 分开（known_botw_ryujinx.json / known_botw_cemu.json /
+// known_totk_ryujinx.json）：不同模拟器、不同游戏的偏移不混用（V2.2.0 双游戏）。
 
 package main
 
@@ -27,7 +28,7 @@ type knownData struct {
 	Updated string    `json:"updated"`
 }
 
-// knownPath 按当前平台分开文件，避免不同模拟器的偏移混用。
+// knownPath 按 (游戏,平台) 分开文件，避免不同模拟器/不同游戏的偏移混用。
 func knownPath() string {
 	plat := currentPlatform()
 	name := "unknown"
@@ -35,7 +36,7 @@ func knownPath() string {
 		name = strings.ToLower(plat.Name())
 	}
 	exe, _ := os.Executable()
-	return filepath.Join(filepath.Dir(exe), fmt.Sprintf("known_%s.json", name))
+	return filepath.Join(filepath.Dir(exe), fmt.Sprintf("known_%s_%s.json", currentGame.Name(), name))
 }
 
 func parseHex(v string) uintptr {
@@ -112,7 +113,7 @@ func saveKnown(addrs []uintptr, block uintptr, pos [3]float32) {
 	os.WriteFile(knownPath(), buf, 0644)
 }
 
-// loadKnownData 读 known_<platform>.json（不存在/损坏返回零值）。
+// loadKnownData 读 known_<game>_<platform>.json（不存在/损坏返回零值）。
 func loadKnownData() (knownData, error) {
 	var d knownData
 	data, err := os.ReadFile(knownPath())

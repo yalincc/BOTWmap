@@ -137,6 +137,28 @@ func virtualQueryEx(h uintptr, addr uintptr, mbi *MemoryBasicInformation) uintpt
 	return r
 }
 
+// hLive 轻量句柄活性检查：进程已退出/句柄失效时 VirtualQueryEx 立即失败。
+// 用于 ensureAttach 与平台 Attach 的句柄复用路径，防止死进程句柄导致 0 块卡死。
+func hLive(h uintptr) bool {
+	if h == 0 {
+		return false
+	}
+	var mbi MemoryBasicInformation
+	return virtualQueryEx(h, 0, &mbi) != 0
+}
+
+// vqRetry 查询内存区域，遇瞬态失败重试 3 次；仍失败返回 false。
+// 内存枚举的容错基础：单次查询失败不再直接放弃整轮遍历
+// （Ryujinx 重映射/加载瞬间会有瞬态失败，见 V2.2.0 卡死修复）。
+func vqRetry(h uintptr, addr uintptr, mbi *MemoryBasicInformation) bool {
+	for i := 0; i < 3; i++ {
+		if virtualQueryEx(h, addr, mbi) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // readMem 读取进程内存，成功返回实际读到的字节，失败返回 nil。
 func readMem(h uintptr, addr uintptr, size int) []byte {
 	buf := make([]byte, size)

@@ -29,11 +29,18 @@ func (p *ryujinxPlatform) Name() string { return "Ryujinx" }
 func (p *ryujinxPlatform) Attach() bool {
 	pid := findPid("ryujinx")
 	if pid == 0 {
+		if p.h != 0 {
+			closeHandle(p.h)
+		}
 		p.h, p.pid = 0, 0
 		return false
 	}
 	if pid == p.pid && p.h != 0 {
-		return true
+		if hLive(p.h) {
+			return true
+		}
+		closeHandle(p.h)
+		p.h = 0 // 句柄已失效（进程曾退出/被替换），继续走重开
 	}
 	if p.h != 0 {
 		closeHandle(p.h)
@@ -101,11 +108,18 @@ func ryuGuestBlocks(h uintptr, minMB float64) []MemBlock {
 	addr := uintptr(0)
 	const limit = uintptr(0x7FFFFFFFFFFF)
 	const mirrorStep = uintptr(0x800000000)
+	consecFails := 0
 	for addr < limit {
 		var mbi MemoryBasicInformation
-		if virtualQueryEx(h, addr, &mbi) == 0 {
-			break
+		if !vqRetry(h, addr, &mbi) {
+			consecFails++
+			if consecFails > 64 {
+				break // 句柄失效等持续失败：放弃本轮，避免空转
+			}
+			addr += 0x1000
+			continue
 		}
+		consecFails = 0
 		base, size := mbi.BaseAddress, mbi.RegionSize
 		p := mbi.Protect & 0xFF
 		if mbi.State == memCommit && mbi.Type == memMapped &&
@@ -139,11 +153,18 @@ func ryuLargestGuestBlock(h uintptr, minMB float64) (uintptr, uintptr) {
 	var candidates []block
 	addr := uintptr(0)
 	const limit = uintptr(0x7FFFFFFFFFFF)
+	consecFails := 0
 	for addr < limit {
 		var mbi MemoryBasicInformation
-		if virtualQueryEx(h, addr, &mbi) == 0 {
-			break
+		if !vqRetry(h, addr, &mbi) {
+			consecFails++
+			if consecFails > 64 {
+				break // 句柄失效等持续失败：放弃本轮，避免空转
+			}
+			addr += 0x1000
+			continue
 		}
+		consecFails = 0
 		base, size := mbi.BaseAddress, mbi.RegionSize
 		if mbi.State == memCommit && mbi.Type == memMapped &&
 			((mbi.Protect&0xFF) == 0x02 || (mbi.Protect&0xFF) == 0x04) &&

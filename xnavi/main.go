@@ -1,13 +1,16 @@
-// xnavi — BOTW 通用定位导航程序（单一状态机，Ryujinx/Cemu 双平台）。
+// xnavi — 通用定位导航程序（单一状态机，双游戏 × 双平台）。
 //
-// 用途：在本地为在线互动地图 https://botw.yalin.site/ 提供实时角色追踪。
+// 用途：在本地为在线互动地图提供实时角色追踪：
+//   BOTW https://botw.yalin.site/ ｜ TOTK https://totk.yalin.site/
 // 原理：读模拟器进程内存定位玩家坐标 → HTTP API（127.0.0.1:8766）
 // → 在线地图页跨域连接显示红点/轨迹/导航。
 //
 // 平台：auto（默认，Ryujinx 优先）| ryujinx | cemu —— 内存布局/字节序/存档
-// 差异全部由平台驱动隔离，定位核心（watch.go 单一状态机）不感知。
+// 差异全部由平台驱动隔离；游戏：auto（默认）| botw | totk —— 坐标语义/存档/
+// 进度/位面差异由游戏适配层隔离；定位核心（watch.go 单一状态机）两者都不感知。
 //
-// 用法：xnavi.exe [port] [--no-open] [--no-save] [--emu=auto|ryujinx|cemu] [--dump]
+// 用法：xnavi.exe [port] [--no-open] [--no-save] [--emu=auto|ryujinx|cemu]
+//                [--game=auto|botw|totk] [--save-dir=...] [--dump]
 
 package main
 
@@ -23,13 +26,13 @@ import (
 	"time"
 )
 
-const mapURL = "https://botw.yalin.site/"
-
 func main() {
+	enableLogTimestamps()
 	port := 8766
 	autoOpen := true
 	useSave := true
 	emu := "auto"
+	gameName := "auto"
 	dump := false
 	saveDirOverride := ""
 	for _, a := range os.Args[1:] {
@@ -42,6 +45,8 @@ func main() {
 			dump = true
 		case strings.HasPrefix(a, "--emu="):
 			emu = strings.TrimPrefix(a, "--emu=")
+		case strings.HasPrefix(a, "--game="):
+			gameName = strings.TrimPrefix(a, "--game=")
 		case strings.HasPrefix(a, "--save-dir="):
 			saveDirOverride = strings.TrimPrefix(a, "--save-dir=")
 			setSaveDirOverride(saveDirOverride)
@@ -63,19 +68,39 @@ func main() {
 	case "cemu":
 		setPlatform(&cp)
 	default: // auto
-		if rp.Attach() {
+		// 游戏感知选择：优先"进程在跑且已加载游戏大块内存（≥256MB）"的平台，
+		// 解决 Ryujinx 进程活着但游戏已关时启动永远选不中 Cemu 的问题；
+		// 都没加载游戏则退回按进程存在选（Ryujinx 优先），后续状态机 0 块检测会再切。
+		autoPlatform = true
+		switch {
+		case rp.Attach() && len(rp.Blocks(256.0)) > 0:
 			setPlatform(&rp)
-		} else if cp.Attach() {
+		case cp.Attach() && len(cp.Blocks(256.0)) > 0:
 			setPlatform(&cp)
-		} else {
+		case rp.Attach():
+			setPlatform(&rp)
+		case cp.Attach():
+			setPlatform(&cp)
+		default:
 			setPlatform(&rp) // 都没在跑：默认 Ryujinx，状态机等它出现
 		}
 	}
 
-	setConsoleTitle("xnavi · BOTW Live")
+	// 游戏选择：显式指定 or 自动识别。auto 规则见 detectGame（P2 随 TOTK 落地）。
+	switch gameName {
+	case "totk":
+		fmt.Println("  !! --game=totk：TOTK 适配尚未完成（开发计划 P2 阶段），本轮按 BOTW 运行")
+		currentGame = &gameBotw{}
+	case "botw":
+		currentGame = &gameBotw{}
+	default:
+		currentGame = detectGame()
+	}
+
+	setConsoleTitle("xnavi · " + strings.ToUpper(currentGame.Name()) + " Live")
 
 	fmt.Println("=" + strings.Repeat("=", 61))
-	fmt.Println(" xnavi · BOTW live - auto locating player position")
+	fmt.Printf(" xnavi · %s live - auto locating player position\n", strings.ToUpper(currentGame.Name()))
 	fmt.Println("=" + strings.Repeat("=", 61))
 
 	if !useSave {
@@ -121,14 +146,23 @@ func main() {
 	state.mu.RUnlock()
 	fmt.Println("")
 	fmt.Printf("  serving -> %s\n", st)
-	fmt.Printf("  live map -> %s\n", mapURL)
+	fmt.Printf("  live map -> %s\n", currentGame.MapURL())
 	fmt.Println("  (Ctrl+C to stop)")
 
 	if autoOpen {
-		openBrowser(mapURL)
+		openBrowser(currentGame.MapURL())
 	}
 
 	select {}
+}
+
+// detectGame 自动识别当前游戏（--game=auto）。
+// P1 阶段恒返回 BOTW；P2 随 TOTK 适配落地完整规则：
+//   - Cemu 平台 → 恒 BOTW（Wii U 无 TOTK）
+//   - Ryujinx → 按存档目录判定：存在 game_data.sav → BOTW；存在 progress.sav → TOTK；
+//     两者都有 → 配置偏好 + 最近 mtime
+func detectGame() Game {
+	return &gameBotw{}
 }
 
 // dumpDiagnostics 打印当前平台进程/内存/定位诊断信息（联调用，不开服务器）。

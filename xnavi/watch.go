@@ -78,7 +78,7 @@ func tryOffsets() (uintptr, [3]float32, bool) {
 	}
 	var vals []val
 	for _, o := range offs {
-		if d := decodeTripleAt(h, base+o); d != nil {
+		if d := currentGame.DecodeAt(h, base+o); d != nil {
 			vals = append(vals, val{base + o, [3]float32{d[0], d[1], d[2]}})
 		}
 	}
@@ -260,6 +260,8 @@ func stateMachine() {
 	var probeStart, probeLast time.Time
 	probeLockGi := -1
 	lockSince := time.Now()
+	unverifiedN := 0
+	lastDataHintAt := time.Now().Add(-time.Minute)
 
 	resetFollow := func() {
 		prev, hasPrev = [3]float32{}, false
@@ -270,6 +272,9 @@ func stateMachine() {
 	tick := time.NewTicker(smTick)
 	defer tick.Stop()
 	genN := 0
+	tickN := 0
+	zeroBlockN := 0
+	lastZeroProbe := time.Now()
 
 	for range tick.C {
 		if !ensureAttach() {
@@ -292,6 +297,37 @@ func stateMachine() {
 		// Ryujinx guest 块动态重映射，新块检测不可靠，禁用
 		_ = genN
 
+		// —— 0 块检测：游戏未加载/切换模拟器 → 自动重探测平台（仅 --emu=auto）——
+		// 每 5 tick（≈1s）检查当前平台是否还有游戏内存（≥256MB 块）；连续 5 次
+		// （≈5s）0 块且另一平台已加载游戏时自动切换。修两个真机 bug：
+		// ① 传送/重映射瞬间 0 块卡死约 30s（配枚举容错后此处为兜底切换）；
+		// ② Ryujinx 进程活着但游戏已关时永远切不到 Cemu。
+		tickN++
+		if autoPlatform && !inLocked && tickN%5 == 0 {
+			if len(p.Blocks(256.0)) == 0 {
+				if zeroBlockN < 5 {
+					zeroBlockN++
+				}
+				if zeroBlockN >= 5 && time.Since(lastZeroProbe) >= 15*time.Second {
+					lastZeroProbe = time.Now()
+					if alt := platformWithGame(p); alt != nil {
+						fmt.Printf("  [platform] %s 0 blocks for ~%ds, auto-switching to %s (game detected)\n",
+							p.Name(), zeroBlockN, alt.Name())
+						setPlatform(alt)
+						currentSessionBase = 0
+						knownBlocks = nil
+						zeroBlockN = 0
+						goUnlocked("platform auto-switched")
+						p = alt
+						h = alt.Handle()
+						procPID = alt.PID()
+					}
+				}
+			} else {
+				zeroBlockN = 0
+			}
+		}
+
 		select {
 		case <-rescanCh:
 			lastScanAt = time.Time{}
@@ -305,7 +341,7 @@ func stateMachine() {
 		// ---- UNLOCKED：固定偏移优先，失败再扫描 ----
 		if !inLocked {
 			// 1) 先试平台已知固定偏移（秒锁，不扫描）
-			if offsets := p.KnownOffsets(); len(offsets) > 0 && time.Since(lastFixedTry) > 2*time.Second {
+			if offsets := currentGame.KnownOffsets(p); len(offsets) > 0 && time.Since(lastFixedTry) > 2*time.Second {
 				lastFixedTry = time.Now()
 				blks := p.Blocks(256.0)
 				fmt.Printf("  [sm] trying fixed offsets on %d blocks:\n", len(blks))
@@ -317,17 +353,18 @@ func stateMachine() {
 				for _, blk := range blks {
 					for _, off := range offsets {
 						addr := blk.Base + off
-						d := decodeTripleAt(h, addr)
+						d := currentGame.DecodeAt(h, addr)
 						if d == nil {
-							fmt.Printf("    try base=0x%X+0x%X -> read failed\n", blk.Base, off)
+							// 区分"读内存失败"与"读到但坐标非法"，原始字节直接进日志，
+							// 便于判断游戏是否处于传送/加载的数据异常期。
+							if raw := readMem(h, addr, 12); len(raw) < 12 {
+								fmt.Printf("    try base=0x%X+0x%X -> RPM failed\n", blk.Base, off)
+							} else {
+								fmt.Printf("    try base=0x%X+0x%X -> invalid coords hex=% X\n", blk.Base, off, raw)
+							}
 							continue
 						}
-						var ok bool
-						if p.LittleEndian() {
-							ok = gameValidTriple(d[0], d[2], d[1])
-						} else {
-							ok = gameValidTriple(d[0], d[1], d[2])
-						}
+						ok := currentGame.ValidRaw(d, p.LittleEndian())
 						fmt.Printf("    try base=0x%X+0x%X -> (%.1f, %.1f, %.1f) valid=%v\n", blk.Base, off, d[0], d[1], d[2], ok)
 						if ok {
 							cands = append(cands, cand{addr, [3]float32{d[0], d[1], d[2]}})
@@ -336,7 +373,7 @@ func stateMachine() {
 				}
 				if len(cands) > 0 {
 					best := cands[0]
-					anchors := readSaveAnchors(p)
+					anchors := currentGame.SaveAnchors(p)
 					if len(anchors) > 0 {
 						savePt := anchors[0].Pos
 						bestDist := float32(1e9)
@@ -371,6 +408,10 @@ func stateMachine() {
 					continue
 				}
 				fmt.Printf("  [sm] fixed offset not valid on %d guest blocks, falling back to scan\n", len(blks))
+				if time.Since(lastDataHintAt) > 15*time.Second {
+					lastDataHintAt = time.Now()
+					fmt.Printf("  [sm]   hint: 坐标数据异常（游戏传送/加载中?），游戏恢复后固定偏移会自动锁定；如长时间不恢复请检查游戏是否卡死\n")
+				}
 			}
 			// 2) 固定偏移失败，走全量结构扫描（不依赖存档锚点）
 			if useSaveScan && time.Since(lastScanAt) >= scanCooldown {
@@ -439,7 +480,7 @@ func stateMachine() {
 				}
 				for i := 0; i < n; i++ {
 					adr := g.Addrs[i]
-					d := decodeTripleAt(h, adr)
+					d := currentGame.DecodeAt(h, adr)
 					if d == nil {
 						continue
 					}
@@ -465,7 +506,7 @@ func stateMachine() {
 				}
 				if bestGi >= 0 {
 					adr := probeGroups[bestGi].Addrs[0]
-					if d := decodeTripleAt(h, adr); d != nil {
+					if d := currentGame.DecodeAt(h, adr); d != nil {
 						// 哪个在动就切到哪个（不限制距离，因为锁的位置可能本身就是错的静态候选）
 						// 切到后不直接 verified，等移动确认
 						setLock(adr, false, probeGroups[bestGi].Copies, "probe")
@@ -490,7 +531,7 @@ func stateMachine() {
 			inLocked = false
 			continue
 		}
-		v := decodeTripleAt(h, a)
+		v := currentGame.DecodeAt(h, a)
 		if v == nil {
 			invalidN++
 			state.mu.Lock()
@@ -510,14 +551,20 @@ func stateMachine() {
 		ver := lock.verified
 		lock.mu.RUnlock()
 		if !ver && time.Since(lockSince) > 15*time.Second {
+			unverifiedN++
 			fmt.Printf("  [sm] lock 0x%X unverified after 15s -> rescan\n", a)
+			if unverifiedN >= 3 {
+				unverifiedN = 0
+				fmt.Printf("  [sm]   hint: 连续多轮锁定后坐标未移动——玩家可能站在原地或游戏冻结；\n")
+				fmt.Printf("  [sm]         在游戏内走动几步可触发移动确认；仍无效请检查游戏是否卡死\n")
+			}
 			inLocked = false
 			goUnlocked("unverified timeout")
 			continue
 		}
 
 		if shrineMode {
-			if abs32(cur[0]) > gameShrineExit || abs32(cur[1]) > gameShrineExit {
+			if abs32(cur[0]) > currentGame.ShrineExit() || abs32(cur[1]) > currentGame.ShrineExit() {
 				fmt.Printf("  [shrine] left shrine -> normal tracking\n")
 				shrineMode = false
 			} else {
@@ -541,7 +588,7 @@ func stateMachine() {
 				frozenN = 0
 				preJump = prev
 				lastJumpAt = time.Now()
-				if pnt := matchShrine(cur[0], cur[2], cur[1]); pnt != nil {
+				if pnt := currentGame.MatchShrine(cur[0], cur[2], cur[1]); pnt != nil {
 					shrineMode = true
 					fmt.Printf("  [shrine] entered %s\n", pnt.Cn)
 				}
@@ -552,8 +599,9 @@ func stateMachine() {
 			}
 		}
 
-		if !lastJumpAt.IsZero() && time.Since(lastJumpAt) < gameShrineReturnWindow &&
-			dist3(cur, preJump) < gameShrineReturnDist {
+		shrineWin, shrineDist := currentGame.ShrineReturn()
+		if !lastJumpAt.IsZero() && time.Since(lastJumpAt) < shrineWin &&
+			dist3(cur, preJump) < shrineDist {
 			cur = preJump
 			lastJumpAt = time.Time{}
 		}
@@ -586,11 +634,12 @@ func stateMachine() {
 		lock.mu.RLock()
 		verified, copies, src := lock.verified, lock.copies, lock.source
 		lock.mu.RUnlock()
+		gx, gy, gz := currentGame.Display(cur)
 		state.mu.Lock()
 		state.ok = true
-		state.gx, state.gy, state.gz = cur[0], cur[2], cur[1]
-		state.mx, state.my = gameToMap(cur[0], cur[2], cur[1])
-		state.layer = gameLayer
+		state.gx, state.gy, state.gz = gx, gy, gz
+		state.mx, state.my = currentGame.ToMap(gx, gy, gz)
+		state.layer = currentGame.LayerOf(gx, gy, gz)
 		state.age = float64(time.Now().UnixNano()) / 1e9
 		state.verified = verified
 		state.copies = copies

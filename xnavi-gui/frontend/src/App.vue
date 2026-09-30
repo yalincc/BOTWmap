@@ -243,7 +243,8 @@ function pushLogs(lines) {
   if (!lines || !lines.length) return
   const items = lines.map(l => {
     const m = l.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) ?(.*)$/)
-    const time = m ? m[1].slice(11) : '--:--:--'
+    // core 已统一输出时间戳；解析不到时（如分隔线行）兜底用本机当前时间
+    const time = m ? m[1].slice(11) : new Date().toTimeString().slice(0, 8)
     let text = m ? m[2] : l
     let level = 'info', color = 'text-slate-400', levelColor = 'text-sky-500'
     if (/ERROR|FAILED|panic/i.test(text)) { level = 'error'; color = 'text-red-400'; levelColor = 'text-red-500' }

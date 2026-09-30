@@ -114,7 +114,7 @@ func (w *progressWatcher) refresh() {
 		w.ok = false
 		return
 	}
-	anchors := readSaveAnchors(plat)
+	anchors := currentGame.SaveAnchors(plat)
 	if len(anchors) == 0 {
 		if !w.init {
 			fmt.Println("  [progress] no usable save file yet - will watch for it")

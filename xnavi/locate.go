@@ -456,7 +456,7 @@ func locate(pid uint32, window float64, onlyBlocks []MemBlock, logf func(string)
 		return nil
 	}
 
-	anchors := readSaveAnchors(plat)
+	anchors := currentGame.SaveAnchors(plat)
 	var refs [][3]float32
 	if len(anchors) > 0 {
 		primary := anchors[0]
@@ -555,23 +555,10 @@ func locate(pid uint32, window float64, onlyBlocks []MemBlock, logf func(string)
 	}
 }
 
-// decodeTripleAt 读 12 字节并端序解码 + 游戏校验 → 展示序 (gx, gz, alt)；无效返回 nil。
+// decodeTripleAt 读 12 字节并端序解码 + 游戏校验 → 展示序三元组；无效返回 nil。
+// 已委托游戏适配层（currentGame.DecodeAt）：BOTW 实现见 game_botw.go（原逻辑原样平移）。
 func decodeTripleAt(h uintptr, addr uintptr) []float32 {
-	d := readMem(h, addr, 12)
-	if len(d) < 12 {
-		return nil
-	}
-	plat := currentPlatform()
-	var x, alt, z float32
-	if plat != nil && !plat.LittleEndian() {
-		x = math.Float32frombits(uint32(d[0])<<24 | uint32(d[1])<<16 | uint32(d[2])<<8 | uint32(d[3]))
-		alt = math.Float32frombits(uint32(d[4])<<24 | uint32(d[5])<<16 | uint32(d[6])<<8 | uint32(d[7]))
-		z = math.Float32frombits(uint32(d[8])<<24 | uint32(d[9])<<16 | uint32(d[10])<<8 | uint32(d[11]))
-	} else {
-		a := floats(d[:12])
-		x, alt, z = a[0], a[1], a[2]
-	}
-	return gameHud(x, alt, z)
+	return currentGame.DecodeAt(h, addr)
 }
 
 func shortlistAddrs(sl []ShortlistEntry) int {

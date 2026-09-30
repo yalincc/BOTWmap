@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 )
 
 const (
@@ -97,15 +96,21 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 	}
 }
 
-// findSaveFiles 在根目录下递归找 game_data.sav（不区分大小写）。
-func findSaveFiles(root string) []string {
+// findSaveFiles 在根目录下递归找当前游戏存档文件（不区分大小写）。
+// 文件名清单来自游戏适配层（game.SaveFileNames），TOTK 为 progress.sav/caption.sav。
+func findSaveFiles(root string, names []string) []string {
 	var out []string
 	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-		if !d.IsDir() && strings.EqualFold(d.Name(), "game_data.sav") {
-			out = append(out, p)
+		if !d.IsDir() {
+			for _, n := range names {
+				if strings.EqualFold(d.Name(), n) {
+					out = append(out, p)
+					break
+				}
+			}
 		}
 		return nil
 	})
@@ -119,12 +124,13 @@ func setSaveDirOverride(d string) { saveDirOverride = d }
 
 // allSaveFiles 遍历当前平台所有存档根候选（去重、排序）。
 func allSaveFiles(p Platform) []string {
+	names := currentGame.SaveFileNames()
 	var out []string
 	if saveDirOverride != "" {
-		out = append(out, findSaveFiles(saveDirOverride)...)
+		out = append(out, findSaveFiles(saveDirOverride, names)...)
 	}
 	for _, root := range p.SaveRoots() {
-		out = append(out, findSaveFiles(root)...)
+		out = append(out, findSaveFiles(root, names)...)
 	}
 	seen := map[string]bool{}
 	var uniq []string
@@ -136,51 +142,6 @@ func allSaveFiles(p Platform) []string {
 	}
 	sort.Strings(uniq)
 	return uniq
-}
-
-// readSaveAnchors 返回定位扫描锚点（内存序 (X, alt, Z)），按平台主档策略：
-//   - Ryujinx：全部有效档按 playtime 降序（同位置去重，保留最高 playtime）
-//   - Cemu：mtime 最新档（有效则）单锚
-// 锚点数组用于 locate 的窗口中心候选；主档 = anchors[0]。
-func readSaveAnchors(p Platform) []*SaveAnchor {
-	files := allSaveFiles(p)
-	switch p.Name() {
-	case "Cemu":
-		best, bestT := "", time.Time{}
-		for _, f := range files {
-			if fi, err := os.Stat(f); err == nil && fi.ModTime().After(bestT) {
-				best, bestT = f, fi.ModTime()
-			}
-		}
-		if best == "" {
-			return nil
-		}
-		_, a := parseGameData(best)
-		if a == nil {
-			return nil
-		}
-		return []*SaveAnchor{a}
-	default: // Ryujinx / 兜底
-		var out []*SaveAnchor
-		seen := map[[3]int32]int{}
-		for _, f := range files {
-			_, a := parseGameData(f)
-			if a == nil {
-				continue
-			}
-			key := [3]int32{int32(round1(a.Pos[0])), int32(round1(a.Pos[2])), int32(round1(a.Pos[1]))}
-			if i, ok := seen[key]; ok {
-				if a.Playtime > out[i].Playtime { // 同位置多个槽：保留游玩时间最高者
-					out[i] = a
-				}
-				continue
-			}
-			seen[key] = len(out)
-			out = append(out, a)
-		}
-		sort.Slice(out, func(i, j int) bool { return out[i].Playtime > out[j].Playtime })
-		return out
-	}
 }
 
 // round1 四舍五入到 1 位小数（×10 取整）。
