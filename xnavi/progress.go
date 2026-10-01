@@ -147,6 +147,12 @@ func (w *progressWatcher) refresh() {
 		w.ok = false
 		return
 	}
+	// Q14 存档隔离：TOTK 模式下 BOTW watcher 完全待机
+	// （此前经 currentGame.SaveFileNames() 误读 TOTK 的 caption.sav）
+	if currentGame != nil && currentGame.Name() == "totk" {
+		w.ok = false
+		return
+	}
 	anchors := currentGame.SaveAnchors(plat)
 	if len(anchors) == 0 {
 		if !w.init {

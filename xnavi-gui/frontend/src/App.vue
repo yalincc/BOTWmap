@@ -161,7 +161,7 @@
   </div>
 </template>
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 const api = window.go.main.App
 const rt = window.runtime
 const ver = ref('v2.0.0')
@@ -298,6 +298,9 @@ function onFirstVerified() {
 }
 function parseState(line) {
   const s = line
+  // Q13：新 core 会话（platform selected）→ 重置地图自动打开标记，
+  // 否则切换游戏后（TOTK 开过地图 → BOTW 锁定）不再自动打开新游戏地图
+  if (/platform\]\s*selected/.test(s)) { mapAutoOpened.value = false }
   if (/fixed offset.*confirmed/.test(s)) {
     stateText.value = '已验证 · 跟随中'
     setStep(3, '已锁定'); scanPercent.value = 100
@@ -309,7 +312,12 @@ function parseState(line) {
   }
   else if (/probe -> switched/.test(s)) { stateText.value = '已锁定 · 探针换活组'; setStep(2, '验证移动'); scanPercent.value = 80 }
   else if (/scan -> lock/.test(s)) { stateText.value = '已锁定 · 待移动确认'; setStep(2, '验证移动'); scanPercent.value = 70 }
-  else if (/structural scan|trying fixed/.test(s)) { stateText.value = '定位中...'; setStep(1, '扫描中'); scanPercent.value = 30 }
+  else if (/structural scan|trying fixed/.test(s)) {
+    // Q14：后台重扫（锁定期间）也含 "structural scan" 字样——已锁定/跟随中不回退状态
+    if (!/跟随中|已锁定/.test(stateText.value)) {
+      stateText.value = '定位中...'; setStep(1, '扫描中'); scanPercent.value = 30
+    }
+  }
   else if (/UNLOCKED/.test(s)) { stateText.value = '未锁定'; setStep(0, '就绪'); scanPercent.value = 0; mapAutoOpened.value = false }
 }
 let offLogs
@@ -356,4 +364,6 @@ onMounted(async () => {
   })
 })
 onUnmounted(() => { if (offLogs) offLogs() })
+// Q13：识别游戏变化（如 totk→botw）→ 重置地图自动打开标记
+watch(detectedGame, () => { mapAutoOpened.value = false })
 </script>

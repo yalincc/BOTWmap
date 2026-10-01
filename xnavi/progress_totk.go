@@ -405,6 +405,11 @@ func newTotkProgressWatcher() *totkProgressWatcher {
 func (w *totkProgressWatcher) refresh() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	// Q14 存档隔离：非 TOTK 模式（BOTW/Cemu）下本 watcher 完全待机
+	if currentGame == nil || currentGame.Name() != "totk" {
+		w.ok = false
+		return
+	}
 	mt, path := totkFindLatestProgress()
 	if path == "" {
 		if !w.init {

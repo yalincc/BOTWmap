@@ -170,7 +170,6 @@ const LIVE = (() => {
     const done = new Set();
     for (const mk of map.markers) {
       const t = DONE_TYPES[mk.cat];
-      if (!t) continue;
       const cx = Math.floor(mk.px[0] / CELL), cy = Math.floor(mk.px[1] / CELL);
       let hit = false;
       for (let dx = -1; dx <= 1 && !hit; dx++) {
@@ -184,7 +183,14 @@ const LIVE = (() => {
           }
         }
       }
-      if (hit) done.add(mk.id);
+      if (hit) {
+        done.add(mk.id);
+      } else if (!t && map.doneSet.has(mk.id)) {
+        // Q13：存档未覆盖的类别（宝箱/EX 宝箱/材料/自定义等）——服务器无判据，
+        // 本地手动标记为准（doneSet 持久化），不再被每次同步抹掉；
+        // 五大可收集类仍严格以存档为准（设计初衷不变）
+        done.add(mk.id);
+      }
     }
     const changed = map.liveDone.size !== done.size;
     map.liveDone = done;

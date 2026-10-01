@@ -314,7 +314,10 @@ func stateMachine() {
 	lastConsensusAt := time.Time{}
 	consensusCand := uintptr(0) // 冻结共识候选（需"动了"才换锁）
 	var consensusCandPos [3]float32
-	frozenLimit := int(currentGame.FrozenRescanAfter() / smTick) // 冻结重扫阈值（按游戏策略：BOTW 30s / TOTK 90s）
+	// Q14：FrozenRescanAfter<=0 = 彻底禁用冻结兜底（BOTW 固定偏移是活副本永不失效，
+	// 站立零扫描）。此前阈值 0 时 frozenN>=0 恒真，导致 BOTW/Cemu 锁定后每 60s 强制重扫
+	frozenEnabled := currentGame.FrozenRescanAfter() > 0
+	frozenLimit := int(currentGame.FrozenRescanAfter() / smTick)
 	// Q10 根治：冻结 → 后台重扫（不解锁、不清显示）。站立不动时副本无写入属正常
 	// （TOTK 只在移动时写位置），解锁重扫会把红点甩到副本数最多的静态结构上。
 	// 后台扫描+探针：玩家真移动时探针自动切活副本（mv≥3），站立时什么都不变。
@@ -582,6 +585,10 @@ func stateMachine() {
 				}
 			if probing && time.Since(probeStart) > probeLife {
 				probing = false
+				// Q13：一轮完整观察周期结束 → 冻结计数清零。站立不动时 500 组
+				// 全无移动属正常（副本只在移动时写入），清零避免后台重扫反复触发；
+				// 玩家动起来后下一个 90s 冻结周期内的探针会抓到移动组
+				frozenN = 0
 				// Q7 诊断：探针到期仍没切组——打印有移动计数的组，判断活组是否在观察名单
 				moved := 0
 				for gi, mv := range probeMoved {
@@ -767,7 +774,7 @@ func stateMachine() {
 		// （frozenN≥frozenTicks）时，在锚块 known 偏移里找与本锁差 >15m 的
 		// ≥consensusMin 成员一致簇作候选；候选在下一次检查"动了"（活副本证明）
 		// 才换锁——玩家站桩绝不误换，玩家一动 1~2s 内自愈。
-		if frozenN >= frozenLimit && time.Since(lastConsensusAt) >= consensusEvery {
+		if frozenEnabled && frozenN >= frozenLimit && time.Since(lastConsensusAt) >= consensusEvery {
 			lastConsensusAt = time.Now()
 			a2, v2, ok := consensusCopy(h, a)
 			if !ok {
