@@ -459,8 +459,13 @@ func stateMachine() {
 			if !currentGame.PreferScanOnUnlock() && len(currentGame.KnownOffsets(p)) > 0 && time.Since(lastFixedTry) > 2*time.Second {
 				offsets := currentGame.KnownOffsets(p)
 				lastFixedTry = time.Now()
+				blkT0 := time.Now()
 				blks := p.Blocks(256.0)
-				fmt.Printf("  [sm] trying fixed offsets on %d blocks:\n", len(blks))
+				blkMs := float64(time.Since(blkT0).Microseconds()) / 1000.0
+				fmt.Printf("  [sm] trying fixed offsets on %d blocks (enum %.0fms):\n", len(blks), blkMs)
+				for bi, b := range blks {
+					fmt.Printf("    blk[%d] base=0x%X size=%dMB\n", bi, b.Base, b.Size/1048576)
+				}
 				var cands []OffsetCand
 				for _, blk := range blks {
 					for _, off := range offsets {
@@ -468,13 +473,25 @@ func stateMachine() {
 						d := currentGame.DecodeAt(h, addr)
 						if d == nil && !currentGame.PreferScanOnUnlock() {
 							// Q19（BOTW 传送后实测）：槽位被高频交替写入（玩家数据+无效数据
-							// 轮流），单次 DecodeAt 100% 踩中无效相位，而紧随的重读全是有效
-							// 玩家坐标（x 随走动漂移、alt 恒定）——给 4 次 250ms 二次采样，
-							// 任一有效立即采用。TOTK 走扫描优先不受影响（保持快速失败）。
-							for i := 0; i < 4; i++ {
-								time.Sleep(250 * time.Millisecond)
-								if d = currentGame.DecodeAt(h, addr); d != nil {
-									break
+							// 轮流），单次 DecodeAt 会踩中无效相位，紧随的重读是有效玩家
+							// 坐标 —— 二次采样确实需要。
+							//
+							// 但旧实现对"任何 DecodeAt 失败"一律重试 4×250ms。DecodeAt 失败
+							// 有性质完全不同的两种原因：
+							//   (a) RPM 读不到字节 —— 传送/加载期页保护瞬变，重试有意义（Q19 本意）
+							//   (b) 读到了但坐标非法 —— 该块根本不是坐标所在，重试永远不会成功
+							// stateMachine 是单 goroutine 200ms 一拍的主循环，(b) 会让每个非
+							// 目标块白睡 1 秒；N 个块时主循环近乎全瘫 —— 表现为卡顿、且定位
+							// 永久起不来（后续 unlocked→scan 的节拍全被拖住）。
+							//
+							// 修正：(b) 立即跳过不做任何等待；(a) 保留重试但退避上限压到
+							// 3×40ms=120ms，不再长时间占据主循环。
+							if raw := readMem(h, addr, 12); len(raw) < 12 {
+								for i := 0; i < 3; i++ {
+									time.Sleep(40 * time.Millisecond)
+									if d = currentGame.DecodeAt(h, addr); d != nil {
+										break
+									}
 								}
 							}
 						}
