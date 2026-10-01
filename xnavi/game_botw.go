@@ -72,8 +72,11 @@ func gameValidTriple(x, alt, z float32) bool {
 		alt <= gameMinAlt || alt >= gameMaxAlt {
 		return false
 	}
-	// BOTW 地图坐标在千位级，排除 (30,80,100) 这种引擎内部小向量
-	if abs32(x) < 100 || abs32(z) < 100 {
+	// BOTW 地图坐标在千位级，排除 (30,80,100) 这种引擎内部小向量。
+	// Q20 修正：原为 |x|<100 || |z|<100（单轴即拒），导致传送/行走到地图中心带
+	// （|x|<100，如 x=-28）的合法玩家坐标被当垃圾拒绝——固定偏移永远锁不上、
+	// 解码循环死转。改为三轴都小才拒（引擎小向量三轴皆小，玩家位置 z 或 alt 必大）。
+	if abs32(x) < 100 && abs32(z) < 100 && alt < 100 {
 		return false
 	}
 	return true

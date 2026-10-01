@@ -466,6 +466,18 @@ func stateMachine() {
 					for _, off := range offsets {
 						addr := blk.Base + off
 						d := currentGame.DecodeAt(h, addr)
+						if d == nil && !currentGame.PreferScanOnUnlock() {
+							// Q19（BOTW 传送后实测）：槽位被高频交替写入（玩家数据+无效数据
+							// 轮流），单次 DecodeAt 100% 踩中无效相位，而紧随的重读全是有效
+							// 玩家坐标（x 随走动漂移、alt 恒定）——给 4 次 250ms 二次采样，
+							// 任一有效立即采用。TOTK 走扫描优先不受影响（保持快速失败）。
+							for i := 0; i < 4; i++ {
+								time.Sleep(250 * time.Millisecond)
+								if d = currentGame.DecodeAt(h, addr); d != nil {
+									break
+								}
+							}
+						}
 						if d == nil {
 							// 区分"读内存失败"与"读到但坐标非法"，原始字节直接进日志，
 							// 便于判断游戏是否处于传送/加载的数据异常期。
