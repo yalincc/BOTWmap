@@ -3,7 +3,7 @@
     <header class="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-slate-800 shrink-0">
       <div class="flex items-center space-x-2 text-sm font-semibold tracking-wide">
         <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
-        <span class="text-white">xnavi - BOTW 定位导航</span>
+        <span class="text-white">Xnavi 游戏定位导航</span>
         <span class="text-xs text-slate-400 font-mono">{{ ver }}</span>
       </div>
       <div class="flex items-center space-x-4 text-xs">
@@ -147,7 +147,7 @@
     <div v-if="showAbout" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showAbout = false">
       <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-96 text-xs space-y-2">
         <div class="text-sm font-bold text-white mb-2">关于 xnavi</div>
-        <div class="text-slate-300">BOTW 通用定位导航（Cemu + Ryujinx）</div>
+        <div class="text-slate-300">多游戏定位导航（BOTW + TOTK × Cemu + Ryujinx）</div>
         <div class="text-slate-400">版本：{{ ver }}</div>
         <div class="text-slate-400">地图：<a :href="mapUrl" class="text-blue-400 hover:underline">{{ mapUrl.replace('https://','').replace('/','') }}</a></div>
         <div class="text-slate-400">GitHub：<a href="https://github.com/yalincc/BOTWmap" class="text-blue-400 hover:underline">yalincc/BOTWmap</a></div>
@@ -164,7 +164,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 const api = window.go.main.App
 const rt = window.runtime
-const ver = ref('v2.0.0')
+const ver = ref('v2.2.1')
 const coreRunning = ref(false)
 const syncText = ref('等待坐标流')
 const syncDot = ref('bg-slate-600')
@@ -288,13 +288,22 @@ function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
   rt.EventsEmit("update:check");
 }
-async function openMap() { rt.BrowserOpenURL(mapUrl.value) }
+// 协议 v1（2026-10-01）：导航发起打开地图 → URL 追加 follow=1&game=<识别的游戏>。
+// game 优先级：core 识别结果 detectedGame → GUI 配置 env.game（auto 时兜底 botw）。
+// core 侧 map_url 保持裸地址（不变式：参数一律由 GUI 拼，避免 core/GUI 版本耦合）。
+function buildMapUrl() {
+  let g = detectedGame.value
+  if (!g || g === 'auto') g = (env.game && env.game !== 'auto') ? env.game : 'botw'
+  const sep = mapUrl.value.includes('?') ? '&' : '?'
+  return `${mapUrl.value}${sep}follow=1&game=${g}`
+}
+async function openMap() { rt.BrowserOpenURL(buildMapUrl()) }
 async function openLogDir() { await api.OpenLogDir() }
 async function exportDiag() { await api.ExportDiagnostics() }
 function onFirstVerified() {
   if (mapAutoOpened.value) return
   mapAutoOpened.value = true
-  rt.BrowserOpenURL(mapUrl.value)
+  rt.BrowserOpenURL(buildMapUrl())
 }
 function parseState(line) {
   const s = line

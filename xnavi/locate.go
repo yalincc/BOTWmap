@@ -434,12 +434,16 @@ func groupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 	}
 	// Q12 覆盖面扩展：实时副本是"小组"（副本数 1~3），玩家移动中位置历史打散，
 	// 会被大静态组压制在 30 名以外——探针只看 top30 就会"30 组全部没动"。
-	// 附加观察 rank 31~500 的每组首个地址（探针成本 +470 次 RPM/拍，可忽略），
-	// 保证在动的组无论副本数多少都进探针视野。byCopies[30:] 仍按副本数降序。
+	// 附加观察 rank 31~500：每组前 12 个地址（Q15 只盯 1 个会错过实时镜像；
+	// Q16 提到 12——典型小组成员数 8~12，基本全覆盖，成本 ~6400 次 RPM/拍仍可忽略）
 	for i := 30; i < len(byCopies) && i < 500; i++ {
 		g := byCopies[i]
 		if len(g.Addrs) == 0 {
 			continue
+		}
+		nAddr := len(g.Addrs)
+		if nAddr > 12 {
+			nAddr = 12
 		}
 		shortlist = append(shortlist, ShortlistEntry{
 			Hud:    [3]float32{g.X, g.Z, g.Y},
@@ -447,7 +451,7 @@ func groupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 			Struct: g.Struct,
 			Dist:   g.Dist,
 			Slot:   g.Ri,
-			Addrs:  g.Addrs[:1],
+			Addrs:  g.Addrs[:nAddr],
 		})
 	}
 	return top, shortlist

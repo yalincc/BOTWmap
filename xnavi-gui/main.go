@@ -15,7 +15,7 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:     "xnavi · BOTW 定位导航",
+		Title:     "Xnavi 游戏定位导航",
 		Width:     920,
 		Height:    680,
 		MinWidth:  720,

@@ -232,7 +232,7 @@ const (
 	scanCooldown   = 15 * time.Second
 	knownRetry     = 1 * time.Second
 	probeEvery     = 600 * time.Millisecond
-	probeMoveN     = 3
+	probeMoveN     = 2 // Q15: 3→2——实时镜像在慢快照组里只贡献少量 mv，3 票门槛切不过去（18:06 实测 mv=1 卡死）；误切由移动确认淘汰
 	probeLife      = 60 * time.Second
 	probeAddrCap   = 24
 	probeNearDist  = 50.0
@@ -328,6 +328,16 @@ func stateMachine() {
 	// 可能是冻结的旧条目，实时条目在其他下标——换锁必须锁"组内动得最多的地址"，
 	// 否则锁到旧槽位（每 ~30s 环回写一次才更新，表现为红点 10~30s 才跳一次）
 	probeAddrMoves := map[uintptr]int{}
+	// Q15 重装填次数上限：探针到期"有 mover 但没到门槛"时立即重装填再观察一轮；
+	// 但 NPC 持续走动会让 mover 永远存在 → 探针空转（持续 RPM 读）→ 游戏掉帧。
+	// 每轮锁定最多重装填 2 次，之后停探针等下一个 180s 冻结周期
+	probeRearms := 0
+	// Q16 乒乓拉黑：锁到的地址若在两个固定位置间来回跳（玩家镜像被多数据源
+	// 轮流写），拉黑后探针跳过它找下一个候选；10 分钟后自动解禁
+	probeBlacklist := map[uintptr]time.Time{}
+	// 乒乓检测用：>100m 瞬跳时记录跳前位置（cap 4），cur 若与历史值重合 = A→B→A
+	ppHist := [][3]float32{}
+	ppReprobe := false
 
 	resetFollow := func() {
 		prev, hasPrev = [3]float32{}, false
@@ -489,6 +499,7 @@ func stateMachine() {
 					probeStart = time.Now()
 					probeLast = time.Now()
 					probeLockGi = 0
+					probeRearms = 0
 					fmt.Printf("  [sm] scan -> lock 0x%X copies=%d [probing top %d, waiting move confirm]\n",
 						addr, best.Copies, len(shortlist))
 				} else {
@@ -523,6 +534,12 @@ func stateMachine() {
 
 		if probing && time.Since(probeLast) >= probeEvery {
 			probeLast = time.Now()
+			// Q16：拉黑名单清理（10 分钟解禁，防止名单无限增长）
+			for ad, t := range probeBlacklist {
+				if time.Since(t) > 10*time.Minute {
+					delete(probeBlacklist, ad)
+				}
+			}
 			for gi, g := range probeGroups {
 				n := len(g.Addrs)
 				if n > probeAddrCap {
@@ -530,6 +547,9 @@ func stateMachine() {
 				}
 				for i := 0; i < n; i++ {
 					adr := g.Addrs[i]
+					if _, bad := probeBlacklist[adr]; bad {
+						continue
+					}
 					d := currentGame.DecodeAt(h, adr)
 					if d == nil {
 						continue
@@ -556,20 +576,33 @@ func stateMachine() {
 					}
 				}
 				if bestGi >= 0 {
-					// Q7：锁"组内移动最多的地址"而非 Addrs[0]——位置历史环形缓冲里
-					// Addrs[0] 可能是冻结旧条目（每 ~30s 环回才更新），实时条目在其他下标
-					adr := probeGroups[bestGi].Addrs[0]
-					bestAdrMv := probeAddrMoves[adr]
-					nCap := len(probeGroups[bestGi].Addrs)
-					if nCap > probeAddrCap {
-						nCap = probeAddrCap
+				// Q7：锁"组内移动最多的地址"而非 Addrs[0]——位置历史环形缓冲里
+				// Addrs[0] 可能是冻结旧条目（每 ~30s 环回才更新），实时条目在其他下标
+				adr := probeGroups[bestGi].Addrs[0]
+				bestAdrMv := probeAddrMoves[adr]
+				nCap := len(probeGroups[bestGi].Addrs)
+				if nCap > probeAddrCap {
+					nCap = probeAddrCap
+				}
+				for i := 0; i < nCap; i++ {
+					ad := probeGroups[bestGi].Addrs[i]
+					if _, bad := probeBlacklist[ad]; bad {
+						continue
 					}
-					for i := 0; i < nCap; i++ {
-						ad := probeGroups[bestGi].Addrs[i]
-						if m := probeAddrMoves[ad]; m > bestAdrMv {
-							bestAdrMv, adr = m, ad
-						}
+					if m := probeAddrMoves[ad]; m > bestAdrMv {
+						bestAdrMv, adr = m, ad
 					}
+				}
+				// Q16：被拉黑地址不得成为换锁目标（整组全拉黑时 mv 无法累积、组不会被选中）
+				if _, bad := probeBlacklist[adr]; bad {
+					bestGi = -1
+				}
+				// Q16：目标地址自身至少 2 次移动才换锁——只动过 1 次可能是多数据源
+				// 共享槽位的偶发写入（19:08 实测 addrMv=1 切过去后乒乓跳）
+				if bestGi >= 0 && bestAdrMv < 2 {
+					bestGi = -1
+				}
+				if bestGi >= 0 {
 					if d := currentGame.DecodeAt(h, adr); d != nil {
 						// 哪个在动就切到哪个（不限制距离，因为锁的位置可能本身就是错的静态候选）
 						// 切到后不直接 verified，等移动确认
@@ -583,13 +616,10 @@ func stateMachine() {
 							bestGi, probeGroups[bestGi].Copies, adr, bestAdrMv, d[0], d[1], d[2])
 					}
 				}
+			}
 			if probing && time.Since(probeStart) > probeLife {
-				probing = false
-				// Q13：一轮完整观察周期结束 → 冻结计数清零。站立不动时 500 组
-				// 全无移动属正常（副本只在移动时写入），清零避免后台重扫反复触发；
-				// 玩家动起来后下一个 90s 冻结周期内的探针会抓到移动组
-				frozenN = 0
-				// Q7 诊断：探针到期仍没切组——打印有移动计数的组，判断活组是否在观察名单
+				// Q15：到期时有组在动（mv>0）但没到门槛 → 立即重装填再观察一轮，
+				// 不再等 90s 冻结重扫（玩家持续移动时能更快切到实时镜像）
 				moved := 0
 				for gi, mv := range probeMoved {
 					if mv > 0 && gi < len(probeGroups) {
@@ -601,7 +631,23 @@ func stateMachine() {
 					}
 				}
 				if moved == 0 {
+					probing = false
+					// Q13：一轮完整观察周期结束 → 冻结计数清零。站立不动时 500 组
+					// 全无移动属正常（副本只在移动时写入），清零避免后台重扫反复触发；
+					// 玩家动起来后下一个 90s 冻结周期内的探针会抓到移动组
+					frozenN = 0
 					fmt.Printf("  [sm] probe expired: %d groups watched, none moved\n", len(probeGroups))
+				} else if probeRearms < 2 {
+					probeRearms++
+					probeMoved = make([]int, len(probeGroups))
+					probeBase = map[uintptr][3]float32{}
+					probeAddrMoves = map[uintptr]int{}
+					probeStart = time.Now()
+					fmt.Printf("  [sm] probe expired with %d mover(s) below threshold -> rearm #%d (fresh 60s window)\n", moved, probeRearms)
+				} else {
+					probing = false
+					frozenN = 0
+					fmt.Printf("  [sm] probe rearmed twice with movers below threshold -> stop probing (next freeze cycle)\n")
 				}
 			}
 		}
@@ -632,6 +678,7 @@ func stateMachine() {
 				probeStart = time.Now()
 				probeLast = time.Now()
 				probeLockGi = -1
+				probeRearms = 0
 				for gi := range shortlist {
 					if len(shortlist[gi].Addrs) > 0 && shortlist[gi].Addrs[0] == a {
 						probeLockGi = gi // 当前锁自己的组：探针不切到自己
@@ -690,6 +737,37 @@ func stateMachine() {
 		}
 
 		delta := dist3(cur, prev)
+
+		// Q16 乒乓检测：锁到的地址在两个固定位置间来回跳（A→B→A，每跳 >100m 且瞬发）
+		// = 多数据源共享槽位（19:09~19:24 实测：红点在 (-284,174)↔(-230,20) 反复横跳 15 分钟，
+		// 层判定还被 (0,y,-105) 垃圾值带进地底）——拉黑该地址，立即重启探针换候选
+		if hasPrev && delta > 100 {
+			ppHist = append(ppHist, prev)
+			if len(ppHist) > 4 {
+				ppHist = ppHist[len(ppHist)-4:]
+			}
+			for _, old := range ppHist {
+				if dist3(cur, old) < 1.0 {
+					probeBlacklist[a] = time.Now()
+					fmt.Printf("  [sm] lock 0x%X ping-pong (%.0fm jump back to recent pos) -> blacklist + re-probe\n", a, delta)
+					ppHist = ppHist[:0]
+					probing = true
+					probeMoved = make([]int, len(probeGroups))
+					probeBase = map[uintptr][3]float32{}
+					probeAddrMoves = map[uintptr]int{}
+					probeStart = time.Now()
+					probeLast = time.Now()
+					probeLockGi = -1
+					probeRearms = 0
+					ppReprobe = true
+					break
+				}
+			}
+			if ppReprobe {
+				ppReprobe = false
+				continue
+			}
+		}
 
 		if hasPrev && delta > teleportDist {
 			lock.mu.RLock()

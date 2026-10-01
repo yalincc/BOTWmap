@@ -132,10 +132,12 @@ func (g *gameTotk) PreferScanOnUnlock() bool { return true }
 // （probeLife），探针永远切不到活组；僵尸由冻结兜底（90s 无共识 → 重扫）处理。
 func (g *gameTotk) UnverifiedRescanAfter() time.Duration { return 0 }
 
-// FrozenRescanAfter TOTK 已知副本是周期快照（实测 30s~分钟级更新），30s 阈值
-// 和副本节奏打架（刚要更新就被判冻结重扫 = "锁定后不停扫描"），放宽到 90s。
-// 代价：真传送后位置最长滞后 90s，由传送跳变逻辑（preJump）平滑。
-func (g *gameTotk) FrozenRescanAfter() time.Duration { return 90 * time.Second }
+// FrozenRescanAfter TOTK 已知副本是周期快照（实测 30s~分钟级更新）。v2.2.0 曾放宽到 90s，
+// v2.2.1 再放宽到 180s：结构扫描是全内存突发读（~2.8s、GB/s 级带宽），90s 一次会让
+// Ryujinx 可感知掉帧（用户实测反馈"游戏变卡"）。副本自愈主力已移交探针（Q15 重装填），
+// 冻结重扫只兜底"副本全死"场景，180s 一次可接受；代价：站桩后真传送最坏滞后 180s 才重扫
+// （传送跳变逻辑通常先行接管，实际影响小）。
+func (g *gameTotk) FrozenRescanAfter() time.Duration { return 180 * time.Second }
 
 // totkLiveness 上一轮仲裁的候选坐标（展示序），用于活性判定：
 // 值在两次仲裁之间变过 = 活副本（跟随玩家）；冻结副本（旧会话快照）票数再多
