@@ -20,10 +20,13 @@ import (
 )
 
 const (
-	ptrScanRangeBack = 0x4000            // 指针目标值下界：M-16KB（环基址到当前槽的最大距离）
+	// Q18: 0x4000(16KB) 实测 0 命中（21:11 会话 build failed: no range pointers）——
+	// 环缓冲可能远大于 16KB（全 actor 位置池），加宽到 1MB；代价是候选数上升，
+	// 由解引用+槽位匹配过滤
+	ptrScanRangeBack = 0x100000          // 指针目标值下界：M-1MB（环基址到当前槽的最大距离）
 	ptrScanRangeFwd  = 0x10              // 上界：M+16B
 	ptrScanMaxLog    = 8                 // 日志最多列出的基址数
-	ptrRingWindow    = 0x4000            // 环窗口大小（解引用后读取的字节数）
+	ptrRingWindow    = 0x4000            // S1 报告的默认解引用窗口
 )
 
 type ptrHit struct {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"syscall"
+	"time"
 	"unicode/utf16"
 	"unsafe"
 )
@@ -160,14 +161,21 @@ func vqRetry(h uintptr, addr uintptr, mbi *MemoryBasicInformation) bool {
 }
 
 // readMem 读取进程内存，成功返回实际读到的字节，失败返回 nil。
+// 带 3 次重试（1ms 间隔）：模拟器传送/加载时会瞬时切换页保护（decommit/recommit），
+// 单次 RPM 会瞬时失败——实测 BOTW 传送后固定偏移读数全部瞬时失败导致定位死循环。
 func readMem(h uintptr, addr uintptr, size int) []byte {
 	buf := make([]byte, size)
 	var got uintptr
-	r, _, _ := procReadProcessMemory.Call(h, addr, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), uintptr(unsafe.Pointer(&got)))
-	if r == 0 {
-		return nil
+	for attempt := 0; attempt < 3; attempt++ {
+		r, _, _ := procReadProcessMemory.Call(h, addr, uintptr(unsafe.Pointer(&buf[0])), uintptr(size), uintptr(unsafe.Pointer(&got)))
+		if r != 0 && got != 0 {
+			return buf[:got]
+		}
+		if attempt < 2 {
+			time.Sleep(time.Millisecond)
+		}
 	}
-	return buf[:got]
+	return nil
 }
 
 func setConsoleTitle(title string) {

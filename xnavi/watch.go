@@ -472,7 +472,9 @@ func stateMachine() {
 							if raw := readMem(h, addr, 12); len(raw) < 12 {
 								fmt.Printf("    try base=0x%X+0x%X -> RPM failed\n", blk.Base, off)
 							} else {
-								fmt.Printf("    try base=0x%X+0x%X -> invalid coords hex=% X\n", blk.Base, off, raw)
+								// Q17：解码并指出具体拒绝原因（RPM 瞬时失败 vs 边界拒绝 vs 撕裂读）
+								fmt.Printf("    try base=0x%X+0x%X -> decode rejected (%s) hex=% X\n",
+									blk.Base, off, gameTripleRejectReason(raw, p.LittleEndian()), raw)
 							}
 							continue
 						}

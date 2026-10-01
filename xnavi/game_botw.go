@@ -81,6 +81,37 @@ func gameValidTriple(x, alt, z float32) bool {
 
 // gameHud 校验并转换内存序 (X, alt, Z) → 展示序 (gx=X, gy=alt, gz=Z)。无效返回 nil。
 // V2.2.0 P2 统一序：DecodeAt 直接返回展示序，Display 恒等（原先返回 (X,Z,alt) 由 Display 再交换）。
+// gameTripleRejectReason 诊断用：解码 12 字节并返回被拒原因（Q17）。
+// 传送/加载期页保护瞬时切换会造成 RPM 瞬时失败或撕裂读，此函数让日志直接可判。
+func gameTripleRejectReason(raw []byte, littleEndian bool) string {
+	if len(raw) < 12 {
+		return "short-read"
+	}
+	var x, alt, z float32
+	if littleEndian {
+		a := floats(raw[:12])
+		x, alt, z = a[0], a[1], a[2]
+	} else {
+		x = math.Float32frombits(uint32(raw[0])<<24 | uint32(raw[1])<<16 | uint32(raw[2])<<8 | uint32(raw[3]))
+		alt = math.Float32frombits(uint32(raw[4])<<24 | uint32(raw[5])<<16 | uint32(raw[6])<<8 | uint32(raw[7]))
+		z = math.Float32frombits(uint32(raw[8])<<24 | uint32(raw[9])<<16 | uint32(raw[10])<<8 | uint32(raw[11]))
+	}
+	switch {
+	case x != x || alt != alt || z != z:
+		return fmt.Sprintf("NaN (%g,%g,%g)", x, alt, z)
+	case math.Abs(float64(x)) < 1e-20 || math.Abs(float64(z)) < 1e-20:
+		return fmt.Sprintf("denormal (%g,%g,%g)", x, alt, z)
+	case x <= gameMinX || x >= gameMaxX:
+		return fmt.Sprintf("x out of bounds (%g,%g,%g)", x, alt, z)
+	case z <= gameMinZ || z >= gameMaxZ:
+		return fmt.Sprintf("z out of bounds (%g,%g,%g)", x, alt, z)
+	case alt <= gameMinAlt || alt >= gameMaxAlt:
+		return fmt.Sprintf("alt out of bounds (%g,%g,%g)", x, alt, z)
+	default:
+		return fmt.Sprintf("valid-looking (%g,%g,%g) — RPM 撕裂/瞬时失败嫌疑", x, alt, z)
+	}
+}
+
 func gameHud(x, alt, z float32) []float32 {
 	if !gameValidTriple(x, alt, z) {
 		return nil

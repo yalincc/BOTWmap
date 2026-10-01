@@ -36,6 +36,7 @@ const (
 type totkChainRecord struct {
 	PtrOff  uintptr   `json:"ptr_off_in_block"` // 指针地址在所属块内的偏移
 	BlkSize uint64    `json:"block_size"`       // 所属块大小（会话间匹配用）
+	WinSize uint64    `json:"win_size"`         // 环窗口字节数（基址→镜像槽+余量）
 	OK      int       `json:"ok_count"`
 	Fail    int       `json:"fail_count"`
 	LastOK  time.Time `json:"last_ok"`
@@ -51,6 +52,7 @@ type totkChainRT struct {
 	PtrAddr uintptr // 指针所在的内存地址（每拍读它得环基址）
 	Rec     totkChainRecord
 
+	WinSize  uintptr    // 环窗口字节数（= M-基址+余量，建链时确定；覆盖到镜像槽）
 	prevWin  []byte     // 上一拍环窗口（差分用）
 	hasPrev  bool
 	out      [3]float32 // 上帧输出
@@ -126,7 +128,10 @@ func totkChainTryKnown(h uintptr, blocks []MemBlock) *totkChainRT {
 		if blkBase == 0 {
 			continue
 		}
-		rt := &totkChainRT{PtrAddr: blkBase + rec.PtrOff, Rec: rec}
+		rt := &totkChainRT{PtrAddr: blkBase + rec.PtrOff, Rec: rec, WinSize: uintptr(rec.WinSize)}
+		if rt.WinSize == 0 || rt.WinSize > 4<<20 {
+			rt.WinSize = chainRingWindow
+		}
 		if _, ok := rt.read(h, blocks); ok {
 			fmt.Printf("  [chain] L1 record ok: ptr=0x%X (blk+0x%X, ok=%d) — 等待移动确认\n",
 				rt.PtrAddr, rec.PtrOff, rec.OK)
@@ -174,6 +179,14 @@ func totkChainBuild(h uintptr, mirror uintptr, coords [3]float32) *totkChainRT {
 			if !stable {
 				continue
 			}
+			// 环窗口：覆盖 基址→镜像槽（Q18：基址可能在镜像前最远 1MB 处）
+			winSize := uintptr(0x1000)
+			if a.Mirror > a.Base {
+				winSize = a.Mirror - a.Base + 0x1000
+			}
+			if winSize > ptrScanRangeBack+0x1000 {
+				winSize = ptrScanRangeBack + 0x1000
+			}
 			// 归属块（持久化用）：指针地址 - 块基址 = 跨会话复用偏移
 			var blkSize uint64
 			var ptrOff uintptr
@@ -189,9 +202,11 @@ func totkChainBuild(h uintptr, mirror uintptr, coords [3]float32) *totkChainRT {
 			}
 			rt := &totkChainRT{
 				PtrAddr: pa,
+				WinSize: winSize,
 				Rec: totkChainRecord{
 					PtrOff:  ptrOff,
 					BlkSize: blkSize,
+					WinSize: uint64(winSize),
 					Note:    fmt.Sprintf("base=0x%X slotHits=%d", a.Base, a.SlotHits),
 				},
 			}
@@ -220,8 +235,8 @@ func (rt *totkChainRT) read(h uintptr, blocks []MemBlock) ([3]float32, bool) {
 	if !addrInBlocks(base, blocks) {
 		return rt.fail(zero)
 	}
-	// 2) 环窗口
-	win := readMem(h, base, chainRingWindow)
+	// 2) 环窗口（窗口大小建链时确定：覆盖 基址→镜像槽）
+	win := readMem(h, base, int(rt.WinSize))
 	if len(win) < 12 {
 		return rt.fail(zero)
 	}
