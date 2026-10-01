@@ -137,6 +137,7 @@ func statusLoop() {
 			"copies":   copies,
 			"lockAddr": fmt.Sprintf("0x%X", addr),
 			"ageSec":   ageSec,
+			"mode":     locModeString(),
 			"counters": map[string]any{
 				"locks":     cntLocks.Load(),
 				"relocates": cntRelocates.Load(),

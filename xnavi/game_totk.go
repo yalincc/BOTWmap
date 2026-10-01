@@ -132,6 +132,9 @@ func (g *gameTotk) PreferScanOnUnlock() bool { return true }
 // （probeLife），探针永远切不到活组；僵尸由冻结兜底（90s 无共识 → 重扫）处理。
 func (g *gameTotk) UnverifiedRescanAfter() time.Duration { return 0 }
 
+// ChainCapable TOTK 启用指针链定位（L1 链列表快路径 → L2 指针扫描建链 → L3 兜底扫描）。
+func (g *gameTotk) ChainCapable() bool { return true }
+
 // FrozenRescanAfter TOTK 已知副本是周期快照（实测 30s~分钟级更新）。v2.2.0 曾放宽到 90s，
 // v2.2.1 再放宽到 180s：结构扫描是全内存突发读（~2.8s、GB/s 级带宽），90s 一次会让
 // Ryujinx 可感知掉帧（用户实测反馈"游戏变卡"）。副本自愈主力已移交探针（Q15 重装填），

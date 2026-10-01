@@ -86,6 +86,16 @@
           <span v-if="scanInfo" class="text-slate-400 ml-2">{{ scanInfo }}</span>
         </div>
       </section>
+      <!-- S3 基准校准（TOTK）：游戏地图读坐标输入，独立于自动定位的手工模块 -->
+      <section class="bg-[#161b22] border border-slate-800 rounded-md p-2.5 shrink-0 flex items-center gap-2 flex-wrap">
+        <span class="text-[11px] font-semibold text-slate-400">基准校准</span>
+        <input v-model="calib.x" placeholder="X" class="w-20 bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none" />
+        <input v-model="calib.y" placeholder="高度" class="w-20 bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none" />
+        <input v-model="calib.z" placeholder="Z" class="w-20 bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none" />
+        <button @click="doCalibrate" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-xs">校准</button>
+        <span v-if="calibMsg" class="text-[11px] text-slate-400">{{ calibMsg }}</span>
+        <span class="text-[10px] text-slate-600 ml-auto">定位模式: {{ locMode || 'idle' }}</span>
+      </section>
       <section class="bg-[#0d1117] border border-slate-800 rounded-md p-2.5 flex flex-col font-mono text-[11px] flex-1 min-h-0">
         <div class="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-800/80 text-slate-400 text-[10px] shrink-0">
           <span>实时日志</span>
@@ -226,6 +236,16 @@ const emuLabel = computed(() => {
 })
 const gameVerLabel = computed(() => '') // BOTW 版本识别（存档版本号）P2b 后接入
 const detectedGame = ref('') // core status.json 上报的实际识别游戏（botw/totk）
+// S3 基准校准（TOTK）：独立手工模块，不影响自动定位
+const calib = reactive({ x: '', y: '', z: '' })
+const calibMsg = ref('')
+const locMode = ref('')
+async function doCalibrate() {
+  const x = parseFloat(calib.x), y = parseFloat(calib.y), z = parseFloat(calib.z)
+  if (isNaN(x) || isNaN(y) || isNaN(z)) { calibMsg.value = '请输入三个数字（游戏地图上的坐标）'; return }
+  calibMsg.value = await api.Calibrate(x, y, z)
+  setTimeout(() => { calibMsg.value = '' }, 15000)
+}
 // 存档卡片五槽标签按游戏切换（TOTK: 龙之泪=回忆位、树根=神兽位）
 const gameLabels = computed(() => {
   const g = detectedGame.value || env.game
@@ -359,6 +379,7 @@ onMounted(async () => {
     }
     if (st.emuVer) emuVer.value = st.emuVer
     if (st.game) detectedGame.value = st.game
+    if (st.mode) locMode.value = st.mode
     if (st.map_url) statusMapUrl.value = st.map_url
     if (st.running && st.ok) {
       syncText.value = '坐标流同步中'

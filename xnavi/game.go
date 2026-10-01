@@ -60,6 +60,11 @@ type Game interface {
 	//     探针永远来不及切到活组；TOTK 的僵尸由冻结兜底（30s 无共识 → 重扫）处理
 	UnverifiedRescanAfter() time.Duration
 
+	// ChainCapable 是否启用指针链定位模式（指针扫描定位方案 v1，2026-10-01）。
+	//   - BOTW=false：固定偏移跨重启验证恒成立，秒锁已稳定，不参与链模式（隔离红线）
+	//   - TOTK=true：走 L1 链列表快路径 → L2 指针扫描建链 → L3 兜底扫描 三级策略
+	ChainCapable() bool
+
 	// FrozenRescanAfter 已验证锁读数冻结多久后触发"共识兜底/重扫"。
 	//   - BOTW=30s（live-go 原口径）
 	//   - TOTK=90s：TOTK 的已知副本全是周期快照（实测 30s~分钟级更新节奏），
