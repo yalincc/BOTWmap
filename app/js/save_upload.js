@@ -105,18 +105,11 @@ const SAVE_UPLOAD = (() => {
       if (f) handleFile(f);
     });
 
-    // 查找表：随页面部署（app/data/ 下），多路径兜底（根部署 / app 子目录部署）
-    const cands = ['data/save_flags.json?v=' + Date.now(),
-                   '../data/save_flags.json?v=' + Date.now(),
-                   './data/save_flags.json?v=' + Date.now()];
-    (async () => {
-      for (const c of cands) {
-        try {
-          const r = await fetch(c, { cache: 'no-store' });
-          if (r.ok) { flags = await r.json(); return; }
-        } catch (e) {}
-      }
-    })();
+    // 查找表：V1.4.4 改由 <script src="data/save_flags.js"> 内联引入（全局 SAVE_FLAGS）。
+    // 此前用 fetch(data/save_flags.json)，file:// 本地部署下 fetch 被浏览器禁止 → 查找表永远
+    // 加载不到 → 报「标志查找表尚未就绪」。script 标签在 file:// 下可用，线上行为不变。
+    flags = (typeof SAVE_FLAGS !== 'undefined') ? SAVE_FLAGS : null;
+    if (!flags) console.warn('[save_upload] SAVE_FLAGS 查找表未加载：index.html 未引入 data/save_flags.js？');
   }
 
   function handleFile(file) {

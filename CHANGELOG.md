@@ -2,6 +2,17 @@
 
 本项目遵循语义化版本（SemVer）：`主版本.次版本.修订号`。
 
+## v1.4.4（2026-10-01）导航配合修复
+
+### 修复
+- **本地部署加载存档报"标志查找表尚未就绪"**：查找表 `save_flags.json` 改由 `data/save_flags.js` 内联引入（全局 `SAVE_FLAGS`），file:// 本地打开也可用（原 fetch JSON 在 file:// 下被浏览器禁止）
+- **从 xnavi 打开地图不跟随视图**：支持 URL 参数 `?follow=1`（导航启动强制开启视图跟随并持久化，手动打开不受影响）——配套协议见《BOTWmap导航配合接口协议 v1》
+- **xnavi 同步后全部标记变未完成**：`/progress` 格式防御——TOTK 口径（无 points）不再被当空进度应用，保留现状并提示；`map.saveLoaded()` 改为 points 口径判定，避免 TOTK counts 误触发只看空 liveDone
+
+### 变更
+- 新增数据文件 `app/data/save_flags.js`（生成脚本 `source/build_save_flags.js`）
+- 与导航程序配合的 URL 参数（follow/game）与 `/pos`、`/progress` 契约统一成文：`归档/docs-过程文档-20260929/BOTWmap导航配合接口协议-URL带参与进度契约-v1.md`（xnavi / TOTKmap 项目组对照实现）
+
 ## navicemu v1.3.0（2026-09-30）最终版
 
 ### 重构

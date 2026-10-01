@@ -448,9 +448,13 @@ class BotwMap {
     return Math.min(Math.max(s, min), max);
   }
 
-  /* 是否已载入存档进度（live 服务 /progress 或手动上传存档） */
+  /* 是否已载入存档进度（live 服务 /progress 或手动上传存档）
+   * V1.4.4：严格以"points 口径"判定——xnavi 在 TOTK 模式 /progress 无 points
+   * （counts 也非空），若仅凭 counts 判定，_mkDone 会只看空的 liveDone，
+   * 把所有标记误显为未完成（线上 Bug3）。pointsLoaded 由 live.js 在成功应用后置位。 */
   saveLoaded() {
-    return !!((this.live && this.live.counts)) || !!window.__saveUploaded;
+    if (window.__saveUploaded) return true;
+    return !!(this.live && this.live.counts && this.live.pointsLoaded);
   }
 
   /* 是否已完成：本地标记完成 或 存档进度（live.js 注入的 liveDone） */

@@ -27,6 +27,17 @@ const LIVE = (() => {
   let follow = false;
   try { follow = localStorage.getItem(K_FOLLOW) !== '0'; } catch (e) {}
 
+  /* V1.4.4 URL 上下文（xnavi 导航程序打开地图时带参，见《BOTWmap导航配合接口协议 v1》）：
+   *   ?follow=1 → 导航启动，强制开启视图跟随并持久化（用户手动设置让位于导航启动意图）
+   *   ?game=    → 导航当前识别的游戏（botw/totk），进度口径选择与提示参考 */
+  const _sp = new URLSearchParams(location.search);
+  if (_sp.get('follow') === '1') {
+    follow = true;
+    try { localStorage.setItem(K_FOLLOW, '1'); } catch (e) {}
+  }
+  const urlGame = _sp.get('game');   // 'botw' | 'totk' | null
+  let progWarned = false;            // TOTK 口径/格式不符提示只弹一次，不刷屏
+
   const CAT_CN = {};                        // 类别 key -> 中文名
   const DONE_TYPES = { shrine: 'shrine', tower: 'tower', seed: 'korok', memory: 'memory', beast: 'beast' };
 
@@ -156,7 +167,21 @@ const LIVE = (() => {
   }
 
   function applyProgress(j) {
-    const points = j.points || [];
+    // V1.4.4 格式防御（线上 Bug3）：xnavi /progress 按当前游戏分两种口径——
+    //   BOTW = points 数组；TOTK = doneIds/mapped/counts（无 points）。
+    // 若不判格式，TOTK 口径会被当成"空进度"应用，把所有已收集标记误清为未完成。
+    // 标准：无 points 数组 → 不应用、保留现状、提示一次。
+    if (!j || !Array.isArray(j.points)) {
+      if (!progWarned) {
+        progWarned = true;
+        UI.toast(urlGame === 'totk'
+          ? '当前 xnavi 识别为 TOTK，进度请查看 totk 地图'
+          : '进度数据格式不符（非 BOTW 口径），已保留当前进度');
+      }
+      return;
+    }
+    map.live.pointsLoaded = true;    // points 口径已成功应用 → saveLoaded 判定依据（map.js）
+    const points = j.points;
     // 已完成点的空间网格（128px 格）
     const CELL = 128;
     const grid = new Map();
