@@ -145,7 +145,7 @@ func statusLoop() {
 			},
 		}
 		if progress != nil {
-			if pok, psum := progress.summarize(); pok {
+			if pok, psum := progressSummarize(); pok {
 				obj["progress"] = psum
 			}
 		}

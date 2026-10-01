@@ -103,20 +103,6 @@ func (p *cemuPlatform) LargestBlock(minMB float64) (uintptr, uintptr) {
 	return cemuLargestRWBlock(p.h)
 }
 
-// DecodeTriple 大端 12 字节 → (X, alt, Z)。
-func (p *cemuPlatform) DecodeTriple(d []byte) (float32, float32, float32, bool) {
-	if len(d) < 12 {
-		return 0, 0, 0, false
-	}
-	x := math.Float32frombits(binary.BigEndian.Uint32(d[0:4]))
-	alt := math.Float32frombits(binary.BigEndian.Uint32(d[4:8]))
-	z := math.Float32frombits(binary.BigEndian.Uint32(d[8:12]))
-	if x == 0 && alt == 0 && z == 0 {
-		return 0, 0, 0, false // 未初始化槽
-	}
-	return x, alt, z, true
-}
-
 // SaveRoots Cemu 存档根候选（按序探测，含便携版与常见安装目录）。
 func (p *cemuPlatform) SaveRoots() []string {
 	var roots []string
@@ -144,12 +130,6 @@ func (p *cemuPlatform) SaveRoots() []string {
 		add(filepath.Join(base, "mlc01", "usr", "save", "00050000"))
 	}
 	return roots
-}
-
-// KnownOffsets Cemu BOTW 已知坐标偏移（相对最大 RW 块 AllocationBase）。
-// 社区公开针位（koko-yl/BotWRamWatch），本机 Cemu 2.6 + JP v208 实测有效。
-func (p *cemuPlatform) KnownOffsets() []uintptr {
-	return []uintptr{0x1055300C, 0xC1F8BF4}
 }
 
 // ---- 内存枚举（Cemu 专属）----

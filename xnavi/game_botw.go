@@ -37,10 +37,11 @@ const (
 	gameMinX, gameMaxX         = -7000.0, 7000.0
 	gameMinZ, gameMaxZ         = -7000.0, 7000.0
 	gameMinAlt, gameMaxAlt     = -600.0, 5000.0
-	gameMatchShrineRadius      = 80.0   // 传送跳变目标与神庙坐标的像素匹配半径（px）
-	gameShrineExit             = 300.0  // 神庙内部坐标上限：|gx|,|gz| 超此判定已离开神庙
-	gameShrineReturnWindow     = 3 * 1000 // ms 回跳撤销窗口（与 live-cemu poll 3s 一致）
-	gameShrineReturnDist       = 50.0   // 米 回跳撤销距离
+	gameMatchShrineRadius      = 80.0     // 传送跳变目标与神庙坐标的像素匹配半径（px）
+	gameShrineExit             = 300.0    // 神庙内部坐标上限：|gx|,|gz| 超此判定已离开神庙
+	gameShrineReturnWindow     = 3 * 1000 // 毫秒：回跳撤销窗口 = 3s（与 live-cemu poll 3s 一致；
+	// P3 曾误作微秒使用导致窗口实际为 3µs，2026-10-01 修正为真正的 3 秒）
+	gameShrineReturnDist = 50.0 // 米 回跳撤销距离
 )
 
 // gameValidTriple 校验内存序三元组 (X, alt, Z) 是否为合法玩家坐标。
@@ -220,7 +221,9 @@ func (g *gameBotw) MatchShrine(gx, gy, gz float32) *ProgressPoint {
 }
 
 func (g *gameBotw) ShrineReturn() (time.Duration, float32) {
-	return gameShrineReturnWindow, gameShrineReturnDist
+	// P3 单位修正：gameShrineReturnWindow 数值为毫秒，原样返回 = 3µs（bug），
+	// 现在真正返回 3s——神庙回跳撤销窗口恢复设计行为（BOTW 神庙场景需回归测试）
+	return gameShrineReturnWindow * time.Millisecond, gameShrineReturnDist
 }
 
 // SaveAnchors = 原 savefile.go readSaveAnchors 逻辑原样平移。

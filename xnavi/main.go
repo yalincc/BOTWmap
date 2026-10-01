@@ -127,8 +127,13 @@ func main() {
 	}
 
 	loadConfig()
+	// 进度双 watcher（P2b：三组合存档隔离）——BOTW watcher 只认 game_data.sav，
+	// TOTK watcher 只认 progress.sav（文件名硬编码隔离，与 currentGame 无关），
+	// 两个都常驻轮询，对外按 currentGame 分发（见 server/monitor 的 progressFor）。
 	progress = newProgressWatcher()
 	go progress.loop()
+	totkProgress = newTotkProgressWatcher()
+	go totkProgress.loop()
 
 	// 服务器先于定位启动（踩坑固化：网页端要能第一时间连上）
 	addr := fmt.Sprintf("127.0.0.1:%d", port)

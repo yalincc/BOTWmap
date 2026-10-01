@@ -9,8 +9,6 @@
 package main
 
 import (
-	"encoding/binary"
-	"math"
 	"os"
 	"path/filepath"
 )
@@ -68,20 +66,6 @@ func (p *ryujinxPlatform) LargestBlock(minMB float64) (uintptr, uintptr) {
 	return ryuLargestGuestBlock(p.h, minMB)
 }
 
-// DecodeTriple 小端 12 字节 → (X, alt, Z)。
-func (p *ryujinxPlatform) DecodeTriple(d []byte) (float32, float32, float32, bool) {
-	if len(d) < 12 {
-		return 0, 0, 0, false
-	}
-	x := math.Float32frombits(binary.LittleEndian.Uint32(d[0:4]))
-	alt := math.Float32frombits(binary.LittleEndian.Uint32(d[4:8]))
-	z := math.Float32frombits(binary.LittleEndian.Uint32(d[8:12]))
-	if x == 0 && alt == 0 && z == 0 {
-		return 0, 0, 0, false // 未初始化槽
-	}
-	return x, alt, z, true
-}
-
 // SaveRoots Ryujinx 存档根（Switch 版）。
 func (p *ryujinxPlatform) SaveRoots() []string {
 	appdata := os.Getenv("APPDATA")
@@ -89,13 +73,6 @@ func (p *ryujinxPlatform) SaveRoots() []string {
 		appdata = os.Getenv("USERPROFILE") + "\\AppData\\Roaming"
 	}
 	return []string{filepath.Join(appdata, "Ryujinx", "bis", "user", "save")}
-}
-
-// KnownOffsets Ryujinx BOTW 已知坐标偏移。
-// 0xA77FCBBC: 5次重启样本验证，player = block_base + 0xA77FCBBC 恒成立。
-// 块基址在两个 3GB guest 块间切换，但偏移固定。
-func (p *ryujinxPlatform) KnownOffsets() []uintptr {
-	return []uintptr{0xA77FCBBC}
 }
 
 // ---- 内存枚举（Ryujinx 专属，原 live-go winapi.go）----

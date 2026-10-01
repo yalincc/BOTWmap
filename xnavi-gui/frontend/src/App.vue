@@ -61,11 +61,11 @@
           </div>
           <div class="text-xs text-slate-300 mt-1">{{ emuLabel }}<span v-if="emuVer"> · v{{ emuVer }}</span> · {{ gameDisplayName }}<span v-if="gameVerLabel"> {{ gameVerLabel }}</span></div>
           <div v-if="progressData.counts" class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 font-mono">
-            <div class="text-[12px] text-slate-400">神庙 <span class="text-white font-bold">{{ progressData.counts.shrine[0] }}<span class="text-slate-500">/{{ progressData.counts.shrine[1] }}</span></span></div>
-            <div class="text-[12px] text-slate-400">塔 <span class="text-white font-bold">{{ progressData.counts.tower[0] }}<span class="text-slate-500">/{{ progressData.counts.tower[1] }}</span></span></div>
-            <div class="text-[12px] text-slate-400">呀哈哈 <span class="text-white font-bold">{{ progressData.counts.korok[0] }}<span class="text-slate-500">/{{ progressData.counts.korok[1] }}</span></span></div>
-            <div class="text-[12px] text-slate-400">回忆 <span class="text-white font-bold">{{ progressData.counts.memory[0] }}<span class="text-slate-500">/{{ progressData.counts.memory[1] }}</span></span></div>
-            <div class="text-[12px] text-slate-400">神兽 <span class="text-white font-bold">{{ progressData.counts.beast[0] }}<span class="text-slate-500">/{{ progressData.counts.beast[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">{{ gameLabels.shrine }} <span class="text-white font-bold">{{ progressData.counts.shrine[0] }}<span class="text-slate-500">/{{ progressData.counts.shrine[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">{{ gameLabels.tower }} <span class="text-white font-bold">{{ progressData.counts.tower[0] }}<span class="text-slate-500">/{{ progressData.counts.tower[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">{{ gameLabels.korok }} <span class="text-white font-bold">{{ progressData.counts.korok[0] }}<span class="text-slate-500">/{{ progressData.counts.korok[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">{{ gameLabels.memory }} <span class="text-white font-bold">{{ progressData.counts.memory[0] }}<span class="text-slate-500">/{{ progressData.counts.memory[1] }}</span></span></div>
+            <div class="text-[12px] text-slate-400">{{ gameLabels.beast }} <span class="text-white font-bold">{{ progressData.counts.beast[0] }}<span class="text-slate-500">/{{ progressData.counts.beast[1] }}</span></span></div>
             <div class="text-[12px] text-slate-400">时长 <span class="text-white font-bold">{{ playtimeText }}</span></div>
           </div>
           <div v-else class="mt-2 text-[11px] text-slate-500">等待读取存档...</div>
@@ -226,6 +226,13 @@ const emuLabel = computed(() => {
 })
 const gameVerLabel = computed(() => '') // BOTW 版本识别（存档版本号）P2b 后接入
 const detectedGame = ref('') // core status.json 上报的实际识别游戏（botw/totk）
+// 存档卡片五槽标签按游戏切换（TOTK: 龙之泪=回忆位、树根=神兽位）
+const gameLabels = computed(() => {
+  const g = detectedGame.value || env.game
+  return g === 'totk'
+    ? { shrine: '神庙', tower: '鸟望台', korok: '呀哈哈', memory: '龙之泪', beast: '树根' }
+    : { shrine: '神庙', tower: '塔', korok: '呀哈哈', memory: '回忆', beast: '神兽' }
+})
 const statusMapUrl = ref('') // core status.json 上报的地图地址（V2.2.0 Q1）
 const mapUrl = computed(() => {
   if (statusMapUrl.value) return statusMapUrl.value

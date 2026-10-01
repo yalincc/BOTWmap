@@ -39,19 +39,11 @@ type Platform interface {
 	// LargestBlock 返回最大的一块（known 偏移重定位的稳定锚点）。
 	LargestBlock(minMB float64) (uintptr, uintptr)
 
-	// DecodeTriple 端序解码 12 字节 → 内存序三元组 (X, alt, Z)。
-	// 读取失败或全零返回 ok=false。
-	DecodeTriple(d []byte) (x, alt, z float32, ok bool)
-
 	// LittleEndian 返回平台内存字节序是否小端（Switch=小端，Wii U=大端）。
 	LittleEndian() bool
 
 	// SaveRoots 存档根候选目录（递归找 game_data.sav 的起点）。
 	SaveRoots() []string
-
-	// KnownOffsets 返回该平台已知的玩家坐标偏移候选（相对 LargestBlock 基址），
-	// 按优先级排序。启动时优先用这些偏移直接读，失败再回退全量扫描。
-	KnownOffsets() []uintptr
 }
 
 // ---- 当前平台管理 ----
