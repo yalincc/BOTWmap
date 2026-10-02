@@ -2,6 +2,25 @@
 
 本项目遵循语义化版本（SemVer）：`主版本.次版本.修订号`。
 
+## xnavi v2.3.0（2026-10-03）TOTK 剥离，恢复纯 BOTW 定位
+
+### 重构
+- **TOTK 彻底剥离**（2026-10-02 架构决策落地）：删除 game_totk.go / sky_totk.go / progress_totk.go / chain_totk.go / pointer.go / calibrate.go（1728 行），TOTK 改由 `TOTKmap\live-go` 独立承载；BOTW（固定偏移秒锁）与 TOTK（扫描+启发式）策略不再相互牵扯
+- **watch.go 瘦身**：清除指针链（L1/L2/L3）稳态读/移动确认/冻结分支与 TOTK layer 日志，主循环回到纯 BOTW：固定偏移秒锁 + 全量扫描 + 探针 + 冻结共识兜底
+- **main.go**：`--game` 只收 `auto|botw`；detectGame 识别到 TOTK 明确提示改用 live-go；删除存档兜底猜游戏与死代码
+- **progress.go**：移除 TOTK watcher 分发，只读 game_data.sav（done_hash + 神庙坐标点表口径）
+
+### 修复（2026-10-01~02 BOTW 稳定性修复，随本版一并登记）
+- 固定偏移秒锁不再阻塞主循环：失败重试前先读 12 字节判性质，读到但坐标非法立即跳过，退避压到 3×40ms（Ryujinx 5 块 3316ms→316ms）
+- 乒乓检测门槛 100m→20m，修复 60m 双槽乒乓漏网漂移
+- BOTW 小向量过滤单轴误杀修正（|x|<100 拒绝地图中心带合法坐标）
+- readMem RPM 3 次重试（传送期页保护瞬时切换）+ 固定偏移失败原因诊断
+
+### 验证
+- go build / go vet / go test 全量通过（真实存档解析：神庙 104/136）
+- 真机验收（2026-10-02）：BOTW Cemu 秒锁 68s 零扫描 / Ryujinx 316ms 锁定
+- 冒烟运行：纯 BOTW 启动，地图链接 botw.yalin.site
+
 ## v1.4.4（2026-10-01）导航配合修复
 
 ### 修复
