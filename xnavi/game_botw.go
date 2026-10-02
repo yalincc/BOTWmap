@@ -223,9 +223,6 @@ func (g *gameBotw) PreferScanOnUnlock() bool { return false }
 // UnverifiedRescanAfter BOTW 保持 15s 快速自愈（原行为）。
 func (g *gameBotw) UnverifiedRescanAfter() time.Duration { return 15 * time.Second }
 
-// ChainCapable BOTW 不参与指针链模式（固定偏移已稳定，隔离红线：BOTW 路径零改动）。
-func (g *gameBotw) ChainCapable() bool { return false }
-
 // FrozenRescanAfter BOTW=0（禁用）：固定偏移是跨重启验证的活副本，游戏运行期
 // 不会失效；站立不动=副本无写入属正常，30s 冻结阈值曾造成"站立期间反复后台
 // 重扫"（Q13）。真异常（块切换读数错乱）由读数失效路径处理。

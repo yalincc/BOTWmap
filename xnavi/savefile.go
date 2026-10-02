@@ -97,7 +97,7 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 }
 
 // findSaveFiles 在根目录下递归找当前游戏存档文件（不区分大小写）。
-// 文件名清单来自游戏适配层（game.SaveFileNames），TOTK 为 progress.sav/caption.sav。
+// 文件名清单来自游戏适配层（game.SaveFileNames），BOTW 为 game_data.sav。
 func findSaveFiles(root string, names []string) []string {
 	var out []string
 	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {

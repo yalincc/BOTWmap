@@ -30,12 +30,6 @@ type lockT struct {
 
 var lock = lockT{}
 
-// TOTK layer 日志（验证天空/地底位面）：layer 变化或超 30s 打一次。
-var (
-	lastLayerLog    int
-	lastLayerLogAt  time.Time
-)
-
 type stateT struct {
 	mu         sync.RWMutex
 	ok         bool
@@ -309,12 +303,9 @@ func stateMachine() {
 	lockSince := time.Now()
 	unverifiedN := 0
 	lastDataHintAt := time.Now().Add(-time.Minute)
-	lastPtrScanAddr := uintptr(0) // S1 指针扫描去重：同一镜像地址只扫一次
-	// 指针链模式（指针扫描定位方案 S2/S4，TOTK 专属；BOTW ChainCapable=false 零接触）
-	chainMode := false
-	chainRT := (*totkChainRT)(nil)
-	chainL1Tried := false
-	lastChainFrozenLog := time.Time{}
+	// 指针链模式（S2/S4）与 S1 指针扫描已随 TOTK 一并移除：
+	// 2026-10-02 在 live-go 上做过地址空间 spike，结论是 TOTK 玩家槽无数据指针可达
+	// （大概率「基址 + index × stride」计算寻址），这条路线已确认走不通。
 
 	// 冻结共识兜底状态（V2.2.0 Q7 自 live-go 1.8.7 移植）
 	lastConsensusAt := time.Time{}
@@ -324,8 +315,8 @@ func stateMachine() {
 	// 站立零扫描）。此前阈值 0 时 frozenN>=0 恒真，导致 BOTW/Cemu 锁定后每 60s 强制重扫
 	frozenEnabled := currentGame.FrozenRescanAfter() > 0
 	frozenLimit := int(currentGame.FrozenRescanAfter() / smTick)
-	// Q10 根治：冻结 → 后台重扫（不解锁、不清显示）。站立不动时副本无写入属正常
-	// （TOTK 只在移动时写位置），解锁重扫会把红点甩到副本数最多的静态结构上。
+	// Q10 根治：冻结 → 后台重扫（不解锁、不清显示）。站立不动时副本无写入属正常，
+	// 解锁重扫会把红点甩到副本数最多的静态结构上。
 	// 后台扫描+探针：玩家真移动时探针自动切活副本（mv≥3），站立时什么都不变。
 	bgScan := false
 	var lastBgScanAt time.Time
@@ -418,44 +409,12 @@ func stateMachine() {
 				inLocked = false
 				goUnlocked("/rescan requested")
 			}
-		case rt := <-calibSetCh:
-			// S3：基准校准成功 → 切换 CHAIN 模式（用户明确要求的定位源）
-			chainRT = rt
-			chainMode = true
-			chainL1Tried = true
-			setLock(rt.PtrAddr, false, 0, "chain")
-			inLocked = true
-			resetFollow()
-			probing = false
-			probeGroups = nil
-			lockSince = time.Now()
-			SetLocMode("chain")
-			setChainStat(rt)
-			fmt.Printf("  [chain] engaged via calibration — zero-scan tracking from now on\n")
 		default:
 		}
 
-		// ---- UNLOCKED：解锁策略因游戏而异 ----
+		// ---- UNLOCKED ----
 		if !inLocked {
-			// 0) L1 指针链快路径（TOTK 专属，会话内一次）：持久化链形态直接复用，
-			//    成功则跳过扫描（用户要求：锁定后零扫描零换锁）
-			if currentGame.ChainCapable() && !chainL1Tried && p != nil {
-				chainL1Tried = true
-				if rt := totkChainTryKnown(h, p.Blocks(256.0)); rt != nil {
-					chainRT = rt
-					chainMode = true
-					setLock(rt.PtrAddr, false, 0, "chain-l1")
-					inLocked = true
-					resetFollow()
-					lockSince = time.Now()
-					SetLocMode("chain")
-					setChainStat(rt)
-					fmt.Printf("  [chain] L1 engaged: ptr=0x%X — 在游戏内移动以完成确认\n", rt.PtrAddr)
-					continue
-				}
-			}
-			// 1) 固定偏移秒锁（仅 BOTW：偏移跨重启验证过。TOTK 走扫描优先——
-			//    偏移是会话快照无一持续跟随，秒锁只会锁到僵尸，见 PreferScanOnUnlock）
+			// 1) 固定偏移秒锁（BOTW：偏移跨重启验证过，秒锁后零扫描零换锁）
 			if !currentGame.PreferScanOnUnlock() && len(currentGame.KnownOffsets(p)) > 0 && time.Since(lastFixedTry) > 2*time.Second {
 				offsets := currentGame.KnownOffsets(p)
 				lastFixedTry = time.Now()
@@ -523,7 +482,6 @@ func stateMachine() {
 					setLock(best.Addr, !needConfirm, 0, "fixed-offset")
 					inLocked = true
 					resetFollow()
-					SetLocMode("fixed")
 						lockSince = time.Now() // 新锁重新计时，否则 15s unverified 保险丝用旧时间戳秒杀新锁
 						if needConfirm {
 							fmt.Printf("  [sm] fixed offset locked OK [pending move confirm]\n")
@@ -549,7 +507,6 @@ func stateMachine() {
 				hits := structuralScan(h, blocks, logf)
 				if len(hits) > 0 {
 					ranked, shortlist := groupAndRank(h, hits)
-					calibStashGroups(ranked) // S3：给基准校准提供候选源
 					for i := 0; i < len(ranked) && i < 10; i++ {
 						g := ranked[i]
 						logf(fmt.Sprintf("    rank %d: x%-5d struct %2d  mem=(%.1f, %.1f, %.1f)",
@@ -560,7 +517,6 @@ func stateMachine() {
 					setLock(addr, false, best.Copies, "scan")
 					inLocked = true
 					resetFollow()
-					SetLocMode("probe")
 					lockSince = time.Now()
 					probing = true
 					probeGroups = shortlist
@@ -733,8 +689,7 @@ func stateMachine() {
 
 		// Q10：冻结后台重扫——保持当前锁和位置显示，只跑扫描+探针。
 		// 玩家真移动时活副本组 mv≥3 自动切换；站立不动时扫描无果、什么都不变。
-		// CHAIN 模式下禁用（用户要求：锁定后零扫描；站立=正常）
-		if bgScan && !chainMode && time.Since(lastBgScanAt) >= 60*time.Second {
+		if bgScan && time.Since(lastBgScanAt) >= 60*time.Second {
 			bgScan = false
 			lastBgScanAt = time.Now()
 			logf := func(s string) { fmt.Println("    " + s) }
@@ -761,28 +716,7 @@ func stateMachine() {
 			}
 		}
 
-		// 指针链稳态读（S2）：TOTK 链模式下位置来自"指针→环基址→活槽"，
-		// 每拍 2 次 RPM，零扫描零换锁；链断（连续失败）→ 回退常规路径
-		var v []float32
-		if chainMode && chainRT != nil && currentGame.ChainCapable() {
-			out, okc := chainRT.read(h, p.Blocks(256.0))
-			if !okc || chainRT.Broken() {
-				if chainRT.Broken() {
-					fmt.Printf("  [chain] broken (failN=%d) -> fallback to normal tracking\n", chainRT.failN)
-					rec := chainRT.Rec
-					rec.Fail++
-					totkChainSave(rec)
-					chainMode = false
-					chainRT = nil
-					SetLocMode("fallback")
-				}
-				v = nil
-			} else {
-				v = []float32{out[0], out[1], out[2]}
-			}
-		} else {
-			v = currentGame.DecodeAt(h, a)
-		}
+		v := currentGame.DecodeAt(h, a)
 		if v == nil {
 			invalidN++
 			state.mu.Lock()
@@ -801,15 +735,6 @@ func stateMachine() {
 		lock.mu.RLock()
 		ver := lock.verified
 		lock.mu.RUnlock()
-		// L1 链信任超时：复用的链 60s 内没等到移动确认 → 放弃，回退常规路径
-		if chainMode && chainRT != nil && !ver && time.Since(lockSince) > chainL1TrustSec*time.Second {
-			fmt.Printf("  [chain] L1 not confirmed in %ds -> fallback to scan path\n", chainL1TrustSec)
-			chainMode = false
-			chainRT = nil
-			inLocked = false
-			goUnlocked("chain l1 unconfirmed")
-			continue
-		}
 		if ua := currentGame.UnverifiedRescanAfter(); ua > 0 && !ver && time.Since(lockSince) > ua {
 			unverifiedN++
 			fmt.Printf("  [sm] lock 0x%X unverified after 15s -> rescan\n", a)
@@ -846,7 +771,7 @@ func stateMachine() {
 		// 单拍瞬跳 20m+ 必是"换写者"而非玩家移动（真传送 >300m 由跳变逻辑先行处理）。
 		// 实测漏网案例：两槽位仅差 60m 的乒乓（(61,-1521)↔(1,-1514)）在 100m 门槛下
 		// 永远不触发，红点漂移 12 分钟。
-		if hasPrev && delta > 20 && !chainMode {
+		if hasPrev && delta > 20 {
 			ppHist = append(ppHist, prev)
 			if len(ppHist) > 4 {
 				ppHist = ppHist[len(ppHist)-4:]
@@ -913,43 +838,10 @@ func stateMachine() {
 				}
 				lock.mu.Unlock()
 				probing = false
-				if chainMode {
-					// CHAIN 模式确认：不写 known（ptrAddr 不是坐标偏移）、不跑 diag；
-					// 首次确认时持久化强化链记录（L1 复用成功率随使用次数提升）
-					lock.mu.RLock()
-					l1 := lock.source == "chain-l1"
-					lock.mu.RUnlock()
-					if l1 && !chainRT.savedOK {
-						chainRT.savedOK = true
-						chainRT.Rec.OK++
-						chainRT.Rec.LastOK = time.Now()
-						totkChainSave(chainRT.Rec)
-						fmt.Printf("  [chain] L1 confirmed — record reinforced (ok=%d)\n", chainRT.Rec.OK)
-					}
-					continue
-				}
 				if !savedKnown {
 					savedKnown = true
 					saveKnown([]uintptr{a}, guestRamBase(), [3]float32{cur[0], cur[1], cur[2]})
 					dumpDiagnostic(a, cur)
-					// S2 指针扫描建链（TOTK 专属，L2）：确认活镜像后立即建链，
-					// 成功则进入 CHAIN 稳态（之后零扫描零换锁）
-					if currentGame.Name() == "totk" && a != lastPtrScanAddr {
-						lastPtrScanAddr = a
-						fmt.Printf("  [chain] L2 building from mirror 0x%X (full pointer scan ~3s)...\n", a)
-						if rt := totkChainBuild(h, a, cur); rt != nil {
-							chainRT = rt
-							chainMode = true
-							rt.Rec.OK++
-							rt.Rec.LastOK = time.Now()
-							totkChainSave(rt.Rec)
-							SetLocMode("chain")
-							setChainStat(rt)
-							fmt.Printf("  [chain] ENGAGED — zero-scan tracking from now on\n")
-						} else {
-							fmt.Printf("  [chain] build failed — staying on probe fallback (L3)\n")
-						}
-					}
 				}
 			}
 		} else {
@@ -976,55 +868,36 @@ func stateMachine() {
 		prev = cur
 		hasPrev = true
 
-		// TOTK layer 日志（天空20/地面18/地底19）：变化或超 30s 打一次
-		if currentGame.Name() == "totk" {
-			lay := currentGame.LayerOf(gx, gy, gz)
-			if lay != lastLayerLog || time.Since(lastLayerLogAt) > 30*time.Second {
-				lastLayerLog = lay
-				lastLayerLogAt = time.Now()
-				fmt.Printf("  [layer] %d (%s) @ (%.0f, %.0f, %.0f)\n", lay, totkLayerName(lay), gx, gy, gz)
-			}
-		}
-
 		// 冻结共识兜底（V2.2.0 Q7 自 live-go 1.8.7 移植，零扫描）：锁读数停滞 ≥30s
 		// （frozenN≥frozenTicks）时，在锚块 known 偏移里找与本锁差 >15m 的
 		// ≥consensusMin 成员一致簇作候选；候选在下一次检查"动了"（活副本证明）
 		// 才换锁——玩家站桩绝不误换，玩家一动 1~2s 内自愈。
-		// CHAIN 模式：站立=正常，零动作（10 分钟提示一次），不走共识/后台重扫
 		if frozenEnabled && frozenN >= frozenLimit && time.Since(lastConsensusAt) >= consensusEvery {
-			if chainMode {
-				if time.Since(lastChainFrozenLog) > 10*time.Minute {
-					lastChainFrozenLog = time.Now()
-					fmt.Printf("  [chain] frozen %.0fs — standing still, chain keeps output (no rescan)\n",
+			lastConsensusAt = time.Now()
+			a2, v2, ok := consensusCopy(h, a)
+			if !ok {
+				consensusCand = 0
+				// Q10：冻结且无共识候选 → 后台重扫（不解锁）。
+				// 站立不动时副本无写入属正常；玩家真移动时探针会找到活副本并切换。
+				// 节流：与上次后台重扫间隔 ≥60s 才再次置位（防日志每秒刷屏）
+				if time.Since(lastBgScanAt) >= 60*time.Second {
+					fmt.Printf("  [sm] lock frozen %.0fs -> background rescan (lock kept)\n",
 						float64(frozenN)*smTick.Seconds())
+					bgScan = true
 				}
-			} else {
-				lastConsensusAt = time.Now()
-				a2, v2, ok := consensusCopy(h, a)
-				if !ok {
-					consensusCand = 0
-					// Q10：冻结且无共识候选 → 后台重扫（不解锁）。
-					// 站立不动时副本无写入属正常；玩家真移动时探针会找到活副本并切换。
-					// 节流：与上次后台重扫间隔 ≥60s 才再次置位（防日志每秒刷屏）
-					if time.Since(lastBgScanAt) >= 60*time.Second {
-						fmt.Printf("  [sm] lock frozen %.0fs -> background rescan (lock kept)\n",
-							float64(frozenN)*smTick.Seconds())
-						bgScan = true
-					}
-					continue
-				} else if a2 != consensusCand {
-					consensusCand, consensusCandPos = a2, v2
-					fmt.Printf("  [sm] lock frozen %.0fs, consensus candidate 0x%X (%.0fm away) - watching\n",
-						float64(frozenLimit)*smTick.Seconds(), a2, dist3(v2, cur))
-				} else if dist3(v2, consensusCandPos) > moveDist {
-					// 候选位置变了 = 活副本在跟随玩家 → 换锁
-					fmt.Printf("  [sm] frozen lock 0x%X -> relock to live consensus copy 0x%X\n", a, a2)
-					setLock(a2, false, 0, "consensus")
-					resetFollow()
-					probing = false
-					probeGroups = nil
-					continue
-				}
+				continue
+			} else if a2 != consensusCand {
+				consensusCand, consensusCandPos = a2, v2
+				fmt.Printf("  [sm] lock frozen %.0fs, consensus candidate 0x%X (%.0fm away) - watching\n",
+					float64(frozenLimit)*smTick.Seconds(), a2, dist3(v2, cur))
+			} else if dist3(v2, consensusCandPos) > moveDist {
+				// 候选位置变了 = 活副本在跟随玩家 → 换锁
+				fmt.Printf("  [sm] frozen lock 0x%X -> relock to live consensus copy 0x%X\n", a, a2)
+				setLock(a2, false, 0, "consensus")
+				resetFollow()
+				probing = false
+				probeGroups = nil
+				continue
 			}
 		}
 

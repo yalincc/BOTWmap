@@ -82,3 +82,5 @@ _changelog.py
 
 # 发布版本归档（本地留底，不入库）
 RELEASE/
+
+xnavi/xnavi-core-new.exe

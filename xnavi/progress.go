@@ -52,33 +52,22 @@ type progressWatcher struct {
 
 var progress *progressWatcher
 
-// progressSource 两个游戏 watcher 的公共只读视图。
+// progressSource 进度 watcher 的公共只读视图。
 type progressSource interface {
 	snapshot() (bool, []byte, string)
 }
 
-// progressFor 按当前游戏分发进度源（P2b 三组合隔离）：
-//   - TOTK → totkProgress（progress.sav murmur3 哈希对照口径，doneIds/mapped/counts）
-//   - BOTW（Cemu/Ryujinx）→ progress（done_hash + 神庙坐标点表口径）
-//
-// 隔离红线：两个 watcher 各自只读自家存档文件名（TOTK=progress.sav /
-// BOTW=game_data.sav），互不读写对方数据；切换游戏（重启 core）后
-// gen 变化，网站自动重拉对应口径。
+// progressFor 进度源（xnavi 只服务 BOTW：done_hash + 神庙坐标点表口径，
+// 只读 game_data.sav；TOTK 的 progress.sav 口径已随 TOTK 移交 live-go）。
 func progressFor() progressSource {
-	if currentGame != nil && currentGame.Name() == "totk" && totkProgress != nil {
-		return totkProgress
-	}
 	if progress != nil {
 		return progress
 	}
 	return nil
 }
 
-// progressSummarize status.json 用：按当前游戏分发计数摘要。
+// progressSummarize status.json 用的计数摘要。
 func progressSummarize() (bool, map[string]any) {
-	if currentGame != nil && currentGame.Name() == "totk" && totkProgress != nil {
-		return totkProgress.summarize()
-	}
 	if progress != nil {
 		return progress.summarize()
 	}
@@ -144,12 +133,6 @@ func (w *progressWatcher) refresh() {
 
 	plat := currentPlatform()
 	if plat == nil {
-		w.ok = false
-		return
-	}
-	// Q14 存档隔离：TOTK 模式下 BOTW watcher 完全待机
-	// （此前经 currentGame.SaveFileNames() 误读 TOTK 的 caption.sav）
-	if currentGame != nil && currentGame.Name() == "totk" {
 		w.ok = false
 		return
 	}

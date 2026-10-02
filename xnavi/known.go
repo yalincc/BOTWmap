@@ -3,8 +3,8 @@
 //
 // 格式带 Pos（上次锁定坐标，内存序 X, alt, Z）——坐标先验锚，Cemu 结构扫描就近选槽用。
 // 已知偏移只在平滑/移动确认后写入，防漂移坐标污染。
-// 文件按 (游戏,平台) 分开（known_botw_ryujinx.json / known_botw_cemu.json /
-// known_totk_ryujinx.json）：不同模拟器、不同游戏的偏移不混用（V2.2.0 双游戏）。
+// 文件按平台分开（known_botw_ryujinx.json / known_botw_cemu.json）：
+// 不同模拟器的偏移不混用。
 
 package main
 

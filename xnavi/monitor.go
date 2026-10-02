@@ -137,7 +137,8 @@ func statusLoop() {
 			"copies":   copies,
 			"lockAddr": fmt.Sprintf("0x%X", addr),
 			"ageSec":   ageSec,
-			"mode":     locModeString(),
+			"mode":     src, // 原为 locModeString()（随 calibrate/chain 一并移除）；
+			//           source 已含 fixed-offset / probe / scan 等定位模式信息
 			"counters": map[string]any{
 				"locks":     cntLocks.Load(),
 				"relocates": cntRelocates.Load(),

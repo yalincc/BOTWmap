@@ -1,16 +1,17 @@
-// xnavi — 通用定位导航程序（单一状态机，双游戏 × 双平台）。
+// xnavi — BOTW 定位导航程序（单一状态机，双平台）。
 //
 // 用途：在本地为在线互动地图提供实时角色追踪：
-//   BOTW https://botw.yalin.site/ ｜ TOTK https://totk.yalin.site/
+//   BOTW https://botw.yalin.site/
 // 原理：读模拟器进程内存定位玩家坐标 → HTTP API（127.0.0.1:8766）
 // → 在线地图页跨域连接显示红点/轨迹/导航。
 //
 // 平台：auto（默认，Ryujinx 优先）| ryujinx | cemu —— 内存布局/字节序/存档
-// 差异全部由平台驱动隔离；游戏：auto（默认）| botw | totk —— 坐标语义/存档/
-// 进度/位面差异由游戏适配层隔离；定位核心（watch.go 单一状态机）两者都不感知。
+// 差异全部由平台驱动隔离；游戏：auto（默认）| botw —— 坐标语义/存档/
+// 进度差异由游戏适配层隔离；定位核心（watch.go 单一状态机）不感知平台。
+// （TOTK 已于 2026-10-02 拆分到 TOTKmap/live-go 独立工程，见交接文档。）
 //
 // 用法：xnavi.exe [port] [--no-open] [--no-save] [--emu=auto|ryujinx|cemu]
-//                [--game=auto|botw|totk] [--save-dir=...] [--dump]
+//                [--game=auto|botw] [--save-dir=...] [--dump]
 
 package main
 
@@ -21,7 +22,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -60,7 +60,7 @@ func main() {
 		}
 	}
 
-	// 平台选择：显式指定 or 自动探测（先全平台选，游戏识别后再做 TOTK 平台修正）
+	// 平台选择：显式指定 or 自动探测（先全平台选，再按实际进程切换）
 	var rp ryujinxPlatform
 	var cp cemuPlatform
 	switch emu {
@@ -87,27 +87,13 @@ func main() {
 		}
 	}
 
-	// 游戏选择：显式指定 or 游戏感知自动识别（auto 时读当前平台内存试固定偏移，
-	// BOTW/TOTK 偏移互斥——用户实测 BOTW 偏移在 TOTK 内存全 invalid）
+	// 游戏选择：xnavi 只服务 BOTW（TOTK 已移交 live-go），仍接受显式 --game=botw。
 	switch gameName {
-	case "totk":
-		fmt.Println("  [game] explicit: totk")
-		currentGame = &gameTotk{}
 	case "botw":
 		fmt.Println("  [game] explicit: botw")
 		currentGame = &gameBotw{}
 	default:
 		currentGame = detectGame(currentPlatform())
-	}
-
-	// TOTK 平台修正：TOTK 仅 Ryujinx（Wii U 无 TOTK）。
-	// auto 检测到 TOTK 时平台必为 Ryujinx（TOTK 偏移只存在于 Ryujinx 内存），此分支
-	// 覆盖显式 --game=totk 配 auto 平台选中 Cemu（如 Cemu 正跑 BOTW）的情况。
-	if currentGame.Name() == "totk" {
-		if p := currentPlatform(); p != nil && p.Name() == "Cemu" {
-			fmt.Println("  !! TOTK 仅 Ryujinx：平台强制切换 Ryujinx")
-			setPlatform(&rp)
-		}
 	}
 
 	setConsoleTitle("xnavi · " + strings.ToUpper(currentGame.Name()) + " Live")
@@ -127,13 +113,10 @@ func main() {
 	}
 
 	loadConfig()
-	// 进度双 watcher（P2b：三组合存档隔离）——BOTW watcher 只认 game_data.sav，
-	// TOTK watcher 只认 progress.sav（文件名硬编码隔离，与 currentGame 无关），
-	// 两个都常驻轮询，对外按 currentGame 分发（见 server/monitor 的 progressFor）。
+	// 进度 watcher：BOTW 只认 game_data.sav
+	// （TOTK 的 progress.sav 口径已随 TOTK 一并移交 live-go）
 	progress = newProgressWatcher()
 	go progress.loop()
-	totkProgress = newTotkProgressWatcher()
-	go totkProgress.loop()
 
 	// 服务器先于定位启动（踩坑固化：网页端要能第一时间连上）
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
@@ -175,13 +158,11 @@ func main() {
 }
 
 // detectGame 自动识别当前游戏（--game=auto）。
-// 两步判定（V2.2.0 Q7 修订：误判 BOTW 修复）：
-//   1) 游戏感知（当前平台内存，重试 3 次）：TOTK 偏移共识/任两候选相距 <5m → TOTK；
-//      BOTW 偏移任一 valid → BOTW。TOTK 先判（严格共识受杂散影响小），
+// xnavi 只服务 BOTW，此函数用于确认当前运行的游戏确实是 BOTW：
+//   1) 窗口标题判定（Q8 主判定）：模拟器自报的硬标识，零内存扫描；
+//      若识别到 TOTK，明确提示用户改用 live-go（TOTKmap 项目）。
+//   2) 内存感知（重试 3 次）：BOTW 任一已知偏移读出合法坐标 → BOTW。
 //      读数有瞬时性（传送/加载瞬间全 invalid），一次失败不能下结论。
-//   2) 存档兜底（内存感知连续失败/游戏未运行）：只有一边有存档 → 直接判；
-//      两边都有（本机现状）→ 按最近修改时间猜当前在玩的游戏——
-//      原实现硬编码 BOTW，用户玩 TOTK 时整场会话按 BOTW 解码 + 打开 BOTW 地图。
 func detectGame(p Platform) Game {
 	if p != nil && p.Attach() {
 		h := p.Handle()
@@ -189,48 +170,22 @@ func detectGame(p Platform) Game {
 			if attempt > 0 {
 				time.Sleep(time.Second)
 			}
-			// 0) 窗口标题判定（Q8 主判定）：Ryujinx 游戏窗口标题自带游戏名 + Title ID，
-			//    模拟器自报的硬标识，零内存扫描、无假阳性（Cemu 不匹配 TID，走原逻辑）
+			// 0) 窗口标题判定（Q8 主判定）：模拟器自报的硬标识，零内存扫描
 			if game := detectGameByTitle(p.PID()); game != "" {
-				fmt.Printf("  [game] auto-detected: %s (window title TID)\n", game)
 				if game == "totk" {
-					return &gameTotk{}
+					// xnavi 只服务 BOTW；检测到 TOTK 就明确提示，
+					// 免得用户对着一个永远锁不上的界面找原因
+					fmt.Println("  [game] 检测到 TOTK：本程序只服务 BOTW，TOTK 请改用 live-go（TOTKmap 项目）")
+				} else {
+					fmt.Printf("  [game] auto-detected: botw (window title TID)\n")
+					return &gameBotw{}
 				}
-				return &gameBotw{}
 			}
 			blks := p.Blocks(256.0)
 			if len(blks) == 0 {
 				continue
 			}
-			// TOTK：共识优先，另加宽松口径——任两候选相距 <5m 也算命中
-			// （EA24 快照对相差恰 ~2m，PickOffset 的逐轴 <2 聚类可能漏掉）
-			gt := &gameTotk{}
-			var hits []OffsetCand
-			for _, off := range gt.KnownOffsets(p) {
-				for _, blk := range blks {
-					addr := blk.Base + off
-					if d := gt.DecodeAt(h, addr); d != nil {
-						hits = append(hits, OffsetCand{addr, [3]float32{d[0], d[1], d[2]}})
-					}
-				}
-			}
-			totkHit := false
-			if _, _, ok := gt.PickOffset(hits, p); ok {
-				totkHit = true
-			} else {
-				for i := 0; i < len(hits) && !totkHit; i++ {
-					for j := i + 1; j < len(hits); j++ {
-						if dist3(hits[i].Pos, hits[j].Pos) < 5 {
-							totkHit = true
-						}
-					}
-				}
-			}
-			if totkHit {
-				fmt.Println("  [game] auto-detected: totk (fixed offset consensus)")
-				return gt
-			}
-			// BOTW：任一偏移 valid → BOTW
+			// BOTW：任一已知偏移读出合法坐标 → BOTW
 			gb := &gameBotw{}
 			botwOffs := []uintptr{0xA77FCBBC, 0x1055300C, 0xC1F8BF4}
 			for _, blk := range blks {
@@ -243,50 +198,10 @@ func detectGame(p Platform) Game {
 			}
 		}
 	}
-	// 存档兜底
-	root := ""
-	if app := os.Getenv("APPDATA"); app != "" {
-		root = filepath.Join(app, "Ryujinx", "bis", "user", "save")
-	}
-	if root != "" {
-		totkFiles := findSaveFiles(root, []string{"progress.sav", "caption.sav"})
-		botwFiles := findSaveFiles(root, []string{"game_data.sav"})
-		totk, botw := len(totkFiles) > 0, len(botwFiles) > 0
-		switch {
-		case totk && !botw:
-			fmt.Println("  [game] auto-detected: totk (save dir)")
-			return &gameTotk{}
-		case botw && !totk:
-			fmt.Println("  [game] auto-detected: botw (save dir)")
-			return &gameBotw{}
-		case totk && botw:
-			// 双存档并存：最近修改的存档 = 当前在玩的游戏
-			nt, _ := newestSaveMtime(totkFiles)
-			nb, _ := newestSaveMtime(botwFiles)
-			if nt.After(nb) {
-				fmt.Printf("  [game] auto-detected: totk (save mtime: totk %s > botw %s)\n",
-					nt.Format("01-02 15:04"), nb.Format("01-02 15:04"))
-				return &gameTotk{}
-			}
-			fmt.Printf("  [game] auto-detected: botw (save mtime: botw %s > totk %s)\n",
-				nb.Format("01-02 15:04"), nt.Format("01-02 15:04"))
-			return &gameBotw{}
-		}
-	}
-	fmt.Println("  [game] auto-detected: botw")
+	// xnavi 只服务 BOTW，不再做"存档兜底猜游戏"——那套逻辑当初是为了在
+	// BOTW / TOTK 之间做选择，现在没有第二个游戏可选了。
+	fmt.Println("  [game] auto-detected: botw (default)")
 	return &gameBotw{}
-}
-
-// newestSaveMtime 返回存档文件里最新的修改时间（及对应路径）。
-func newestSaveMtime(files []string) (time.Time, string) {
-	var newest time.Time
-	path := ""
-	for _, f := range files {
-		if fi, err := os.Stat(f); err == nil && fi.ModTime().After(newest) {
-			newest, path = fi.ModTime(), f
-		}
-	}
-	return newest, path
 }
 
 // dumpDiagnostics 打印当前平台进程/内存/定位诊断信息（联调用，不开服务器）。

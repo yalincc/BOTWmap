@@ -171,12 +171,11 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, payload)
 }
 
-// handleProgress 返回当前游戏的收集进度（口径随游戏分发）：
+// handleProgress 返回当前游戏的收集进度：
 //   - BOTW（Cemu/Ryujinx）：done_hash + 神庙坐标点表（progress_points.json 口径）
-//   - TOTK（Ryujinx）：doneIds + mapped + counts（progress.sav murmur3 哈希对照口径）
 //
 // 参考表缺失或尚无存档时返回 503，前端据此降级到本地/静态路径。
-// 存档隔离红线：两 watcher 各自只读自家存档文件名，互不干扰。
+// 存档隔离：watcher 只读自家存档文件名（game_data.sav）。
 func (s *server) handleProgress(w http.ResponseWriter, r *http.Request) {
 	ok, body, _ := progressFor().snapshot()
 	if !ok || len(body) == 0 {
