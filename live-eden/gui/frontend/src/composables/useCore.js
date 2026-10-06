@@ -1,6 +1,6 @@
 // useCore.js — BOTWNavi GUI 共享状态 + 全部 Wails 调用（V1.1.0 重构）
 // 单一数据源：status.json（core 400ms 写，eventBridge 300ms 推）+
-// xnavi-gui-core.log（增量读）。前端所有视图组件只从这里取状态/调方法。
+// botwnavi-gui-core.log（增量读）。前端所有视图组件只从这里取状态/调方法。
 import { ref, reactive, computed, watch } from 'vue'
 
 const api = window.go.main.App

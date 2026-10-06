@@ -12,6 +12,7 @@
 
 ### 修复
 - 存档 PLAYER_POSITION 解析：连续三块同 hash（X/alt/Z）只取第一次命中——原实现被 i+8/i+16 伪命中覆盖读出垃圾值，导致 botwSane 拒绝、无可用锚点（live-go parseSave 同款 break 逻辑）
+- **GUI 核心子进程文件名冲突**：核心原命名 botwnavi-eden.exe 与 GUI 产物 BOTWNavi-Eden.exe 在 Windows 大小写不敏感文件系统上是同一文件，复制/打包时互相覆盖导致 GUI 无法启动核心——核心改名 `botwnavi-core-eden.exe`（照 TOTK 侧 xnavi-core-eden.exe 惯例），GUI 日志 `xnavi-gui-core.log` → `botwnavi-gui-core.log`
 
 ### 验证
 - 真机实测（2026-10-07，Eden 运行 BOTW）：扫描锁定 copies=243 struct=26（ActorBase 特征）、轴序与存档锚点 d=0.0 一致、`confirmed live (moving)` verified=true、坐标随玩家走动实时跟随、网页地图红点跟随人工确认通过

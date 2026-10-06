@@ -24,8 +24,8 @@ import (
 // guiVersion 导航程序版本（与地图网页版本解耦，见 BOTWmap 项目规则第 3 条）。
 const guiVersion = "v1.0.0"
 
-// App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
-// 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
+// App Wails 后端：管理核心子进程 + 读 status.json / botwnavi-gui-core.log + 网页端端口探测。
+// 与核心的通信完全走文件（status.json、botwnavi-gui-core.log），不依赖 8766 HTTP——
 // 保证 GUI 与网页端两个入口相互独立（ds 双入口原则）：8766 被占时 GUI 照常工作。
 type App struct {
 	ctx       context.Context
@@ -277,12 +277,14 @@ func (a *App) ClearTarget() string {
 	return "已请求清除目标（地图同步取消）"
 }
 
-// corePath 核心子进程 exe 路径：与 GUI 同目录的 botwnavi-eden.exe。
+// corePath 核心子进程 exe 路径：与 GUI 同目录的 botwnavi-core-eden.exe。
+// 注意：不能叫 botwnavi-eden.exe——Windows 文件名不区分大小写，会与
+// GUI 产物 BOTWNavi-Eden.exe 撞成同一文件（TOTK 侧同款命名 xnavi-core-eden.exe）。
 func (a *App) corePath() string {
-	return filepath.Join(a.workDir, "botwnavi-eden.exe")
+	return filepath.Join(a.workDir, "botwnavi-core-eden.exe")
 }
 
-// StartCore 启动核心子进程（botwnavi-eden.exe --no-open [--save-dir=]）。
+// StartCore 启动核心子进程（botwnavi-core-eden.exe --no-open [--save-dir=]）。
 // V1.0.0：固定 Eden + BOTW，不再有模拟器/游戏选项。
 // 重复调用会先停掉旧进程。
 func (a *App) StartCore() string {
@@ -291,7 +293,7 @@ func (a *App) StartCore() string {
 	a.stopCoreLocked()
 	exe := a.corePath()
 	if _, err := os.Stat(exe); err != nil {
-		return "找不到核心程序 botwnavi-eden.exe（应放在本程序同目录）"
+		return "找不到核心程序 botwnavi-core-eden.exe（应放在本程序同目录）"
 	}
 	args := []string{"--no-open"}
 	if a.cfg != nil {
@@ -304,7 +306,7 @@ func (a *App) StartCore() string {
 	// core 是控制台程序，但 GUI 已经在日志面板实时显示它的输出，
 	// 这里把它的控制台窗口隐藏，避免弹一个黑窗且里面空白（stdout 重定向到了文件）。
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
-	f, err := os.OpenFile(filepath.Join(a.workDir, "xnavi-gui-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(filepath.Join(a.workDir, "botwnavi-gui-core.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
 		cmd.Stdout = f
 		cmd.Stderr = f
@@ -392,9 +394,9 @@ func (a *App) lastLog() string {
 	return strings.Join(a.logBuf[len(a.logBuf)-n:], "\n")
 }
 
-// tailInit 首次加载 xnavi-gui-core.log 末尾（最多 2000 行）。
+// tailInit 首次加载 botwnavi-gui-core.log 末尾（最多 2000 行）。
 func (a *App) tailInit() {
-	os.WriteFile(filepath.Join(a.workDir, "xnavi-gui-core.log"), nil, 0644)
+	os.WriteFile(filepath.Join(a.workDir, "botwnavi-gui-core.log"), nil, 0644)
 	a.logMarker = ""
 }
 
@@ -414,9 +416,9 @@ func (a *App) appendLines(lines []string) {
 	}
 }
 
-// PollLogs 前端轮询：返回 xnavi-gui-core.log 新增行（增量读）。
+// PollLogs 前端轮询：返回 botwnavi-gui-core.log 新增行（增量读）。
 func (a *App) PollLogs() []string {
-	path := filepath.Join(a.workDir, "xnavi-gui-core.log")
+	path := filepath.Join(a.workDir, "botwnavi-gui-core.log")
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -502,7 +504,7 @@ func (a *App) ExportDiagnostics() string {
 	}
 
 	// 2) 工作目录下的日志/状态文件（core 写的）
-	for _, name := range []string{"status.json", "xnavi-gui-core.log", "run-events.log"} {
+	for _, name := range []string{"status.json", "botwnavi-gui-core.log", "run-events.log"} {
 		buf, err := os.ReadFile(filepath.Join(a.workDir, name))
 		if err != nil {
 			continue
