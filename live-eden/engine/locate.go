@@ -486,9 +486,12 @@ func locate(pid uint32, window float64, onlyBlocks []struct{ Base, Size uintptr 
 		best = ranked[0]
 		if best.Struct > 0 {
 			// 锁定前 decodePos 校验：占位池/垃圾组可能排第一（坐标近零被窗口放过时），
-			// 从 ranked 依次取第一个 decodePos 非 nil 的组作候选。
+			// 从 ranked 依次取第一个"组内存在合法坐标"的组作候选。
+			// 组内多测（前 8 地址）：Eden 内存活跃，单地址瞬时全零/垃圾常见，只测
+			// Addrs[0] 会把最大簇（活槽）误判 invalid → fallback 到次优半死槽
+			// （2026-10-07 实测：copies=1095 最大簇被跳、锁了会冻结跳变的 x227）。
 			for _, g := range ranked {
-				if d := decodePos(readMem(h, g.Addrs[0], 12)); d != nil {
+				if groupHasValid(h, g) {
 					if g != best {
 						log(fmt.Sprintf("    candidate #1 (copies=%d struct=%d) invalid pos - fallback to 0x%012X (copies=%d)",
 							best.Copies, best.Struct, g.Addrs[0], g.Copies))
@@ -529,6 +532,22 @@ func shortlistAddrs(sl []ShortlistEntry) int {
 		n += len(g.Addrs)
 	}
 	return n
+}
+
+// groupHasValid 检查组内前 8 个地址是否存在合法坐标（锁定前校验用）。
+// 防 Eden 瞬态失效误杀活槽：只测 Addrs[0] 会把瞬时全零/垃圾的活槽判死，
+// 导致 fallback 到次优组（可能锁上半死槽）。
+func groupHasValid(h uintptr, g *Group) bool {
+	n := len(g.Addrs)
+	if n > 8 {
+		n = 8
+	}
+	for i := 0; i < n; i++ {
+		if decodePos(readMem(h, g.Addrs[i], 12)) != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // scanAll 并发扫描所有区域（worker pool）。

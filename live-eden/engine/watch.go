@@ -359,6 +359,9 @@ func stateMachine() {
 	lastProbeIgnoreGi := -1    // ignore 限频：同组 30s 内只打一行
 	var lastProbeIgnoreAt time.Time
 
+	// BOTW 半死槽快速换锁状态（game_botw.go botwFastRelock）：本锁冻结但世界在动 → 5s 内换锁
+	var fastWatch fastWatchState
+
 	resetFollow := func() {
 		prev, hasPrev = [3]float32{}, false
 		moveN, invalidN, frozenN = 0, 0, 0
@@ -369,6 +372,7 @@ func stateMachine() {
 		knownWatchAddrs = nil
 		knownWatchBase = map[uintptr][3]float32{}
 		knownWatchMoved = []int{}
+		fastWatch = fastWatchState{}
 	}
 
 	tick := time.NewTicker(smTick)
@@ -670,7 +674,6 @@ func stateMachine() {
 			}
 		}
 		invalidN = 0 // 正常读数（含真传送接受）清零无效计数
-
 		// known 锁确认窗口状态：本锁槽出现移动采样 → 锁对（玩家在动且槽跟随）
 		lock.mu.RLock()
 		lockSrc, lockVer := lock.source, lock.verified
@@ -702,6 +705,20 @@ func stateMachine() {
 			moveN = 0
 			if hasPrev {
 				frozenN++
+				// BOTW 半死槽快速换锁（game_botw.go）：本锁冻结 ≥5s 且 knownPool/known
+				// 有净位移 >moveNet 的活跃成员（= 玩家在动、本锁死了）→ 立即换锁到
+				// 活跃成员。玩家站桩时无活跃成员 → 永不误换；TOTK 语义不启用（其槽
+				// 持续更新无半死槽）。换锁后 pending move confirm，重新走确认流程。
+				if a2, v2, ok := botwFastRelock(h, a, cur, frozenN, &fastWatch); ok {
+					fmt.Printf("  [sm] botw fast-relock: frozen lock 0x%X (player moving, %.0fs) -> live copy 0x%X (%.1f, %.1f, %.1f)\n",
+						a, float64(botwFastFrozenTicks)*smTick.Seconds(), a2, v2[0], v2[1], v2[2])
+					setLock(a2, false, 0, botwFastRelockSrc)
+					resetFollow()
+					probing = false
+					probeGroups = nil
+					a = a2
+					continue
+				}
 			}
 			// 静止确认（Fix 2026-10-04）：玩家站桩时锁读数冻结属正常，但移动确认
 			// 永不触发 → 锁一直 verified=false → 30s 冻结共识把"不动候选"判死 →

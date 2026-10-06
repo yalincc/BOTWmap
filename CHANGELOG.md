@@ -13,9 +13,12 @@
 ### 修复
 - 存档 PLAYER_POSITION 解析：连续三块同 hash（X/alt/Z）只取第一次命中——原实现被 i+8/i+16 伪命中覆盖读出垃圾值，导致 botwSane 拒绝、无可用锚点（live-go parseSave 同款 break 逻辑）
 - **GUI 核心子进程文件名冲突**：核心原命名 botwnavi-eden.exe 与 GUI 产物 BOTWNavi-Eden.exe 在 Windows 大小写不敏感文件系统上是同一文件，复制/打包时互相覆盖导致 GUI 无法启动核心——核心改名 `botwnavi-core-eden.exe`（照 TOTK 侧 xnavi-core-eden.exe 惯例），GUI 日志 `xnavi-gui-core.log` → `botwnavi-gui-core.log`
+- **BOTW 半死槽快速换锁**（2:51 漂移根因，真机诊断定位）：BOTW 坐标槽质量参差，存在"半死槽"（实测 x227 锁定后 60s 完全冻结 + 70m 跳变，红点乱跳；玩家移动时偶尔被写一次能混过移动确认）。修复：锁读数冻结 ≥5s 且 knownPool/known 存在净位移 >2m 活跃成员（= 玩家在动、本锁死了）→ 5s 内自动换锁到活跃副本（位置闸门 50m 防远处相机/NPC 槽误换）；玩家站桩无活跃成员 → 永不误换。实现于 game_botw.go（BOTW 语义，TOTK 不启用）
+- **扫描锁定前 fallback 组内多测**：原只测每组 Addrs[0]，Eden 内存活跃单地址瞬时全零/垃圾会把最大簇（活槽）误判 invalid 跳过 → fallback 到次优半死槽（2:51 copies=1095 最大簇被跳、锁了会冻结的 x227）——改为组内前 8 地址存在合法坐标即通过
 
 ### 验证
 - 真机实测（2026-10-07，Eden 运行 BOTW）：扫描锁定 copies=243 struct=26（ActorBase 特征）、轴序与存档锚点 d=0.0 一致、`confirmed live (moving)` verified=true、坐标随玩家走动实时跟随、网页地图红点跟随人工确认通过
+- 修复后复测（用户实测）：传送 / 开菜单 / 长时间跟随不再漂移，known 快路径秒锁正常；诊断对比 x227（半死槽：60s 冻结+70m 跳变）vs x872（稳定活槽：持续跟随）确认根因
 - Ryujinx 偏移 `0xA77FCBBC` 在 Eden 实测不可用（不加快路径，符合既定方案）
 
 ## xnavi v2.3.0（2026-10-03）TOTK 剥离，恢复纯 BOTW 定位
