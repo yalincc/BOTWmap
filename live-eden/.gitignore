@@ -1,0 +1,18 @@
+# 运行时产物与诊断输出（不入库）
+*.exe
+*.exe~
+*.log
+*.err
+*.txt
+engine/known_botw.json
+engine/status.json
+engine/coords-req.json
+engine/coords-resp.json
+engine/nav-clear.json
+known_botw.json
+status.json
+# GUI 构建产物与依赖（源码入库，产物重建）
+gui/node_modules/
+gui/frontend/node_modules/
+gui/frontend/dist/
+gui/build/

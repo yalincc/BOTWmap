@@ -2,6 +2,21 @@
 
 本项目遵循语义化版本（SemVer）：`主版本.次版本.修订号`。
 
+## botwnavi-eden v1.0.0（2026-10-07）Eden 模拟器《旷野之息》实时定位（阶段一）
+
+### 新增
+- **`live-eden/`**：Eden 模拟器 BOTW 实时定位导航（参考 TOTKmap/live-eden 引擎 + BOTW 游戏语义层；TOTK 版零改动，方向 = Eden 多游戏，阶段二再抽统一核心）
+- **引擎 `botwnavi-eden.exe`**：存档锚点全量扫描 + 状态机（known 快路径 `known_botw.json` / 扫描 / 坐标校准 / 活性验证）；BOTW 轴序 (X east, alt 高, Z south+) 直读、elevBias=0；标题 ID `01007EF00011E000` 过滤；`/pos` 像素口径 `mx=2X+12000, my=2Z+10000`（前端 live.js 零改动）；端口 8766
+- **存档进度**：进度表 1078 点（神庙 136 / 高塔 15 / 克洛格 900 / 回忆 23 / 英杰 4）+ 9 类 counts（beast/korok/memory/memory_auto/memory_dlc/memory_final/memory_photo/shrine/tower）；Switch（小端）/ Wii U（大端）端序自适应
+- **GUI `BOTWNavi-Eden.exe`**：Wails 壳（复制 TOTK 改造）：定位状态、存档进度看板、坐标校准卡片、诊断包；regions.js 由进度表 15 座高塔自动生成
+
+### 修复
+- 存档 PLAYER_POSITION 解析：连续三块同 hash（X/alt/Z）只取第一次命中——原实现被 i+8/i+16 伪命中覆盖读出垃圾值，导致 botwSane 拒绝、无可用锚点（live-go parseSave 同款 break 逻辑）
+
+### 验证
+- 真机实测（2026-10-07，Eden 运行 BOTW）：扫描锁定 copies=243 struct=26（ActorBase 特征）、轴序与存档锚点 d=0.0 一致、`confirmed live (moving)` verified=true、坐标随玩家走动实时跟随、网页地图红点跟随人工确认通过
+- Ryujinx 偏移 `0xA77FCBBC` 在 Eden 实测不可用（不加快路径，符合既定方案）
+
 ## xnavi v2.3.0（2026-10-03）TOTK 剥离，恢复纯 BOTW 定位
 
 ### 重构
