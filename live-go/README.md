@@ -1,5 +1,11 @@
 # BotwNavi（BOTW Live · Go 版）
 
+> ## ⚠️ 已废弃（2026-10-07）
+>
+> 本程序已停止维护，**并入 xnavi v3.0.0**（Cemu + Ryujinx + Eden 三合一，统一版本号）。
+> 请改用新下载入口（xnavi），旧版本不再发新 Release。
+> 代码保留在仓库供参考，不再更新。
+
 为《旷野之息》互动地图 [https://botw.yalin.site/](https://botw.yalin.site/) 提供**实时角色追踪**的本地小工具（单 exe，约 7MB，零依赖）。
 
 ## 这是什么

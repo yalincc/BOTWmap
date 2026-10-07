@@ -264,7 +264,7 @@ func scanAll(h uintptr, blocks [][2]uintptr, target [3]float32, tol float32) map
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		fmt.Println("usage: probe_botw.exe scan <x> <y> <z> | save [path] | ryu")
+		fmt.Println("usage: probe_botw.exe scan <x> <y> <z> | save [path] | ryu | layout | chain")
 		return
 	}
 	switch args[0] {
@@ -272,6 +272,14 @@ func main() {
 		cmdSave(args)
 	case "ryu":
 		cmdRyu()
+	case "layout":
+		cmdLayout()
+	case "chain":
+		cmdChain()
+	case "coords":
+		cmdCoords()
+	case "main":
+		cmdMain()
 	case "scan":
 		if len(args) < 4 {
 			fmt.Println("usage: probe_botw.exe scan <x> <y> <z>")
@@ -333,7 +341,12 @@ func cmdScan(x, y, z float32) {
 func cmdSave(args []string) {
 	var paths []string
 	if len(args) >= 2 {
-		paths = append(paths, args[1])
+		// 支持传目录（递归找 game_data.sav）或单文件
+		if fi, err := os.Stat(args[1]); err == nil && fi.IsDir() {
+			paths = append(paths, findSaveFiles(args[1], "")...)
+		} else {
+			paths = append(paths, args[1])
+		}
 	} else {
 		// Cemu Wii U 根（大端）
 		cemuRoot := filepath.Join(os.Getenv("APPDATA"), "Cemu", "mlc01", "usr", "save")
@@ -389,6 +402,16 @@ func edenSaveRoots() []string {
 		// 进程路径推导（照 engine savefile_totk.go）
 		if p := procPath(h); p != "" {
 			out = append(out, filepath.Join(filepath.Dir(p), "user", "nand", "user", "save"))
+		}
+	}
+	// 常见盘符便携布局（照 engine botwSaveRoot：G:\YUZU\eden\user\...）
+	for _, drive := range []string{"C:\\", "D:\\", "E:\\", "F:\\", "G:\\", "H:\\", "I:\\", "J:\\", "K:\\", "L:\\"} {
+		for _, sub := range []string{
+			filepath.Join(drive, "YUZU", "eden", "user", "nand", "user", "save"),
+			filepath.Join(drive, "yuzu", "eden", "user", "nand", "user", "save"),
+			filepath.Join(drive, "YUZU", "user", "nand", "user", "save"),
+		} {
+			out = append(out, sub)
 		}
 	}
 	for _, c := range []string{
