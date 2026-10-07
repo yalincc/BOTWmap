@@ -207,11 +207,20 @@ func (g *gameBotw) ValidRaw(mem []float32, littleEndian bool) bool {
 //   - Cemu: 0x1055300C（社区公开针位 koko-yl/BotWRamWatch，Cemu 2.6 + JP v208 实测有效）
 //           备用 0xC1F8BF4（navicemu 多块固定偏移试读的备选）
 //   - Ryujinx: 0xA77FCBBC（5 次重启样本验证，player = block_base + 偏移恒成立）
+//   - Eden: 空（无固定偏移——金手指链 0x02D1EA00 在 Eden 确认不可用，
+//     定位走 platform_eden.go 锚点窗口扫描 + 绝对地址缓存，见开发计划阶段 0）
 func (g *gameBotw) KnownOffsets(p Platform) []uintptr {
-	if p != nil && p.Name() == "Cemu" {
-		return []uintptr{0x1055300C, 0xC1F8BF4}
+	if p == nil {
+		return []uintptr{0xA77FCBBC}
 	}
-	return []uintptr{0xA77FCBBC}
+	switch p.Name() {
+	case "Cemu":
+		return []uintptr{0x1055300C, 0xC1F8BF4}
+	case "Eden":
+		return nil
+	default:
+		return []uintptr{0xA77FCBBC}
+	}
 }
 
 // FixedNeedsMoveConfirm BOTW 偏移已跨重启验证，保持秒锁 + 直接 verified（不改已验证行为）。
@@ -220,13 +229,31 @@ func (g *gameBotw) FixedNeedsMoveConfirm() bool { return false }
 // PreferScanOnUnlock BOTW 偏移已验证，解锁后固定偏移优先秒锁。
 func (g *gameBotw) PreferScanOnUnlock() bool { return false }
 
-// UnverifiedRescanAfter BOTW 保持 15s 快速自愈（原行为）。
-func (g *gameBotw) UnverifiedRescanAfter() time.Duration { return 15 * time.Second }
+// UnverifiedRescanAfter BOTW 按平台：
+//   - Cemu/Ryujinx=15s（原行为）：扫描兜底锁错概率高，15s 快速自愈。
+//   - Eden=0（禁用）：Eden 扫描锁信任——站立不动是常态（挂机），15s unverified
+//     重扫会导致每 15s 重扫闪红点 + 无限循环。锁错自愈：玩家开始动 → 探针
+//     （锁定后 10s 窗口）换到移动中的组并 verified；探针已关 + 锁错 → 读数
+//     不变 → FrozenRescanAfter=30s 冻结检测 → bgScan 全量重扫换活槽。
+func (g *gameBotw) UnverifiedRescanAfter() time.Duration {
+	if p := currentPlatform(); p != nil && p.Name() == "Eden" {
+		return 0
+	}
+	return 15 * time.Second
+}
 
-// FrozenRescanAfter BOTW=0（禁用）：固定偏移是跨重启验证的活副本，游戏运行期
-// 不会失效；站立不动=副本无写入属正常，30s 冻结阈值曾造成"站立期间反复后台
-// 重扫"（Q13）。真异常（块切换读数错乱）由读数失效路径处理。
-func (g *gameBotw) FrozenRescanAfter() time.Duration { return 0 }
+// FrozenRescanAfter BOTW 按平台：
+//   - Cemu/Ryujinx=0（禁用）：固定偏移是跨重启验证的活副本，游戏运行期
+//     不会失效；站立不动=副本无写入属正常，30s 冻结阈值曾造成"站立期间反复后台
+//     重扫"（Q13）。真异常（块切换读数错乱）由读数失效路径处理。
+//   - Eden=30s：Eden 坐标槽会话内稳定、场景切换漂移——场景切换后旧地址可能
+//     仍返回旧坐标（内存未释放 → 红点冻结），30s 无变化触发冻结后台重扫自愈。
+func (g *gameBotw) FrozenRescanAfter() time.Duration {
+	if p := currentPlatform(); p != nil && p.Name() == "Eden" {
+		return 30 * time.Second
+	}
+	return 0
+}
 
 func (g *gameBotw) ShrineExit() float32 { return gameShrineExit }
 
@@ -263,10 +290,12 @@ func (g *gameBotw) ShrineReturn() (time.Duration, float32) {
 }
 
 // SaveAnchors = 原 savefile.go readSaveAnchors 逻辑原样平移。
+// 主档策略：Cemu/Eden=最新 mtime 槽（BotW 轮转写 6 槽，槽号固定不可靠，
+// 按 mtime 取最新，live-cemu 与 live-eden 双端实测）；Ryujinx=最高 playtime。
 func (g *gameBotw) SaveAnchors(p Platform) []*SaveAnchor {
 	files := allSaveFiles(p)
 	switch p.Name() {
-	case "Cemu":
+	case "Cemu", "Eden":
 		best, bestT := "", time.Time{}
 		for _, f := range files {
 			if fi, err := os.Stat(f); err == nil && fi.ModTime().After(bestT) {
@@ -282,25 +311,25 @@ func (g *gameBotw) SaveAnchors(p Platform) []*SaveAnchor {
 		}
 		return []*SaveAnchor{a}
 	default: // Ryujinx / 兜底
-		var out []*SaveAnchor
-		seen := map[[3]int32]int{}
-		for _, f := range files {
-			_, a := parseGameData(f)
-			if a == nil {
-				continue
-			}
-			key := [3]int32{int32(round1(a.Pos[0])), int32(round1(a.Pos[2])), int32(round1(a.Pos[1]))}
-			if i, ok := seen[key]; ok {
-				if a.Playtime > out[i].Playtime { // 同位置多个槽：保留游玩时间最高者
-					out[i] = a
+			var out []*SaveAnchor
+			seen := map[[3]int32]int{}
+			for _, f := range files {
+				_, a := parseGameData(f)
+				if a == nil {
+					continue
 				}
-				continue
+				key := [3]int32{int32(round1(a.Pos[0])), int32(round1(a.Pos[2])), int32(round1(a.Pos[1]))}
+				if i, ok := seen[key]; ok {
+					if a.Playtime > out[i].Playtime { // 同位置多个槽：保留游玩时间最高者
+						out[i] = a
+					}
+					continue
+				}
+				seen[key] = len(out)
+				out = append(out, a)
 			}
-			seen[key] = len(out)
-			out = append(out, a)
-		}
-		sort.Slice(out, func(i, j int) bool { return out[i].Playtime > out[j].Playtime })
-		return out
+			sort.Slice(out, func(i, j int) bool { return out[i].Playtime > out[j].Playtime })
+			return out
 	}
 }
 

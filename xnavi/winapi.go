@@ -24,6 +24,7 @@ var (
 	procProcess32FirstW          = kernel32.NewProc("Process32FirstW")
 	procProcess32NextW           = kernel32.NewProc("Process32NextW")
 	procSetConsoleTitleW         = kernel32.NewProc("SetConsoleTitleW")
+	procCreateMutexW             = kernel32.NewProc("CreateMutexW")
 )
 
 const (
@@ -32,6 +33,7 @@ const (
 	th32csSnapprocess       = 0x00000002
 	memCommit               = 0x1000
 	memMapped               = 0x40000
+	memPrivate              = 0x20000
 	pageGuard               = 0x100
 )
 
@@ -181,6 +183,25 @@ func readMem(h uintptr, addr uintptr, size int) []byte {
 func setConsoleTitle(title string) {
 	p, _ := syscall.UTF16PtrFromString(title)
 	procSetConsoleTitleW.Call(uintptr(unsafe.Pointer(p)))
+}
+
+// acquireSingleInstance 命名互斥体单实例锁。
+// 返回 false 表示已有同名实例持有锁（防多开：孤儿 core 占 8766 端口会
+// 导致新 core HTTP 绑定失败 + 平台反复重新探测——2026-10-08 真机事故）。
+// 锁 handle 由本进程持有（不关闭即保持，进程退出自动释放）。
+func acquireSingleInstance(name string) bool {
+	p, err := syscall.UTF16PtrFromString(name)
+	if err != nil {
+		return true // 编码失败放行，不阻塞定位
+	}
+	h, _, e := procCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(p)))
+	if h == 0 {
+		return true // 创建失败（权限等）放行
+	}
+	if e == syscall.Errno(183) { // ERROR_ALREADY_EXISTS
+		return false
+	}
+	return true
 }
 
 // ---- 模拟器 exe 版本号（诊断用）----

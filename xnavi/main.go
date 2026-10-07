@@ -29,6 +29,14 @@ import (
 
 func main() {
 	enableLogTimestamps()
+	// 单实例锁：防多开（2026-10-08 真机事故——孤儿 core 占 8766 端口，
+	// 新 core HTTP 绑定失败 + 每次重启重新 auto 探测 → 表现为平台"换来换去"）。
+	// 已有实例（含残留）时本实例直接退出，提示用户先关旧实例。
+	if !acquireSingleInstance("Local\\xnavi-core-v3") {
+		fmt.Println("  !! 已有 xnavi-core 实例在运行（可能是残留进程），本实例退出；")
+		fmt.Println("  !! 请先关闭旧实例（任务管理器结束 xnavi-core.exe），再点开始定位")
+		return
+	}
 	port := 8766
 	autoOpen := true
 	useSave := true
@@ -63,11 +71,14 @@ func main() {
 	// 平台选择：显式指定 or 自动探测（先全平台选，再按实际进程切换）
 	var rp ryujinxPlatform
 	var cp cemuPlatform
+	var ep edenPlatform
 	switch emu {
 	case "ryujinx":
 		setPlatform(&rp)
 	case "cemu":
 		setPlatform(&cp)
+	case "eden":
+		setPlatform(&ep)
 	default: // auto
 		// 游戏感知选择：优先"进程在跑且已加载游戏大块内存（≥256MB）"的平台，
 		// 解决 Ryujinx 进程活着但游戏已关时启动永远选不中 Cemu 的问题；
@@ -78,10 +89,14 @@ func main() {
 			setPlatform(&rp)
 		case cp.Attach() && len(cp.Blocks(256.0)) > 0:
 			setPlatform(&cp)
+		case ep.Attach() && len(ep.Blocks(256.0)) > 0:
+			setPlatform(&ep)
 		case rp.Attach():
 			setPlatform(&rp)
 		case cp.Attach():
 			setPlatform(&cp)
+		case ep.Attach():
+			setPlatform(&ep)
 		default:
 			setPlatform(&rp) // 都没在跑：默认 Ryujinx，状态机等它出现
 		}
@@ -96,10 +111,10 @@ func main() {
 		currentGame = detectGame(currentPlatform())
 	}
 
-	setConsoleTitle("xnavi · " + strings.ToUpper(currentGame.Name()) + " Live")
+	setConsoleTitle("xnavi " + CoreVersion + " · " + strings.ToUpper(currentGame.Name()) + " Live")
 
 	fmt.Println("=" + strings.Repeat("=", 61))
-	fmt.Printf(" xnavi · %s live - auto locating player position\n", strings.ToUpper(currentGame.Name()))
+	fmt.Printf(" xnavi %s · %s live - auto locating player position\n", CoreVersion, strings.ToUpper(currentGame.Name()))
 	fmt.Println("=" + strings.Repeat("=", 61))
 
 	if !useSave {

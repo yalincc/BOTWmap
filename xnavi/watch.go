@@ -498,6 +498,36 @@ func stateMachine() {
 					fmt.Printf("  [sm]   hint: 坐标数据异常（游戏传送/加载中?），游戏恢复后固定偏移会自动锁定；如长时间不恢复请检查游戏是否卡死\n")
 				}
 			}
+			// 1.5) Eden 平台：锚点窗口扫描 + 绝对地址缓存（模块化隔离：
+			//      Cemu/Ryujinx 不实现 edenLocator 接口 → 此分支不生效，路径零改动。
+			//      Eden 无固定偏移（KnownOffsets 空），定位走这里；known 秒锁
+			//      （Copies=0）或扫描锁定（Copies>0，带探针确认）。）
+			if loc, ok := p.(edenLocator); ok && useSaveScan && time.Since(lastScanAt) >= scanCooldown {
+				lastScanAt = time.Now()
+				if res := loc.EdenLocate(false); res != nil {
+					setLock(res.Addr, false, res.Copies, "eden-scan")
+					inLocked = true
+					resetFollow()
+					lockSince = time.Now()
+					probing = false
+					probeGroups = nil
+					probeTag := "known cache"
+					if res.Copies > 0 && len(res.Shortlist) > 0 {
+						probing = true
+						probeGroups = res.Shortlist
+						probeMoved = make([]int, len(probeGroups))
+						probeBase = map[uintptr][3]float32{}
+						probeAddrMoves = map[uintptr]int{}
+						probeStart = time.Now()
+						probeLast = time.Now()
+						probeLockGi = 0
+						probeRearms = 0
+						probeTag = fmt.Sprintf("probing top %d, waiting move confirm", len(probeGroups))
+					}
+					fmt.Printf("  [sm] eden -> lock 0x%X copies=%d [%s]\n", res.Addr, res.Copies, probeTag)
+					continue
+				}
+			}
 			// 2) 固定偏移失败，走全量结构扫描（不依赖存档锚点）
 			if useSaveScan && time.Since(lastScanAt) >= scanCooldown {
 				lastScanAt = time.Now()
@@ -692,6 +722,30 @@ func stateMachine() {
 		if bgScan && time.Since(lastBgScanAt) >= 60*time.Second {
 			bgScan = false
 			lastBgScanAt = time.Now()
+			if loc, ok := p.(edenLocator); ok {
+				// Eden：冻结后台重扫走锚点窗口扫描（跳过 known——known 就是冻结的旧地址，
+				// 强制全量重新定位新坐标槽）。锁保持不解锁，探针找活副本后自动切换。
+				res := loc.EdenLocate(true)
+				if res != nil && res.Copies > 0 && len(res.Shortlist) > 0 {
+					probing = true
+					probeGroups = res.Shortlist
+					probeMoved = make([]int, len(probeGroups))
+					probeBase = map[uintptr][3]float32{}
+					probeAddrMoves = map[uintptr]int{}
+					probeStart = time.Now()
+					probeLast = time.Now()
+					probeLockGi = -1
+					probeRearms = 0
+					for gi := range res.Shortlist {
+						if len(res.Shortlist[gi].Addrs) > 0 && res.Shortlist[gi].Addrs[0] == a {
+							probeLockGi = gi // 当前锁自己的组：探针不切到自己
+							break
+						}
+					}
+					fmt.Printf("  [sm] eden frozen -> background rescan done, probing top %d (lock kept)\n", len(res.Shortlist))
+				}
+				continue
+			}
 			logf := func(s string) { fmt.Println("    " + s) }
 			fmt.Println("  [sm] frozen -> background rescan (lock kept)...")
 			hits := structuralScan(h, sessionBlocks(h), logf)
@@ -717,6 +771,19 @@ func stateMachine() {
 		}
 
 		v := currentGame.DecodeAt(h, a)
+		if v == nil {
+			// Q19+Eden 跑快停滞修复（2026-10-08）：锁定地址已确认正确，读失败多为
+			// 玩家高速移动时坐标槽高频交替写入（玩家数据+无效数据轮流）踩中无效
+			// 相位，属瞬时撕裂读 → 立即二次采样（3×40ms），停滞从秒级降到 <120ms。
+			// 与固定偏移路径的 (b) 不重试不同：那里是"对候选块试错"（读到非法 =
+			// 该块不是坐标，重试永远失败）；这里是"已锁定地址的瞬时无效"，重试有效。
+			for i := 0; i < 3; i++ {
+				time.Sleep(40 * time.Millisecond)
+				if v = currentGame.DecodeAt(h, a); v != nil {
+					break
+				}
+			}
+		}
 		if v == nil {
 			invalidN++
 			state.mu.Lock()
@@ -840,7 +907,11 @@ func stateMachine() {
 				probing = false
 				if !savedKnown {
 					savedKnown = true
-					saveKnown([]uintptr{a}, guestRamBase(), [3]float32{cur[0], cur[1], cur[2]})
+					if loc, ok := currentPlatform().(edenLocator); ok {
+						loc.EdenSaveKnown(a) // Eden：绝对地址缓存（神庙槽拒绝）
+					} else {
+						saveKnown([]uintptr{a}, guestRamBase(), [3]float32{cur[0], cur[1], cur[2]})
+					}
 					dumpDiagnostic(a, cur)
 				}
 			}

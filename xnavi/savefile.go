@@ -22,6 +22,7 @@ const (
 	playerPositionHash = 0xA40BA103 // PLAYER_POSITION
 	playtimeHash       = 0x73C29681 // PlayTime
 	korokCounterHash   = 0x8A94E07A // HiddenKorok_Number
+	botwTitleID        = "01007EF00011E000" // BOTW Switch 标题 ID（Eden 存档根过滤用）
 )
 
 // validSaveVersions 存档格式版本号（Switch/Wii U 共用，仅字节序相反）。
@@ -123,6 +124,8 @@ var saveDirOverride string
 func setSaveDirOverride(d string) { saveDirOverride = d }
 
 // allSaveFiles 遍历当前平台所有存档根候选（去重、排序）。
+// Eden 存档根可能混入其他 Switch 游戏存档（同目录多个 title），按 BOTW 标题 ID
+// 过滤；Cemu（Wii U）/Ryujinx 存档目录本就只含 BOTW，不过滤（零影响）。
 func allSaveFiles(p Platform) []string {
 	names := currentGame.SaveFileNames()
 	var out []string
@@ -130,7 +133,17 @@ func allSaveFiles(p Platform) []string {
 		out = append(out, findSaveFiles(saveDirOverride, names)...)
 	}
 	for _, root := range p.SaveRoots() {
-		out = append(out, findSaveFiles(root, names)...)
+		files := findSaveFiles(root, names)
+		if p.Name() == "Eden" {
+			var ef []string
+			for _, f := range files {
+				if strings.Contains(strings.ToUpper(f), botwTitleID) {
+					ef = append(ef, f)
+				}
+			}
+			files = ef
+		}
+		out = append(out, files...)
 	}
 	seen := map[string]bool{}
 	var uniq []string

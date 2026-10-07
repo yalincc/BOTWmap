@@ -23,6 +23,10 @@ type MemBlock struct {
 
 // Platform 描述一个模拟器平台的只读访问能力。
 // 实现必须保证：只读、不注入、不修改游戏内存。
+// 平台：Ryujinx / Cemu / Eden（Eden = Yuzu fork，见 platform_eden.go）。
+// 定位策略差异经 edenLocator 接口隔离：仅 Eden 实现（锚点窗口扫描+绝对地址缓存），
+// Cemu/Ryujinx 走固定偏移 + 结构扫描默认路径——多套定位策略互不干扰
+// （TOTK 事故教训：并入 TOTK Ryujinx 曾导致 Cemu/Ryujinx BOTW 也无法锁定）。
 type Platform interface {
 	Name() string // "Ryujinx" / "Cemu"
 
