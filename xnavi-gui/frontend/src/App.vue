@@ -24,9 +24,10 @@
             <div>
               <label class="block text-xs text-slate-400 mb-1">模拟器：</label>
               <select v-model="env.emulator" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:border-blue-500 focus:outline-none">
-                <option value="auto">Auto (Cemu/Ryujinx)</option>
+                <option value="auto">Auto (Cemu/Ryujinx/Eden)</option>
                 <option value="cemu">Cemu</option>
                 <option value="ryujinx">Ryujinx</option>
+                <option value="eden">Eden</option>
               </select>
             </div>
             <div>
@@ -86,14 +87,11 @@
           <span v-if="scanInfo" class="text-slate-400 ml-2">{{ scanInfo }}</span>
         </div>
       </section>
-      <!-- S3 基准校准（TOTK）：游戏地图读坐标输入，独立于自动定位的手工模块 -->
+      <!-- 状态步骤（坐标校准已移除：V3.0.0 三合一后不再需要手工校准） -->
       <section class="bg-[#161b22] border border-slate-800 rounded-md p-2.5 shrink-0 flex items-center gap-2 flex-wrap">
-        <span class="text-[11px] font-semibold text-slate-400">基准校准</span>
-        <input v-model="calib.x" placeholder="X" class="w-20 bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none" />
-        <input v-model="calib.y" placeholder="高度" class="w-20 bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none" />
-        <input v-model="calib.z" placeholder="Z" class="w-20 bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-blue-500 focus:outline-none" />
-        <button @click="doCalibrate" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-xs">校准</button>
-        <span v-if="calibMsg" class="text-[11px] text-slate-400">{{ calibMsg }}</span>
+        <span class="text-[11px] font-semibold text-slate-400">状态</span>
+        <span :class="stateTextClass">{{ stateText }}</span>
+        <span v-if="scanInfo" class="text-slate-400 text-xs">{{ scanInfo }}</span>
         <span class="text-[10px] text-slate-600 ml-auto">定位模式: {{ locMode || 'idle' }}</span>
       </section>
       <section class="bg-[#0d1117] border border-slate-800 rounded-md p-2.5 flex flex-col font-mono text-[11px] flex-1 min-h-0">
@@ -157,7 +155,7 @@
     <div v-if="showAbout" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showAbout = false">
       <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-96 text-xs space-y-2">
         <div class="text-sm font-bold text-white mb-2">关于 xnavi</div>
-        <div class="text-slate-300">多游戏定位导航（BOTW + TOTK × Cemu + Ryujinx）</div>
+        <div class="text-slate-300">三合一定位导航（BOTW × Cemu + Ryujinx + Eden）</div>
         <div class="text-slate-400">版本：{{ ver }}</div>
         <div class="text-slate-400">地图：<a :href="mapUrl" class="text-blue-400 hover:underline">{{ mapUrl.replace('https://','').replace('/','') }}</a></div>
         <div class="text-slate-400">GitHub：<a href="https://github.com/yalincc/BOTWmap" class="text-blue-400 hover:underline">yalincc/BOTWmap</a></div>
@@ -174,7 +172,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 const api = window.go.main.App
 const rt = window.runtime
-const ver = ref('v2.2.1')
+const ver = ref('v3.0.0')
 const coreRunning = ref(false)
 const syncText = ref('等待坐标流')
 const syncDot = ref('bg-slate-600')
@@ -185,12 +183,12 @@ const updateInfo = ref(null)
 let isInitLog = true
 const paths = reactive({ cemu: '', ryujinx: '', saveDir: '' })
 const env = reactive({ emulator: 'auto', game: 'auto' })
-const envDetect = reactive({ cemu: false, ryujinx: false })
+const envDetect = reactive({ cemu: false, ryujinx: false, eden: false })
 const hitText = computed(() => {
-  if (envDetect.cemu && envDetect.ryujinx) return '✓ Cemu + Ryujinx 路径已配置'
-  if (envDetect.cemu) return '✓ Cemu 路径已配置'
-  if (envDetect.ryujinx) return '✓ Ryujinx 路径已配置'
-  return '未配置模拟器路径（点开始后自动探测进程）'
+  if (envDetect.cemu && envDetect.ryujinx) return '✓ Cemu + Ryujinx 路径已配置（Eden 免配置）'
+  if (envDetect.cemu) return '✓ Cemu 路径已配置（Eden 免配置）'
+  if (envDetect.ryujinx) return '✓ Ryujinx 路径已配置（Eden 免配置）'
+  return '未配置模拟器路径（点开始后自动探测进程；Eden 无需配置）'
 })
 const hitClass = computed(() => (envDetect.cemu || envDetect.ryujinx) ? 'text-emerald-400' : 'text-amber-400')
 const isLocating = ref(false)
@@ -232,20 +230,14 @@ const mapAutoOpened = ref(false)
 const saveTip = '主档自动识别：Ryujinx 取游玩时间最长的槽，Cemu 取最近修改的槽。游戏内保存后约 2 秒自动刷新。'
 const emuLabel = computed(() => {
   if (!progressData.value || !progressData.value.save) return '未连接模拟器'
-  return progressData.value.save.toLowerCase().includes('ryujinx') ? 'Ryujinx' : 'Cemu'
+  const p = progressData.value.save.toLowerCase()
+  if (p.includes('ryujinx')) return 'Ryujinx'
+  if (p.includes('eden')) return 'Eden'
+  return 'Cemu'
 })
 const gameVerLabel = computed(() => '') // BOTW 版本识别（存档版本号）P2b 后接入
 const detectedGame = ref('') // core status.json 上报的实际识别游戏（botw/totk）
-// S3 基准校准（TOTK）：独立手工模块，不影响自动定位
-const calib = reactive({ x: '', y: '', z: '' })
-const calibMsg = ref('')
 const locMode = ref('')
-async function doCalibrate() {
-  const x = parseFloat(calib.x), y = parseFloat(calib.y), z = parseFloat(calib.z)
-  if (isNaN(x) || isNaN(y) || isNaN(z)) { calibMsg.value = '请输入三个数字（游戏地图上的坐标）'; return }
-  calibMsg.value = await api.Calibrate(x, y, z)
-  setTimeout(() => { calibMsg.value = '' }, 15000)
-}
 // 存档卡片五槽标签按游戏切换（TOTK: 龙之泪=回忆位、树根=神兽位）
 const gameLabels = computed(() => {
   const g = detectedGame.value || env.game
@@ -302,7 +294,7 @@ function pushLogs(lines) {
 async function pickCemu() { const d = await api.PickDir("选择 Cemu 目录"); if (d) paths.cemu = d }
 async function pickRyujinx() { const d = await api.PickDir("选择 Ryujinx 目录"); if (d) paths.ryujinx = d }
 async function pickSave() { const d = await api.PickDir("选择存档目录"); if (d) paths.saveDir = d }
-async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator, game: env.game }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx }
+async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator, game: env.game }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx; envDetect.eden = det.eden }
 function clearLogs() { logs.value = [] }
 function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
@@ -367,6 +359,7 @@ onMounted(async () => {
   const det = await api.EnvDetect()
   envDetect.cemu = det.cemu
   envDetect.ryujinx = det.ryujinx
+  envDetect.eden = det.eden
   const initial = await api.TailLog()
   pushLogs(initial)
   isInitLog = false
@@ -377,7 +370,7 @@ onMounted(async () => {
     if (st.progress && st.progress.counts) {
       progressData.value = st.progress
     }
-    if (st.emuVer) emuVer.value = st.emuVer
+    if (st.emuVer !== undefined) emuVer.value = st.emuVer || ''
     if (st.game) detectedGame.value = st.game
     if (st.mode) locMode.value = st.mode
     if (st.map_url) statusMapUrl.value = st.map_url

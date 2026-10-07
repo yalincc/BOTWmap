@@ -20,8 +20,10 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// guiVersion 导航程序版本（与地图网页版本解耦，见 BOTWmap 项目规则第 3 条）。
-const guiVersion = "v2.2.1"
+// guiVersion 导航程序版本（三合一统一版本 v3.0.0，2026-10-07 拍板：
+// GUI 壳与导航核心 xnavi 共享同一版本号，不再各自解耦）。
+// 注意：必须与 xnavi/version.go 的 CoreVersion 保持一致。
+const guiVersion = "v3.0.0"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -41,8 +43,8 @@ type Config struct {
 	CemuDir    string `json:"cemuDir"`
 	RyujinxDir string `json:"ryujinxDir"`
 	SaveDir    string `json:"saveDir"`
-	Emulator   string `json:"emulator"` // auto | cemu | ryujinx
-	Game       string `json:"game"`     // auto | botw | totk（V2.2.0 双游戏）
+	Emulator   string `json:"emulator"` // auto | cemu | ryujinx | eden
+	Game       string `json:"game"`     // auto | botw | totk
 }
 
 func (a *App) configPath() string { return filepath.Join(a.workDir, "xnavi-gui-config.json") }
@@ -78,6 +80,11 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.cfg = a.loadConfig()
+	// 清理孤儿 core（2026-10-08 真机事故修复）：GUI 崩溃/被杀后其 core 子进程
+	// 可能残留并独占 8766 端口 → 新 core 全部 HTTP 绑定失败 + 平台反复重新探测
+	// （表现为"换来换去"）。startup 时按进程名清理一次（core 是 GUI 专属子进程，
+	// 用户不会单独运行；core 侧另有单实例锁兜底）。
+	exec.Command("taskkill", "/IM", "xnavi-core.exe", "/F").Run()
 	a.tailInit()
 	go a.eventBridge(ctx)
 	go a.checkUpdate()
@@ -167,7 +174,7 @@ func (a *App) corePath() string {
 }
 
 // StartCore 启动核心子进程（xnavi-core.exe --emu=<emu> [--game=<game>] --no-open）。
-// emu: auto | ryujinx | cemu；game 从已保存配置读取（auto | botw | totk，auto 时不传让 core 自动识别）。
+// emu: auto | ryujinx | cemu | eden；game 从已保存配置读取（auto | botw | totk，auto 时不传让 core 自动识别）。
 // 重复调用会先停掉旧进程。
 func (a *App) StartCore(emu string) string {
 	a.mu.Lock()
@@ -434,11 +441,12 @@ func portInUse(port int) bool {
 // EnvDetect 探测"已配置的"模拟器路径是否存在（仅给前端做提示，不挡开始按钮）。
 // 真实"是否附加到运行中的模拟器进程"由 core 经 status.json 的 pid 上报，
 // 这里不再硬编码开发机盘符——任何用户机器上都不该因为路径猜不到而点不了开始。
+// Eden 无路径配置（进程名 + 存档自动探测），恒 false，前端提示免配置。
 func (a *App) EnvDetect() map[string]any {
 	a.mu.Lock()
 	cfg := a.cfg
 	a.mu.Unlock()
-	res := map[string]any{"ryujinx": false, "cemu": false}
+	res := map[string]any{"ryujinx": false, "cemu": false, "eden": false}
 	if cfg != nil {
 		if cfg.CemuDir != "" && pathExists(cfg.CemuDir) {
 			res["cemu"] = true
