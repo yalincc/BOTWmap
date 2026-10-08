@@ -150,29 +150,30 @@
         <button id="hbClose" class="card-close" title="关闭">×</button>
       </div>
       <div class="hq">
-        <h4>📂 加载存档进度</h4>
+        <h4>📂 加载存档进度（网页上传）</h4>
         <p>存档文件：<code>game_data.sav</code>（Switch 与 Wii U·Cemu 同名，上传后自动识别端序），拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
-        <p>Ryujinx（Switch 模拟器）：</p>
-        <code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code>
-        <p class="hq-note">游戏 ID 目录 <code>0000000000000008\0</code> 下还有一层存档槽文件夹（0、1、2…），挑文件修改时间最新的 game_data.sav；找不到时按 <code>Win + R</code> 粘贴下面路径回车，逐步进入：</p>
-        <code>%APPDATA%\Ryujinx\bis\user\save</code>
-        <p>Cemu（Wii U 模拟器）：</p>
-        <code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\1\game_data.sav</code>
-        <p class="hq-note">进入后同样先找存档槽文件夹（0、1、2…）再挑 game_data.sav；<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。</p>
+        <p>常见存档位置：</p>
+        <p>Cemu：<code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\&lt;槽&gt;\game_data.sav</code><br>Ryujinx / Eden：<code>%APPDATA%\Ryujinx\bis\user\save\...\01007EF00011E000\&lt;槽&gt;\game_data.sav</code></p>
+        <p class="hq-note">中间的用户/标题 ID 目录每个人不一样；找不到时按 <code>Win + R</code> 粘贴上面的根路径回车，逐层进到 <code>game_data.sav</code> 为止。<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。</p>
         <hr>
         <h4>🔄 进度是怎么同步的</h4>
         <p>上传存档后，浏览器本地解析出神庙 / 塔 / 克洛格 / 主线回忆 / 神兽的收集状态，写进本机浏览器，<b>离线再打开也保留</b>。</p>
-        <p>本机跑 live 服务（悬浮框导航）时，游戏内收集会自动同步，与上传共用同一套进度；手动勾选是叠加，不会冲突，<b>以存档为准</b>。</p>
+        <p>用 <b>xnavi</b> 实时定位时，进度自动同步：xnavi 每 2 秒检查你的存档文件，<b>游戏保存后 ≤2 秒自动刷新</b>，与上传共用同一套进度；手动勾选是叠加，不会冲突，<b>以存档为准</b>。</p>
         <hr>
-        <h4>🧭 悬浮框与实时导航（本机）</h4>
-        <p>运行 <code>live/start-all.bat</code> 一键启动服务和悬浮框；游戏里走动，浮窗与网页红点实时跟随。</p>
-        <p>点地图上的标注 →「导航」出现引导线；信息卡可拖住头部移动；状态胶囊：<span class="hq-dot on">●</span> 已连接 · <span class="hq-dot warn">◐</span> 定位中（移动角色）· <span class="hq-dot off">●</span> 离线。</p>
+        <h4>🧭 xnavi 实时定位（本机）</h4>
+        <p>下载 <a href="https://github.com/yalincc/BOTWmap/releases" target="_blank" rel="noopener">xnavi</a> 解压，先启动模拟器进游戏，双击 <code>xnavi.exe</code> → 开始定位。支持 <b>Cemu / Ryujinx / Eden</b> 三平台，自动识别，几秒锁定；游戏里走路/滑翔/传送，网页红点实时跟随。</p>
+        <p>存档自动探测；自动找不到时，在 xnavi 设置里手动填对应平台的 BOTW 存档路径即可。</p>
         <p>回忆 / 克洛格标注的卡片里有「收集」按钮：开启后自动导航到离你最近的未收集点，收集完成（游戏内保存或手动勾选）自动前往下一个；底部横幅「结束」可随时退出。</p>
+        <hr>
+        <h4>📁 存档 Q&A（xnavi）</h4>
+        <p><b>提示 "no usable save anchor found"？</b> 找不到可用存档（定位锚点 + 进度同步都需要它）。通常是：模拟器目录不常见 → 设置里手动填存档路径；游戏还没保存过 → 进游戏存一次档。</p>
+        <p><b>存档槽 0-5 加载哪个？</b> xnavi 自动取最近修改的槽（BOTW 轮转写 6 槽，最近写过的最接近当前状态）；不同槽是不同时刻的存档，不要手动指定旧槽，否则进度会显示旧数据。</p>
+        <p><b>红点是读存档还是内存？</b> 读内存（只读不修改游戏），存档只做定位辅助判据 + 进度来源。</p>
         <hr>
         <h4>❓ 常见问题</h4>
         <p>为什么宝箱 / 英杰·EX 回忆一直是 0？—— 这两类在存档里没有逐项记录，只能手动勾选。</p>
         <p>克洛格计数器和实际数量不一致？—— 以游戏内实际收集为准（逐项记录），计数器仅供参考。</p>
-        <p>手机上能用吗？—— 能，上传存档即可；悬浮框导航仅限本机。</p>
+        <p>手机上能用吗？—— 能，上传存档即可；实时定位（红点跟随）仅限本机 xnavi。</p>
       </div>
     </div>
 
