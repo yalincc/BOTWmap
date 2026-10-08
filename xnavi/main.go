@@ -150,6 +150,7 @@ func main() {
 		fmt.Printf("  API -> http://127.0.0.1:%d/pos\n", port)
 		go http.Serve(ln, &server{})
 	}
+	lanURL = makeLanURL(port, currentGame.Name()) // 手机镜像 URL（/pos.lanUrl 供网页二维码面板读取）
 
 	// 单一状态机：唯一写 lock.addr 的 goroutine
 	go stateMachine()
@@ -306,6 +307,34 @@ func openBrowser(url string) {
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("  (could not open browser: %v)\n", err)
 	}
+}
+
+// defaultRouteIPv4 取本机出公网的默认路由 IPv4（UDP dial 不发包，仅选路）；
+// 手机与 PC 同 WiFi 时，这个 IP 就是手机能直达的局域网地址。
+func defaultRouteIPv4() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	if la, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+		return la.IP.String()
+	}
+	return ""
+}
+
+// makeLanURL 构造移动端镜像 URL：http://<IP>:<port>/botw/?follow=1&game=<game>
+func makeLanURL(port int, game string) string {
+	ip := defaultRouteIPv4()
+	if ip == "" {
+		if ips := lanIPv4s(); len(ips) > 0 {
+			ip = ips[0]
+		}
+	}
+	if ip == "" {
+		return ""
+	}
+	return fmt.Sprintf("http://%s:%d/botw/?follow=1&game=%s", ip, port, game)
 }
 
 // lanIPv4s 列出本机非回环 IPv4 地址（移动端局域网镜像 URL 用）

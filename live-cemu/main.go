@@ -250,6 +250,34 @@ func lanIPv4s() []string {
 	return out
 }
 
+// defaultRouteIPv4 取本机出公网的默认路由 IPv4（UDP dial 不发包，仅选路）；
+// 手机与 PC 同 WiFi 时，这个 IP 就是手机能直达的局域网地址。
+func defaultRouteIPv4() string {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+	if la, ok := conn.LocalAddr().(*net.UDPAddr); ok {
+		return la.IP.String()
+	}
+	return ""
+}
+
+// makeLanURL 构造移动端镜像 URL：http://<IP>:<port>/botw/?follow=1&game=<game>
+func makeLanURL(port int, game string) string {
+	ip := defaultRouteIPv4()
+	if ip == "" {
+		if ips := lanIPv4s(); len(ips) > 0 {
+			ip = ips[0]
+		}
+	}
+	if ip == "" {
+		return ""
+	}
+	return fmt.Sprintf("http://%s:%d/botw/?follow=1&game=%s", ip, port, game)
+}
+
 func pickPort(start int) (net.Listener, int) {
 	for p := start; p < start+15; p++ {
 		l, err := net.Listen("tcp", fmt.Sprintf(":%d", p))
@@ -275,6 +303,7 @@ func main() {
 		os.Exit(1)
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d", port)
+	lanURL = makeLanURL(port, "botw") // 手机镜像 URL（/pos.lanUrl 供网页二维码面板读取）
 
 	fmt.Printf("  API: %s/pos\n", url)
 	if port != 8766 {

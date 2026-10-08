@@ -18,6 +18,9 @@ var botwRoots = []string{
 	`..\..\BOTWmap\app`,
 }
 
+// lanURL 移动端局域网镜像 URL（main 启动时计算；/pos 返回，网页二维码面板读取）
+var lanURL string
+
 func cors(w http.ResponseWriter) {
 	h := w.Header()
 	h.Set("Access-Control-Allow-Origin", "*")
@@ -66,6 +69,7 @@ func newMux() *http.ServeMux {
 			"target":      t,
 			"source":      st.Source,
 			"progressGen": "",
+			"lanUrl":      lanURL,
 		}
 		st.mu.Unlock()
 		jsonOut(w, resp)

@@ -362,6 +362,32 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 }
 #collectStop:hover { color: #ff8f8f; border-color: var(--danger); }
 
+/* ---------- 手机镜像面板（V1.5.0） ---------- */
+#btnMirror.on { color: var(--gold); border-color: var(--gold-dim); background: var(--gold-bg); }
+#mirrorPanel {
+  position: absolute; right: 14px; bottom: 90px; z-index: 8; width: 250px;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+  padding: 10px 12px 12px; box-shadow: 0 4px 18px rgba(0,0,0,.4);
+}
+#mirrorPanel .mp-head { font-size: 12.5px; color: var(--gold-lite); margin-bottom: 8px; }
+#mirrorPanel .mp-qr { text-align: center; margin-bottom: 8px; }
+#mirrorPanel .mp-qr img { width: 176px; height: 176px; border-radius: 6px; background: #fff; border: 1px solid #fff; }
+#mirrorPanel .mp-url-wrap { display: flex; gap: 6px; }
+#mirrorPanel .mp-url-wrap input {
+  flex: 1; min-width: 0; background: #14211a; color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 11.5px;
+}
+#mirrorPanel .mp-url-wrap button {
+  background: #3a5a17; border: 1px solid #8fbf3a; color: #eaffd0; border-radius: 6px;
+  padding: 0 10px; font-size: 11.5px; cursor: pointer; flex: none;
+}
+#mirrorPanel .mp-hint { margin: 8px 0 0; font-size: 11px; color: var(--text-dim); }
+#mirrorPanel .mp-close {
+  position: absolute; top: 6px; right: 8px; background: transparent; border: none;
+  color: var(--text-dim); font-size: 16px; cursor: pointer; line-height: 1;
+}
+#mirrorPanel .mp-close:hover { color: #ff8f8f; }
+
 /* ---------- 鑷畾涔夋爣璁拌〃鍗?---------- */
 #pinForm {
   position: absolute; z-index: 18; width: 200px;
@@ -560,6 +586,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   #modeHint { font-size: 11.5px; padding: 5px 12px; }
   #toast { font-size: 12px; width: 86vw; text-align: center; }
   #collectBar { font-size: 11px; bottom: 62px; max-width: 92vw; }
+  #mirrorPanel { right: 10px; bottom: 96px; width: min(240px, 86vw); }
 }
 
 /* ---------- 图层组合（v1.1.8 已移除） ---------- */

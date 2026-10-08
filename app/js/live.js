@@ -33,6 +33,9 @@ const LIVE = (() => {
   let follow = false;
   try { follow = localStorage.getItem(K_FOLLOW) !== '0'; } catch (e) {}
 
+  /* V1.5.0 手机镜像面板：显示可复制的局域网链接 + 第三方二维码（api.qrserver.com） */
+  let mirrorShown = false, lastLanUrl = null;
+
   /* V1.4.4 URL 上下文（xnavi 导航程序打开地图时带参，见《BOTWmap导航配合接口协议 v1》）：
    *   ?follow=1 → 导航启动，强制开启视图跟随并持久化（用户手动设置让位于导航启动意图）
    *   ?game=    → 导航当前识别的游戏（botw/totk），进度口径选择与提示参考 */
@@ -69,6 +72,13 @@ const LIVE = (() => {
       });
     }
 
+    const bMirror = document.getElementById('btnMirror');
+    if (bMirror) bMirror.addEventListener('click', toggleMirror);
+    const cMirror = document.getElementById('mirrorClose');
+    if (cMirror) cMirror.addEventListener('click', hideMirror);
+    const cpBtn = document.getElementById('mirrorCopy');
+    if (cpBtn) cpBtn.addEventListener('click', copyMirrorUrl);
+
     const cbStop = document.getElementById('collectStop');
     if (cbStop) cbStop.addEventListener('click', () => { stopCollectMode(); UI.toast('已结束收集模式'); });
 
@@ -90,6 +100,9 @@ const LIVE = (() => {
 
     const L = map.live;
     L.online = !!(p && p.ok);
+    // V1.5.0：服务端返回 lanUrl（局域网手机镜像入口）→ 刷新面板（变化时才更新 DOM）
+    const lanUrl = (p && typeof p.lanUrl === 'string' && p.lanUrl) ? p.lanUrl : '';
+    if (lanUrl !== lastLanUrl) { lastLanUrl = lanUrl; renderMirror(lanUrl); }
     if (L.online) {
       L.mx = p.mx; L.my = p.my;
       L.gx = p.gx; L.gy = p.gy; L.gz = p.gz;
@@ -447,6 +460,52 @@ const LIVE = (() => {
       }
     }
     if (UI && UI.syncCollectBtn) UI.syncCollectBtn();
+  }
+
+  /* ---------- 手机镜像面板（V1.5.0） ---------- */
+  function toggleMirror() {
+    const b = document.getElementById('btnMirror');
+    const el = document.getElementById('mirrorPanel');
+    if (!b || !el) return;
+    if (mirrorShown) { hideMirror(); return; }
+    mirrorShown = true;
+    el.classList.remove('hidden');
+    b.classList.add('on');
+    if (!lastLanUrl) UI.toast('未检测到本地定位服务，请先启动定位程序');
+  }
+  function hideMirror() {
+    mirrorShown = false;
+    const el = document.getElementById('mirrorPanel');
+    const b = document.getElementById('btnMirror');
+    if (el) el.classList.add('hidden');
+    if (b) b.classList.remove('on');
+  }
+  function renderMirror(url) {
+    const el = document.getElementById('mirrorPanel');
+    if (!el) return;
+    const input = document.getElementById('mirrorUrl');
+    const img = document.getElementById('mirrorQr');
+    if (!input || !img) return;
+    if (!url) {
+      input.value = '';
+      img.removeAttribute('src');
+      img.style.display = 'none';
+      return;
+    }
+    input.value = url;
+    img.style.display = '';
+    img.onerror = () => { img.style.display = 'none'; };
+    img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=6&data=' + encodeURIComponent(url);
+  }
+  function copyMirrorUrl() {
+    const input = document.getElementById('mirrorUrl');
+    if (!input || !input.value) { UI.toast('暂无可复制的链接'); return; }
+    input.focus();
+    input.select();
+    input.setSelectionRange(0, 99999);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    UI.toast(ok ? '链接已复制 · 手机需与电脑在同一 WiFi' : '复制失败，请长按选择复制');
   }
 
   /* ---------- 画布绘制（挂到 BotwMap.prototype._drawLive） ---------- */

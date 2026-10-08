@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=40">
+<link rel="stylesheet" href="css/style.css?v=41">
 </head>
 <body>
 <div id="app">
@@ -103,6 +103,7 @@
       <button id="zoomOut">－</button>
       <button id="zoomFit" title="重置视图">⌂</button>
       <button id="btnFollow" class="live-follow" title="开启后视图跟随玩家位置">🎯</button>
+      <button id="btnMirror" class="live-follow" title="手机镜像：同一 WiFi 下扫码，手机/iPad 打开同一地图">📱</button>
     </div>
 
     <div id="coordReadout">X: --  Z: --</div>
@@ -112,6 +113,17 @@
       <span class="dim" id="collectBarProg"></span>
       <span id="collectBarCur"></span>
       <button id="collectStop" type="button">结束</button>
+    </div>
+    <!-- 手机镜像面板（V1.5.0）：同一 WiFi 下扫码/复制链接，手机/iPad 打开同源地图 -->
+    <div id="mirrorPanel" class="hidden">
+      <button id="mirrorClose" type="button" class="mp-close" title="关闭">×</button>
+      <div class="mp-head">📱 手机镜像 · 同一 WiFi</div>
+      <div class="mp-qr"><img id="mirrorQr" alt="手机镜像二维码" src="" draggable="false"></div>
+      <div class="mp-url-wrap">
+        <input id="mirrorUrl" type="text" readonly spellcheck="false">
+        <button id="mirrorCopy" type="button" title="复制链接">复制</button>
+      </div>
+      <p class="mp-hint">手机打开后：红点跟随 / 点图标导航 / 收集进度与电脑一致</p>
     </div>
     <div id="modeHint" class="hidden"></div>
     <div id="toast"></div>
@@ -306,7 +318,7 @@
 <script src="js/map.js?v=27"></script>
 <script src="js/ui.js?v=41"></script>
 <script src="js/main.js?v=9"></script>
-<script src="js/live.js?v=13"></script>
+<script src="js/live.js?v=14"></script>
 <script src="data/save_flags.js?v=1"></script>
 <script src="js/save_upload.js?v=10"></script>
 </body>

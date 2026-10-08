@@ -94,6 +94,9 @@ func writeJSON(w http.ResponseWriter, obj any) {
 	w.Write(buf)
 }
 
+// lanURL 移动端局域网镜像 URL（main 启动时计算；/pos 返回，网页二维码面板读取）
+var lanURL string
+
 type server struct{}
 
 // BOTWmap 资产候选位置（v3.0.2 局域网镜像：存在即接管 /botw/，缺失不影响核心导航）
@@ -198,6 +201,7 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 		_, _, gen := progressFor().snapshot()
 		payload["progressGen"] = gen
 	}
+	payload["lanUrl"] = lanURL
 	writeJSON(w, payload)
 }
 
