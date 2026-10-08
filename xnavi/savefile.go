@@ -118,20 +118,13 @@ func findSaveFiles(root string, names []string) []string {
 	return out
 }
 
-// saveDirOverride 由 --save-dir= 命令行参数指定（GUI 设置），优先于自动探测。
-var saveDirOverride string
-
-func setSaveDirOverride(d string) { saveDirOverride = d }
-
 // allSaveFiles 遍历当前平台所有存档根候选（去重、排序）。
+// 平台手动路径（--<平台>-save-dir，GUI 设置）由各平台 SaveRoots 最优先返回；
 // Eden 存档根可能混入其他 Switch 游戏存档（同目录多个 title），按 BOTW 标题 ID
 // 过滤；Cemu（Wii U）/Ryujinx 存档目录本就只含 BOTW，不过滤（零影响）。
 func allSaveFiles(p Platform) []string {
 	names := currentGame.SaveFileNames()
 	var out []string
-	if saveDirOverride != "" {
-		out = append(out, findSaveFiles(saveDirOverride, names)...)
-	}
 	for _, root := range p.SaveRoots() {
 		files := findSaveFiles(root, names)
 		if p.Name() == "Eden" {

@@ -43,7 +43,6 @@ func main() {
 	emu := "auto"
 	gameName := "auto"
 	dump := false
-	saveDirOverride := ""
 	for _, a := range os.Args[1:] {
 		switch {
 		case a == "--no-open":
@@ -57,8 +56,13 @@ func main() {
 		case strings.HasPrefix(a, "--game="):
 			gameName = strings.TrimPrefix(a, "--game=")
 		case strings.HasPrefix(a, "--save-dir="):
-			saveDirOverride = strings.TrimPrefix(a, "--save-dir=")
-			setSaveDirOverride(saveDirOverride)
+			// v3.0.0 通用存档路径已弃用（跨平台污染），改平台独立 --*-save-dir
+		case strings.HasPrefix(a, "--cemu-save-dir="):
+			setCemuSaveDirOverride(strings.TrimPrefix(a, "--cemu-save-dir="))
+		case strings.HasPrefix(a, "--ryujinx-save-dir="):
+			setRyujinxSaveDirOverride(strings.TrimPrefix(a, "--ryujinx-save-dir="))
+		case strings.HasPrefix(a, "--eden-save-dir="):
+			setEdenSaveDirOverride(strings.TrimPrefix(a, "--eden-save-dir="))
 		case strings.HasPrefix(a, "--"):
 			// ignore
 		default:

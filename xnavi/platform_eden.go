@@ -128,18 +128,30 @@ func (p *edenPlatform) LargestBlock(minMB float64) (uintptr, uintptr) {
 	return best, bestSize
 }
 
-// SaveRoots Eden 存档根候选：环境变量 → 运行中 eden.exe 目录推导 → 盘符便携
-// 布局 → APPDATA。返回多个候选（全部存在则首个命中；调用方递归找 game_data.sav）。
+// edenSaveDirOverride 由 --eden-save-dir= 指定（GUI 设置"Eden 存档路径"），
+// 直接作为存档根，优先于一切自动探测。
+var edenSaveDirOverride string
+
+func setEdenSaveDirOverride(d string) { edenSaveDirOverride = d }
+
+// SaveRoots Eden 存档根候选：环境变量 → GUI 手动路径 → 运行中 eden.exe 目录推导
+// → 盘符便携布局 → APPDATA。返回多个候选（全部存在则首个命中；调用方递归找 game_data.sav）。
 func (p *edenPlatform) SaveRoots() []string {
 	var roots []string
 	if v := os.Getenv("BOTW_SAVE_DIR"); v != "" {
 		roots = append(roots, v)
 	}
+	if sd := edenSaveDirOverride; sd != "" {
+		// GUI 设置"Eden 存档路径"（直接存档根，BOTW 为 nand/user/save 下含 01007EF00011E000 的目录）
+		roots = append(roots, sd)
+	}
 	if p.h != 0 {
 		if exe := edenProcessPath(p.h); exe != "" {
+			exeDir := filepath.Dir(exe)
 			roots = append(roots,
-				filepath.Join(filepath.Dir(exe), "user", "nand", "user", "save"),
-				filepath.Join(filepath.Dir(exe), "..", "..", "user", "nand", "user", "save"))
+				filepath.Join(exeDir, "user", "nand", "user", "save"),
+				filepath.Join(exeDir, "..", "user", "nand", "user", "save"),
+				filepath.Join(exeDir, "..", "..", "user", "nand", "user", "save"))
 		}
 	}
 	for _, drive := range []string{"C:\\", "D:\\", "E:\\", "F:\\", "G:\\", "H:\\", "I:\\", "J:\\", "K:\\", "L:\\"} {
@@ -573,7 +585,29 @@ func (p *edenPlatform) EdenLocate(bypassKnown bool) *LocateResult {
 	//    性能：8.5GB 全扫 2.6s（含 4GB 巨型块——玩家槽会跨块漂移，不能跳过）。
 	anchors := currentGame.SaveAnchors(p)
 	if len(anchors) == 0 {
+		// 诊断日志（2026-10-08 用户反馈"no usable save anchor"）：列出尝试的存档根
+		// 与找到的 game_data.sav 数，帮助定位是"路径没覆盖"还是"存档没生成/解析失败"。
+		names := currentGame.SaveFileNames()
 		fmt.Println("  [eden] no usable save anchor found - retrying")
+		for _, root := range p.SaveRoots() {
+			n := 0
+			filepath.WalkDir(root, func(p2 string, d os.DirEntry, err error) error {
+				if err == nil && !d.IsDir() {
+					for _, nm := range names {
+						if strings.EqualFold(d.Name(), nm) {
+							n++
+							break
+						}
+					}
+				}
+				return nil
+			})
+			if n > 0 {
+				fmt.Printf("  [eden]   save root %s -> %d game_data.sav found (parse fail?)\n", root, n)
+			} else {
+				fmt.Printf("  [eden]   save root %s -> none\n", root)
+			}
+		}
 		return nil
 	}
 	refs := [][3]float32{anchors[0].Pos}

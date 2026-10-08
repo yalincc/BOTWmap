@@ -27,6 +27,12 @@ type cemuPlatform struct {
 	pid uint32
 }
 
+// cemuSaveDirOverride 由 --cemu-save-dir= 指定（GUI 设置"Cemu 存档路径"），
+// 直接作为存档根，优先于一切自动探测。
+var cemuSaveDirOverride string
+
+func setCemuSaveDirOverride(d string) { cemuSaveDirOverride = d }
+
 func init() {
 	registerPlatform(&cemuPlatform{})
 }
@@ -113,6 +119,10 @@ func (p *cemuPlatform) SaveRoots() []string {
 	}
 	if v := os.Getenv("CEMUNAVI_SAVE_ROOT"); v != "" {
 		add(v)
+	}
+	if sd := cemuSaveDirOverride; sd != "" {
+		// GUI 设置"Cemu 存档路径"（直接存档根，BOTW 为 mlc01/usr/save/00050000 下含 101c9300 的目录）
+		add(sd)
 	}
 	if app := os.Getenv("APPDATA"); app != "" {
 		add(filepath.Join(app, "Cemu", "mlc01", "usr", "save", "00050000"))

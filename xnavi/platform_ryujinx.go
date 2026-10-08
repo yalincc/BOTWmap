@@ -66,13 +66,25 @@ func (p *ryujinxPlatform) LargestBlock(minMB float64) (uintptr, uintptr) {
 	return ryuLargestGuestBlock(p.h, minMB)
 }
 
+// ryujinxSaveDirOverride 由 --ryujinx-save-dir= 指定（GUI 设置"Ryujinx 存档路径"），
+// 直接作为存档根，优先于一切自动探测。
+var ryujinxSaveDirOverride string
+
+func setRyujinxSaveDirOverride(d string) { ryujinxSaveDirOverride = d }
+
 // SaveRoots Ryujinx 存档根（Switch 版）。
 func (p *ryujinxPlatform) SaveRoots() []string {
+	var roots []string
+	if sd := ryujinxSaveDirOverride; sd != "" {
+		// GUI 设置"Ryujinx 存档路径"（直接存档根，BOTW 为 bis/user/save 下含 01007EF00011E000 的目录）
+		roots = append(roots, sd)
+	}
 	appdata := os.Getenv("APPDATA")
 	if appdata == "" {
 		appdata = os.Getenv("USERPROFILE") + "\\AppData\\Roaming"
 	}
-	return []string{filepath.Join(appdata, "Ryujinx", "bis", "user", "save")}
+	roots = append(roots, filepath.Join(appdata, "Ryujinx", "bis", "user", "save"))
+	return roots
 }
 
 // ---- 内存枚举（Ryujinx 专属，原 live-go winapi.go）----
