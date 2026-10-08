@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -95,6 +96,29 @@ func writeJSON(w http.ResponseWriter, obj any) {
 
 type server struct{}
 
+// BOTWmap 资产候选位置（v3.0.2 局域网镜像：存在即接管 /botw/，缺失不影响核心导航）
+var botwRoots = []string{
+	`E:\WorkSpace\BOTWmap\app`,
+	`..\BOTWmap\app`,
+	`..\..\BOTWmap\app`,
+}
+
+// botwFS BOTWmap 静态文件处理器（StripPrefix "/botw"：/botw → 首页，相对路径资源照常）
+var botwFS http.Handler
+
+func init() {
+	for _, c := range botwRoots {
+		if abs, err := filepath.Abs(c); err == nil {
+			c = abs
+		}
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			botwFS = http.StripPrefix("/botw", http.FileServer(http.Dir(c)))
+			fmt.Printf("  [asset] BOTWmap assets mounted: %s\n", c)
+			break
+		}
+	}
+}
+
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	if path == "" {
@@ -106,6 +130,12 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// BOTWmap 静态站（手机/iPad 局域网镜像入口；同源 http 页面，见 Mobile/方案-移动端定位镜像）
+	if botwFS != nil && (path == "/botw" || strings.HasPrefix(path, "/botw/")) {
+		botwFS.ServeHTTP(w, r)
 		return
 	}
 

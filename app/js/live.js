@@ -15,7 +15,13 @@
  */
 'use strict';
 
-const LIVE_API = 'http://127.0.0.1:8766';   // 本地追踪服务（Go 版"灵墟地图追踪助手"）
+// 本地追踪服务地址（V1.5.0 移动端镜像入口）：
+//   页面由 PC 以 http 提供（手机/iPad 局域网镜像）→ 用同源 location.origin，
+//   规避浏览器对 https 页面连 http/ws 局域网地址的混合内容 + PNA/LNA 限制；
+//   其余场景（PC 本机开 https 公网站 / localhost）维持原 127.0.0.1:8766 不变。
+const LIVE_API = (location.protocol === 'http:' && !/^(127\.0\.0\.1|localhost)$/.test(location.hostname))
+  ? location.origin
+  : 'http://127.0.0.1:8766';   // 本地追踪服务（Go 版"灵墟地图追踪助手"）
 
 const LIVE = (() => {
   let map = null;

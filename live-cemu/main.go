@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const buildVer = "v1.3.0"
+const buildVer = "v1.3.1"
 
 const onlineMapURL = "https://botw.yalin.site/"
 
@@ -218,6 +218,38 @@ func abs64(v float64) float64 {
 	return v
 }
 
+// lanIPv4s 列出本机非回环 IPv4 地址（移动端局域网镜像 URL 用）
+func lanIPv4s() []string {
+	var out []string
+	ifas, err := net.Interfaces()
+	if err != nil {
+		return out
+	}
+	for _, ifa := range ifas {
+		if ifa.Flags&net.FlagUp == 0 || ifa.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := ifa.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			var ip net.IP
+			switch v := a.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+				continue
+			}
+			out = append(out, ip.String())
+		}
+	}
+	return out
+}
+
 func pickPort(start int) (net.Listener, int) {
 	for p := start; p < start+15; p++ {
 		l, err := net.Listen("tcp", fmt.Sprintf(":%d", p))
@@ -247,6 +279,10 @@ func main() {
 	fmt.Printf("  API: %s/pos\n", url)
 	if port != 8766 {
 		fmt.Println("  note: 8766 taken, using spare port (online map expects 8766)")
+	}
+	// v1.3.1 移动端镜像入口：手机/iPad 同一 WiFi 打开下列任一地址即可跟随红点+导航
+	for _, ip := range lanIPv4s() {
+		fmt.Printf("  LAN: http://%s:%d/botw/?follow=1&game=botw\n", ip, port)
 	}
 	fmt.Println("  Close this window to stop")
 	fmt.Println("--------------------------------------------------")

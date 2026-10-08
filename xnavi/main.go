@@ -138,7 +138,8 @@ func main() {
 	go progress.loop()
 
 	// 服务器先于定位启动（踩坑固化：网页端要能第一时间连上）
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	// v3.0.2：绑定全部接口（":port"），供手机/iPad 局域网镜像访问；PC 本机不受防火墙影响（回环豁免）
+	addr := fmt.Sprintf(":%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		// 端口占用/防火墙拦截：不阻塞定位（ds 双入口原则——GUI 与网页端独立）。
@@ -146,7 +147,7 @@ func main() {
 		fmt.Printf("  !! HTTP %s failed: %v\n", addr, err)
 		fmt.Println("  !! HTTP 端口被占用：网页端不可用，定位导航照常运行")
 	} else {
-		fmt.Printf("  API -> http://%s/pos\n", addr)
+		fmt.Printf("  API -> http://127.0.0.1:%d/pos\n", port)
 		go http.Serve(ln, &server{})
 	}
 
@@ -167,6 +168,10 @@ func main() {
 	fmt.Println("")
 	fmt.Printf("  serving -> %s\n", st)
 	fmt.Printf("  live map -> %s\n", currentGame.MapURL())
+	// v3.0.2 移动端镜像入口：手机/iPad 同一 WiFi 打开下列任一地址即可跟随红点+导航
+	for _, ip := range lanIPv4s() {
+		fmt.Printf("  LAN -> http://%s:%d/botw/?follow=1&game=%s\n", ip, port, currentGame.Name())
+	}
 	fmt.Println("  (Ctrl+C to stop)")
 
 	if autoOpen {
@@ -301,4 +306,36 @@ func openBrowser(url string) {
 	if err := cmd.Start(); err != nil {
 		fmt.Printf("  (could not open browser: %v)\n", err)
 	}
+}
+
+// lanIPv4s 列出本机非回环 IPv4 地址（移动端局域网镜像 URL 用）
+func lanIPv4s() []string {
+	var out []string
+	ifas, err := net.Interfaces()
+	if err != nil {
+		return out
+	}
+	for _, ifa := range ifas {
+		if ifa.Flags&net.FlagUp == 0 || ifa.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := ifa.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			var ip net.IP
+			switch v := a.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+			if ip == nil || ip.IsLoopback() || ip.To4() == nil {
+				continue
+			}
+			out = append(out, ip.String())
+		}
+	}
+	return out
 }

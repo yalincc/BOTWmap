@@ -6,4 +6,4 @@
 package main
 
 // CoreVersion 核心程序版本（GUI 侧 guiVersion 必须与此一致，见 xnavi-gui/app.go）。
-const CoreVersion = "v3.0.1"
+const CoreVersion = "v3.0.2"
