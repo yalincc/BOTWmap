@@ -495,6 +495,18 @@ const LIVE = (() => {
     input.value = url;
     img.style.display = '';
     img.onerror = () => { img.style.display = 'none'; };
+    // V1.5.1：本地 qrcodejs 渲染（离线可用、不把局域网地址发给第三方 QR API）；库加载失败时回退外网 API
+    if (typeof QRCode === 'function') {
+      try {
+        const box = document.createElement('span');
+        el.appendChild(box);
+        new QRCode(box, { text: url, width: 240, height: 240, correctLevel: QRCode.CorrectLevel.H });
+        const q = box.querySelector('img');
+        if (q && q.src) img.src = q.src;
+        box.remove();
+        return;
+      } catch (e) { /* 回退下方外网 API */ }
+    }
     img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=6&data=' + encodeURIComponent(url);
   }
   function copyMirrorUrl() {
