@@ -116,26 +116,27 @@
         <div class="text-sm font-bold text-white mb-4">设置</div>
         <div class="space-y-3 text-xs">
           <div>
-            <label class="block text-slate-400 mb-1">Cemu 路径：</label>
+            <label class="block text-slate-400 mb-1">Cemu 的 BOTW 存档路径（留空自动探测）：</label>
             <div class="flex gap-1">
-              <input v-model="paths.cemu" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
-              <button @click="pickCemu" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
+              <input v-model="paths.cemuSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
+              <button @click="pickCemuSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
             </div>
           </div>
           <div>
-            <label class="block text-slate-400 mb-1">Ryujinx 路径：</label>
+            <label class="block text-slate-400 mb-1">Ryujinx 的 BOTW 存档路径（留空自动探测）：</label>
             <div class="flex gap-1">
-              <input v-model="paths.ryujinx" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
-              <button @click="pickRyujinx" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
+              <input v-model="paths.ryujinxSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
+              <button @click="pickRyujinxSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
             </div>
           </div>
           <div>
-            <label class="block text-slate-400 mb-1">存档路径（留空自动探测）：</label>
+            <label class="block text-slate-400 mb-1">Eden 的 BOTW 存档路径（留空自动探测）：</label>
             <div class="flex gap-1">
-              <input v-model="paths.saveDir" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
-              <button @click="pickSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
+              <input v-model="paths.edenSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
+              <button @click="pickEdenSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
             </div>
           </div>
+          <div class="text-slate-500">只读该平台存档做进度同步与定位锚点，填错了换个正确的即可。</div>
         </div>
         <div class="flex justify-end mt-4">
           <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white" @click="saveSettings">保存</button>
@@ -181,16 +182,17 @@ const showSettings = ref(false)
 const showAbout = ref(false)
 const updateInfo = ref(null)
 let isInitLog = true
-const paths = reactive({ cemu: '', ryujinx: '', saveDir: '' })
+const paths = reactive({ cemuSave: '', ryujinxSave: '', edenSave: '' })
 const env = reactive({ emulator: 'auto', game: 'auto' })
 const envDetect = reactive({ cemu: false, ryujinx: false, eden: false })
 const hitText = computed(() => {
-  if (envDetect.cemu && envDetect.ryujinx) return '✓ Cemu + Ryujinx 路径已配置（Eden 免配置）'
-  if (envDetect.cemu) return '✓ Cemu 路径已配置（Eden 免配置）'
-  if (envDetect.ryujinx) return '✓ Ryujinx 路径已配置（Eden 免配置）'
-  return '未配置模拟器路径（点开始后自动探测进程；Eden 无需配置）'
+  const n = [envDetect.cemu, envDetect.ryujinx, envDetect.eden].filter(Boolean).length
+  if (n === 3) return '✓ Cemu + Ryujinx + Eden 存档路径已配置'
+  if (n === 2) return '✓ 已配置 ' + n + ' 个平台的存档路径'
+  if (n === 1) return '✓ 已配置 1 个平台的存档路径'
+  return '未手动配置存档路径（点开始后自动探测存档；找不到时在设置里填对应平台的存档路径）'
 })
-const hitClass = computed(() => (envDetect.cemu || envDetect.ryujinx) ? 'text-emerald-400' : 'text-amber-400')
+const hitClass = computed(() => (envDetect.cemu || envDetect.ryujinx || envDetect.eden) ? 'text-emerald-400' : 'text-amber-400')
 const isLocating = ref(false)
 async function toggleLocating() {
   if (isLocating.value) { await api.StopCore(); isLocating.value = false }
@@ -291,10 +293,10 @@ function pushLogs(lines) {
     for (const it of items) { parseState(it.text) }
   }
 }
-async function pickCemu() { const d = await api.PickDir("选择 Cemu 目录"); if (d) paths.cemu = d }
-async function pickRyujinx() { const d = await api.PickDir("选择 Ryujinx 目录"); if (d) paths.ryujinx = d }
-async function pickSave() { const d = await api.PickDir("选择存档目录"); if (d) paths.saveDir = d }
-async function saveSettings() { await api.SaveConfig({ cemuDir: paths.cemu, ryujinxDir: paths.ryujinx, saveDir: paths.saveDir, emulator: env.emulator, game: env.game }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx; envDetect.eden = det.eden }
+async function pickCemuSave() { const d = await api.PickDir("选择 Cemu 的 BOTW 存档目录"); if (d) paths.cemuSave = d }
+async function pickRyujinxSave() { const d = await api.PickDir("选择 Ryujinx 的 BOTW 存档目录"); if (d) paths.ryujinxSave = d }
+async function pickEdenSave() { const d = await api.PickDir("选择 Eden 的 BOTW 存档目录"); if (d) paths.edenSave = d }
+async function saveSettings() { await api.SaveConfig({ cemuSaveDir: paths.cemuSave, ryujinxSaveDir: paths.ryujinxSave, edenSaveDir: paths.edenSave, emulator: env.emulator, game: env.game }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx; envDetect.eden = det.eden }
 function clearLogs() { logs.value = [] }
 function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
@@ -351,9 +353,9 @@ onMounted(async () => {
   steps.value.forEach(s => s.state = (s.name === '就绪' ? 'done' : 'idle'))
   ver.value = await api.Version()
   const cfg = await api.LoadConfig()
-  if (cfg.cemuDir) paths.cemu = cfg.cemuDir
-  if (cfg.ryujinxDir) paths.ryujinx = cfg.ryujinxDir
-  if (cfg.saveDir) paths.saveDir = cfg.saveDir
+  if (cfg.cemuSaveDir) paths.cemuSave = cfg.cemuSaveDir
+  if (cfg.ryujinxSaveDir) paths.ryujinxSave = cfg.ryujinxSaveDir
+  if (cfg.edenSaveDir) paths.edenSave = cfg.edenSaveDir
   if (cfg.emulator) env.emulator = cfg.emulator
   if (cfg.game) env.game = cfg.game
   const det = await api.EnvDetect()

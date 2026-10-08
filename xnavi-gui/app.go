@@ -23,7 +23,7 @@ import (
 // guiVersion 导航程序版本（三合一统一版本 v3.0.0，2026-10-07 拍板：
 // GUI 壳与导航核心 xnavi 共享同一版本号，不再各自解耦）。
 // 注意：必须与 xnavi/version.go 的 CoreVersion 保持一致。
-const guiVersion = "v3.0.0"
+const guiVersion = "v3.0.1"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -39,12 +39,13 @@ type App struct {
 }
 
 // Config GUI 持久化配置（xnavi-gui-config.json）。
+// v3.0.1：三平台各自独立的 BOTW 存档路径（留空自动探测）。
 type Config struct {
-	CemuDir    string `json:"cemuDir"`
-	RyujinxDir string `json:"ryujinxDir"`
-	SaveDir    string `json:"saveDir"`
-	Emulator   string `json:"emulator"` // auto | cemu | ryujinx | eden
-	Game       string `json:"game"`     // auto | botw | totk
+	CemuSaveDir    string `json:"cemuSaveDir"`    // Cemu 的 BOTW 存档目录（可选）
+	RyujinxSaveDir string `json:"ryujinxSaveDir"` // Ryujinx 的 BOTW 存档目录（可选）
+	EdenSaveDir    string `json:"edenSaveDir"`    // Eden 的 BOTW 存档目录（可选）
+	Emulator       string `json:"emulator"`       // auto | cemu | ryujinx | eden
+	Game           string `json:"game"`           // auto | botw | totk
 }
 
 func (a *App) configPath() string { return filepath.Join(a.workDir, "xnavi-gui-config.json") }
@@ -192,14 +193,14 @@ func (a *App) StartCore(emu string) string {
 	if game != "" && game != "auto" {
 		args = append(args, "--game="+game)
 	}
-	if a.cfg.CemuDir != "" {
-		args = append(args, "--cemu-dir="+a.cfg.CemuDir)
+	if a.cfg.CemuSaveDir != "" {
+		args = append(args, "--cemu-save-dir="+a.cfg.CemuSaveDir)
 	}
-	if a.cfg.RyujinxDir != "" {
-		args = append(args, "--ryujinx-dir="+a.cfg.RyujinxDir)
+	if a.cfg.RyujinxSaveDir != "" {
+		args = append(args, "--ryujinx-save-dir="+a.cfg.RyujinxSaveDir)
 	}
-	if a.cfg.SaveDir != "" {
-		args = append(args, "--save-dir="+a.cfg.SaveDir)
+	if a.cfg.EdenSaveDir != "" {
+		args = append(args, "--eden-save-dir="+a.cfg.EdenSaveDir)
 	}
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = a.workDir
@@ -397,7 +398,7 @@ func (a *App) ExportDiagnostics() string {
 
 	// 1) 系统信息
 	info := fmt.Sprintf(
-		"xnavi diagnostics\n===================\nGUI version: %s\nOS: %s/%s\nArch: %s\nCPU cores: %d\nHostname: %s\nTime: %s\nEmulator setting: %s\nCemuDir configured: %q\nRyujinxDir configured: %q\nSaveDir override: %q\n\n",
+		"xnavi diagnostics\n===================\nGUI version: %s\nOS: %s/%s\nArch: %s\nCPU cores: %d\nHostname: %s\nTime: %s\nEmulator setting: %s\nCemuSaveDir configured: %q\nRyujinxSaveDir configured: %q\nEdenSaveDir configured: %q\n\n",
 		guiVersion, stdruntime.GOOS, stdruntime.GOARCH, stdruntime.GOARCH,
 		stdruntime.NumCPU(), hostname(),
 		time.Now().Format("2006-01-02 15:04:05"),
@@ -407,9 +408,9 @@ func (a *App) ExportDiagnostics() string {
 			}
 			return "auto"
 		}(),
-		func() string { if a.cfg != nil { return a.cfg.CemuDir }; return "" }(),
-		func() string { if a.cfg != nil { return a.cfg.RyujinxDir }; return "" }(),
-		func() string { if a.cfg != nil { return a.cfg.SaveDir }; return "" }(),
+		func() string { if a.cfg != nil { return a.cfg.CemuSaveDir }; return "" }(),
+		func() string { if a.cfg != nil { return a.cfg.RyujinxSaveDir }; return "" }(),
+		func() string { if a.cfg != nil { return a.cfg.EdenSaveDir }; return "" }(),
 	)
 	if bw, e := w.Create("info.txt"); e == nil {
 		bw.Write([]byte(info))
@@ -448,11 +449,14 @@ func (a *App) EnvDetect() map[string]any {
 	a.mu.Unlock()
 	res := map[string]any{"ryujinx": false, "cemu": false, "eden": false}
 	if cfg != nil {
-		if cfg.CemuDir != "" && pathExists(cfg.CemuDir) {
+		if cfg.CemuSaveDir != "" && pathExists(cfg.CemuSaveDir) {
 			res["cemu"] = true
 		}
-		if cfg.RyujinxDir != "" && pathExists(cfg.RyujinxDir) {
+		if cfg.RyujinxSaveDir != "" && pathExists(cfg.RyujinxSaveDir) {
 			res["ryujinx"] = true
+		}
+		if cfg.EdenSaveDir != "" && pathExists(cfg.EdenSaveDir) {
+			res["eden"] = true
 		}
 	}
 	return res

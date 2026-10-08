@@ -1,9 +1,9 @@
 export namespace main {
 	
 	export class Config {
-	    cemuDir: string;
-	    ryujinxDir: string;
-	    saveDir: string;
+	    cemuSaveDir: string;
+	    ryujinxSaveDir: string;
+	    edenSaveDir: string;
 	    emulator: string;
 	    game: string;
 	
@@ -13,9 +13,9 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.cemuDir = source["cemuDir"];
-	        this.ryujinxDir = source["ryujinxDir"];
-	        this.saveDir = source["saveDir"];
+	        this.cemuSaveDir = source["cemuSaveDir"];
+	        this.ryujinxSaveDir = source["ryujinxSaveDir"];
+	        this.edenSaveDir = source["edenSaveDir"];
 	        this.emulator = source["emulator"];
 	        this.game = source["game"];
 	    }
