@@ -6,6 +6,7 @@ export namespace main {
 	    edenSaveDir: string;
 	    emulator: string;
 	    game: string;
+	    tls: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -18,6 +19,7 @@ export namespace main {
 	        this.edenSaveDir = source["edenSaveDir"];
 	        this.emulator = source["emulator"];
 	        this.game = source["game"];
+	        this.tls = source["tls"];
 	    }
 	}
 
