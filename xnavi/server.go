@@ -136,6 +136,13 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 根路径（手机用户最自然的动作是只输 IP:端口）→ 302 跳到镜像入口，
+	// 否则返回 unknown endpoint JSON（v3.0.3；app 未挂载时保持原行为）
+	if botwFS != nil && path == "/" {
+		http.Redirect(w, r, "/botw/?follow=1&game=botw", http.StatusFound)
+		return
+	}
+
 	// BOTWmap 静态站（手机/iPad 局域网镜像入口；同源 http 页面，见 Mobile/方案-移动端定位镜像）
 	if botwFS != nil && (path == "/botw" || strings.HasPrefix(path, "/botw/")) {
 		botwFS.ServeHTTP(w, r)
