@@ -7,6 +7,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -100,26 +101,80 @@ var lanURL string
 type server struct{}
 
 // BOTWmap 资产候选位置（v3.0.2 局域网镜像：存在即接管 /botw/，缺失不影响核心导航）
+// v3.1.0 排序（重要）：
+//   1. exe 同目录 app/ —— 发布形态，引导页就是这么教用户的，必须最优先
+//   2. cwd 相对 app/   —— 开发/命令行形态兜底
+//   3~4. 上级目录 / 开发机绝对路径 —— 历史遗留，保留兼容
+//
+// 注意：候选 1 必须基于 os.Executable() 而不是进程 cwd——从快捷方式或任意目录启动时
+// cwd ≠ exe 目录，只看 cwd 会出现"用户明明解压到 exe 同目录却仍找不到"的翻车。
 var botwRoots = []string{
+	`app`,
 	`E:\WorkSpace\BOTWmap\app`,
 	`..\BOTWmap\app`,
 	`..\..\BOTWmap\app`,
 }
 
 // botwFS BOTWmap 静态文件处理器（StripPrefix "/botw"：/botw → 首页，相对路径资源照常）
-var botwFS http.Handler
+// 惰性解析：见 resolveBotwFS（用户解压完 app/ 后刷新即生效，无需重启 xnavi）
+var (
+	botwFS   http.Handler
+	botwFSMu sync.Mutex
+)
 
-func init() {
-	for _, c := range botwRoots {
+//go:embed mirror_fallback.html
+var mirrorFallbackHTML string
+
+// 内置手机镜像引导页：exe 旁无 app/ 时 / 与 /botw/ 返回此页（v3.1.0），
+// 替代兜底 unknown endpoint 黑 JSON（终端用户手机扫码后至少知道缺什么、怎么补）。
+// 编译进 exe，不依赖任何外部文件。
+func writeMirrorFallback(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	corsHeaders(w)
+	w.Write([]byte(mirrorFallbackHTML))
+}
+
+// exeDirApp 返回 exe 所在目录下的 app/ 路径（引导页承诺的位置）。
+func exeDirApp() string {
+	if exe, err := os.Executable(); err == nil {
+		if real, err2 := filepath.EvalSymlinks(exe); err2 == nil {
+			exe = real
+		}
+		return filepath.Join(filepath.Dir(exe), "app")
+	}
+	return ""
+}
+
+// resolveBotwFS 返回本地地图静态处理器；没有就返回 nil（调用方回落到引导页）。
+// 惰性解析 + mutex：用户按引导页提示解压 app/ 后，刷新页面即可生效，不必重启 xnavi。
+// 已挂载成功后不再重复 stat（botwFS != nil 直接返回）。
+func resolveBotwFS() http.Handler {
+	botwFSMu.Lock()
+	defer botwFSMu.Unlock()
+	if botwFS != nil {
+		return botwFS
+	}
+	cands := make([]string, 0, len(botwRoots)+1)
+	if p := exeDirApp(); p != "" {
+		cands = append(cands, p) // 最高优先：exe 同目录
+	}
+	cands = append(cands, botwRoots...)
+	for _, c := range cands {
 		if abs, err := filepath.Abs(c); err == nil {
 			c = abs
 		}
 		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
 			botwFS = http.StripPrefix("/botw", http.FileServer(http.Dir(c)))
 			fmt.Printf("  [asset] BOTWmap assets mounted: %s\n", c)
-			break
+			return botwFS
 		}
 	}
+	return nil
+}
+
+func init() {
+	// 预热：启动时挂载则打印日志；未挂载不打印（每次请求都会重试，不吵启动日志）
+	resolveBotwFS()
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -136,16 +191,20 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 根路径（手机用户最自然的动作是只输 IP:端口）→ 302 跳到镜像入口，
-	// 否则返回 unknown endpoint JSON（v3.0.3；app 未挂载时保持原行为）
-	if botwFS != nil && path == "/" {
-		http.Redirect(w, r, "/botw/?follow=1&game=botw", http.StatusFound)
-		return
-	}
-
-	// BOTWmap 静态站（手机/iPad 局域网镜像入口；同源 http 页面，见 Mobile/方案-移动端定位镜像）
-	if botwFS != nil && (path == "/botw" || strings.HasPrefix(path, "/botw/")) {
-		botwFS.ServeHTTP(w, r)
+	// 根路径（手机用户最自然的动作是只输 IP:端口）→ 有 app/ 302 跳镜像入口；
+	// 无 app/ 直接返回内置引导页（v3.1.0，替代 unknown endpoint）
+	isBotwPath := path == "/botw" || strings.HasPrefix(path, "/botw/")
+	if path == "/" || isBotwPath {
+		fs := resolveBotwFS()
+		if fs == nil {
+			writeMirrorFallback(w)
+			return
+		}
+		if path == "/" {
+			http.Redirect(w, r, "/botw/?follow=1&game=botw", http.StatusFound)
+			return
+		}
+		fs.ServeHTTP(w, r)
 		return
 	}
 

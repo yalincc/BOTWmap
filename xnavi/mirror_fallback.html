@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>手机镜像 · 本地地图未安装</title>
+<style>
+  body{background:#1a1a1a;color:#eee;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+       max-width:560px;margin:0 auto;padding:24px;line-height:1.7}
+  h1{font-size:20px;color:#ffd54f;margin:0 0 12px}
+  .card{background:#2a2a2a;border-radius:8px;padding:14px 16px;margin:14px 0}
+  .status{font-size:14px;color:#aaa}
+  .status b{color:#8bc34a}
+  .hint{color:#aaa;font-size:13px}
+  code{background:#333;padding:2px 6px;border-radius:4px;font-size:13px;word-break:break-all}
+  button{display:block;width:100%;padding:14px;margin:10px 0;font-size:16px;border:none;border-radius:8px;
+         background:#4caf50;color:#fff;cursor:pointer}
+  button.sec{background:#555}
+  ol{margin:8px 0;padding-left:22px}
+  li{margin:6px 0}
+</style>
+</head>
+<body>
+<h1>📱 手机镜像 · 本地地图未安装</h1>
+
+<div class="card">
+  <div class="status" id="st">⏳ 正在检查定位状态…</div>
+</div>
+
+<p>当前 xnavi 目录下没有 <code>app/</code> 地图文件夹，手机跟随需要本地地图文件。</p>
+
+<div class="card">
+  <b>请按下面三步补齐：</b>
+  <ol>
+    <li>下载地图包 <code>botw-map-app.zip</code></li>
+    <li>解压到 <code>xnavi.exe</code> 同目录（形成 <code>app/</code> 文件夹）</li>
+    <li>回到本页点「刷新」</li>
+  </ol>
+</div>
+
+<p class="hint">注意：在线地图 <code>https://botw.yalin.site</code> 仅支持<b>电脑浏览器</b>跟随红点；
+手机直接打开在线站会因浏览器安全限制（HTTPS 页面禁止访问 HTTP 本地接口）无法显示定位。</p>
+
+<button id="btn-dl">下载地图包（GitHub Releases）</button>
+<button class="sec" onclick="location.reload()">刷新</button>
+<button class="sec" onclick="location.href='https://botw.yalin.site'">打开在线地图（仅电脑可跟随）</button>
+
+<script>
+// 地图包下载地址：改这里即可（当前指 Releases 页，不随版本号失效）
+var MAP_PKG_URL = 'https://github.com/yalincc/BOTWmap/releases';
+document.getElementById('btn-dl').onclick = function(){ location.href = MAP_PKG_URL; };
+
+// 显示定位状态：让用户知道 xnavi 本身是好的，只差地图文件
+(function(){
+  var el = document.getElementById('st');
+  fetch('/pos', {cache:'no-store'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d && d.ok) {
+        el.innerHTML = '✅ xnavi 定位正常（' + (d.source || 'follow') + '）· 只差地图文件';
+      } else {
+        el.innerHTML = '⚠️ xnavi 尚未锁定坐标 · 请先在电脑上启动定位';
+      }
+    })
+    .catch(function(){ el.innerHTML = '⚠️ 读取定位状态失败'; });
+})();
+</script>
+</body>
+</html>
