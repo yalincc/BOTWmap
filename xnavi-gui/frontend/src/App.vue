@@ -137,6 +137,13 @@
             </div>
           </div>
           <div class="text-slate-500">只读该平台存档做进度同步与定位锚点，填错了换个正确的即可。</div>
+          <div>
+            <label class="flex items-center gap-2 cursor-pointer select-none py-1">
+              <input v-model="paths.tls" type="checkbox" class="accent-blue-600 w-3.5 h-3.5" />
+              <span class="text-slate-300">手机防息屏（Https）</span>
+            </label>
+            <div class="text-[10px] text-slate-600 mt-0.5">手机镜像页走 HTTPS，防息屏用系统 Wake Lock 而非视频保亮。首次使用需先运行 certs/gen-cert.ps1 生成证书并在手机安装 rootCA.pem（certs/README.md），装一次长期有效；下次启动定位生效。</div>
+          </div>
         </div>
         <div class="flex justify-end mt-4">
           <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white" @click="saveSettings">保存</button>
@@ -182,7 +189,7 @@ const showSettings = ref(false)
 const showAbout = ref(false)
 const updateInfo = ref(null)
 let isInitLog = true
-const paths = reactive({ cemuSave: '', ryujinxSave: '', edenSave: '' })
+const paths = reactive({ cemuSave: '', ryujinxSave: '', edenSave: '', tls: false })
 const env = reactive({ emulator: 'auto', game: 'auto' })
 const envDetect = reactive({ cemu: false, ryujinx: false, eden: false })
 const hitText = computed(() => {
@@ -296,7 +303,7 @@ function pushLogs(lines) {
 async function pickCemuSave() { const d = await api.PickDir("选择 Cemu 的 BOTW 存档目录"); if (d) paths.cemuSave = d }
 async function pickRyujinxSave() { const d = await api.PickDir("选择 Ryujinx 的 BOTW 存档目录"); if (d) paths.ryujinxSave = d }
 async function pickEdenSave() { const d = await api.PickDir("选择 Eden 的 BOTW 存档目录"); if (d) paths.edenSave = d }
-async function saveSettings() { await api.SaveConfig({ cemuSaveDir: paths.cemuSave, ryujinxSaveDir: paths.ryujinxSave, edenSaveDir: paths.edenSave, emulator: env.emulator, game: env.game }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx; envDetect.eden = det.eden }
+async function saveSettings() { await api.SaveConfig({ cemuSaveDir: paths.cemuSave, ryujinxSaveDir: paths.ryujinxSave, edenSaveDir: paths.edenSave, emulator: env.emulator, game: env.game, tls: paths.tls }); showSettings.value = false; const det = await api.EnvDetect(); envDetect.cemu = det.cemu; envDetect.ryujinx = det.ryujinx; envDetect.eden = det.eden }
 function clearLogs() { logs.value = [] }
 function checkUpdate() {
   rt.EventsOn("update:latest", () => { alert("已经是最新版") });
@@ -358,6 +365,7 @@ onMounted(async () => {
   if (cfg.edenSaveDir) paths.edenSave = cfg.edenSaveDir
   if (cfg.emulator) env.emulator = cfg.emulator
   if (cfg.game) env.game = cfg.game
+  if (cfg.tls) paths.tls = cfg.tls
   const det = await api.EnvDetect()
   envDetect.cemu = det.cemu
   envDetect.ryujinx = det.ryujinx

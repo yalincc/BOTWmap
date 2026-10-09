@@ -68,6 +68,13 @@
 - 启动时枚举本机非回环 IPv4 并打印移动端镜像 URL（`/botw/` 静态托管为既有能力，无需改动）
 - `/pos` 新增 `lanUrl` 字段（默认路由 IPv4 + 实际端口），供网页渲染手机镜像二维码
 
+## xnavi v3.1.0（2026-10-09）手机防息屏 HTTPS（--tls 双协议）
+
+- **新增 `--tls` 模式**：8766 端口 http + https 双协议共存（Accept 预读首字节，`0x16` 走 TLS 通道）。手机镜像页走 https 后浏览器暴露 Screen Wake Lock API，手机保持常亮不自动息屏；在线地图 http 轮询、旧 http 书签、GUI 端口探测全部照旧
+- GUI 设置新增【手机防息屏（Https）】勾选（`Config.TLS` → core 追加 `--tls`）；**纯可选**，不勾选一切照旧
+- `certs/` 证书体系：`gen-cert.ps1` 一键生成自签 CA（rootCA 10 年 + server 398 天 iPhone 硬限制，SAN 绑定本机局域网 IP）；`serve-cert.ps1` 临时 8443 分发 rootCA 供手机安装；发布包只带 rootCA.pem + 脚本 + README（**不含私钥**）
+- 证书缺失/无效时**降级 http 模式**（定位照常，日志醒目提示先跑 gen-cert.ps1）；`/pos.lanUrl` 在 tls 模式输出 `https://`
+
 ## xnavi v3.0.3（2026-10-09）根路径重定向
 
 - **HTTP 根路径 `/` 302 重定向到 `/botw/?follow=1&game=botw`**：手机/iPad 浏览器只输 `IP:端口` 也能直接进地图站，不再看到 `{"error":"unknown endpoint","ok":false}`（app 目录未挂载时保持原行为）
