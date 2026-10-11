@@ -76,7 +76,7 @@
 
 ### 变更
 - 新增数据文件 `app/data/save_flags.js`（生成脚本 `source/build_save_flags.js`）
-- 与导航程序配合的 URL 参数（follow/game）与 `/pos`、`/progress` 契约统一成文：`归档/docs-过程文档-20260929/BOTWmap导航配合接口协议-URL带参与进度契约-v1.md`（xnavi / TOTKmap 项目组对照实现）
+- 与导航程序配合的 URL 参数（follow/game）与 `/pos`、`/progress` 契约统一成文：`归档/开发计划/docs-过程文档-20260929/BOTWmap导航配合接口协议-URL带参与进度契约-v1.md`（xnavi / TOTKmap 项目组对照实现）
 
 ## navicemu v1.3.0（2026-09-30）最终版
 
