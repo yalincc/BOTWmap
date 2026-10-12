@@ -109,25 +109,33 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lg-group[data-group="探索收集"] .lrows,
 .lg-group[data-group="设施地点"] .lrows,
 .lg-group[data-group="敌人"] .lrows,
-.lg-group[data-group="任务"] .lrows {
+.lg-group[data-group="任务"] .lrows,
+.lg-group[data-group="装备"] .lrows,
+.lg-group[data-group="宝箱"] .lrows {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 6px;
 }
 .lg-group[data-group="探索收集"] .lrow,
 .lg-group[data-group="设施地点"] .lrow,
 .lg-group[data-group="敌人"] .lrow,
-.lg-group[data-group="任务"] .lrow {
+.lg-group[data-group="任务"] .lrow,
+.lg-group[data-group="装备"] .lrow,
+.lg-group[data-group="宝箱"] .lrow {
   flex-wrap: nowrap; column-gap: 6px; row-gap: 0; padding: 6px 6px; align-items: center; min-width: 0;
 }
 .lg-group[data-group="探索收集"] .lrow .lname,
 .lg-group[data-group="设施地点"] .lrow .lname,
 .lg-group[data-group="敌人"] .lrow .lname,
-.lg-group[data-group="任务"] .lrow .lname {
+.lg-group[data-group="任务"] .lrow .lname,
+.lg-group[data-group="装备"] .lrow .lname,
+.lg-group[data-group="宝箱"] .lrow .lname {
   flex: 1; white-space: nowrap; min-width: 0; overflow: hidden;
 }
 .lg-group[data-group="探索收集"] .lrow .lprog,
 .lg-group[data-group="设施地点"] .lrow .lprog,
 .lg-group[data-group="敌人"] .lrow .lprog,
-.lg-group[data-group="任务"] .lrow .lprog {
+.lg-group[data-group="任务"] .lrow .lprog,
+.lg-group[data-group="装备"] .lrow .lprog,
+.lg-group[data-group="宝箱"] .lrow .lprog {
   flex: 0 0 auto; min-width: 0; text-align: right; font-size: 11px;
 }
 #mapArea { flex: 1; position: relative; height: calc(100vh - 58px); overflow: hidden; }
@@ -609,3 +617,216 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lg-group[data-group="材料"] .mat-item .lprog {
   flex: 0 0 auto; min-width: 30px; text-align: right; font-size: 11px; color: var(--text-dim);
 }
+
+/* ============ 任务板块（V1.6.0） ============ */
+/* 探索面板 · 任务组（与材料组同构：lg 分组头 + lrow 行） */
+.lg-group[data-group="任务"] .lrow { cursor: pointer; }
+.lg-group[data-group="任务"] .lrow .dot { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+
+/* ============ 任务卡片 / 装备卡片（TOTKmap 视觉语言，V1.6.0 升级） ============ */
+#questCard, #equipCard {
+  position: absolute; z-index: 21; width: 350px; max-width: calc(100vw - 24px);
+  max-height: 78vh; overflow-y: auto; pointer-events: auto;
+  background: rgba(28,30,36,.97); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.55);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  padding: 14px 16px 16px; font-size: 13px; color: rgba(255,255,255,.85);
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.14) transparent;
+}
+#questCard.hidden, #equipCard.hidden { display: none; }
+#questCard::-webkit-scrollbar, #equipCard::-webkit-scrollbar { width: 3px; }
+#questCard::-webkit-scrollbar-thumb, #equipCard::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
+#questCardBody, #equipCardBody { padding: 0; }
+
+/* 顶部：tk-grip 抓手 + 分类徽章 + 操作（TOTKmap 原版视觉） */
+.tk-grip {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  cursor: grab; padding: 2px 0; margin-left: -2px; margin-right: -2px;
+  border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 6px;
+  touch-action: none;
+}
+.tk-grip:active { cursor: grabbing; }
+.tk-grip::before {
+  content: ""; flex: 0 0 auto; width: 11px; height: 9px; opacity: .4;
+  background-image: radial-gradient(currentColor 1px, transparent 1.1px);
+  background-size: 3.5px 3.5px; color: rgba(255,255,255,.9);
+}
+.tk-chip {
+  font-size: 11px; padding: 2px 7px; border-radius: 4px;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.7);
+  white-space: nowrap;
+}
+.tk-chip-main { background: rgba(234,194,126,.16); color: #eac27e; }
+.tk-chip-imp  { background: rgba(126,200,169,.16); color: #7ec8a9; }
+.tk-chip-sub  { background: rgba(111,179,224,.16); color: #6fb3e0; }
+.tk-chip-mini { background: rgba(184,160,232,.16); color: #c4b0f0; }
+.tk-close {
+  margin-left: auto; width: 22px; height: 22px; line-height: 1;
+  border: none; background: transparent; color: rgba(255,255,255,.45);
+  font-size: 19px; cursor: pointer; border-radius: 4px; flex: 0 0 auto;
+}
+.tk-grip-acts { display: flex; align-items: center; gap: 3px; margin-left: auto; }
+.tk-grip-acts .tk-close { margin-left: 0; }
+/* ★ 上/下一个（以及装备卡复制）小按钮：纯线条无底，不要白底（用户要求） */
+.tk-icon-btn {
+  width: 22px; height: 22px; padding: 0; line-height: 1;
+  border: 1px solid rgba(255,255,255,.28); background: transparent;
+  color: rgba(255,255,255,.65); font-size: 13px; border-radius: 5px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.tk-icon-btn:hover { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.45); }
+.tk-grip-acts .tk-nav { width: 22px; height: 22px; font-size: 13px; }
+.tk-close:hover { background: rgba(255,255,255,.1); color: #fff; }
+
+/* 标题行：档内序号徽标（金底黑字）+ 名称 + 复制 */
+.tk-title-row {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px;
+}
+.tk-name {
+  font-size: 16px; font-weight: 600; line-height: 1.4; color: #f0f1f3;
+  margin: 0; min-width: 0; flex: 1; word-break: break-word;
+}
+.tk-no-badge {
+  background: #c9a227; color: #14181c; font-weight: bold; font-size: 12px;
+  padding: 2px 7px; border-radius: 4px; flex: 0 0 auto; margin-top: 1px;
+}
+.tk-copy {
+  display: inline-block; border: none; background: none; padding: 0 2px;
+  margin-left: 6px; color: #9a8a6c; font-size: 11px; font-weight: normal;
+  line-height: 1; cursor: pointer; vertical-align: baseline;
+}
+.tk-copy:hover { color: #eac27e; }
+
+/* 关键信息（★ 区域一行、位置一行：block 纵向排列，TOTKmap 卡片结构） */
+.tk-meta { margin-bottom: 4px; display: block; }
+.tk-mrow { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.7; }
+.tk-mk { color: rgba(255,255,255,.42); flex: 0 0 52px; }
+.tk-mv { color: rgba(255,255,255,.85); flex: 1; }
+.co-link { color: #eac27e; font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; letter-spacing: .3px; }
+.co-link:hover { text-decoration: underline; }
+.tk-plabel { color: #eac27e; font-weight: 600; font-size: 13px; letter-spacing: .3px; flex: 0 0 auto; margin-right: 8px; }
+.tk-mtag {
+  display: inline-block; font-size: 11.5px; line-height: 1.6;
+  padding: 1px 7px; border-radius: 4px; flex: 0 0 auto;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.7);
+}
+
+/* kv 行（前置/后续/注意/奖励） */
+.tk-kv { display: flex; gap: 8px; margin-bottom: 5px; font-size: 12.5px; }
+/* ★ 前置条件与「位置」区之间的分割线（用户要求） */
+.tk-kv-div { border-top: 1px solid rgba(255,255,255,.07); padding-top: 8px; margin-top: 8px; }
+/* ★ 任务要点正文下的第一个子项（接取）加一点间距 */
+.tk-sec-b + .tk-kv { margin-top: 6px; }
+.tk-k { color: rgba(255,255,255,.42); flex: 0 0 56px; }
+.tk-v { flex: 1; color: rgba(255,255,255,.85); }
+.tk-req { color: #eac27e; }
+.tk-req .tk-none2 { color: rgba(234,194,126,.6); }
+.tk-req-link { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.tk-none2 { color: rgba(255,255,255,.32); font-size: 11px; }
+.tk-dash { color: rgba(255,255,255,.5); font-weight: bold; }
+.tk-kv b, .tk-note b { color: rgba(255,255,255,.9); font-weight: 600; }
+
+/* 分区（任务要点/流程地点） */
+.tk-sec { margin-top: 9px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.07); }
+.tk-sec-t {
+  font-size: 11.5px; color: #9a8a6c; margin-bottom: 5px;
+  display: flex; align-items: center; gap: 6px;
+}
+.tk-src {
+  font-size: 10px; color: rgba(255,255,255,.28);
+  border: 1px solid rgba(255,255,255,.12); border-radius: 3px; padding: 0 4px;
+}
+.tk-sec-b { font-size: 13px; line-height: 1.65; color: rgba(255,255,255,.8); }
+
+/* 官方分步（编号圆点） */
+.tk-steps { list-style: none; margin: 0; padding: 0; }
+.tk-step { display: flex; gap: 8px; margin-bottom: 6px; }
+.tk-step-no {
+  flex: 0 0 17px; height: 17px; line-height: 17px; text-align: center;
+  font-size: 10.5px; border-radius: 50%;
+  background: rgba(234,194,126,.18); color: #eac27e;
+  font-variant-numeric: tabular-nums; margin-top: 2px;
+}
+.tk-step-tx { flex: 1; }
+.tk-pending { color: rgba(255,255,255,.4); font-style: italic; }
+.tk-none {
+  font-size: 12.5px; color: rgba(255,255,255,.45);
+  background: rgba(255,255,255,.04); border-radius: 6px;
+  padding: 7px 9px; line-height: 1.6;
+}
+
+/* 流程地点坐标网格（TOTKmap V2.5.0：最多 3 列自动缩放） */
+.tk-flow-t {
+  font-size: 11.5px; color: #9a8a6c; font-weight: bold;
+  letter-spacing: 1px; margin-bottom: 2px; flex: 1 1 100%; display: block;
+}
+.flow-pts { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; flex: 1 1 100%; }
+.fp {
+  display: flex; align-items: center; gap: 6px; background: #232b33;
+  border: 1px solid #333d47; border-radius: 8px; padding: 6px 9px; cursor: pointer;
+  font-size: 12px; position: relative; min-width: 0;
+}
+.fp:hover { border-color: #eac27e; }
+.fp .num { color: #eac27e; font-weight: bold; font-size: 13px; flex: 0 0 16px; text-align: center; }
+.fp .txt { color: #dcd7cb; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.fp .tip { display: none; position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
+  background: #0d1114; border: 1px solid #3a434d; border-radius: 6px; padding: 4px 8px;
+  font-size: 11px; color: #eac27e; white-space: nowrap; z-index: 9; }
+.fp:hover .tip { display: block; }
+.fp .tip .xy { color: #b8b2a6; }
+
+/* 底部操作：金色渐变主题（TOTKmap 原版） */
+.tk-actions { display: flex; gap: 8px; margin-top: 14px; }
+.tk-actions .btn { flex: 1; min-height: 40px; border-radius: 8px; padding: 9px 4px; font-size: 13px;
+  cursor: pointer; border: 1px solid #c9a227; font-family: inherit;
+  background: linear-gradient(180deg, #e0b64e, #c9a227); color: #14181c; font-weight: bold; }
+.tk-actions .btn.act:hover { filter: brightness(1.08); }
+.tk-actions .btn.act.tk-ghost { background: rgba(201,162,39,.12); color: #eac27e; border: 1px solid rgba(201,162,39,.55); font-weight: bold; }
+.tk-actions .btn.act.tk-ghost:hover { background: rgba(201,162,39,.22); filter: none; }
+.tk-actions .btn.act.is-on { background: rgba(234,194,126,.16); border-color: rgba(234,194,126,.45); color: #eac27e; }
+.tk-actions .btn.act.is-off { opacity: .36; cursor: not-allowed; }
+.tk-actions .btn.done { border: 1px solid #c9a227; background: linear-gradient(180deg,#e0b64e,#c9a227); color: #14181c; font-weight: bold; }
+.tk-actions .btn.done:hover { filter: brightness(1.08); }
+.tk-actions .btn.done.is-done { background: rgba(63,156,82,.16); border-color: rgba(63,156,82,.42); color: #8fd79c; cursor: default; }
+.tk-actions .btn.done.is-done:disabled { opacity: 1; }
+
+/* 完成勾（绿色实心 + 白勾） */
+.tk-done-tick {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 19px; height: 19px; border-radius: 50%; flex: 0 0 auto;
+  background: #3f9c52; color: #fff; font-size: 12px; font-weight: 700; line-height: 1;
+}
+
+/* 装备专属：分类行图标 + 获取来源坐标（复用 flow-pts 网格） */
+.eq-lrow-ic { width: 14px; height: 14px; object-fit: contain; flex: 0 0 auto; align-self: center; }
+.eq-obtain-h {
+  font-size: 11.5px; color: rgba(255,255,255,.6);
+  display: flex; align-items: center; gap: 6px; margin: 4px 0 6px;
+}
+.qcard-en { font-size: 12px; color: rgba(255,255,255,.45); margin-bottom: 10px; word-break: break-all; }
+.q-badge-hard {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
+  font-size: 10.5px; background: rgba(192,132,217,.14); border: 1px solid #8a5aa8; color: #c084d9;
+}
+.qcard-src {
+  margin-top: 10px; font-size: 11px; color: rgba(255,255,255,.35);
+  padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.12);
+}
+.q-obtain-more { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 3px; }
+.q-hard-note {
+  margin-top: 8px; font-size: 11px; color: rgba(255,255,255,.4);
+  padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.12);
+}
+
+
+/* 手机端：任务卡 / 装备卡底部抽屉（与 #infoCard 一致） */
+@media (max-width: 760px) {
+  #questCard, #equipCard {
+    left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; max-width: none;
+    max-height: 55vh; overflow-y: auto;
+    border-color: rgba(234,194,126,.4);
+    box-shadow: 0 0 0 1px rgba(234,194,126,.25), rgba(0,0,0,.55);
+  }
+  /* 手机抽屉：获取来源坐标沿用 grid 1-3 列自适应（窄屏自动降列） */
+}
+

@@ -185,6 +185,34 @@ const UI = (() => {
     });
   }
 
+  /* V1.6.1 调整i：共享卡片拖动（quest/equip/chest 卡复用；手机底部抽屉不拖）。
+     拖动后写 card.dataset.manual='1'，模块 positionCard 见 manual 即跳过避让重算；
+     下次 openCard / 定位跳转清除 manual 重新避让。 */
+  window.initCardDrag = function (card) {
+    if (!card || card._dragInit) return;
+    card._dragInit = true;
+    card.addEventListener('pointerdown', e => {
+      if (window.innerWidth <= 760) return;
+      if (e.target.closest('.tk-close, .btn, button, .co-link')) return;
+      e.preventDefault();
+      var r0 = card.getBoundingClientRect();
+      var offX = e.clientX - r0.left, offY = e.clientY - r0.top;
+      var move = ev => {
+        var left = Math.max(8, Math.min(ev.clientX - offX, window.innerWidth - 60));
+        var top = Math.max(8, Math.min(ev.clientY - offY, window.innerHeight - 50));
+        card.style.left = left + 'px'; card.style.top = top + 'px';
+        card.style.right = 'auto'; card.style.bottom = 'auto';
+        card.dataset.manual = '1';
+      };
+      var up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    });
+  };
+
   /* ---------- 图层列表 ---------- */
   function buildLayerList() {
     const wrap = $('layerList');
@@ -509,6 +537,26 @@ const UI = (() => {
         searchIndex.push({ mat: m, cat: m.cat, name: m.cn, en: m.en, catCn: '材料·' + m.cat, px: null });
       });
     }
+    // 任务板块（V1.6.0）：147 个任务并入搜索（quest.js 提供 __questSearch）
+    if (window.__questSearch) {
+      window.__questSearch.forEach(t => {
+        searchIndex.push({
+          quest: t.q, cat: t.cat, name: t.name, en: t.en,
+          catCn: t.catCn, px: (t.pts && t.pts[0]) || null, region: t.q.region || '',
+        });
+      });
+    }
+    // 装备板块（V1.6.0）：武器/防具并入搜索（equip.js 提供 __equipSearch）
+    if (window.__equipSearch) {
+      window.__equipSearch.forEach(t => {
+        searchIndex.push({
+          equip: t.e, cat: t.kind, name: t.name, en: t.en,
+          catCn: t.catCn, px: t.pts || null, region: t.region || '',
+        });
+      });
+    }
+    // 供 quest.js 在移除旧任务标点后重建索引（防御性保留）
+    window._rebuildSearch = buildSearchIndex;
     const input = $('searchInput');
     let timer = null;
     input.addEventListener('input', () => {
@@ -538,10 +586,36 @@ const UI = (() => {
       box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
     } else {
       box.innerHTML = hits.map(h => `
-        <div class="sr-item ${h.mat ? '' : (map._mkDone(h.mk) ? 'done' : '')}" ${h.mat ? 'data-mat="' + h.mat.id + '"' : 'data-id="' + h.id + '"'}>
+        <div class="sr-item ${h.mat ? '' : h.quest ? '' : h.equip ? '' : (map._mkDone(h.mk) ? 'done' : '')}" ${h.mat ? 'data-mat="' + h.mat.id + '"' : h.quest ? 'data-quest="' + h.quest.key + '"' : h.equip ? 'data-equip="' + h.equip.id + '"' : 'data-id="' + h.id + '"'}>
           <span class="sr-name">${esc(h.name)}</span>
           <span class="sr-meta">${h.catCn}${h.region ? ' · ' + esc(h.region) : ''}</span>
         </div>`).join('');
+      // 任务命中（V1.6.0）：打开任务卡 + 定位 + 确保对应分类勾选可见
+      box.querySelectorAll('.sr-item[data-quest]').forEach(el => {
+        el.addEventListener('click', () => {
+          const t = window.__questSearch.find(x => x.q.key === el.dataset.quest);
+          if (t && window.QuestPanel) {
+            if (!window.QuestPanel.isOn(t.q.cat)) window.QuestPanel.toggle(t.q.cat);
+            window.QuestPanel.locate(t.q);
+            window.QuestPanel.openCard(t.q);
+          }
+          hideResults();
+          $('searchInput').blur();
+        });
+      });
+      // 装备命中（V1.6.0）：打开装备卡 + 定位 + 确保对应分类勾选可见
+      box.querySelectorAll('.sr-item[data-equip]').forEach(el => {
+        el.addEventListener('click', () => {
+          const t = window.__equipSearch && window.__equipSearch.find(x => x.e.id === el.dataset.equip);
+          if (t && window.EquipPanel) {
+            if (!window.EquipPanel.isOn(t.kind)) window.EquipPanel.toggle(t.kind);
+            window.EquipPanel.locate(t.e);
+            window.EquipPanel.openCard(t.e);
+          }
+          hideResults();
+          $('searchInput').blur();
+        });
+      });
       // 材料命中：自动启用对应类目 → 飞到分布中心 → 选中材料（高亮全部点）
       box.querySelectorAll('.sr-item[data-mat]').forEach(el => {
         el.addEventListener('click', () => {
@@ -597,6 +671,22 @@ const UI = (() => {
 
   function onSelect(hit) {
     if (!hit) { currentMarker = null; navMk = null; hideInfo(); return; }
+    // V1.6.0 外部图层命中：任务点 → 任务卡片；装备点 → 装备卡片（两卡互斥）
+    if (hit.ext) {
+      currentMarker = null;
+      navMk = null;
+      hideInfo();
+      if (hit.ext.type === 'quest' && window.QuestPanel) {
+        var eqCard = document.getElementById('equipCard');
+        if (eqCard) eqCard.classList.add('hidden');
+        window.QuestPanel.openCard(hit.ext.quest);
+      }
+      if (hit.ext.type === 'equip' && window.EquipPanel) {
+        if (window.QuestPanel && window.QuestPanel.closeCard) window.QuestPanel.closeCard();
+        window.EquipPanel.openCard(hit.ext.equip);
+      }
+      return;
+    }
     if (hit.custom) {
       currentMarker = null;
       navMk = null;

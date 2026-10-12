@@ -32,6 +32,8 @@ const SAVE_UPLOAD = (() => {
 
   function init(m) {
     map = m;
+    // V1.6.0 任务完成标志反查表：hash -> flagName（quest_save.js 提供 flagName -> hash）
+    buildQuestHash();
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
     if (!input || !btn) return;
@@ -143,12 +145,23 @@ const SAVE_UPLOAD = (() => {
     return true;
   }
 
+  /* V1.6.0：任务完成标志反查表 hash -> flagName（存档扁平表按 hash 检索，需要反向索引） */
+  let questHashToFlag = null;
+  function buildQuestHash() {
+    if (questHashToFlag) return;
+    const QS = (typeof QUEST_SAVE !== 'undefined') ? QUEST_SAVE : null;
+    if (!QS) { console.warn('[save_upload] QUEST_SAVE 任务标志表未加载：index.html 未引入 data/quest_save.js？'); return; }
+    questHashToFlag = {};
+    Object.keys(QS).forEach(f => { questHashToFlag[QS[f]] = f; });
+  }
+
   function applySave(buf, fileName) {
     if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
     const littleEndian = detectEndian(dv, fileName);
     const srcName = littleEndian ? 'Switch（Ryujinx）' : 'Wii U（Cemu）';
     const done = new Map();         // hash -> type
+    const questFlags = {};          // V1.6.0: flagName -> true（任务完成标志）
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
       const h = dv.getUint32(o, littleEndian);
@@ -156,6 +169,7 @@ const SAVE_UPLOAD = (() => {
       entries++;
       if (h === H_PLAYTIME) playtime = v;
       else if (h === H_KOROK_CNT) korokCnt = v;
+      else if (v !== 0 && questHashToFlag && questHashToFlag[h]) questFlags[questHashToFlag[h]] = true;
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
@@ -183,6 +197,13 @@ const SAVE_UPLOAD = (() => {
       UI.renderStats();
       UI.updateLayerList();
     }
+    // V1.6.0 任务完成同步（存档权威）：命中任务标志 → 注入任务板块 → 刷新任务行计数与绘制
+    const qfNames = Object.keys(questFlags);
+    if (qfNames.length && window.QuestPanel) {
+      window.QuestPanel.QuestDone.loadSave(questFlags);
+      if (window._questRefreshRows) window._questRefreshRows();
+      map.draw();
+    }
     loaded = true;
     window.__saveUploaded = true;   // 统计面板「存档已同步 ✓」行
     UI.renderStats();
@@ -192,6 +213,7 @@ const SAVE_UPLOAD = (() => {
     for (const k of ['shrine', 'tower', 'korok', 'beast']) {
       if (byT[k]) parts.push(CAT_CN[k] + ' ' + byT[k]);
     }
+    if (qfNames.length) parts.push('任务 ' + qfNames.length);
     if (byT.memory) {
       const mp = [];
       if (memByTier.photo) mp.push('照片 ' + memByTier.photo);

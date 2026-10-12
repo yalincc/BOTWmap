@@ -44,8 +44,8 @@ const CAT_CFG = {
   objective:  { color:'#ffe066', shape:'excl',      order:1, lz:0.7,  icon:'icons_32.png', isz:[20,20] },
 };
 const CAT_GROUP = {
-  '探索收集': ['shrine','tower','beast','seed','memory','treasure'],
-  '设施地点': ['village','stable','inn','store','armor','dye','jewelry','lab','fountain','statue','pot','raft','settlement'],
+  '探索收集': ['shrine','tower','beast','lab','seed','memory','treasure'],
+  '设施地点': ['village','stable','inn','store','armor','dye','jewelry','fountain','statue','pot','settlement'],
   '敌人':     ['lynel','hinox','talus','molduga','guardian','bokoblin','moblin','lizalfos','keese','chuchu','octorok','wizzrobe','yiga','dragon','pebblit'],
   '任务':     ['mainquest','shrinequest','sidequest','objective'],
 };
@@ -77,6 +77,17 @@ class BotwMap {
     this.hoverMat = null;       // hover 材料点（v1.4.0，悬停名字提示用）
     this.tipEl = null;          // 材料悬停提示浮层 #mapTip
     this.selected = null;       // 选中标记
+    // V1.6.0 外部图层钩子：quest.js / equip.js 注册绘制与命中（与地图引擎隔离）
+    this._extDraw = [];         // fn(ctx)：在 draw() 末尾调用
+    this.extHits = [];          // fn(mx,my) -> {type,...} | null：hitTest 内查询
+    // V1.6.1 调整5：ext hover 预览分发（仅 hoverExt 变化时通知；payload 带稳定 _r/_p 引用做对比）
+    this.extHoverHooks = [];    // fn(ext|null)：任务/装备/宝箱卡片 hover 预览
+    this.hoverExt = null;
+    this._hoverSX = 0;          // 鼠标在 canvas 内的屏幕坐标（预览卡片锚点用）
+    this._hoverSY = 0;
+    // V1.6.1 调整g：定位脉冲光圈（pulseAt 触发，RAF 驱动自停）
+    this._pulses = [];
+    this._pulseRAF = 0;
 
     this.view = { x: 0, y: 0, scale: 0.3 };
     this.dpr = window.devicePixelRatio || 1;
@@ -311,6 +322,9 @@ class BotwMap {
         if (cell) for (const idx of cell) {
           const mk = this.markers[idx];
         if (!this.enabled.has(mk.cat)) continue;
+        // V1.6.1：旧 treasure 标记（data.js 1315 点）停用，统一由 chest.js 三组
+        // （普通 1167 / DLC 27 / 大师模式 118）绘制与命中；此处一处跳过同时停绘制+命中拦截
+        if (mk.cat === 'treasure') continue;
         // V1.4.3：小岩石人默认隐藏（hide 标记，设置里可开启）
         // 回忆：地图上只标注 13 个照片回忆点（照片12 + 最终1）；主线自动 / DLC 回忆随任务触发，不标注
         if (mk.cat === 'memory' && !(mk.extra && (mk.extra.tier === 'photo' || mk.extra.tier === 'final'))) continue;
@@ -340,7 +354,94 @@ class BotwMap {
     this._drawCustom(ctx);
     // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入；live.js 加载前的早期 draw 可能未挂载，防御）
     if (typeof this._drawLive === 'function') this._drawLive(ctx);
+    // V1.6.0 外部图层：任务 / 装备点（quest.js / equip.js 注册，独立绘制不侵入主线）
+    for (const fn of this._extDraw) {
+      try { fn(ctx); } catch (e) { /* 外部图层异常不影响主地图 */ }
+    }
+    // V1.6.1 调整g：定位脉冲光圈（标记之上、UI 之下）
+    this._drawPulses(ctx);
     this._updateZoomPct();
+  }
+
+  /* V1.6.1 调整g：触发定位脉冲（px,py 地图像素坐标）。
+     方案=自然消退：2 圈金色扩散环 1.6s 淡出（TOTK 风格，触发一次自停）。 */
+  pulseAt(px, py) {
+    if (!this.ctx) return;
+    this._pulses.push({ px: px, py: py, t0: performance.now(), dur: 1600 });
+    if (!this._pulseRAF) this._pulseStep();
+  }
+
+  _pulseStep() {
+    var self = this;
+    this._pulseRAF = requestAnimationFrame(function () {
+      var now = performance.now();
+      self._pulses = self._pulses.filter(function (pl) { return now - pl.t0 < pl.dur; });
+      self.draw();
+      if (self._pulses.length) self._pulseStep();
+      else self._pulseRAF = 0;
+    });
+  }
+
+  _drawPulses(ctx) {
+    if (!this._pulses.length) return;
+    var now = performance.now();
+    for (var i = 0; i < this._pulses.length; i++) {
+      var pl = this._pulses[i];
+      var t = (now - pl.t0) / pl.dur;           // 0..1
+      var sx = this.view.x + pl.px * this.view.scale;
+      var sy = this.view.y + pl.py * this.view.scale;
+      ctx.save();
+      /* 两圈错峰扩散 */
+      for (var k = 0; k < 2; k++) {
+        var phase = Math.min(1, Math.max(0, t * 2 - k * 0.4));   // 第二圈晚 0.4
+        var r = 6 + phase * 34;
+        ctx.globalAlpha = (1 - phase) * 0.85;
+        ctx.beginPath();
+        ctx.arc(sx, sy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+      /* 中心亮点 */
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffe9a8';
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  /* V1.6.1 调整g：共享卡片避让定位（quest/equip/chest 三模块统一调用）。
+     sx,sy = canvas 内屏幕坐标；卡片放锚点侧 24px 不遮挡目标，右侧溢出换左侧，
+     垂直居中于锚点并视口夹取；手机端清空内联样式走 CSS 底部抽屉。 */
+  layoutCard(card, sx, sy) {
+    if (!card) return;
+    var vw = window.innerWidth, vh = window.innerHeight;
+    if (vw <= 760) {
+      card.style.left = ''; card.style.top = '';
+      return;
+    }
+    card.style.maxHeight = '70%';
+    card.style.overflowY = 'auto';
+    var sidebar = document.getElementById('sidebar');
+    var guard = (sidebar && !sidebar.classList.contains('collapsed')) ? 312 : 12;
+    var r = this.canvas.getBoundingClientRect();
+    var ax = r.left + sx, ay = r.top + sy;
+    var cw = card.offsetWidth || 300;
+    var ch = Math.min(card.offsetHeight || 320, vh * 0.7);
+    var left = ax + 24, top = ay - ch / 2;
+    if (left + cw > vw - 10) left = ax - cw - 24;   // 右侧放不下 → 换左侧
+    left = Math.max(guard, Math.min(left, vw - cw - 10));
+    top = Math.max(10, Math.min(top, vh - 90));
+    card.style.left = left + 'px';
+    card.style.top = top + 'px';
+  }
+
+  /* V1.6.1 调整g：地图空白命中广播（tap 轻点 / 鼠标 click 空白分支调用），
+     三模块监听关闭各自卡片并复位 pv 态机。 */
+  _fireBlankClose() {
+    try { window.dispatchEvent(new CustomEvent('botw:blankclose')); } catch (e) {}
   }
 
   /* 右下角缩放百分比：全图适配 = 100%，放大 2 倍 = 200% */
@@ -1102,6 +1203,11 @@ class BotwMap {
     }
     const mhit = this._matHitTest(mx, my);
     if (mhit) return mhit;
+    // V1.6.0 外部图层命中：任务 / 装备点（优先于克洛格轨迹与返回 null）
+    for (const fn of this.extHits) {
+      const h = fn(mx, my);
+      if (h) return { ext: h };
+    }
     // 克洛格轨迹（v1.1.4）：点在折线上 → 选中对应克洛格
     if (!best) {
       const pathMk = this._hitKorokPath(mx, my);
@@ -1131,10 +1237,12 @@ class BotwMap {
           if (hit.cluster != null) self._expandCluster(hit.material, hit.cluster, hit.matPx[0], hit.matPx[1], sx, sy);
           else self._selectMaterial(hit.material, hit.matPx);
         }
+        else if (hit.ext && self._onSelect) self._onSelect({ ext: hit.ext });   // V1.6.0 外部图层（任务/装备）
         else self._selectMarker(hit.marker);
       } else {
         self._selectMarker(null);
         if (self.matSel != null) self._selectMaterial(null);
+        self._fireBlankClose();   /* V1.6.1 调整g：手机空白轻点 → 关闭三卡片 */
       }
     }
 
@@ -1264,6 +1372,7 @@ class BotwMap {
         lastX = e.clientX; lastY = e.clientY;
         this._updateMatTip(null);
         this._updateDragonTip(null);
+        this._fireHoverExt(null);
         this.draw();
       } else {
         // 悬停 + 坐标读数
@@ -1279,6 +1388,15 @@ class BotwMap {
         this._updateMatTip(this.hoverMat, e.clientX, e.clientY);
         this._updateDragonTip(this.hoverDragon, e.clientX, e.clientY);
         if (this._onHover) this._onHover(this.hover);
+        // V1.6.1 调整5：ext hover 预览——复用已有 hit（零额外遍历），仅变化时通知
+        this._hoverSX = sx; this._hoverSY = sy;
+        const ext = (hit && hit.ext) || null;
+        const prev = this.hoverExt;
+        const same = prev && ext && prev._r === ext._r && prev._p === ext._p;
+        if ((!!prev) !== (!!ext) || !same) {
+          this.hoverExt = ext;
+          for (const fn of this.extHoverHooks) { try { fn(ext); } catch (err) {} }
+        }
         if (this.mode === 'browse') this.draw();
       }
     });
@@ -1301,10 +1419,12 @@ class BotwMap {
           if (hit.cluster != null) this._expandCluster(hit.material, hit.cluster, hit.matPx[0], hit.matPx[1], e.clientX - r.left, e.clientY - r.top);
           else this._selectMaterial(hit.material, hit.matPx);
         }
+        else if (hit.ext && this._onSelect) this._onSelect({ ext: hit.ext });   // V1.6.0 外部图层（任务/装备）
         else this._selectMarker(hit.marker);
       } else {
         this._selectMarker(null);
         if (this.matSel != null) this._selectMaterial(null);
+        this._fireBlankClose();   /* V1.6.1 调整g：空白点击 → 关闭三卡片 */
       }
     });
 
@@ -1532,6 +1652,13 @@ class BotwMap {
   }
 
   /* 材料悬停名字提示（v1.4.0）：#mapTip 跟随光标，命中材料单点才显示 */
+  /* V1.6.1 调整5：强制通知 ext hover 变化（拖拽开始 / 移出地图时调用） */
+  _fireHoverExt(ext) {
+    if (!this.hoverExt && !ext) return;
+    this.hoverExt = ext;
+    for (const fn of this.extHoverHooks) { try { fn(ext); } catch (err) {} }
+  }
+
   _updateMatTip(mat, x, y) {
     if (!this.tipEl) this.tipEl = document.getElementById('mapTip');
     if (!this.tipEl) return;

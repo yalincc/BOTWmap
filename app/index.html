@@ -5,8 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=41">
-</head>
+<link rel="stylesheet" href="css/style.css?v=48">
+<!-- V1.6.1 宝箱卡片：与 #questCard/#equipCard 同款视觉（不动 style.css，内联在 index.html） -->
+<style>
+#chestCard{position:absolute;z-index:21;width:350px;max-width:calc(100vw - 24px);max-height:78vh;overflow-y:auto;pointer-events:auto;background:rgba(28,30,36,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:14px 16px 16px;font-size:13px;color:rgba(255,255,255,.85);}
+#chestCard.hidden{display:none;}
+@media (max-width:760px){#chestCard{left:8px;right:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;overflow-y:auto;border-color:rgba(234,194,126,.4);}}
+</style>
+</head></head></head>
 <body>
 <div id="app">
 
@@ -84,7 +90,7 @@
     </div>
 
     <footer class="side-foot">
-      <p class="foot-version">BOTWMAP V1.5.0 © 2026 yalincc</p>
+      <p class="foot-version">BOTWMAP 1.6.1 © 2026 yalincc</p>
       <p>GitHub <a href="https://github.com/yalincc/BOTWmap" target="_blank" rel="noopener">https://github.com/yalincc/BOTWmap</a></p>
     </footer>
   </aside>
@@ -303,11 +309,26 @@
         <button id="cardDelPin" class="danger hidden">删除标记</button>
       </div>
     </div>
+  
+    <!-- 任务卡片（V1.6.0） -->
+    <div id="questCard" class="hidden">
+      <div id="questCardBody"></div>
+    </div>
+
+    <!-- 装备卡片（V1.6.0） -->
+    <div id="equipCard" class="hidden">
+      <div id="equipCardBody"></div>
+    </div>
+
+    <!-- 宝箱卡片（V1.6.1）：点 DLC / 大师模式宝箱点查看内容物与归属 -->
+    <div id="chestCard" class="hidden">
+      <div id="chestCardBody"></div>
+    </div>
   </main>
 
 </div>
 
-<script src="js/data.js?v=4"></script>
+<script src="js/data.js?v=5"></script>
 <script src="js/enemies.js?v=2"></script>
 <script src="js/dragon_paths.js?v=3"></script>
 <script src="js/koroks.js?v=1"></script>
@@ -315,12 +336,21 @@
 <script src="js/supercluster.min.js"></script>
 <script src="js/materials.js?v=1"></script>
 <script src="js/regions.js?v=rn4"></script>
-<script src="js/map.js?v=27"></script>
-<script src="js/ui.js?v=41"></script>
-<script src="js/main.js?v=9"></script>
+<script src="js/map.js?v=33"></script>
+<script src="js/ui.js?v=45"></script>
+<script src="js/main.js?v=10"></script>
 <script src="js/live.js?v=14"></script>
 <script src="data/save_flags.js?v=1"></script>
-<script src="js/save_upload.js?v=10"></script>
+<script src="data/quest_save.js?v=1"></script>
+<script src="js/save_upload.js?v=11"></script>
+<script src="data/quests.js?v=5"></script>
+<script src="js/quest.js?v=15"></script>
+<script src="data/weapons.js?v=1"></script>
+<script src="data/armors.js?v=1"></script>
+<script src="js/equip.js?v=13"></script>
+<!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
+<script src="data/chests.js?v=1"></script>
+<script src="js/chest.js?v=6"></script>
 </body>
 </html>
 
