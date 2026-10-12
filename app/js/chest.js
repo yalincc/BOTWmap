@@ -230,7 +230,9 @@
     if (!map || !p) return;
     map.view.scale = Math.min(Math.max(map.view.scale, 1.2), map.maxScale);
     map.view.x = map.w / 2 - p[0] * map.view.scale;
-    map.view.y = map.h / 2 - p[1] * map.view.scale;
+    /* V1.6.1：手机端底部抽屉（55vh）会盖住下半屏，定位时把目标点推到上方 35% 处 */
+    var vy = (window.CardLayout && window.CardLayout.isMobile()) ? map.h * 0.35 : map.h / 2;
+    map.view.y = vy - p[1] * map.view.scale;
     map.draw();
     if (map.pulseAt) map.pulseAt(p[0], p[1]);   /* V1.6.1 调整g：定位脉冲光圈 */
     /* V1.6.1 调整i：跳转后按新目标点重算避让 */

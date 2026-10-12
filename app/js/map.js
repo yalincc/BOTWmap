@@ -363,12 +363,13 @@ class BotwMap {
     this._updateZoomPct();
   }
 
-  /* V1.6.1 调整g：触发定位脉冲（px,py 地图像素坐标）。
-     方案=自然消退：2 圈金色扩散环 1.6s 淡出（TOTK 风格，触发一次自停）。 */
+  /* V1.6.1 卡片避让统一内核：定位光圈改由 CardLayout 提层到 DOM（z-index 940），
+     不再画在 canvas 上被卡片（z-index 20/21）盖死。px,py = 地图像素坐标。 */
   pulseAt(px, py) {
-    if (!this.ctx) return;
-    this._pulses.push({ px: px, py: py, t0: performance.now(), dur: 1600 });
-    if (!this._pulseRAF) this._pulseStep();
+    if (!window.CardLayout || !this.m2s) return;
+    var sp = this.m2s([px, py]);
+    var r = this.canvas.getBoundingClientRect();
+    window.CardLayout.ring(r.left + sp[0], r.top + sp[1]);
   }
 
   _pulseStep() {
@@ -412,30 +413,14 @@ class BotwMap {
     }
   }
 
-  /* V1.6.1 调整g：共享卡片避让定位（quest/equip/chest 三模块统一调用）。
-     sx,sy = canvas 内屏幕坐标；卡片放锚点侧 24px 不遮挡目标，右侧溢出换左侧，
-     垂直居中于锚点并视口夹取；手机端清空内联样式走 CSS 底部抽屉。 */
+  /* V1.6.1 卡片避让统一内核：实现已迁至 js/card-layout.js（window.CardLayout），
+     此处只做薄转发，保持既有调用点（quest/equip/chest）不变即可自动获得：
+     坐标系归一（消除 +56 下移）、夹取后重叠校验、多卡协同避让。
+     sx,sy = canvas 内屏幕坐标。 */
   layoutCard(card, sx, sy) {
-    if (!card) return;
-    var vw = window.innerWidth, vh = window.innerHeight;
-    if (vw <= 760) {
-      card.style.left = ''; card.style.top = '';
-      return;
-    }
-    card.style.maxHeight = '70%';
-    card.style.overflowY = 'auto';
-    var sidebar = document.getElementById('sidebar');
-    var guard = (sidebar && !sidebar.classList.contains('collapsed')) ? 312 : 12;
+    if (!card || !window.CardLayout) return;
     var r = this.canvas.getBoundingClientRect();
-    var ax = r.left + sx, ay = r.top + sy;
-    var cw = card.offsetWidth || 300;
-    var ch = Math.min(card.offsetHeight || 320, vh * 0.7);
-    var left = ax + 24, top = ay - ch / 2;
-    if (left + cw > vw - 10) left = ax - cw - 24;   // 右侧放不下 → 换左侧
-    left = Math.max(guard, Math.min(left, vw - cw - 10));
-    top = Math.max(10, Math.min(top, vh - 90));
-    card.style.left = left + 'px';
-    card.style.top = top + 'px';
+    window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: card.id });
   }
 
   /* V1.6.1 调整g：地图空白命中广播（tap 轻点 / 鼠标 click 空白分支调用），

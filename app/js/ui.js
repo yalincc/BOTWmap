@@ -198,8 +198,12 @@ const UI = (() => {
       var r0 = card.getBoundingClientRect();
       var offX = e.clientX - r0.left, offY = e.clientY - r0.top;
       var move = ev => {
-        var left = Math.max(8, Math.min(ev.clientX - offX, window.innerWidth - 60));
-        var top = Math.max(8, Math.min(ev.clientY - offY, window.innerHeight - 50));
+        /* ★ 坐标系归一：left/top 是相对卡片定位容器（#mapArea）的，
+           原实现直接写视口坐标导致拖动中卡片比指针低一个顶栏高度、松手位置也是错的 */
+        var h = window.CardLayout ? window.CardLayout.toHost(0, 0)
+          : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
+        var left = Math.max(8, Math.min(ev.clientX - offX - h.x, h.w - 60));
+        var top = Math.max(8, Math.min(ev.clientY - offY - h.y, h.h - 50));
         card.style.left = left + 'px'; card.style.top = top + 'px';
         card.style.right = 'auto'; card.style.bottom = 'auto';
         card.dataset.manual = '1';
@@ -965,30 +969,34 @@ const UI = (() => {
     btn.textContent = cur ? '停止导航' : '导航';
   }
 
+  /* V1.6.1 卡片避让统一内核：实现迁至 js/card-layout.js（window.CardLayout）。
+     锚点仍是最近一次点击地图位置（无记录用画布中心偏上），避让/夹取/多卡协同全交给内核。 */
   function positionCard() {
     const card = $('infoCard');
-    const vw = window.innerWidth, vh = window.innerHeight;
-    // 手机（≤760px）：底部抽屉布局，位置/高度交给 CSS（left/right/bottom 抽屉），不设 left/top
-    if (vw <= 760) {
-      card.style.left = ''; card.style.top = '';
-      card.style.right = ''; card.style.bottom = '';
-      card.style.maxHeight = ''; card.style.overflowY = '';
+    if (!card || !map) return;
+    /* 新打开（此刻仍是 hidden）→ 清除手动态重新避让；已显示的卡保持手动态位 */
+    if (card.classList.contains('hidden')) card.dataset.manual = '';
+    if (card.dataset.manual === '1') return;   /* 手动拖过：保持手动态位 */
+    if (window.CardLayout) {
+      const r = map.canvas.getBoundingClientRect();
+      let sx = map.w / 2, sy = map.h * 0.45;
+      if (map._lastClick) { sx = map._lastClick.sx; sy = map._lastClick.sy; }
+      window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: 'infoCard' });
       return;
     }
+    // 兜底（内核未加载时）：保持原行为
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (vw <= 760) { card.style.left = ''; card.style.top = ''; return; }
     card.style.right = 'auto'; card.style.bottom = 'auto';
-    card.style.maxHeight = '70%'; card.style.overflowY = 'auto';
-    // 桌面侧边栏展开时避让（300px）；折叠或手机抽屉时不避让
     const sidebar = document.getElementById('sidebar');
     const guard = (sidebar && !sidebar.classList.contains('collapsed')) ? 312 : 12;
-    // 锚点：最近一次点击地图的位置；无记录则用画布中心偏上
     const r = map.canvas.getBoundingClientRect();
     let ax = r.left + r.width / 2, ay = r.top + r.height * 0.45;
     if (map._lastClick) { ax = r.left + map._lastClick.sx; ay = r.top + map._lastClick.sy; }
     const cw = card.offsetWidth || 300;
     const ch = Math.min(card.offsetHeight || 320, vh * 0.7);
-    let left = ax + 20;                                   // 锚点右侧
-    let top = ay - ch / 2;                                // 纵向居中于锚点
-    if (left + cw > vw - 10) left = ax - cw - 20;         // 放不下 → 锚点左侧
+    let left = ax + 20, top = ay - ch / 2;
+    if (left + cw > vw - 10) left = ax - cw - 20;
     left = Math.max(guard, Math.min(left, vw - cw - 10));
     top = Math.max(10, Math.min(top, vh - 90));
     card.style.left = left + 'px';

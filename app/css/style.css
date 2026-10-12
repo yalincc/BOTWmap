@@ -623,6 +623,20 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lg-group[data-group="任务"] .lrow { cursor: pointer; }
 .lg-group[data-group="任务"] .lrow .dot { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
 
+/* ---------- 定位光圈（V1.6.1）：从 canvas 提到 DOM 层，z-index 压过所有卡片 ---------- */
+.mk-locate-ring {
+  position: absolute; z-index: 940; pointer-events: none; border-radius: 50%;
+  border: 2.5px solid rgba(255, 209, 102, .95);
+  box-shadow: 0 0 0 1px rgba(255, 233, 168, .55);
+  animation: mk-ring-pulse 1.6s ease-out forwards;
+}
+.mk-locate-ring.static { animation: none; transform: scale(1.15); opacity: .9; }
+@keyframes mk-ring-pulse {
+  0%   { transform: scale(.35); opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
 /* ============ 任务卡片 / 装备卡片（TOTKmap 视觉语言，V1.6.0 升级） ============ */
 #questCard, #equipCard {
   position: absolute; z-index: 21; width: 350px; max-width: calc(100vw - 24px);
