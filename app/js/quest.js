@@ -529,6 +529,8 @@
 
   /* hover 预览入口（map.js mousemove 仅变化时回调） */
   function onHoverExt(ext) {
+    /* V1.6.1：PC 端悬停不再弹卡预览（改为地图左上角名称条），只有点击才弹卡 */
+    if (window.innerWidth > 760) return;
     if (pv.mode === 'fixed') return;           // 已固定：hover 不打扰
     var mine = ext && ext.type === 'quest' ? ext.quest : null;
     if (mine) {

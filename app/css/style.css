@@ -623,6 +623,19 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lg-group[data-group="任务"] .lrow { cursor: pointer; }
 .lg-group[data-group="任务"] .lrow .dot { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
 
+/* ---------- 悬停名称条（V1.6.1）：地图左上角统一显示当前悬停目标名称 ---------- */
+#hoverName {
+  position: absolute; left: 12px; top: 10px; z-index: 45; pointer-events: none;
+  max-width: min(50vw, 460px); padding: 5px 12px; border-radius: 8px;
+  background: var(--panel-solid); border: 1px solid var(--gold-dim);
+  box-shadow: 0 4px 14px rgba(0,0,0,.45);
+  font-size: 13px; line-height: 1.5;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hoverName.hidden { display: none; }
+#hoverName .hn-kind { color: var(--brown); font-size: 11.5px; margin-right: 8px; }
+#hoverName .hn-name { color: var(--gold-lite); font-weight: 600; }
+
 /* ---------- 定位光圈（V1.6.1）：从 canvas 提到 DOM 层，z-index 压过所有卡片 ---------- */
 .mk-locate-ring {
   position: absolute; z-index: 940; pointer-events: none; border-radius: 50%;

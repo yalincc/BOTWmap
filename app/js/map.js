@@ -1358,8 +1358,7 @@ class BotwMap {
         this.view.x += (e.clientX - lastX);
         this.view.y += (e.clientY - lastY);
         lastX = e.clientX; lastY = e.clientY;
-        this._updateMatTip(null);
-        this._updateDragonTip(null);
+        this._updateHoverName(true);
         this._fireHoverExt(null);
         this.draw();
       } else {
@@ -1373,8 +1372,6 @@ class BotwMap {
           ? (this.MATS.materials[hit.material] || null) : null;
         // v1.4.3：龙轨迹悬停名字提示（标记/材料命中时不干扰）
         this.hoverDragon = (!this.hover && !this.hoverMat) ? this._hitDragonPath(m[0], m[1]) : null;
-        this._updateMatTip(this.hoverMat, e.clientX, e.clientY);
-        this._updateDragonTip(this.hoverDragon, e.clientX, e.clientY);
         if (this._onHover) this._onHover(this.hover);
         // V1.6.1 调整5：ext hover 预览——复用已有 hit（零额外遍历），仅变化时通知
         this._hoverSX = sx; this._hoverSY = sy;
@@ -1385,6 +1382,7 @@ class BotwMap {
           this.hoverExt = ext;
           for (const fn of this.extHoverHooks) { try { fn(ext); } catch (err) {} }
         }
+        this._updateHoverName();
         if (this.mode === 'browse') this.draw();
       }
     });
@@ -1639,7 +1637,6 @@ class BotwMap {
     this.draw();
   }
 
-  /* 材料悬停名字提示（v1.4.0）：#mapTip 跟随光标，命中材料单点才显示 */
   /* V1.6.1 调整5：强制通知 ext hover 变化（拖拽开始 / 移出地图时调用） */
   _fireHoverExt(ext) {
     if (!this.hoverExt && !ext) return;
@@ -1647,48 +1644,41 @@ class BotwMap {
     for (const fn of this.extHoverHooks) { try { fn(ext); } catch (err) {} }
   }
 
-  _updateMatTip(mat, x, y) {
-    if (!this.tipEl) this.tipEl = document.getElementById('mapTip');
-    if (!this.tipEl) return;
-    if (mat == null) { this.tipEl.classList.add('hidden'); return; }
-    this.tipEl.textContent = '';
-    const b = document.createElement('b');
-    b.textContent = mat.cn || mat.name || '';
-    this.tipEl.appendChild(b);
-    if (mat.en) {
-      const s = document.createElement('span');
-      s.textContent = mat.en;
-      this.tipEl.appendChild(s);
+  /* ---------- 悬停名称条（V1.6.1）：地图左上角统一显示当前悬停目标名称 ----------
+     取代原先「材料/龙跟随光标浮层」+「任务/装备/宝箱悬停弹卡」两套机制：
+     悬停只报名字，详情走点击。 */
+  _catCn(cat) {
+    if (!this._catCnMap) {
+      this._catCnMap = {};
+      const cats = (this.data && this.data.categories) || [];
+      for (const c of cats) this._catCnMap[c.key] = c.cn;
     }
-    this.tipEl.classList.remove('hidden');
-    const tw = this.tipEl.offsetWidth || 120;
-    let left = x + 16, top = y - 18;
-    if (left + tw > window.innerWidth - 8) left = x - tw - 16;
-    if (top < 8) top = y + 24;
-    this.tipEl.style.left = Math.max(4, left) + 'px';
-    this.tipEl.style.top = top + 'px';
+    return this._catCnMap[cat] || '';
   }
 
-  /* v1.4.3：龙轨迹悬停名字气泡（颜色圆点 + 龙名；材料气泡优先） */
-  _updateDragonTip(dragon, x, y) {
-    if (this.hoverMat) return;                 // 材料气泡优先，不覆盖
-    if (!this.tipEl) this.tipEl = document.getElementById('mapTip');
-    if (!this.tipEl) return;
-    if (dragon == null) { this.tipEl.classList.add('hidden'); return; }
-    this.tipEl.textContent = '';
-    const DOT = { farosh: '#e8be40', dinraal: '#e86040', naydra: '#58a8f0' };
-    const c = document.createElement('span');
-    c.style.cssText = 'display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;background:' + (DOT[dragon.color] || '#888') + ';box-shadow:0 0 0 1px rgba(0,0,0,.35)';
-    this.tipEl.appendChild(c);
-    const b = document.createElement('b');
-    b.textContent = dragon.name || '';
-    this.tipEl.appendChild(b);
-    this.tipEl.classList.remove('hidden');
-    const tw = this.tipEl.offsetWidth || 120;
-    let left = x + 16, top = y - 18;
-    if (left + tw > window.innerWidth - 8) left = x - tw - 16;
-    if (top < 8) top = y + 24;
-    this.tipEl.style.left = Math.max(4, left) + 'px';
-    this.tipEl.style.top = top + 'px';
+  /* 当前悬停对象的「类别 + 名称」；无悬停返回 null */
+  _hoverLabel() {
+    const mk = this.hover, mat = this.hoverMat, dr = this.hoverDragon, ex = this.hoverExt;
+    if (mk) return { kind: this._catCn(mk.cat), name: mk.cn || mk.name || '' };
+    if (mat) return { kind: '材料', name: mat.cn || mat.name || '' };
+    if (dr) return { kind: '龙', name: dr.name || dr.cn || '' };
+    if (ex) {
+      if (ex.type === 'quest' && ex.quest) return { kind: '任务', name: ex.quest.name || '' };
+      if (ex.type === 'equip' && ex.equip) return { kind: '装备', name: ex.equip.name || '' };
+      if (ex.type === 'chest' && ex.item) return { kind: '宝箱', name: ex.item.contentCn || ex.item.en || '' };
+    }
+    return null;
+  }
+
+  _updateHoverName(forceHide) {
+    if (!this.hnEl) this.hnEl = document.getElementById('hoverName');
+    if (!this.hnEl) return;
+    const lab = forceHide ? null : this._hoverLabel();
+    if (!lab || !lab.name || this.mode !== 'browse') { this.hnEl.classList.add('hidden'); return; }
+    const k = this.hnEl.querySelector('.hn-kind');
+    const n = this.hnEl.querySelector('.hn-name');
+    if (k) k.textContent = lab.kind || '';
+    if (n) n.textContent = lab.name;
+    this.hnEl.classList.remove('hidden');
   }
 }
