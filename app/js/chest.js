@@ -344,8 +344,13 @@
     var card = document.getElementById('chestCard');
     if (!card || !map) return;
     if (card.dataset.manual === '1') return;   /* 手动拖过：保持手动态位 */
+    /* 卡片此刻还是 hidden = 正要打开新卡 → 清掉上次定位锚点，改用地图点击点 */
+    if (card.classList.contains('hidden') && window.CardLayout) window.CardLayout.clearAnchor();
     var sx, sy;
     if (previewNow && typeof map._hoverSX === 'number') { sx = map._hoverSX; sy = map._hoverSY; }
+    /* ★ 优先复用最近一次定位的锚点（卡片内点坐标定位后，外层还会再调一次本函数，
+       若此时退回 _lastClick 会把正确的避让结果覆盖掉） */
+    else if (window.CardLayout && window.CardLayout.getAnchor()) { var a = window.CardLayout.getAnchor(); sx = a.sx; sy = a.sy; }
     else if (map._lastClick) { sx = map._lastClick.sx; sy = map._lastClick.sy; }
     else { sx = map.w / 2; sy = map.h * 0.45; }
     map.layoutCard(card, sx, sy);

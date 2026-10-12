@@ -193,6 +193,19 @@
     return placed;
   }
 
+  /* ---------- 当前定位锚点 ----------
+     ★ 修复「点卡片内坐标后又被搬回遮挡位置」：
+     卡片内点坐标的链路是 locate() → layoutCard(card, 新目标) → 外层 handler 又调 positionCard()。
+     后者原本拿 map._lastClick（用户上次点地图的位置，与本次定位无关）当锚点重算，
+     于是把刚算好的正确避让结果覆盖掉 —— 表现为「拖走也没用，点坐标又回到同一处遮挡」。
+     现在 layoutCard 顺手记下本次锚点，positionCard 优先复用它，两边口径一致。 */
+  var _anchor = null;
+  function setAnchor(x, y) {
+    _anchor = (x == null || y == null) ? null : { sx: x, sy: y };
+  }
+  function getAnchor() { return _anchor; }
+  function clearAnchor() { _anchor = null; }
+
   /* ---------- 定位光圈（DOM 层，压过所有卡片） ---------- */
   var _ringEl = null, _ringT1 = 0, _ringT2 = 0;
 
@@ -233,6 +246,9 @@
     placeAll: placeAll,
     ring: ring,
     clearRing: clearRing,
+    setAnchor: setAnchor,
+    getAnchor: getAnchor,
+    clearAnchor: clearAnchor,
     isMobile: isMobile,
     /* 供拖动使用：把视口坐标转成卡片定位坐标系 */
     toHost: function (x, y) {

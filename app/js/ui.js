@@ -21,6 +21,8 @@ const UI = (() => {
     map.canvas.addEventListener('click', e => {
       const r = map.canvas.getBoundingClientRect();
       map._lastClick = { sx: e.clientX - r.left, sy: e.clientY - r.top };
+      /* 用户自己点了地图 → 锚点回到点击位置，不再复用上次定位锚点 */
+      if (window.CardLayout) window.CardLayout.clearAnchor();
     });
     initCardDrag();
     initSideTabs();
@@ -975,12 +977,18 @@ const UI = (() => {
     const card = $('infoCard');
     if (!card || !map) return;
     /* 新打开（此刻仍是 hidden）→ 清除手动态重新避让；已显示的卡保持手动态位 */
-    if (card.classList.contains('hidden')) card.dataset.manual = '';
+    if (card.classList.contains('hidden')) {
+      card.dataset.manual = '';
+      /* 正要打开新卡 → 清掉上次定位锚点，改用地图点击点 */
+      if (window.CardLayout) window.CardLayout.clearAnchor();
+    }
     if (card.dataset.manual === '1') return;   /* 手动拖过：保持手动态位 */
     if (window.CardLayout) {
       const r = map.canvas.getBoundingClientRect();
       let sx = map.w / 2, sy = map.h * 0.45;
-      if (map._lastClick) { sx = map._lastClick.sx; sy = map._lastClick.sy; }
+      const a = window.CardLayout.getAnchor();
+      if (a) { sx = a.sx; sy = a.sy; }
+      else if (map._lastClick) { sx = map._lastClick.sx; sy = map._lastClick.sy; }
       window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: 'infoCard' });
       return;
     }

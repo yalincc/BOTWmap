@@ -419,6 +419,9 @@ class BotwMap {
      sx,sy = canvas 内屏幕坐标。 */
   layoutCard(card, sx, sy) {
     if (!card || !window.CardLayout) return;
+    /* ★ 记下本次定位锚点：卡片内点坐标的链路里，外层 handler 紧接着还会调一次
+       positionCard()，若它拿 map._lastClick 重算就会覆盖这里的正确避让结果 */
+    window.CardLayout.setAnchor(sx, sy);
     var r = this.canvas.getBoundingClientRect();
     window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: card.id });
   }
