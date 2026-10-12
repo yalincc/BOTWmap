@@ -1358,7 +1358,7 @@ class BotwMap {
         this.view.x += (e.clientX - lastX);
         this.view.y += (e.clientY - lastY);
         lastX = e.clientX; lastY = e.clientY;
-        this._updateHoverName(true);
+        this._updateHoverName(sx, sy, true);
         this._fireHoverExt(null);
         this.draw();
       } else {
@@ -1382,7 +1382,7 @@ class BotwMap {
           this.hoverExt = ext;
           for (const fn of this.extHoverHooks) { try { fn(ext); } catch (err) {} }
         }
-        this._updateHoverName();
+        this._updateHoverName(sx, sy);
         if (this.mode === 'browse') this.draw();
       }
     });
@@ -1670,7 +1670,10 @@ class BotwMap {
     return null;
   }
 
-  _updateHoverName(forceHide) {
+  /* sx,sy = 命中点（canvas 内坐标，与 #mapArea 同坐标系）。
+     名称条浮在图标正上方：水平居中于图标，底边离图标 16px；顶部放不下翻到下方；
+     左右夹取在地图区内，绝不越界。 */
+  _updateHoverName(sx, sy, forceHide) {
     if (!this.hnEl) this.hnEl = document.getElementById('hoverName');
     if (!this.hnEl) return;
     const lab = forceHide ? null : this._hoverLabel();
@@ -1680,5 +1683,14 @@ class BotwMap {
     if (k) k.textContent = lab.kind || '';
     if (n) n.textContent = lab.name;
     this.hnEl.classList.remove('hidden');
+    const w = this.hnEl.offsetWidth || 120, h = this.hnEl.offsetHeight || 26;
+    const ax = (sx == null) ? this.w / 2 : sx, ay = (sy == null) ? this.h / 2 : sy;
+    let left = ax - w / 2;
+    let top = ay - h - 16;
+    if (top < 6) top = ay + 20;                                     // 上方放不下 → 翻到下方
+    left = Math.max(6, Math.min(left, Math.max(6, this.w - w - 6)));
+    top = Math.max(6, Math.min(top, Math.max(6, this.h - h - 6)));
+    this.hnEl.style.left = Math.round(left) + 'px';
+    this.hnEl.style.top = Math.round(top) + 'px';
   }
 }

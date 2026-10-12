@@ -625,7 +625,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 
 /* ---------- 悬停名称条（V1.6.1）：地图左上角统一显示当前悬停目标名称 ---------- */
 #hoverName {
-  position: absolute; left: 12px; top: 10px; z-index: 45; pointer-events: none;
+  position: absolute; left: 0; top: 0; z-index: 45; pointer-events: none;
   max-width: min(50vw, 460px); padding: 5px 12px; border-radius: 8px;
   background: var(--panel-solid); border: 1px solid var(--gold-dim);
   box-shadow: 0 4px 14px rgba(0,0,0,.45);
