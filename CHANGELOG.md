@@ -12,6 +12,9 @@
 - 触屏防误拖：整卡可拖模式下，触屏只允许从 `.tk-grip` 抓手起拖，其余区域留给内容滚动（卡片 `overflow-y:auto`，加 `touch-action:none` 会连滚动一起废掉）；鼠标不受影响、全卡任意处可拖
 - 拖动加 `setPointerCapture` + `pointercancel` 兜底，指针移出卡片 / 窗口不丢 `up`
 - 清理 `app/index.html` 重复闭合标签 `</head></head></head>`
+- **无坐标任务的【定位】按钮改为置灰 + title 说明**（TOTKmap 手册 §9.2：隐藏会让玩家以为功能缺失）：原先 `side_148`（EX 异度神剑2 联动，gx/gz 为 null）整条按钮不渲染，现在渲染为 `disabled` + `is-off` + title「本任务在地图上无固定坐标，请用下方「流程地点」定位」
+- **【任务连线】改为按去重后的流程点坐标数判断**（手册 §7：L1 = 去重后 ≥2 个不同坐标）：去重逻辑收在 `QuestFlow.pointsOf()`（绘制/计数/toast 全口径统一），`side_92` / `side_95` / `side_133` 三条「两点同坐标」不再出现连线按钮，也不再画零长度线
+- **`tier` 判定改为按去重坐标**（`build_quests_v2.py`）：原先全库 152 条恒为 L1 等于废字段，现在 **L1 149 / L2 3**，`side_92`/`side_95`/`side_133` 正确降为 L2
 
 ### 新增
 - **宝箱存档自动同步**（恢复实现）：新增 `app/data/chest_save.js`（1312 条 `crc32(flagName) → 地图像素点`，Switch romfs Dynamic 直提 885 + radar Static/AocField 423 + Wii U 事件宝箱 4，全部经 romfs 权威表核验；生成器 `source/build_chest_save.py` + 中间件 `source/chest_sync_src/` 本地保留，`source/` 不入库）；`save_upload.js` 解析循环反查（Switch/Wii U 双字节序通用）→ `chest.js` `ChestSync.loadSave` 注入存档完成集（`botwmap.chestSaveDone.v1`）→ `ChestPanel.isDone = 存档 ∪ 手动标记`；摘要 toast 增「宝箱 N」。数据字典与谱系见 BOTWroms `raw/romfs/save-flags/` + DATA-README §7/§8。验证：真实存档 Node 端到端 **138/138 精确命中 chests.js** + 无头 Chrome 冒烟（1312 就绪 / 138 注入 / 0 报错）全绿
@@ -20,15 +23,21 @@
 - **任务数据校对清单**：并入 `tasks/manual/README.md`，含「要补的 key（P0/P2）」「已齐的 key」「自动校对已通过 6 项」「与 TOTKmap 的 key 差异对齐结论」
 - **首轮自动校对（152 条）**：前后置对称 0 / 控制字符 0 / 坐标越界 0 / region 与坐标一致 0 / `name`·`en` 异常 0 / key 悬空 0 —— 数据层是干净的，缺口只在 `flag` 覆盖率（89/152）与 `side_148` 一条
 - **`app/js/regions.js` 地区译名统一**：r1/r2 原写作「哈特尔」（哈特尔地区 / 东哈特尔 / 哈特尔海 / 西哈特尔，4 处），与全项目主流译名「内卡鲁达」（`data.js` 357 次 / 任务数据 45 次）不一致 → 统一为 内卡鲁达地区 / 东内卡鲁达 / 内卡鲁达海 / 西内卡鲁达；bump `regions.js rn4→rn5`
-- **待定项**（对照 TOTKmap 技术手册 §11 实核后新发现，未改）：① 无坐标任务（side_148）的【定位】按钮被整条隐藏，手册要求置灰 + title 说明原因；② 【任务连线】按 `flowPts.length>=2` 判断，未按去重坐标判断 → `side_92` / `side_95` / `side_133` 三条会画零长度线（且 `tier` 全库恒为 L1，等于废字段）。对照结论已写入 `BOTWmap任务板块技术手册-来自TOTKmapV2.5.0-20261014.md` §12
+- **任务存档同步解冻：flag 覆盖 63/152 → 152/152（100%）**
+  - 验证：新增 `source/verify_quest_flags.py`（只读），用真实 Ryujinx 存档端到端反查。两个独立存档交叉复核一致——romfs 官方 flag **152/152 全部可查**，value 只有 `{0,1}` 二值（无 `0xFFFFFFFF`/中间值，判据无歧义），90 条 value=1
+  - 解冻：`build_quests_v2.py` 的 flag 冻结表（2026-10-13 定）已停用（改名 `quest_flags_locked.json.deprecated-20261014`）；`flag` 归入骨架字段，一律取 romfs 官方值、不接受 YAML 覆盖——实测 `main_01` YAML 手写的 `SeekerEye_Finish` 存档值为 0，romfs 的 `FirstTower_Finish` 才是 1
+  - 配套：新增 `source/build_quest_save_map.py`，`app/data/quest_save.js` 补齐 11 条缺失映射（216 → **227** 条，含四神兽 4 条），否则网页端按 hash 反查不到 flagName
+  - 效果：存档能识别的已完成任务 **39 → 90 条**（+51）
+- **对照 TOTKmap 技术手册 §11 实核**（结论写入 `BOTWmap任务板块技术手册-来自TOTKmapV2.5.0-20261014.md` §12）：10 条里 8 条通过（key 与 romfs 骨架 152 一一对应、三档无缺号、自指 0、前后置对称 0、控制字符 0、坐标越界 0），2 条不适用（多层地图 / ROM steps 清洗，BOTW 天然规避）；据此修掉下面两条：
 
 ### 变更
-- bump 静态资源：`ui.js 47→48` / `quest-card.js 2→3` / `chest.js 13→15`（含存档同步）/ `save_upload.js 11→12`；页脚 `BOTWMAP 1.6.3`
+- bump 静态资源：`ui.js 47→48` / `quest-card.js 2→4` / `quest-flow.js 1→2` / `chest.js 13→15`（含存档同步）/ `save_upload.js 11→12` / `regions.js rn4→rn5` / `quest_save.js 1→2` / `quests.js 6→8`（tier 重算 + flag 解冻）；页脚 `BOTWMAP 1.6.3`
 
 ### 验证
 - 真 Chrome 无头回归 **30 项全绿**：抓手 / 标题 / meta 行 / 来源行 / 卡片空白区 5 处起拖均 **0px 跟手误差**、松手不关闭、`manual` 置位、`_dragged` 复位；贴边夹取不出容器；探索卡 / 装备卡跟手 0 误差；手机 390×844 仍为底部抽屉定位、不被拖动；无 JS 报错
-- 一条命令跑：`tools\verify.bat --all`（Node + playwright-core，自带静态服务）
+- 一条命令跑：`tools\verify.bat --all`（Node + playwright-core，自带静态服务）；本轮**共 61 项全绿**（拖动 30 + 冒烟 31，新增 7 项：存档映射表 227 就绪 / 任务 flag 152 全覆盖 / 无坐标定位按钮置灰 / 有 title / 同坐标任务不给连线 / 多点任务仍有连线 / tier 正确降级）
 - 任务数据体检：`validate_quests.py --check-generated` → **错误 1 条（side_148 region 空）/ 警告 345 条 / 生成物漂移 0**（YAML 与 `quests.js` 完全同步）
+- 存档端到端：`verify_quest_flags.py` → **152/152 可查、90 条完成**，两存档交叉一致；crc32 算法对拍 `quest_save.js` 227 条 **0 差异**
 
 ## v1.6.2（2026-10-13）任务板块对齐 TOTKmap（YAML 底表 / 卡片分区 / 流程连线 / 模块化）
 

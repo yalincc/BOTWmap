@@ -31,12 +31,19 @@
     for (var i = 0; i < QUESTS.length; i++) if (QUESTS[i].key === k) return QUESTS[i];
     return null;
   }
-  /* 流程点（像素坐标） */
+  /* 流程点（像素坐标）
+     ★ V1.6.3：按像素坐标去重（TOTKmap 手册 §7：L1 = 去重后 ≥2 个不同坐标）。
+       不去重时 side_92 / side_95 / side_133 这类「两个流程点坐标相同」的任务
+       会画出一条零长度线、连线按钮也白给。去重放在这里，绘制/计数/toast 全口径统一。 */
   function pointsOf(q) {
-    var out = [];
+    var seen = {}, out = [];
     (q && q.flowPts ? q.flowPts : []).forEach(function (f) {
       if (f.gx == null || f.gz == null) return;
-      out.push({ p: px(f.gx, f.gz), type: f.type || 'other', note: f.note || '' });
+      var p = px(f.gx, f.gz);
+      var k = p[0] + ',' + p[1];
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push({ p: p, type: f.type || 'other', note: f.note || '' });
     });
     return out;
   }
@@ -177,6 +184,7 @@
     toggle: toggle,
     isOn: isOn,
     refresh: refresh,
+    pointsOf: pointsOf,   /* V1.6.3 导出：卡片判「能否连线」要用去重后的点数 */
     typeCn: function (t) { return TYPE_CN[t] || t; }
   };
 

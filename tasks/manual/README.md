@@ -25,7 +25,7 @@ tasks/manual/
 | `cat` | ✅ | `main` / `shrine` / `side` |
 | `name` / `en` | ✅ | 中文名 / 英文名 |
 | `region` | ✅ | 地区 |
-| `flag` |  | 游戏内存档完成标志（官方 `<任务>_Finish(ed)`）；空 = 无独立标志 |
+| `flag` | 🚫 | 游戏内存档完成标志（官方 `<任务>_Finish(ed)`）。**V1.6.3 起由 romfs 官方值直接提供，YAML 里写的不生效**（仅作参考留着）。见下 |
 | `dlc` |  | `null` 本体 / `"1"` DLC1 / `"2"` DLC2 / `"collabo"` 联动 |
 | `npc` |  | 接取 NPC 中文名 |
 | `gx` / `gz` |  | 任务主坐标（游戏世界坐标）；`pts` 缺省时由它换算地图像素 |
@@ -73,12 +73,22 @@ C:/Users/Administrator/.workbuddy/binaries/python/envs/default/Scripts/python.ex
 
 跑 `validate_quests.py` 的当前结论：**错误 1 条，警告 345 条**。真正值得动手的只有下面两组。
 
+### ✅ P0 `flag` 已解决，不用手工校对（V1.6.3）
+
+原先 89/152 条 flag 为空 → 无法与存档同步。经真实存档验证后已解决：
+
+- **romfs 骨架 152/152 条本来就带官方 flag**，只是被 `quest_flags_locked.json`（2026-10-13 定的冻结表）挡着没采用。
+- 用真实存档端到端验证（`source/verify_quest_flags.py`）：两个独立存档交叉复核，**152/152 全部可查，value 只有 0/1 二值，90 条 value=1**，两存档结果完全一致 → 官方 flag 可信，已解冻。
+- 现在 `build_quests_v2.py` 里 `flag` 归入**骨架字段**，一律取 romfs 值、不接受 YAML 覆盖。实测证据：`main_01` YAML 手写的 `SeekerEye_Finish` 在存档里是 0，romfs 的 `FirstTower_Finish` 才是 1（开塔确实完成了）——手写 flag 反而会错。
+- 配套：`app/data/quest_save.js` 补齐 11 条缺失映射（216 → **227** 条），否则网页端反查不到名字。
+
+> 结论：**152/152 全覆盖，一条都不用人工校对**。以后改 flag 只改 romfs 侧，或跑 `verify_quest_flags.py` 复核。
+
 ### 要补的 key（按优先级）
 
 | 优先级 | key | 缺口 | 影响 |
 |---|---|---|---|
 | P0 | `region` | **side_148** 空（唯一硬错误） | 卡片不显示区域行 |
-| P0 | `flag` | **89/152 空**：shrine 31 / side 56 / main 2 | 这些任务**无法与存档自动同步完成态**，只能手动标记 |
 | P2 | `flowPts.actor` | 140 条任务含英文 id、77 条任务为空 | 卡片当前不显示 actor，可后置 |
 | P2 | `reward` | 38 条含多个奖励 | 若日后要拆数组再处理 |
 | P2 | `gx`/`gz` | 仅 side_148 为 `null` | 地图无点，只能从搜索进入；可加 `onMap: false` 显式标记 |

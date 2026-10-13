@@ -134,10 +134,21 @@
       src === 'manual' ? '完成状态：手动标记' : '完成状态：未标记（无存档标志，可手动标记）') + '</div>';
     /* 底部操作 */
     h += '<div class="tk-actions">';
-    if (q.pts && q.pts.length) h += '<button type="button" class="btn act" id="qcardLocate">定位</button>';
-    /* V1.6.2：任务连线（≥2 个流程点才给） */
+    if (q.pts && q.pts.length) {
+      h += '<button type="button" class="btn act" id="qcardLocate">定位</button>';
+    } else {
+      /* V1.6.3（TOTKmap 手册 §9.2）：无坐标时按钮【置灰 + title 说明】，不能隐藏
+         —— 隐藏会让玩家以为功能缺失。locate() 在无 pts 时本来就会安全 return。 */
+      h += '<button type="button" class="btn act is-off" id="qcardLocate" disabled title="' +
+        esc(q.noPlaceReason || '本任务在地图上无固定坐标，请用下方「流程地点」定位') + '">定位</button>';
+    }
+    /* V1.6.3：连线按【去重后】的流程点坐标数判断（手册 §7：L1 = 去重后 ≥2 个不同坐标）。
+       只看 flowPts 条数会给「两点同坐标」的任务（side_92/95/133）画出一条零长度线。 */
     var flowOn = !!(global.QuestFlow && global.QuestFlow.isOn(q.key));
-    if (q.flowPts && q.flowPts.length >= 2) {
+    var flowN = (global.QuestFlow && global.QuestFlow.pointsOf)
+      ? global.QuestFlow.pointsOf(q).length
+      : (q.flowPts ? q.flowPts.length : 0);
+    if (flowN >= 2) {
       h += '<button type="button" class="btn act tk-ghost' + (flowOn ? ' is-on' : '') + '" id="qcardFlow">' +
         (flowOn ? '关闭连线' : '任务连线') + '</button>';
     }
