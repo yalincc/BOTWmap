@@ -1,0 +1,34 @@
+key: shrine_49
+cat: shrine
+name: 兹纳·卡伊神庙
+en: The Skull's Eye
+region: 阿卡莱
+flag: DokuroEye_Finish
+dlc: null
+npc: 洁琳
+gx: 4510
+gz: -3172
+desc: 完成罗比的研究后，在阿卡莱古代研究所与杰琳对话，她指骷髅湖左眼顶的神庙。爬上或滑翔到骷髅湖左眼顶部岩柱，激活神庙。
+note: 骷髅湖有两只眼，神庙在较高的左眼里；走错到较低的右眼会遇到恰克，别下错。
+reward: 开启兹纳·卡伊神庙
+steps:
+- 完成"罗比的研究"后，在阿卡莱研究所与杰琳对话接取
+- 前往骷髅湖（注意是较高的左眼）
+- 攀岩或滑翔到达左眼顶部岩柱
+- 激活兹纳·卡伊神庙
+flowPts:
+- type: take
+  gx: 4511
+  gz: -3162
+  note: 阿卡莱古代研究所·接取
+  actor: Npc_AncientAssistant004
+  step: Finish
+- type: deliver
+  gx: 4510
+  gz: -3172
+  note: 阿卡莱古代研究所·交付
+  step: Finish
+reqs:
+- key: side_76
+  name: 另一位研究者
+unlockList: []

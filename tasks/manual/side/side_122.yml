@@ -1,0 +1,32 @@
+key: side_122
+cat: side
+name: 新郎换回名誉
+en: The Spark of Romance
+region: 海布拉
+flag: null
+dlc: null
+npc: 久戈
+gx: -3600
+gz: -1852
+desc: 在利特村与准新郎乔戈对话，他想挽回名誉、向朱妮表明真心。帮他完成心愿，促成两人的婚事。
+note: 必须先做完准新娘朱妮的「新娘舍华求实」，再回来找乔戈，两人剧情才会接上；顺序反了乔戈不理你。
+reward: 银卢比
+steps:
+- 在利特村与乔戈对话接取
+- 按他的要求帮忙跑腿/达成心愿
+- 回报乔戈
+flowPts:
+- type: take
+  gx: -3604
+  gz: -1852
+  note: 利特村·接取
+  actor: Npc_HighMountain040
+  step: Finish
+- type: deliver
+  gx: -3600
+  gz: -1852
+  note: 利特村·交付
+  actor: 乔戈
+  step: Finish
+reqs: []
+unlockList: []

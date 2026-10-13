@@ -1,0 +1,32 @@
+key: shrine_46
+cat: shrine
+name: 希·库乔夫神庙
+en: The Serpent's Jaws
+region: 费罗尼
+flag: null
+dlc: null
+npc: 卡西
+gx: 813
+gz: 3064
+desc: 在帕戈斯树林听卡西唱歌，"森林巨龙之颚"指达梅尔森林的龙头废墟。到勇气之泉祈祷，射取金色飞龙费罗的鳞片丢入泉水，开启神庙。
+note: 要射金色飞龙费罗取得鳞片，再丢进龙头废墟里的勇气之泉；龙会在德拉科祖湖上空盘旋。
+reward: 获得费罗鳞片，开启希·库乔夫神庙
+steps:
+- 在帕戈斯树林与卡西对话接取
+- 到达梅尔森林德拉科祖湖的龙头废墟（勇气之泉）
+- 射一箭金色飞龙费罗取得鳞片
+- 把费罗鳞片丢入勇气之泉，开启希·库乔夫神庙
+flowPts:
+- type: take
+  gx: 816
+  gz: 3062
+  note: 费罗尼·接取
+  actor: Npc_Musician_002
+  step: Step1
+- type: deliver
+  gx: 879
+  gz: 2386
+  note: 女神像·交付
+  step: Finish
+reqs: []
+unlockList: []

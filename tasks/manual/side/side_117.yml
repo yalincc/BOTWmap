@@ -1,0 +1,32 @@
+key: side_117
+cat: side
+name: 巨大马匹捕捉大作战
+en: Hunt for the Giant Horse
+region: 费罗尼
+flag: FironeMini_GiantHorse_Finish
+dlc: null
+npc: 司狄亚
+gx: -212
+gz: 3490
+desc: 在马术训练场与斯特莱亚对话，他要你捕获传说中的巨大黑马。前往费罗尼地区找到体型庞大的黑马，驯服后骑回。
+note: 这匹巨马是黑色超大匹、耐力条特别长，建议先把精力圈升满再驯；它在费罗尼草原，驯服后要骑回马术训练场才算交差。
+reward: 银卢比
+steps:
+- 在马术训练场与斯特莱亚对话接取
+- 前往费罗尼草原寻找体型巨大的黑马
+- 静默接近并驯服巨马
+- 骑回马术训练场
+flowPts:
+- type: take
+  gx: -212.39
+  gz: 3487.13
+  note: 费罗尼·接取
+  actor: Npc_FaronWoods008
+  step: Ready
+- type: deliver
+  gx: -1210
+  gz: 2704
+  note: 费罗尼·交付
+  step: Finish
+reqs: []
+unlockList: []

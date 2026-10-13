@@ -1,0 +1,33 @@
+key: side_60
+cat: side
+name: 重要的沙铃
+en: The Priceless Maracas
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 伯库林
+gx: 2064
+gz: 1427
+desc: 在前往卡卡利科村的路上遇到摇晃沙铃的伯库林，他的沙铃被附近怪物夺走。帮他清掉东边的波克布林营地、取回沙铃，他便会用克洛格种子为你扩容背包。
+note: 先去东北侧波克布林营地清怪、拿回沙铃；伯库林会沿路移动（→卡卡利科村→村北池塘），扩容要消耗克洛格种子。
+reward: 背包格扩容（武器/弓/盾袋，需克洛格种子交换）
+steps:
+- 在前往卡卡利科村的路上与伯库林对话接任务
+- 向东走到怪物营地，消灭波克布林
+- 取回伯库林的沙铃交还给他
+- 之后可用克洛格种子扩容武器/弓/盾背包
+flowPts:
+- type: take
+  gx: 2069
+  gz: 1422
+  note: 内卡鲁达·接取
+  actor: Npc_OldKorok_Help
+  step: Maracus
+- type: deliver
+  gx: 2064
+  gz: 1427
+  note: 内卡鲁达·交付
+  actor: 伯库林
+  step: Finish
+reqs: []
+unlockList: []

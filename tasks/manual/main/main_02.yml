@@ -1,0 +1,39 @@
+key: main_02
+cat: main
+name: 孤岛
+en: The Isolated Plateau
+region: 中央海拉鲁
+flag: TutorialDungeon_Finish
+dlc: null
+npc: 老人
+gx: -572
+gz: 1698
+desc: 在初始台地与神秘老人对话后接取。老人承诺：若林克通关台地上四座神庙的试炼，就把滑翔伞给他。完成四座神庙后来到时之神殿与老人会面。
+note: 时之神殿女神像第一次奖励二选一（心之容器 vs 精力槽），前期建议拿心之容器——拔大师剑要 13 颗满血心；离开台地前记得爬上时之神殿屋顶开宝箱拿士兵弓。
+reward: 滑翔伞（Paraglider）
+steps:
+- 在初始台地与老人对话，接下四座神庙试炼
+- 通关四座神庙：磁力、炸弹、静止、结冰试炼，拿到四块灵性之球
+- 到时之神殿把球放入女神像，换取心之容器或精力槽
+- 爬上时之神殿屋顶与老人（洛阿姆国王）会面，获得滑翔伞
+flowPts:
+- type: take
+  gx: -572.5
+  gz: 1696.5
+  note: 初始之塔·接取
+  actor: Npc_King_Parasail002
+  step: Ready
+- type: deliver
+  gx: -572
+  gz: 1698
+  note: 初始之塔·交付
+  actor: 老人
+  step: Finish
+reqs:
+- key: main_01
+  name: 跟随希卡石板
+unlockList:
+- key: main_03
+  name: 讨伐盖侬
+- key: main_04
+  name: 拜访英帕

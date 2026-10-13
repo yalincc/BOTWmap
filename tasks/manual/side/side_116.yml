@@ -1,0 +1,32 @@
+key: side_116
+cat: side
+name: 征求！可疑者资讯
+en: A Shady Customer
+region: 阿卡莱
+flag: null
+dlc: null
+npc: 霍司塔
+gx: 4236
+gz: -2736
+desc: 在东阿卡莱驿站与霍兹对话，他在追查一个形迹可疑的人。向驿站附近的人打听情报，夜里跟踪可疑人物后回报。
+note: 白天先在驿站内和人对话套线索，等到夜里再悄悄跟踪那个外出的可疑人物；距离太近会被他发现甩掉。
+reward: 银卢比
+steps:
+- 在东阿卡莱驿站与霍兹对话接取
+- 向驿站附近的人打听可疑者情报
+- 夜里跟踪可疑人物摸清其动向
+- 回报霍兹
+flowPts:
+- type: take
+  gx: 4243
+  gz: -2746
+  note: 东阿卡莱驿站·接取
+  actor: Npc_TamourHatago004
+  step: Finish
+- type: deliver
+  gx: 4236
+  gz: -2736
+  note: 东阿卡莱驿站·交付
+  step: Finish
+reqs: []
+unlockList: []

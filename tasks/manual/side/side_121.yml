@@ -1,0 +1,32 @@
+key: side_121
+cat: side
+name: 新娘舍华求实
+en: The Apple of My Eye
+region: 海布拉
+flag: null
+dlc: null
+npc: 茱诺
+gx: -3618
+gz: -1830
+desc: 在利特村与准新娘朱妮对话，她想讨心上人欢心却不知如何是好。帮她准备心意，撮合这桩婚事。
+note: 这是婚约线前半段，朱妮想要苹果类心意；准备好后她才会提到乔戈，才能接下新郎那条任务。
+reward: 银卢比
+steps:
+- 在利特村与朱妮对话接取
+- 按她的要求帮忙准备礼物
+- 回报朱妮
+flowPts:
+- type: take
+  gx: -3618
+  gz: -1828
+  note: 利特村·接取
+  actor: Npc_HighMountain041
+  step: Finish
+- type: deliver
+  gx: -3618
+  gz: -1830
+  note: 利特村·交付
+  actor: 朱妮
+  step: Finish
+reqs: []
+unlockList: []

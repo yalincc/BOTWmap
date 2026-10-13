@@ -1,0 +1,32 @@
+key: side_103
+cat: side
+name: 今日晚餐
+en: What's for Dinner?
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 基丘乌
+gx: 2889
+gz: 3409
+desc: 在沃托里村旅店/餐馆与琪雅娜对话。她今晚想做海鲜烩饭却缺材料。帮她备齐『来路鱼＋旷野劫＋火焰蜗』等海鲜食材交给她，做出海鲜烩饭。
+note: 把琪雅娜要的几种海鲜食材备齐交给她即可，材料多在沃托里村海边钓，别误交烤制过的成品。
+reward: 紫卢比（50卢比）+ 海鲜烩饭
+steps:
+- 在沃托里村与琪雅娜对话接任务
+- 备好她需要的几种海鲜食材
+- 把食材交给琪雅娜，她做成海鲜烩饭
+flowPts:
+- type: take
+  gx: 2881
+  gz: 3418
+  note: 女神像·接取
+  actor: Npc_SouthernVillage007
+  step: Finish
+- type: deliver
+  gx: 2889
+  gz: 3409
+  note: 女神像·交付
+  actor: 琪雅娜
+  step: Finish
+reqs: []
+unlockList: []

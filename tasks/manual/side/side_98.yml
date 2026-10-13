@@ -1,0 +1,34 @@
+key: side_98
+cat: side
+name: 莫尔德拉吉克的肝脏
+en: Medicinal Molduga
+region: 格鲁德
+flag: null
+dlc: null
+npc: 梅尔埃娜
+gx: -3907
+gz: 2914
+desc: 在格鲁德小镇与玛莱娜对话。她丈夫被沙漠怪物莫尔德拉吉克所伤，需要它的肝脏入药。去格鲁德沙漠打倒一只莫尔德拉吉克，取回肝脏给她。
+note: 用肉当诱饵把莫尔德拉吉克引出沙面再打，蹲在沙面上硬砍会被它钻地掀翻。
+reward: 金卢比（300卢比）
+steps:
+- 在格鲁德小镇与玛莱娜对话接任务
+- 前往格鲁德沙漠引诱并打倒莫尔德拉吉克
+- 取得它的肝脏
+- 回小镇把肝脏交给玛莱娜
+flowPts:
+- type: take
+  gx: -3840
+  gz: 2915
+  note: 格鲁德小镇·接取
+  actor: Npc_oasis028
+  step: Finish
+- type: deliver
+  gx: -3907
+  gz: 2914
+  note: 格鲁德小镇·交付
+  step: Finish
+reqs: []
+unlockList:
+- key: side_100
+  name: '格鲁德至宝: 雷鸣头盔'

@@ -1,0 +1,33 @@
+key: side_89
+cat: side
+name: 沉入水底的宝贝
+en: Riverbed Reward
+region: 中央海拉鲁
+flag: null
+dlc: null
+npc: 伊琐
+gx: 838
+gz: 129
+desc: 在湿地驿站河边与伊兹拉对话。他一直盯着河底，说水底藏着宝物。用磁力能力把河底的宝箱吸上来打开，再回去复命。
+note: 直接用磁力能力从河底吸宝箱即可，不用下水潜水摸。
+reward: 骑士之剑（Knight's Broadsword）
+steps:
+- 在湿地驿站河边与伊兹拉对话接任务
+- 用磁力能力吸出河底的宝箱
+- 打开宝箱取得骑士之剑
+- 回去向伊兹拉复命
+flowPts:
+- type: take
+  gx: 881.36
+  gz: 157.56
+  note: 湿地驿站·接取
+  actor: Npc_NorthHatelHatago001
+  step: Ready
+- type: take
+  gx: 836
+  gz: 126
+  note: 卡亚·米瓦神庙·接取
+  actor: Npc_NorthHatelHatago001
+  step: Step1
+reqs: []
+unlockList: []

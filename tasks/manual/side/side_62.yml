@@ -1,0 +1,32 @@
+key: side_62
+cat: side
+name: 消失的咕咕鸡
+en: Flown the Coop
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 博嘉多
+gx: 1834
+gz: 966
+desc: 在卡卡利科村鸡圈旁与看守咕咕鸡的卡多对话（需先与英帕屋前的卫兵交谈过）。他的7只咕咕鸡散落在村子各处，把它们全部赶回围栏即可。
+note: 要先和英帕屋前的卫兵交谈过才触发任务；共7只鸡，藏在女神像、屋顶、梅丽的梅园等处，把鸡丢进围栏即可。
+reward: 紫卢比（50卢比）
+steps:
+- 在卡卡利科村鸡圈旁与卡多对话接任务
+- 在女神像、防具店屋顶、磨坊、梅丽的梅园等7处找回咕咕鸡
+- 把7只咕咕鸡全部丢进鸡圈围栏
+- 回去向卡多复命
+flowPts:
+- type: take
+  gx: 1807
+  gz: 985
+  note: 卡卡利科村·接取
+  actor: Npc_Kakariko005
+  step: 10kokko
+- type: deliver
+  gx: 1834
+  gz: 966
+  note: 卡卡利科村·交付
+  step: Finish
+reqs: []
+unlockList: []

@@ -1,0 +1,32 @@
+key: side_142
+cat: side
+name: EX 奇妙面具的谣传
+en: EX Strange Mask Rumors
+region: 奥尔汀
+flag: null
+dlc: '1'
+npc: 传闻杂志V1
+gx: 1066
+gz: -1139
+desc: DLC任务。在森林驿站桌上阅读「传闻杂志V1」，按提示前往指定地点，宝箱中获得克洛格面具。
+note: DLC，在森林驿站桌上读传闻杂志V1触发；克洛格面具藏在迷雾森林附近宝箱，戴上后靠近呀哈哈会震动提示。
+reward: 克洛格面具（Korok Mask）
+steps:
+- 在森林驿站阅读传闻杂志V1
+- 按杂志提示前往指定地点
+- 打开宝箱获得克洛格面具
+flowPts:
+- type: take
+  gx: 1073
+  gz: -1140
+  note: 森林驿站·接取
+  actor: TwnObj_UmayadoBook_06
+  step: Step01
+- type: deliver
+  gx: 1066
+  gz: -1139
+  note: 森林驿站·交付
+  actor: 传闻杂志V1
+  step: Finish
+reqs: []
+unlockList: []

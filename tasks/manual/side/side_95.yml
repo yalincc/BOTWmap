@@ -1,0 +1,32 @@
+key: side_95
+cat: side
+name: 避暑药
+en: An Ice Guy
+region: 格鲁德
+flag: null
+dlc: null
+npc: 柒内玛
+gx: -3238
+gz: 2574
+desc: 在卡拉卡拉集市与中暑的盖伊对话。他急需降温，把一颗『冰凉的药材/制冷道具』（用冰块或冰属性食材给他做份冰饮）给他解暑即可。
+note: 给盖伊带冰镇食材或冰块帮他降温即可，不必花钱买贵重药。
+reward: 紫卢比（50卢比）
+steps:
+- 在卡拉卡拉集市与盖伊对话接任务
+- 用冰块或冰属性食材为他准备降温饮品
+- 把冰饮交给盖伊
+flowPts:
+- type: take
+  gx: -3238
+  gz: 2574
+  note: 卡拉卡拉集市·接取
+  actor: Npc_SmallOasis002
+  step: Finish
+- type: deliver
+  gx: -3238
+  gz: 2574
+  note: 卡拉卡拉集市·交付
+  actor: 盖伊
+  step: Finish
+reqs: []
+unlockList: []

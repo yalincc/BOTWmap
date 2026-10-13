@@ -1,0 +1,33 @@
+key: shrine_58
+cat: shrine
+name: 妙斯·希诺神庙
+en: The Bird in the Mountains
+region: 海布拉
+flag: null
+dlc: null
+npc: 桃虹
+gx: -3633
+gz: -1830
+desc: 在利特村听小利特莫里讲故事。爬到塔伦特峰上的孤杉树，向西北望见白色巨鸟（雪架）剪影，滑翔到雪架下方洞穴，找到神庙。
+note: 爬上塔伦特峰那棵孤杉树向西北望，辨认出白色雪架的巨鸟剪影，再滑翔到雪架下方洞穴找神庙。
+reward: 开启妙斯·希诺神庙
+steps:
+- 在利特村与莫里对话听故事接取
+- 爬上塔伦特峰顶的孤杉树
+- 向西北眺望，辨认出白色巨鸟（雪架）剪影
+- 滑翔到雪架下方洞穴，进入妙斯·希诺神庙
+flowPts:
+- type: take
+  gx: -3618.43
+  gz: -1797.41
+  note: 利特村·接取
+  actor: Npc_HighMountain003
+  step: Ready
+- type: deliver
+  gx: -3633
+  gz: -1832
+  note: 利特村·交付
+  actor: Npc_HighMountain003
+  step: Finish
+reqs: []
+unlockList: []

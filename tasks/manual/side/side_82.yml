@@ -1,0 +1,33 @@
+key: side_82
+cat: side
+name: 讯息瓶的行踪
+en: Special Delivery
+region: 拉聂尔
+flag: null
+dlc: null
+npc: 菲内
+gx: 2758
+gz: -86
+desc: 解放水神兽后，在卓拉领地西的许愿河畔（Bank of Wishes）与卓拉小女孩芬莉对话。她把写好情书的大漂流瓶放入河中，你要一路护送瓶子、清理沿途障碍直到收件人商人萨桑捡到。
+note: 漂流瓶会顺流而下，要一路跟着并清掉挡路的岩石和蜥蜴怪，瓶子被卡住就任务失败，需重新读档重来。
+reward: 金卢比（300卢比）
+steps:
+- 在许愿河畔与芬莉对话，目送漂流瓶下水
+- 沿河跟随漂流瓶，清理途中挡路的岩石/怪物
+- 瓶子被蜥蜴营地旁的男青年（萨桑）捡到
+- 回卓拉领地向芬莉复命
+flowPts:
+- type: take
+  gx: 2754.0
+  gz: -83.5
+  note: 拉聂尔·接取
+  actor: Npc_Zora026
+  step: Ready
+- type: deliver
+  gx: 3264
+  gz: -482
+  note: 女神像·交付
+  actor: Npc_Zora126
+  step: Finish
+reqs: []
+unlockList: []

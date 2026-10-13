@@ -1,0 +1,41 @@
+key: shrine_53
+cat: shrine
+name: 乌塔·多神庙
+en: Recital at Warbler's Nest
+region: 海布拉
+flag: null
+dlc: null
+npc: 奇尔
+gx: -3982
+gz: -1746
+desc: 在利特村莺鸟巢与琪尔对话，她要找齐四个姐姐来合唱。找回诺茨、科茨、克里，给杰尔做一道香煎三文鱼后带到莺鸟巢，五姐妹合唱后开启神庙。
+note: 四姐姐里杰尔最任性，要先做一道香煎三文鱼哄她才肯来莺鸟巢合唱，其他三位直接在村里找回即可。
+reward: 开启乌塔·多神庙
+steps:
+- 在利特村莺鸟巢与琪尔对话接取
+- 在村里找回姐姐诺茨、科茨、克里
+- 做香煎三文鱼哄杰尔加入
+- 五姐妹在莺鸟巢合唱，开启乌塔·多神庙
+flowPts:
+- type: take
+  gx: -3979
+  gz: -1751
+  note: 乌塔·多神庙·接取
+  actor: Npc_HighMountain035
+  step: Rito_BrosRock_Step2
+- type: take
+  gx: -3589
+  gz: -1804
+  note: 女神像·接取
+  actor: Npc_HighMountain033
+  step: Rito_BrosRock_Step1
+- type: deliver
+  gx: -3986
+  gz: -1738
+  note: 乌塔·多神庙·交付
+  actor: Rito_BrosRock_Relief
+  step: Finish
+reqs:
+- key: side_124
+  name: 寻找奇尔
+unlockList: []

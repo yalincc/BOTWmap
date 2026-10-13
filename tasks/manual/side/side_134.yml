@@ -1,0 +1,32 @@
+key: side_134
+cat: side
+name: 来自导师的赞美
+en: A Gift from the Monks
+region: 海布拉
+flag: null
+dlc: null
+npc: 修行者
+gx: -1060
+gz: -2697
+desc: 完成全部120座神庙后自动触发。回到任意一座神庙，与修行者对话，领取希卡族赠予的荒野套装。
+note: 需解锁全部120座神庙后自动触发，回任意一座神庙与修行者对话领荒野套；中途去神庙是不给的。
+reward: 荒野之帽 + 荒野衬衣 + 荒野裤子（荒野套）
+steps:
+- 完成全部120座神庙
+- 回到任意一座神庙
+- 与修行者对话领取馈赠
+flowPts:
+- type: take
+  gx: -1057
+  gz: -2697
+  note: 女神像·接取
+  actor: TwnObj_SuperGoddesStatue_A_01
+  step: Finish
+- type: deliver
+  gx: -1060
+  gz: -2697
+  note: 女神像·交付
+  actor: 修行者
+  step: Finish
+reqs: []
+unlockList: []

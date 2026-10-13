@@ -1,0 +1,33 @@
+key: side_112
+cat: side
+name: 王族白马
+en: The Royal White Stallion
+region: 中央海拉鲁
+flag: HyruleDepthMini_WhiteHorse_Finish
+dlc: null
+npc: 陀特茨
+gx: -1442
+gz: 1285
+desc: 在郊外驿站与托法对话，他要你找回王族世代饲养的白马。前往萨托利山附近捕获那匹白马，骑回驿站登记。
+note: 白马在萨托利山附近，性子烈、耐力条长，建议先升至少两圈精力再驯；从背后静默靠近，驯服后要骑回郊外驿站登记。
+reward: 王族缰绳 + 王族马鞍
+steps:
+- 在郊外驿站与托法对话接取
+- 前往萨托利山山脚寻找野生白马
+- 静默接近并驯服白马
+- 骑回郊外驿站登记
+- 回报托法
+flowPts:
+- type: take
+  gx: -1436
+  gz: 1272
+  note: 平原外围的驿站·接取
+  actor: Npc_HyruleDepthHatago007
+  step: Finish
+- type: deliver
+  gx: -1442
+  gz: 1285
+  note: 平原外围的驿站·交付
+  step: Finish
+reqs: []
+unlockList: []

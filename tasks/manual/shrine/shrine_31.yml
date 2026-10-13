@@ -1,0 +1,32 @@
+key: shrine_31
+cat: shrine
+name: 斯玛·萨玛神庙
+en: Secret of the Snowy Peaks
+region: 费罗尼
+flag: null
+dlc: null
+npc: 雪山的日志
+gx: -1387
+gz: 3495
+desc: 在格拉纳吉山顶废屋读《山顶日记》，谜底是在祭坛发光时投下"冷影"。凌晨4:00用制冰术造冰或举雪球，让冰/雪影子投到祭坛中心即可开启神庙。
+note: 在祭坛发光时投下"冷影"：凌晨4点用制冰术在旁边造冰，或站崖边举雪球，让冰/雪的影子正好落到祭坛中心。
+reward: 开启斯玛·萨玛神庙
+steps:
+- 在格拉纳吉山顶废屋读《山顶日记》接取
+- 到旁边达瓦尔峰侧会发光的祭坛处
+- 在凌晨4:00用制冰术在池塘造冰，或站崖边举雪球
+- 让冰/雪球的冷影投到祭坛中心，开启斯玛·萨玛神庙
+flowPts:
+- type: take
+  gx: -1387
+  gz: 3494
+  note: 斯玛·萨玛神庙·接取
+  actor: Obj_DiaryGerudo_A_01
+  step: Finish
+- type: deliver
+  gx: -1387
+  gz: 3495
+  note: 斯玛·萨玛神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

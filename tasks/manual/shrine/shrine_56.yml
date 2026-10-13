@@ -1,0 +1,33 @@
+key: shrine_56
+cat: shrine
+name: 克哈·拉玛神庙
+en: A Brother's Roast
+region: 奥尔汀
+flag: null
+dlc: null
+npc: 布拉东
+gx: 1648
+gz: -2470
+desc: 在鼓隆城与布拉东对话，他弟弟贡隆去格科隧道挖"英雄秘密"没回来。到隧道发现饿倒的贡隆，做一份岩石烤肉送来给他，吃饱后他炸开岩壁露出神庙。
+note: 要做一份岩石烤肉带给格科隧道里饿倒的贡隆，他吃饱才有力气炸开封住神庙的岩壁。
+reward: 兄弟团聚，开启克哈·拉玛神庙
+steps:
+- 在鼓隆城与布拉东对话接取
+- 到格科隧道发现饿倒的贡隆
+- 做好岩石烤肉带回给兄弟俩
+- 贡隆吃饱力气炸开岩壁，开启克哈·拉玛神庙
+flowPts:
+- type: take
+  gx: 1648
+  gz: -2471
+  note: 鼓隆城·接取
+  actor: Npc_Goron010
+  step: Step005
+- type: npc
+  gx: 2028
+  gz: -2036
+  note: 克哈·拉玛神庙·对话
+  actor: Npc_Goron010
+  step: Step010
+reqs: []
+unlockList: []

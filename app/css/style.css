@@ -621,7 +621,9 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 /* ============ 任务板块（V1.6.0） ============ */
 /* 探索面板 · 任务组（与材料组同构：lg 分组头 + lrow 行） */
 .lg-group[data-group="任务"] .lrow { cursor: pointer; }
-.lg-group[data-group="任务"] .lrow .dot { width: 10px; height: 10px; border-radius: 2px; flex: 0 0 auto; }
+/* V1.6.2：任务/宝箱分类图标（卡通图标含透明边距，侧栏放到 22px 才与别行小图标视觉齐平） */
+.lg-group[data-group="任务"] .lrow .lg-ic,
+.lg-group[data-group="宝箱"] .lrow .lg-ic { width: 22px; height: 22px; }
 
 /* ---------- 悬停名称条（V1.6.1）：地图左上角统一显示当前悬停目标名称 ---------- */
 #hoverName {
@@ -802,6 +804,19 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .fp:hover .tip { display: block; }
 .fp .tip .xy { color: #b8b2a6; }
 
+/* V1.6.2 卡片流程地点：序号按流程点类型着色（接取/交付=绿、战斗=红、NPC=金、其他=蓝） */
+.flow-pts .fp.fp-t-take .num, .flow-pts .fp.fp-t-deliver .num { color: #7dd3a0; }
+.flow-pts .fp.fp-t-battle .num { color: #ff8a8a; }
+.flow-pts .fp.fp-t-npc .num { color: #eac27e; }
+.flow-pts .fp.fp-t-other .num { color: #9fc6ff; }
+
+/* V1.6.2 装备卡片：获取点点击高亮 + 大师模式宝箱（紫） */
+.flow-pts .fp.is-cur { border-color: #eac27e; background: rgba(234,194,126,.14); }
+.flow-pts .fp.fp-hard { border-color: rgba(139,92,246,.5); }
+.flow-pts .fp.fp-hard .num { color: #b18cff; }
+.flow-pts .fp.fp-hard.is-cur { border-color: #8a5cf6; background: rgba(139,92,246,.16); }
+.eq-obtain-h.fp-hard-h { color: #b18cff; }
+
 /* 底部操作：金色渐变主题（TOTKmap 原版） */
 .tk-actions { display: flex; gap: 8px; margin-top: 14px; }
 .tk-actions .btn { flex: 1; min-height: 40px; border-radius: 8px; padding: 9px 4px; font-size: 13px;
@@ -825,7 +840,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 }
 
 /* 装备专属：分类行图标 + 获取来源坐标（复用 flow-pts 网格） */
-.eq-lrow-ic { width: 14px; height: 14px; object-fit: contain; flex: 0 0 auto; align-self: center; }
+.eq-lrow-ic { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto; align-self: center; }
 .eq-obtain-h {
   font-size: 11.5px; color: rgba(255,255,255,.6);
   display: flex; align-items: center; gap: 6px; margin: 4px 0 6px;

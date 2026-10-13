@@ -1,0 +1,32 @@
+key: side_143
+cat: side
+name: EX 瞬间移动？！的谣传
+en: EX Teleportation Rumors
+region: 奥尔汀
+flag: null
+dlc: '1'
+npc: 传闻杂志V2
+gx: 3150
+gz: -1690
+desc: DLC任务。在南阿卡莱驿站桌上阅读「传闻杂志V2」，按提示前往指定地点，宝箱中获得传送标记器。
+note: DLC，在南阿卡莱驿站读传闻杂志V2触发；传送标记器宝箱在野外指定位置，拿到后可在背包里注册任意一个自己的传送点。
+reward: 传送标记器（Travel Medallion）
+steps:
+- 在南阿卡莱驿站阅读传闻杂志V2
+- 按杂志提示前往指定地点
+- 打开宝箱获得传送标记器
+flowPts:
+- type: take
+  gx: 3156
+  gz: -1687
+  note: 南阿卡莱驿站·接取
+  actor: TwnObj_UmayadoBook_07
+  step: Step01
+- type: deliver
+  gx: 3150
+  gz: -1690
+  note: 南阿卡莱驿站·交付
+  actor: 传闻杂志V2
+  step: Finish
+reqs: []
+unlockList: []

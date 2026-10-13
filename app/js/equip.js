@@ -53,7 +53,8 @@
     var kind = (w.type === '盾') ? 'shield' : 'weapon';
     ITEMS.push({
       id: id, kind: kind, name: w.name, en: w.en, type: w.type,
-      atk: w.atk, durability: w.durability, hard: !!w.hard, obtain: w.obtain || []
+      atk: w.atk, def: (w.def != null ? w.def : null), durability: w.durability,
+      hard: !!w.hard, obtain: w.obtain || []
     });
   });
   Object.keys(ARMOR_ITEMS).forEach(function (id) {
@@ -69,6 +70,39 @@
   /* 勾选状态：{weapon:true, shield:true, armor:true} 默认全开（localStorage 记忆） */
   var K_LAYERS = 'botwmap.equipLayers.v1';
   var eLayers = { weapon: true, shield: true, armor: true };
+
+  /* ---------- 完成态（V1.6.2 手动，localStorage；与宝箱完成态联动） ---------- */
+  var K_EQDONE = 'botwmap.equipDone.v1';
+  var equipDone = new Set();
+  try { JSON.parse(localStorage.getItem(K_EQDONE) || '[]').forEach(function (k) { equipDone.add(k); }); } catch (e) {}
+  function persistEqDone() {
+    try { localStorage.setItem(K_EQDONE, JSON.stringify(Array.from(equipDone))); } catch (e) {}
+  }
+  var eqListeners = [];
+  var EquipDone = {
+    isDone: function (id) { return !!id && equipDone.has(id); },
+    /* 标记/取消：标记完成时同步把该装备所有宝箱点（普通 + 大师）也存进「宝箱完成」 */
+    toggle: function (it) {
+      if (!it || !it.id) return null;
+      var st;
+      if (equipDone.has(it.id)) { equipDone.delete(it.id); st = { done: false }; }
+      else { equipDone.add(it.id); st = { done: true }; }
+      persistEqDone();
+      var CP = window.ChestPanel;
+      if (CP && CP.markPoints) {
+        var all = [];
+        (it.obtain || []).forEach(function (ob) {
+          if (!ob || ob.kind !== 'chest') return;
+          (ob.pts || []).forEach(function (p) { all.push(p); });
+          (ob.hardPts || []).forEach(function (p) { all.push(p); });
+        });
+        CP.markPoints(all, st.done);
+      }
+      eqListeners.forEach(function (fn) { try { fn(); } catch (e) {} });
+      return st;
+    },
+    onChange: function (fn) { eqListeners.push(fn); }
+  };
 
   /* ---------- 面板注入 ---------- */
   function injectPanel() {
@@ -130,13 +164,13 @@
     map.draw();
   }
 
-  /* 装备获取点：武器层画武器宝箱点，防具层画防具宝箱点；hardPts（大师模式）预留不画 */
+  /* 装备获取点：武器层画武器宝箱点，防具层画防具宝箱点；完成态降透明 + 右上角绿勾 */
   function paint(ctx) {
     if (!map) return;
     window.__ePaints = (window.__ePaints || 0) + 1; /* 调试计数 */
     var scale = map.view.scale;
-    var dot = scale < 0.12;
-    var size = dot ? 8 : 20;
+    /* V1.6.2：随缩放自适应（装备图标几乎无透明边距，画布取同视觉的 0.8 倍） */
+    var size = Math.round(window.CardLayout.markerSize(scale) * 0.8);
     var on = {};
     CAT_ORDER.forEach(function (c) { if (eLayers[c]) on[c] = true; });
     if (!CAT_ORDER.some(function (c) { return on[c]; })) return;
@@ -149,6 +183,7 @@
       var it = ITEMS[i];
       if (!on[it.kind]) continue;
       var color = CAT_COLOR[it.kind] || '#888';
+      var done = EquipDone.isDone(it.id);
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
         if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
@@ -158,26 +193,16 @@
           if (px[0] < x0 || px[0] > x1 || px[1] < y0 || px[1] > y1) continue;
           var sx = map.view.x + px[0] * scale, sy = map.view.y + px[1] * scale;
           ctx.save();
-          if (dot) {
-            ctx.beginPath();
-            ctx.arc(sx, sy, size / 2, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = 'rgba(255,255,255,.6)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-          } else {
-            /* 放大后：用分类图标（武器=剑 / 盾牌=盾 / 防具=衣，抠白 PNG）；
-               尺寸 22px 与 TOTKmap 地图图标一致；图标未就绪时回退自绘剑/盾 */
-            var ic = iconCache[it.kind];
-            if (ic) {
-              var s2 = 22;   /* TOTKmap 同款：L.icon iconSize [22,22] */
-              try { ctx.drawImage(ic, sx - s2 / 2, sy - s2 / 2, s2, s2); }
-              catch (e) { if (it.kind === 'shield') drawShield(ctx, sx, sy, size, color); else drawSword(ctx, sx, sy, size, color); }
-            } else if (it.kind === 'shield') drawShield(ctx, sx, sy, size, color);
-            else if (it.kind === 'armor') drawTunic(ctx, sx, sy, size, color);
-            else drawSword(ctx, sx, sy, size, color);
-          }
+          ctx.globalAlpha = done ? 0.65 : 1;   /* V1.6.2：完成态降透明 */
+          /* 分类图标（武器=剑 / 盾牌=盾 / 防具=衣）；未就绪回退自绘 */
+          var ic = iconCache[it.kind];
+          if (ic) {
+            try { ctx.drawImage(ic, sx - size / 2, sy - size / 2, size, size); }
+            catch (e) { if (it.kind === 'shield') drawShield(ctx, sx, sy, size, color); else drawSword(ctx, sx, sy, size, color); }
+          } else if (it.kind === 'shield') drawShield(ctx, sx, sy, size, color);
+          else if (it.kind === 'armor') drawTunic(ctx, sx, sy, size, color);
+          else drawSword(ctx, sx, sy, size, color);
+          if (done) window.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
           ctx.restore();
         }
       }
@@ -187,7 +212,7 @@
   /* 命中：装备获取点（屏幕 12px 容差），返回 {type:'equip', equip} */
   function hit(mx, my) {
     if (!map) return null;
-    var tol = 12 / map.view.scale;
+    var tol = (window.CardLayout.markerSize(map.view.scale) * 0.8 / 2 + 4) / map.view.scale;
     var best = null, bd = 1e18;
     for (var i = 0; i < ITEMS.length; i++) {
       var it = ITEMS[i];
@@ -324,13 +349,11 @@
     });
   }
 
-  /* 坐标拆分（X / Z 两行显示，供 1-3 列网格窄列内完整展示） */
-  function coordParts(p) {
-    var g = map.gameCoord(p);
-    return {
-      x: (g && g.x != null ? g.x : Math.round((p[0] - 12000) / 2)),
-      z: (g && g.z != null ? g.z : Math.round((p[1] - 10000) / 2))
-    };
+  /* 宝箱类型中文名（V1.6.2：坐标数字玩家无感，改用宝箱类型；数据 chests.js chestTypeCn） */
+  function chestTypeCn(p) {
+    var dict = (typeof BOTW_CHESTS !== 'undefined' && BOTW_CHESTS.chestTypeCn) ? BOTW_CHESTS.chestTypeCn : {};
+    var t = p && p[2];
+    return (t && dict[t]) ? dict[t] : '宝箱';
   }
 
   /* V1.6.1 调整5：hover 预览态机 hidden | preview | fixed（同 quest.js） */
@@ -347,29 +370,31 @@
     var kindCn = CAT_NAME[it.kind] || it.kind;
     var sub = (it.kind === 'weapon' || it.kind === 'shield') ? (it.type || '') : (it.part || '');
     var chipCls = 'tk-chip-' + (it.kind === 'weapon' ? 'main' : it.kind === 'shield' ? 'sub' : 'mini');
-    /* 首个宝箱坐标（金色链接，点击定位） */
-    var firstPt = null;
-    for (var kk = 0; kk < it.obtain.length; kk++) {
-      if (it.obtain[kk] && it.obtain[kk].pts && it.obtain[kk].pts.length) { firstPt = it.obtain[kk].pts[0]; break; }
-    }
-    var g = firstPt ? map.gameCoord(firstPt) : null;
+    var done = EquipDone.isDone(it.id);
 
     var h = '';
-    /* 头部：分类徽章 + 复制/关闭（卡片不放图标，对齐 TOTKmap 卡片） */
+    /* 头部：分类徽章 + 大师模式徽章 + 关闭（V1.6.2：大师模式徽章从英文名后移到分类行） */
     h += '<div class="tk-grip">';
     h += '<span class="tk-chip ' + chipCls + '">' + esc(kindCn) + (sub ? ' · ' + esc(sub) : '') + '</span>';
+    if (it.hard) h += '<span class="q-badge-hard" style="background:rgba(139,92,246,.16);border-color:#8a5cf6;color:#b18cff">大师模式</span>';
     h += '<span class="tk-grip-acts">' +
-      '<button type="button" class="tk-icon-btn tk-nav" id="eqCopy" title="复制装备名">⧉</button>' +
       '<button type="button" class="tk-close" id="eqCardClose" title="关闭">×</button></span>';
     h += '</div>';
-    /* 标题行 */
-    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(it.name) + '</h3></div>';
-    if (it.en) h += '<div class="qcard-en">' + esc(it.en) + (it.hard ? ' <span class="q-badge-hard">大师模式</span>' : '') + '</div>';
-    /* 属性（kv 式，对齐 TOTKmap 防具卡） */
-    if (g) h += '<div class="tk-kv"><span class="tk-k">坐标</span><span class="tk-v"><span class="co-link" data-eq-locate="1" title="点击定位到首个获取点">X ' + g[0] + ' · Z ' + g[1] + '</span></span></div>';
+    /* 标题行：装备名 + [复制]（V1.6.2：⧉ 图标改文字，紧跟名字）+ 完成绿勾 */
+    h += '<div class="tk-title-row">' +
+      '<h3 class="tk-name">' + esc(it.name) + '</h3>' +
+      '<button type="button" class="tk-copy" id="eqCopy" title="复制装备名">[复制]</button>' +
+      (done ? '<span class="tk-done-tick" title="已完成">✓</span>' : '') +
+      '</div>';
+    if (it.en) h += '<div class="qcard-en">' + esc(it.en) + '</div>';
+    /* 属性（V1.6.2：盾显示 防御 + 耐久，不再误显攻击） */
     if (it.kind === 'weapon' || it.kind === 'shield') {
       if (sub) h += '<div class="tk-kv"><span class="tk-k">类型</span><span class="tk-v">' + esc(sub) + '</span></div>';
-      h += '<div class="tk-kv"><span class="tk-k">攻击</span><span class="tk-v">' + (it.atk != null ? it.atk : '<span class="tk-pending">待补充</span>') + '</span></div>';
+      if (it.kind === 'shield') {
+        h += '<div class="tk-kv"><span class="tk-k">防御</span><span class="tk-v">' + (it.def != null ? it.def : '<span class="tk-pending">待补充</span>') + '</span></div>';
+      } else {
+        h += '<div class="tk-kv"><span class="tk-k">攻击</span><span class="tk-v">' + (it.atk != null ? it.atk : '<span class="tk-pending">待补充</span>') + '</span></div>';
+      }
       h += '<div class="tk-kv"><span class="tk-k">耐久</span><span class="tk-v">' + (it.durability != null ? it.durability : '<span class="tk-pending">待补充</span>') + '</span></div>';
     } else {
       if (sub) h += '<div class="tk-kv"><span class="tk-k">部位</span><span class="tk-v">' + esc(sub) + '</span></div>';
@@ -377,28 +402,30 @@
       h += '<div class="tk-kv"><span class="tk-k">套装</span><span class="tk-v">' + (it.set ? esc(it.set) : '<span class="tk-pending">待补充</span>') + '</span></div>';
     }
 
-    var obtainHtml = '', chestCount = 0, hardCount = 0;
-    it.obtain.forEach(function (ob, oi) {
-      if (!ob) return;
-      if (ob.kind === 'chest') {
-        chestCount += (ob.pts ? ob.pts.length : 0);
-        hardCount += (ob.hardPts ? ob.hardPts.length : 0);
-        if (ob.pts && ob.pts.length) {
-          obtainHtml += '<div class="eq-obtain-h">' + esc(ob.desc || '宝箱') + '<span class="tk-src">' + ob.pts.length + ' 处</span></div>';
-          obtainHtml += '<div class="flow-pts">';
-          ob.pts.forEach(function (p, pi) {
-            var cp = coordParts(p);
-          obtainHtml += '<span class="fp" data-oi="' + oi + '" data-pi="' + pi + '" title="点击定位到该宝箱（X:' + cp.x + ' · Z:' + cp.z + '）"><span class="num">' + (pi + 1) + '</span><span class="txt">X:' + cp.x + ' · Z:' + cp.z + '</span></span>';
-          });
-          obtainHtml += '</div>';
-        }
-      }
+    /* 获取来源：普通模式宝箱（黄）/ 大师模式宝箱（紫），逐点可定位 + 点击高亮 */
+    var normalPts = [], hardPts = [];
+    it.obtain.forEach(function (ob) {
+      if (!ob || ob.kind !== 'chest') return;
+      (ob.pts || []).forEach(function (p) { normalPts.push(p); });
+      (ob.hardPts || []).forEach(function (p) { hardPts.push(p); });
     });
-    if (!chestCount) obtainHtml = '<div class="tk-none">暂无宝箱获取点（任务奖励待补充）</div>';
-    h += '<div class="tk-sec"><div class="tk-sec-t">获取来源<span class="tk-src">宝箱</span></div><div class="tk-sec-b">' + obtainHtml + '</div></div>';
-    if (hardCount) h += '<div class="q-hard-note">大师模式另有 ' + hardCount + ' 处（预留，暂未在地图标注）</div>';
+    var allPts = normalPts.concat(hardPts);
+    function ptsHtml(list, cls, base) {
+      return '<div class="flow-pts">' + list.map(function (p, i) {
+        return '<span class="fp ' + cls + '" data-eq-pt="' + (base + i) + '" title="点击定位到该宝箱（' + esc(chestTypeCn(p)) + '）">' +
+          '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(chestTypeCn(p)) + '</span></span>';
+      }).join('') + '</div>';
+    }
+    var obtainHtml = '';
+    if (normalPts.length) obtainHtml += '<div class="eq-obtain-h">普通模式宝箱<span class="tk-src">' + normalPts.length + ' 处</span></div>' + ptsHtml(normalPts, 'fp-normal', 0);
+    if (hardPts.length) obtainHtml += '<div class="eq-obtain-h fp-hard-h">大师模式宝箱<span class="tk-src">' + hardPts.length + ' 处</span></div>' + ptsHtml(hardPts, 'fp-hard', normalPts.length);
+    if (!obtainHtml) obtainHtml = '<div class="tk-none">暂无宝箱获取点（任务奖励待补充）</div>';
+    h += '<div class="tk-sec"><div class="tk-sec-t">获取来源</div><div class="tk-sec-b">' + obtainHtml + '</div></div>';
 
-    h += '<div class="tk-actions"><button type="button" class="btn act" id="eqLocateFirst">定位首个获取点</button></div>';
+    h += '<div class="tk-actions">';
+    if (allPts.length) h += '<button type="button" class="btn act" id="eqLocateFirst">定位</button>';
+    h += '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="eqDone">' + (done ? '取消完成' : '标记完成') + '</button>';
+    h += '</div>';
 
     body.innerHTML = h;
     card.classList.remove('hidden');
@@ -417,29 +444,35 @@
         if (typeof UI !== 'undefined' && UI.toast) UI.toast('已复制：' + it.name);
       }
     });
-    /* 坐标链接定位 */
-    body.querySelectorAll('[data-eq-locate]').forEach(function (el) {
-      el.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        locate(it, 0);
-        positionCard();
-      });
-    });
     var lf = document.getElementById('eqLocateFirst');
     if (lf) lf.addEventListener('click', function (e) {
       e.stopPropagation();
-      locate(it, 0);
+      if (allPts.length) locateByPoint(allPts[0]);
       positionCard();
     });
-    /* 获取点定位按钮（flow-pts 网格格点） */
-    body.querySelectorAll('.fp[data-oi]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var ob = it.obtain[+btn.dataset.oi];
-        if (!ob || !ob.pts || !ob.pts[+btn.dataset.pi]) return;
-        locateByPoint(ob.pts[+btn.dataset.pi]);
+    /* 获取点：点击定位 + 高亮当前点（V1.6.2） */
+    body.querySelectorAll('.fp[data-eq-pt]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var p = allPts[+btn.dataset.eqPt];
+        if (!p) return;
+        body.querySelectorAll('.fp.is-cur').forEach(function (x) { x.classList.remove('is-cur'); });
+        btn.classList.add('is-cur');
+        locateByPoint(p);
+        if (window.SpotMark) window.SpotMark.set(p);   /* V1.6.2：红点脉冲 */
         positionCard();
       });
+    });
+    /* 标记完成（V1.6.2）：同步把该装备所有宝箱点存进「宝箱完成」 */
+    var dn = document.getElementById('eqDone');
+    if (dn) dn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var st = EquipDone.toggle(it);
+      openCard(it);
+      if (map) map.draw();
+      if (typeof UI !== 'undefined' && UI.toast) {
+        UI.toast(st.done ? '已标记完成：' + it.name + '（含 ' + allPts.length + ' 处宝箱）' : '已取消完成：' + it.name);
+      }
     });
     positionCard();
   }
@@ -511,7 +544,8 @@
     toggle: function (cat) { eLayers[cat] = !eLayers[cat]; drawExt(); },
     locate: locate,
     openCard: openCard,
-    buildEquipSearch: buildEquipSearch
+    buildEquipSearch: buildEquipSearch,
+    EquipDone: EquipDone
   };
 
   function init() {
@@ -530,6 +564,7 @@
       if (map.extHoverHooks) map.extHoverHooks.push(onHoverExt);  /* V1.6.1 调整5：hover 预览 */
       var ec = document.getElementById('equipCard');
       if (window.initCardDrag && ec) window.initCardDrag(ec);     /* V1.6.1 调整i：卡片拖动 */
+      EquipDone.onChange(function () { if (map) map.draw(); });   /* V1.6.2：完成态变化重绘地图 */
       /* UI 搜索索引并入装备（buildSearchIndex 读取 __equipSearch 后需重建） */
       if (window._rebuildSearch) window._rebuildSearch();
       ready = true;

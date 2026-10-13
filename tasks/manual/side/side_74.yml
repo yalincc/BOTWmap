@@ -1,0 +1,33 @@
+key: side_74
+cat: side
+name: 送给爱人的礼物
+en: A Gift for My Beloved
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 万作
+gx: 3446
+gz: 2122
+desc: 在哈特诺村与穿背带裤的曼尼对话。他想送礼物给旅店柜台女孩普莉玛却不知送什么，先去打听她的喜好，再帮他抓10只『 restless 蟋蟀』（滚滚蟋蟀）。
+note: 滚滚蟋蟀要在夜间慢步（别跑）捕捉，跑太快会把蟋蟀吓跑；先去旅店柜台打听喜好再来。
+reward: 银卢比（100卢比）
+steps:
+- 在哈特诺村与曼尼对话接任务
+- 去旅店向普莉玛打听她的喜好
+- 回曼尼处复命后抓10只滚滚蟋蟀
+- 把蟋蟀交给曼尼
+flowPts:
+- type: take
+  gx: 3418.24
+  gz: 2121.22
+  note: 女神像·接取
+  actor: Npc_HatenoVillage022
+  step: Ready
+- type: take
+  gx: 3388
+  gz: 2122
+  note: 女神像·接取
+  actor: Npc_HatenoVillage022
+  step: Answer
+reqs: []
+unlockList: []

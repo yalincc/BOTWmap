@@ -239,6 +239,41 @@
     }, 1600);
   }
 
+  /* 完成绿勾（地图图标右上角）：小圆底 + 白勾；自管 alpha，不受父级降透明影响。
+     任务 / 装备 / 宝箱三板块共用，保证绿勾样式全站统一。（V1.6.2 从 quest.js 提上来共用） */
+  function doneCheck(ctx, cx, cy, r) {
+    r = r || 6.5;
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#2fbf71';
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(10,26,16,.85)';
+    ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.7;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.49, cy + r * 0.03);
+    ctx.lineTo(cx - r * 0.14, cy + r * 0.40);
+    ctx.lineTo(cx + r * 0.52, cy - r * 0.43);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* V1.6.2：地图标注图标尺寸——对齐原生标记的档位（原 8px 太低，图标看不见没意义）。
+     原生标记档位参考 map.js `_enemyIconScale`：<0.12 一档 / 0.12~0.25 一档 / ≥0.25 一档。
+     这里把低档从「7px 色点」改成「28px 图标」（与原生神庙 28 / 村庄 30 同档），最大 36px。
+     任务 / 装备 / 宝箱三板块共用；装备画布另取同视觉的 0.8 倍（装备图标几乎无透明边距）。 */
+  function markerSize(scale) {
+    if (scale < 0.12) return 28;
+    if (scale < 0.25) return 32;
+    return 36;
+  }
+
   window.CardLayout = {
     PAD: PAD,
     PRIORITY: PRIORITY,
@@ -250,6 +285,8 @@
     getAnchor: getAnchor,
     clearAnchor: clearAnchor,
     isMobile: isMobile,
+    doneCheck: doneCheck,
+    markerSize: markerSize,
     /* 供拖动使用：把视口坐标转成卡片定位坐标系 */
     toHost: function (x, y) {
       var host = hostEl();

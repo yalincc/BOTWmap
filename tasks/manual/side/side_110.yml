@@ -1,0 +1,33 @@
+key: side_110
+cat: side
+name: 巨鲸化石
+en: Leviathan Bones
+region: 海布拉
+flag: null
+dlc: null
+npc: 奥拉科
+gx: -1543
+gz: -1792
+desc: 在草原驿站与阿克拉对话，他想知道传说巨鲸的真相。前往海拉鲁三处调查巨鲸化石，收集资料后回报。
+note: 三处巨鲸化石分别在海布拉、奥尔汀、格鲁德沙漠，走到骨头旁自动触发调查即可，不需要拍照。
+reward: 金卢比
+steps:
+- 在草原驿站与阿克拉对话接取
+- 前往海布拉山脉调查一处巨鲸化石
+- 前往奥尔汀地区调查一处巨鲸化石
+- 前往格鲁德沙漠调查一处巨鲸化石
+- 回报阿克拉
+flowPts:
+- type: take
+  gx: -1542
+  gz: -1802
+  note: 玛丽塔驿站·接取
+  actor: Npc_HyruleWestHatago004
+  step: Finish
+- type: deliver
+  gx: -1543
+  gz: -1792
+  note: 玛丽塔驿站·交付
+  step: Finish
+reqs: []
+unlockList: []

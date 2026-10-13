@@ -1,0 +1,52 @@
+key: side_107
+cat: side
+name: 克洛格考验
+en: The Korok Trials
+region: 奥尔汀
+flag: KorokMini_KorokShiren_Finish
+dlc: null
+npc: 思达吉
+gx: 433
+gz: -2136
+desc: 在海拉鲁大森林（克洛格森林入口）与奇奥对话，接受克洛格的三项考验。完成森林里的三个试炼任务后回来报告。
+note: 必须先在克洛格森林入口与奇奥对话接取，再把三个子试炼（冰之杖/卢咪/猜谜）全做完才回来交；顺序不限。
+reward: 大松软菇×3
+steps:
+- 在克洛格森林入口与奇奥对话接取
+- 完成「冰之杖考验」
+- 完成「闪闪发光的卢咪考验」
+- 完成「海拉鲁猜谜考验」
+- 返回奇奥处报告
+flowPts:
+- type: take
+  gx: 431
+  gz: -2139
+  note: 克洛格森林·接取
+  actor: Npc_Kokiri008
+  step: Ready
+- type: npc
+  gx: 248
+  gz: -1977
+  note: 奥尔汀·对话
+  actor: Npc_Kokiri010
+  step: Step010
+- type: npc
+  gx: 256
+  gz: -2229
+  note: 奥尔汀·对话
+  actor: Npc_kokiri001
+  step: Step010
+- type: npc
+  gx: 564
+  gz: -2160
+  note: 基耀·乌神庙·对话
+  actor: Npc_Kokiri011
+  step: Step010
+reqs:
+- key: shrine_41
+  name: 库恩·希达吉神庙
+- key: shrine_42
+  name: 达·乔卡席神庙
+- key: shrine_43
+  name: 玛姆·拉诺神庙
+unlockList: []

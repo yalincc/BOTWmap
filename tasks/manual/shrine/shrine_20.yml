@@ -1,0 +1,32 @@
+key: shrine_20
+cat: shrine
+name: 席罗·席拉神庙
+en: Watch Out for the Flowers
+region: 中央海拉鲁
+flag: DontDamageFlower_Finish
+dlc: null
+npc: 奥可芭
+gx: 822
+gz: 846
+desc: 在海拉鲁河花之浅滩，玛格达在神庙周围种满花。沿花间小路小心不踩花走到神庙前即可激活；踩花会激怒她。
+note: 千万别踩花，误踩三次玛格达会暴怒攻击你并把你打到残血；沿花丛间的缝隙小路慢慢走到中央即可。
+reward: 开启席罗·席拉神庙
+steps:
+- 在花之浅滩与玛格达对话接取挑战
+- 沿花丛间小路小心前进，不要踩到花
+- 路上冒出的丘丘怪可绕开
+- 到达花团中央，激活席罗·席拉神庙
+flowPts:
+- type: take
+  gx: 816
+  gz: 836
+  note: 席罗·席拉神庙·接取
+  actor: Npc_Challenge093Lady
+  step: Finish
+- type: deliver
+  gx: 822
+  gz: 846
+  note: 席罗·席拉神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

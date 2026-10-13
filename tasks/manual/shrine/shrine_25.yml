@@ -1,0 +1,33 @@
+key: shrine_25
+cat: shrine
+name: 卡姆·尤奥神庙
+en: The Cursed Statue
+region: 内卡鲁达
+flag: CursedStatue_Finish
+dlc: null
+npc: 卡里尤
+gx: 2398
+gz: 1837
+desc: 在哈特诺堡垒与自封博士的卡利普听说诅咒石像之谜。夜里21:00后在东北石像群中找到眼睛发紫发光的那尊，射中其眼睛即可开启神庙。
+note: 诅咒石像的眼睛只在夜里21:00后才发出紫光，白天来扑空；看到紫光就用箭射它。
+reward: 开启卡姆·尤奥神庙
+steps:
+- 在哈特诺堡垒与卡利普对话（称呼他"博士"）接取
+- 等到晚上21:00后，到他白天考察的石像群
+- 找到眼睛发出紫色光的诅咒石像
+- 用箭射中发光的眼睛，开启卡姆·尤奥神庙
+flowPts:
+- type: take
+  gx: 2399
+  gz: 1839
+  note: 内卡鲁达·接取
+  actor: Npc_HatenoGate001
+  step: Game
+- type: deliver
+  gx: 2398
+  gz: 1837
+  note: 内卡鲁达·交付
+  actor: 卡利普
+  step: Finish
+reqs: []
+unlockList: []

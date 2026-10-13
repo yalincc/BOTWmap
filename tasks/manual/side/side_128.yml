@@ -1,0 +1,32 @@
+key: side_128
+cat: side
+name: 捉住耐火蜥蜴
+en: Fireproof Lizard Roundup
+region: 奥尔汀
+flag: SanrokuMini_Lizard_Finish
+dlc: null
+npc: 麦萨奇
+gx: 1654
+gz: -1956
+desc: 在南部采矿场与基玛对话，他需要10只耐火蜥蜴。在奥尔汀的岩壁旁潜行捕捉耐火蜥蜴，凑够后交给他。
+note: 耐火蜥蜴极警觉，必须蹲下潜行慢慢靠近，直接跑过去会全钻地；建议先吃静默/潜行料理再下手。
+reward: 耐火铠甲（Flamebreaker Armor）
+steps:
+- 在南部采矿场与基玛对话接取
+- 在死亡之山区域潜行捕捉耐火蜥蜴
+- 凑齐10只交给基玛
+flowPts:
+- type: take
+  gx: 1657
+  gz: -1960
+  note: 南部采矿场·接取
+  actor: Npc_DeathEastHatago_002
+  step: Finish
+- type: deliver
+  gx: 1654
+  gz: -1956
+  note: 南部采矿场·交付
+  actor: 基玛
+  step: Finish
+reqs: []
+unlockList: []

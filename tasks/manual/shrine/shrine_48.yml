@@ -1,0 +1,32 @@
+key: shrine_48
+cat: shrine
+name: 希·塔塔恩科神庙
+en: Guardian Slideshow
+region: 费罗尼
+flag: null
+dlc: null
+npc: 柳奈
+gx: 104
+gz: 3812
+desc: 在河豚海滩遇到迷恋古代之球"罗斯科"的露妮（需相机符文）。用相机给飞行、小型、行走三种守护者各拍一张拿给她看，她入迷后交出球放入祭坛开启神庙。
+note: 要分别拍到飞行守护者、小型守护者（探测器）、行走守护者三种照片，再依次拿给露妮看，她入迷后才交出球。
+reward: 获得古代之球罗斯科，开启希·塔塔恩科神庙
+steps:
+- 解锁相机符文后，在河豚海滩与露妮对话接取
+- 分别拍到飞行守护者、小型守护者、行走守护者的照片
+- 回去依次把三张照片给露妮看
+- 她交出古代之球罗斯科，放入祭坛开启希·塔塔恩科神庙
+flowPts:
+- type: take
+  gx: 107
+  gz: 3812
+  note: 希·塔塔恩科神庙·接取
+  actor: Npc_Remains_Fancier001
+  step: Step1
+- type: deliver
+  gx: 122
+  gz: 3839
+  note: 希·塔塔恩科神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

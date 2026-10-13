@@ -1,0 +1,35 @@
+key: shrine_17
+cat: shrine
+name: 拉纳·罗基神庙
+en: The Stolen Heirloom
+region: 内卡鲁达
+flag: HateeluMini_Treasure_Finish
+dlc: null
+npc: 帕雅
+gx: 1781
+gz: 984
+desc: 在卡卡利科村英帕宅邸，帕雅告知希卡族传家宝被盗。夜里跟随守卫多里安到村外的祭坛，击败现身的依盖队剑士，夺回传家宝放入凹槽即可开启神庙。
+note: 必须等到夜里多里安独自走到村外祭坛才会触发依盖队战斗，白天跟踪会被他察觉；提前击败魔王寇伽不影响本条触发。
+reward: 夺回希卡族传家宝，开启拉纳·罗基神庙
+steps:
+- 完成"萤火之光"后，在英帕宅邸与帕雅对话接取挑战
+- 夜里跟随守卫多里安走到村外的祭坛
+- 击败现身的依盖队剑士，夺回希卡族传家宝
+- 将传家宝放入祭坛凹槽，开启拉纳·罗基神庙
+flowPts:
+- type: take
+  gx: 1774
+  gz: 987
+  note: 卡卡利科村·接取
+  actor: Npc_Kakariko002
+  step: Finish
+- type: deliver
+  gx: 1781
+  gz: 984
+  note: 卡卡利科村·交付
+  actor: 帕雅
+  step: Finish
+reqs:
+- key: side_68
+  name: 萤火虫之光
+unlockList: []

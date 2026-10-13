@@ -1,0 +1,34 @@
+key: main_09
+cat: main
+name: 英雄之剑
+en: The Hero's Sword
+region: 奥尔汀
+flag: Get_MasterSword_Finish
+dlc: null
+npc: 德库树长老
+gx: 433
+gz: -2112
+desc: 传说中封印黑暗的宝剑插在森林深处的台座上。穿过迷雾森林（Lost Woods）抵达克洛格森林，在德库树长老面前拔剑。需要至少 13 颗满血心之容器才能拔出大师剑。
+note: 拔大师剑必须有 13 颗满血心，料理/料理加的黄心不算数，不够会被德库树弹回来；迷雾森林里别乱跑，跟着每支火把飘出的火星和风的方向走，迷路会被雾送回入口。
+reward: 大师剑（Master Sword）
+steps:
+- 解锁森林之塔，滑翔进入北边的迷雾森林
+- 跟随火把飘出的火星与风向，走出迷雾抵达克洛格森林
+- 走到森林中央的台座前，面对插在石中的大师剑
+- 以至少 13 颗满血心之容器持续拔剑，拔出大师剑
+flowPts:
+- type: take
+  gx: 418.51
+  gz: -2188.76
+  note: 女神像·接取
+  actor: TwnObj_Village_Korok_DekuTree_A_01
+  step: Ready
+- type: deliver
+  gx: 431
+  gz: -2111
+  note: 克洛格森林·交付
+  step: Finish
+reqs: []
+unlockList:
+- key: side_135
+  name: EX 剑之考验

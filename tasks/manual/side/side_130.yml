@@ -1,0 +1,33 @@
+key: side_130
+cat: side
+name: 死亡之山的秘密
+en: Death Mountain's Secret
+region: 奥尔汀
+flag: null
+dlc: null
+npc: 科普思
+gx: 1790
+gz: -2246
+desc: 在鼓隆温泉与杜格比对话，他说起死亡之山山顶藏着秘密。攀上死火山口附近，找到插在那里的钻头长枪。
+note: 火山口酷热，务必穿好耐火铠甲再上；钻头长枪插在死火山山顶，用磁力拔起，别空手爬。
+reward: 钻头长枪（Drillshaft）
+steps:
+- 在鼓隆温泉与杜格比对话接取
+- 攀登死亡之山，接近火山口
+- 在山顶找到插着的钻头长枪
+- 拾取并回报
+flowPts:
+- type: take
+  gx: 1787
+  gz: -2244
+  note: 奥尔汀·接取
+  actor: Npc_Goron031
+  step: Get
+- type: deliver
+  gx: 1798
+  gz: -2250
+  note: 奥尔汀·交付
+  actor: Npc_Goron031
+  step: Finish
+reqs: []
+unlockList: []

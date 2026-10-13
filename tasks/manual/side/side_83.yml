@@ -1,0 +1,32 @@
+key: side_83
+cat: side
+name: 陶醉在跳水中的男人
+en: Diving is Beauty!
+region: 拉聂尔
+flag: ZoraMini_DiveChallenge_Finish
+dlc: null
+npc: 诺尔
+gx: 3298
+gz: -519
+desc: 解放水神兽后，在卓拉领地二楼与感性的诺尔对话。他想看到一次『美丽的跳水』，从他旁边的高台纵身跳入水中，再攀上瀑布上来即可。
+note: 要从他旁边高台纵身跳下水、再穿着卓拉装备攀上身后瀑布回到台上，光跳下去不上来不算完成。
+reward: 速速莲实×5（Fleet-Lotus Seeds）
+steps:
+- 在卓拉领地二楼与诺尔对话接任务
+- 从他旁边的高台跑起跳入水中
+- 穿着卓拉装备攀上身后瀑布回到台上
+flowPts:
+- type: take
+  gx: 2261.84
+  gz: -118.23
+  note: 拉聂尔之塔·接取
+  actor: Npc_Zora029
+  step: Ready
+- type: take
+  gx: 3292
+  gz: -520
+  note: 女神像·接取
+  actor: Npc_Zora029
+  step: Step1
+reqs: []
+unlockList: []

@@ -1,0 +1,38 @@
+key: side_86
+cat: side
+name: 拉尔斯池塘之巨人讨伐
+en: The Giant of Ralis Pond
+region: 拉聂尔
+flag: Giant_ZoraMini_Finish
+dlc: null
+npc: 托尔伏
+gx: 3314
+gz: -550
+desc: 解放水神兽后，在领地西侧水池旁与卫兵托尔伏对话。他要你讨伐在拉尔斯池塘附近作乱的蓝色西诺克斯，跟随目标标记找到并打倒它，再回领地复命。
+note: 讨伐目标是拉尔斯池塘附近的蓝色西诺克斯，跟着目标标记找，别打错地方。
+reward: 银卢比（100卢比）
+steps:
+- 在卓拉领地西侧与托尔伏对话接任务
+- 前往拉尔斯池塘附近找到蓝色西诺克斯
+- 打倒西诺克斯
+- 回卓拉领地向托尔伏复命
+flowPts:
+- type: take
+  gx: 2252.03
+  gz: -293.6
+  note: 萨奥·科席神庙·接取
+  actor: Npc_Zora036
+  step: Ready
+- type: take
+  gx: 2928
+  gz: -301
+  note: 拉聂尔·接取
+  step: Step1
+- type: deliver
+  gx: 3315
+  gz: -551
+  note: 奈兹·耀玛神庙·交付
+  actor: Npc_Zora036
+  step: Finish
+reqs: []
+unlockList: []

@@ -1,0 +1,31 @@
+key: shrine_34
+cat: shrine
+name: 迪拉·玛神庙
+en: The Desert Labyrinth
+region: 格鲁德
+flag: Desert_Maze_Finish
+dlc: null
+npc: 奇异的声音
+gx: -1794
+gz: 3347
+desc: 走进达瓦尔峰脚下的南洛美迷宫入口，听到僧侣声音。穿越迷宫（避开瘴气池、巡逻的黑波克布林），到达迷宫尽头即可开启祝福神庙。
+note: 迷宫地面和墙上有瘴气池，尽量爬墙避开；小心墙顶巡逻的黑波克布林。
+reward: 开启迪拉·玛神庙（祝福神庙）
+steps:
+- 进入南洛美迷宫触发僧侣声音
+- 翻越迷宫墙避开地面/墙上的瘴气池
+- 小心墙顶巡逻的黑波克布林
+- 到达迷宫尽头，激活迪拉·玛神庙
+flowPts:
+- type: take
+  gx: -1794
+  gz: 3458
+  note: 迪拉·玛神庙·接取
+  step: Finish
+- type: deliver
+  gx: -1794
+  gz: 3347
+  note: 迪拉·玛神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

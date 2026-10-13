@@ -1,0 +1,33 @@
+key: side_72
+cat: side
+name: 暴发户的玩法
+en: Hobbies of the Rich
+region: 阿卡莱
+flag: UMiiMini_RichmansHobby_Finish
+dlc: null
+npc: 哈吉
+gx: 3920
+gz: -1602
+desc: 完成『欣欣向荣吧！樱达建筑店』建好一始村后，在村子西侧与老人哈吉对话。他先给你100卢比，要你去西边的托林湿地调查那里的两台（实际三台）守护者。
+note: 需先完成『欣欣向荣吧！樱达建筑店』建好一始村；托林湿地实际有三台守护者，别只打两台就回去复命。
+reward: 银卢比（100卢比）+ 红卢比（20卢比）
+steps:
+- 一始村建成后在村西与哈吉对话
+- 前往村西的托林湿地确认守护者数量
+- 回去向哈吉复命，他再给20卢比
+flowPts:
+- type: take
+  gx: 3960
+  gz: -1591
+  note: 女神像·接取
+  actor: Npc_UMiiVillage009
+  step: Finish
+- type: deliver
+  gx: 3920
+  gz: -1602
+  note: 一始村·交付
+  step: Finish
+reqs:
+- key: side_80
+  name: 欣欣向荣吧！樱达建筑店
+unlockList: []

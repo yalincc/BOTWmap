@@ -1,0 +1,33 @@
+key: side_109
+cat: side
+name: 闪闪发光的卢咪考验
+en: Legendary Rabbit Trial
+region: 奥尔汀
+flag: null
+dlc: null
+npc: 匹康
+gx: 447
+gz: -2132
+desc: 在克洛格森林与皮克斯对话，他说起传说中的闪光兔子（卢咪）。找到并射中那只罕见的闪光卢咪。
+note: 闪光卢咪（Blupee）一碰就狂奔，建议远距离用弓箭射；射中会掉一地卢比，记得捡完再回奇奥那一组复命。
+reward: 银卢比
+steps:
+- 在克洛格森林与皮克斯对话接取
+- 在森林中寻找闪光的卢咪（Blupee）
+- 用弓箭射中它
+- 回报皮克斯
+flowPts:
+- type: take
+  gx: 441
+  gz: -2133
+  note: 克洛格森林·接取
+  actor: Npc_Kokiri007
+  step: Finish
+- type: take
+  gx: 417
+  gz: -2178
+  note: 女神像·接取
+  actor: Npc_Kokiri007
+  step: Ready
+reqs: []
+unlockList: []

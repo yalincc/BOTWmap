@@ -1,0 +1,33 @@
+key: side_59
+cat: side
+name: 拉姆达大盗的财宝
+en: Misko, the Great Bandit
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 多米达克
+gx: 1770
+gz: 1922
+desc: 在双子驿站与偷偷议论宝藏的多米达克、布利森兄弟对话，付100卢比换取关于大盗拉姆达藏宝洞的谜语。按提示找到双子山东南侧小溪尽头的山洞，炸开裂石进入宝库开宝箱。
+note: 先花100卢比向兄弟买谜语，藏宝洞在双子山东南侧支流小溪尽头的山崖下，必须用炸弹炸开裂纹石壁才进得去。
+reward: 宝箱：蛋白石、琥珀、蓝宝石×2、夜光石、火焰剑等
+steps:
+- 在双子驿站与多米达克、布利森对话，支付100卢比获得谜语
+- 前往双子山东南侧主河支流小溪尽头的山崖
+- 用炸弹炸开挡路的可破坏岩石进入山洞
+- 打开洞内宝箱完成任务
+flowPts:
+- type: take
+  gx: 1767
+  gz: 1925
+  note: 双子驿站·接取
+  actor: subchallnpc000
+  step: Finish
+- type: deliver
+  gx: 1770
+  gz: 1922
+  note: 双子驿站·交付
+  actor: 多米达克
+  step: Finish
+reqs: []
+unlockList: []

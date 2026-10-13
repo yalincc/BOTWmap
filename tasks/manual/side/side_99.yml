@@ -1,0 +1,32 @@
+key: side_99
+cat: side
+name: 奉献给大精灵
+en: A Gift for the Great Fairy
+region: 海布拉
+flag: null
+dlc: null
+npc: 陀鲁
+gx: -2921
+gz: -558
+desc: 在塔邦挞大桥驿站与托伦对话。他想去附近的大精灵泉却被路上的怪物吓住，你只要帮他引路/清出一条路，他便会出资开启那座大精灵泉。
+note: 关键是先清掉去精灵泉路上的怪物、给托伦开路，他才肯出钱把泉开启。
+reward: 解锁大精灵泉（可强化装备）
+steps:
+- 在塔邦挞大桥驿站与托伦对话接任务
+- 带他（或先清怪）前往附近的大精灵泉
+- 托伦出资开启卡夏的大精灵泉
+flowPts:
+- type: take
+  gx: -2916
+  gz: -561
+  note: 塔邦挞大桥驿站·接取
+  actor: Npc_TabantaBridgeHatago005
+  step: Play
+- type: deliver
+  gx: -2921
+  gz: -558
+  note: 塔邦挞大桥驿站·交付
+  actor: 托伦
+  step: Finish
+reqs: []
+unlockList: []

@@ -1,0 +1,33 @@
+key: side_92
+cat: side
+name: 我要买下这匹马
+en: Good-Sized Horse
+region: 格鲁德
+flag: null
+dlc: null
+npc: 兹基
+gx: -2030
+gz: 1870
+desc: 在格鲁德峡谷与养马人泽尔对话。他想要一匹『个头够大』的马，帮他抓一匹体格健壮的野马并登记后带给他。
+note: 抓到大个野马后要先在驿站登记，再骑回给泽尔看；直接骑过去没登记不算数。
+reward: 金卢比（300卢比）
+steps:
+- 在格鲁德峡谷与泽尔对话接任务
+- 在野外驯服一匹体型较大的野马
+- 先在驿站登记马匹
+- 带这匹马回去给泽尔看
+flowPts:
+- type: take
+  gx: -2030
+  gz: 1870
+  note: 格鲁德·接取
+  actor: Npc_HorseBuyer
+  step: Finish
+- type: deliver
+  gx: -2030
+  gz: 1870
+  note: 格鲁德·交付
+  actor: 泽尔
+  step: Finish
+reqs: []
+unlockList: []

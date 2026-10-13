@@ -1,0 +1,33 @@
+key: side_81
+cat: side
+name: 和普莉珂玩吧！
+en: Playtime with Cottla
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 普莉珂
+gx: 1868
+gz: 962
+desc: 白天在卡卡利科村防具店附近遇到小女孩普莉珂。陪她玩游戏：选『抓人』就绕到背后抓住她；选『捉迷藏』就去英帕屋后面找她。
+note: 普莉珂只在下午出现；选捉迷藏要到英帕房子后面找她，选抓人就绕到她背后抓住。
+reward: 岩石盐（岩盐）/ 琥珀等矿石
+steps:
+- 下午在村里与普莉珂对话陪她玩
+- 若玩抓人：绕到她背后抓住她
+- 若玩捉迷藏：到英帕房子后面找到她
+- 她会给你谢礼
+flowPts:
+- type: take
+  gx: 1870.67
+  gz: 957.56
+  note: 女神像·接取
+  actor: Npc_Kakariko004
+  step: Ready
+- type: deliver
+  gx: 1868
+  gz: 962
+  note: 女神像·交付
+  actor: 普莉珂
+  step: Finish
+reqs: []
+unlockList: []

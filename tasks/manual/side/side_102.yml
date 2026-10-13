@@ -1,0 +1,35 @@
+key: side_102
+cat: side
+name: 寻找芭乐塔
+en: The Search for Barta
+region: 格鲁德
+flag: Gerudo_Ch_FindingValetta_Finish
+dlc: null
+npc: 朗洁
+gx: -3912
+gz: 2930
+desc: 在格鲁德小镇与玲奈尔对话。她的姐妹芭乐塔去格鲁德沙漠找『冰凉的东西』后失踪。去北格鲁德高地/南洛美方向的冰谷（冷西卡研究所附近）找到被冻住、躲起来的芭乐塔。
+note: 芭乐塔躲在格鲁德高地寒冷地区的冰谷里，去之前备好耐寒料理或保暖装备。
+reward: 银卢比（100卢比）
+steps:
+- 在格鲁德小镇与玲奈尔对话接任务
+- 前往格鲁德高地寒冷地区寻找芭乐塔
+- 在一处冰洞/冰谷找到快冻僵的芭乐塔
+- 帮她脱困并回小镇，向玲奈尔复命
+flowPts:
+- type: take
+  gx: -3912
+  gz: 2930
+  note: 格鲁德小镇·接取
+  actor: Npc_oasis042
+  step: Step1
+- type: npc
+  gx: -4819
+  gz: 3715
+  note: 哈瓦·卡伊神庙·对话
+  actor: Npc_GerudoDesert004
+  step: Step2
+reqs: []
+unlockList:
+- key: side_100
+  name: '格鲁德至宝: 雷鸣头盔'

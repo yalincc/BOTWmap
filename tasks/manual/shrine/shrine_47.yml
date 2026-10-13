@@ -1,0 +1,33 @@
+key: shrine_47
+cat: shrine
+name: 塔·姆尔神庙
+en: A Landscape of a Stable
+region: 奥尔汀
+flag: null
+dlc: null
+npc: 桑伏
+gx: 2613
+gz: -1147
+desc: 在山麓驿站，马伊罗欣赏墙上驿站风景画。画的是从南面看驿站与背景火山，朝驿站西南方向走，即可找到画中位置对应的神庙。
+note: 画里是从南面看驿站、背景是火山，记住这个构图方位，朝驿站西南方向走即可找到神庙。
+reward: 开启塔·姆尔神庙
+steps:
+- 在山麓驿站内与马伊罗对话，看墙上风景画
+- 记住画中从南面看到的驿站与背景火山构图
+- 朝驿站西南方向走
+- 找到画中位置对应的塔·姆尔神庙
+flowPts:
+- type: take
+  gx: 2621
+  gz: -1145
+  note: 山麓驿站·接取
+  actor: Npc_DeathMt001
+  step: Finished
+- type: deliver
+  gx: 2613
+  gz: -1147
+  note: 山麓驿站·交付
+  actor: 马伊罗
+  step: Finish
+reqs: []
+unlockList: []

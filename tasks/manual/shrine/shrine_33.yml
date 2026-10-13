@@ -1,0 +1,33 @@
+key: shrine_33
+cat: shrine
+name: 拉丘·乌罗神庙
+en: The Undefeated Champ
+region: 格鲁德
+flag: SunazarashiRace_Finish
+dlc: null
+npc: 帕弗宇
+gx: -3761
+gz: 3116
+desc: 解放骆驼神兽后，在格鲁德沙海象竞速场与莎波妮对话。花50卢比参赛，1分30秒内穿完全部拱门打破塔莉纪录，赢得大宝球放到祭坛开启神庙。
+note: 骑沙海象要在1分30秒内穿过全部拱门冲线，漏拱门或中途下盾会判失败；报名费每场50卢比。
+reward: 赢得大宝球（古代之球），开启拉丘·乌罗神庙
+steps:
+- 解放骆驼神兽后，在沙海象竞速场与莎波妮对话接取
+- 付50卢比报名费，骑沙海象比赛
+- 在1分30秒内穿过所有拱门冲线，打破塔莉纪录
+- 领取大宝球（古代之球）放到祭坛，开启拉丘·乌罗神庙
+flowPts:
+- type: take
+  gx: -3761
+  gz: 3116
+  note: 拉丘·乌罗神庙·接取
+  actor: Npc_oasis038
+  step: Step1
+- type: deliver
+  gx: -3781
+  gz: 3117
+  note: 拉丘·乌罗神庙·交付
+  actor: FldObj_ChampionshipBall_01
+  step: Finish
+reqs: []
+unlockList: []

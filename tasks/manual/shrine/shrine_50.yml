@@ -1,0 +1,32 @@
+key: shrine_50
+cat: shrine
+name: 茨茨阿·尼玛神庙
+en: The Spring of Power
+region: 阿卡莱
+flag: null
+dlc: null
+npc: 诺波坦
+gx: 4230
+gz: -2754
+desc: 在东阿卡莱驿站与诺博对话，得知西边力量之泉。到泉前祈祷，射取红色龙奥尔迪拉的鳞片丢入泉水，开启神庙。
+note: 射红色龙奥尔迪拉取得鳞片，再丢进力量之泉；龙在奥尔汀侧翼和塔纳加峡谷上空盘旋。
+reward: 获得奥尔迪拉鳞片，开启茨茨阿·尼玛神庙
+steps:
+- 在东阿卡莱驿站与诺博对话接取
+- 到驿站西边的力量之泉女神像前祈祷
+- 到奥尔汀侧翼/塔纳加峡谷射红色龙奥尔迪拉取得鳞片
+- 把奥尔迪拉鳞片丢入力量之泉，开启茨茨阿·尼玛神庙
+flowPts:
+- type: take
+  gx: 4245
+  gz: -2747
+  note: 东阿卡莱驿站·接取
+  actor: Npc_TamourHatago002
+  step: Step1
+- type: deliver
+  gx: 3744
+  gz: -2657
+  note: 女神像·交付
+  step: Finish
+reqs: []
+unlockList: []

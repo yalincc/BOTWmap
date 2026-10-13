@@ -71,9 +71,44 @@
   /* 子开关状态：{normal, dlc, hard} 默认全开（localStorage 记忆） */
   var K_LAYERS = 'botwmap.chestLayers.v1';
   var cLayers = { normal: true, dlc: true, hard: true };
-  /* V1.6.1 调整k：普通宝箱 marker 用原宝箱图标（DLC/大师模式保持色块不变） */
-  var chestImg = new Image();
-  chestImg.src = 'assets/icons/icons_14.png';
+  /* V1.6.2：三个子类图标（用户自制卡通图标，地图 + 侧栏统一） */
+  var CHEST_ICON = {
+    normal: 'assets/icons/chest_normal.png',
+    dlc: 'assets/icons/chest_dlc.png',
+    hard: 'assets/icons/chest_hard.png'
+  };
+  var chestImgs = {};
+  SUB_ORDER.forEach(function (s) { var im = new Image(); im.src = CHEST_ICON[s]; chestImgs[s] = im; });
+
+  /* ---------- 完成态（V1.6.2 手动，localStorage；以坐标为键，与装备完成态联动） ---------- */
+  var K_CHDONE = 'botwmap.chestDone.v1';
+  var chestDone = new Set();
+  try { JSON.parse(localStorage.getItem(K_CHDONE) || '[]').forEach(function (k) { chestDone.add(k); }); } catch (e) {}
+  function ptKey(p) { return Math.round(p[0]) + ',' + Math.round(p[1]); }
+  function persistChDone() { try { localStorage.setItem(K_CHDONE, JSON.stringify(Array.from(chestDone))); } catch (e) {} }
+  var chListeners = [];
+  function notifyCh() { chListeners.forEach(function (fn) { try { fn(); } catch (e) {} }); }
+  /* 对外：装备完成态标记时会调 markPoints 同步宝箱完成 */
+  window.ChestPanel = {
+    isDone: function (p) { return !!p && chestDone.has(ptKey(p)); },
+    toggleDone: function (p) {
+      if (!p) return null;
+      var kk = ptKey(p), st;
+      if (chestDone.has(kk)) { chestDone.delete(kk); st = { done: false }; }
+      else { chestDone.add(kk); st = { done: true }; }
+      persistChDone(); notifyCh();
+      return st;
+    },
+    markPoints: function (list, on) {
+      (list || []).forEach(function (p) {
+        if (!p) return;
+        var kk = ptKey(p);
+        if (on) chestDone.add(kk); else chestDone.delete(kk);
+      });
+      persistChDone(); notifyCh();
+    },
+    onChange: function (fn) { chListeners.push(fn); }
+  };
 
   /* ---------- 宝箱顶级大类注入（DOM 手术：ui.js buildLayerList 渲染完成后执行；
      从探索收集移除 treasure 行+旧子容器，新建「宝箱」顶级组插在探索收集之前） ---------- */
@@ -112,10 +147,8 @@
       var r = document.createElement('div');
       r.className = 'lrow' + (cLayers[sub] ? ' on' : '');
       r.dataset.cat = 'chest_' + sub;
-      /* 普通宝箱用原始宝箱图标 icons_14.png；DLC/大师模式沿用 dot 徽章 */
-      var iconHtml = (sub === 'normal')
-        ? '<img class="lg-ic" src="assets/icons/icons_14.png" alt="" loading="lazy">'
-        : '<span class="dot" style="background:' + SUB_COLOR[sub] + '"></span>';
+      /* V1.6.2：三子类统一用各自卡通图标 */
+      var iconHtml = '<img class="lg-ic" src="' + CHEST_ICON[sub] + '" alt="" loading="lazy">';
       r.innerHTML =
         iconHtml +
         '<span class="lname">' + SUB_NAME[sub] + '</span>' +
@@ -149,12 +182,11 @@
     map.draw();
   }
 
-  /* ---------- Canvas 绘制（条件：三子开关独立，无父行） ---------- */
+  /* ---------- Canvas 绘制（V1.6.2：三子类图标，屏幕 22px，所有缩放统一） ---------- */
   function paint(ctx) {
     if (!map) return;
     var scale = map.view.scale;
-    var dot = scale < 0.12;
-    var size = dot ? 8 : 20;
+    var size = window.CardLayout.markerSize(scale);   /* V1.6.2：随缩放自适应，最大 36px */
     var any = false;
     SUB_ORDER.forEach(function (sub) { if (cLayers[sub]) any = true; });
     if (!any) return;
@@ -166,39 +198,26 @@
     SUB_ORDER.forEach(function (sub) {
       if (!cLayers[sub]) return;
       var list = SUB[sub], color = SUB_COLOR[sub];
+      var img = chestImgs[sub];
+      var hasImg = img && img.complete && img.naturalWidth;
       for (var i = 0; i < list.length; i++) {
         var entry = list[i];
         var px = entry.pt;
         if (px[0] < x0 || px[0] > x1 || px[1] < y0 || px[1] > y1) continue;
         var sx = map.view.x + px[0] * scale, sy = map.view.y + px[1] * scale;
+        var isDone = window.ChestPanel.isDone(px);
         ctx.save();
-        if (dot) {
-          ctx.beginPath();
-          ctx.arc(sx, sy, size / 2, 0, Math.PI * 2);
-          ctx.fillStyle = color;
-          ctx.fill();
-          ctx.strokeStyle = 'rgba(255,255,255,.6)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        } else if (sub === 'normal' && chestImg.complete && chestImg.naturalWidth) {
-          /* 普通宝箱：icons_14.png 原图（屏幕尺寸 size，低缩放 dot 模式仍走上方圆点） */
-          ctx.drawImage(chestImg, sx - size / 2, sy - size / 2, size, size);
+        ctx.globalAlpha = isDone ? 0.65 : 1;   /* V1.6.2：完成态降透明 */
+        if (hasImg) {
+          ctx.drawImage(img, sx - size / 2, sy - size / 2, size, size);
         } else {
-          var h = size / 2;
-          ctx.fillStyle = color;
-          ctx.strokeStyle = 'rgba(255,255,255,.92)';
-          ctx.lineWidth = 1.5;
+          /* 图标未加载兜底：子类色圆点 */
           ctx.beginPath();
-          if (ctx.roundRect) ctx.roundRect(sx - h, sy - h, size, size, 5);
-          else ctx.rect(sx - h, sy - h, size, size);
+          ctx.arc(sx, sy, size / 2 - 3, 0, Math.PI * 2);
+          ctx.fillStyle = color;
           ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = '#14181c';
-          ctx.font = '700 11px "PingFang SC","Microsoft YaHei",sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('箱', sx, sy + 1);
         }
+        if (isDone) window.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
         ctx.restore();
       }
     });
@@ -207,7 +226,7 @@
   /* 命中：宝箱点（屏幕 12px 容差），返回 {type:'chest', item, pt, hard} */
   function hit(mx, my) {
     if (!map) return null;
-    var tol = 12 / map.view.scale;
+    var tol = (window.CardLayout.markerSize(map.view.scale) / 2 + 4) / map.view.scale;
     var best = null, bd = 1e18;
     SUB_ORDER.forEach(function (sub) {
       if (!cLayers[sub]) return;
@@ -270,7 +289,6 @@
     var ec = document.getElementById('equipCard');
     if (ec) ec.classList.add('hidden');
 
-    var coord = map.gameCoord(p);
     var attr = attrOf(it.content);
     var badgeHtml = '';
     if (entry.hard) {
@@ -283,28 +301,31 @@
       badgeHtml = '<span class="q-badge-hard" style="background:rgba(126,200,169,.16);border-color:#4e9c7c;color:#7ec8a9">联动</span>';
     } else if (attr === '特典') {
       badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,209,102,.16);border-color:#b8902e;color:#ffd166">特典</span>';
-    } else if (!entry.hard) {
+    } else if (/_Aoc|_Collabo/.test(p[2] || '')) {
+      /* V1.6.2 修复：只有 DLC 宝箱点才可能显示「归属待确认」；普通宝箱一律不显示 */
       badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,255,255,.1);border-color:#666;color:#aaa">DLC（归属待确认）</span>';
     }
 
+    var done = window.ChestPanel.isDone(p);
     var h = '';
     h += '<div class="tk-grip">';
     h += '<span class="tk-chip ' + (entry.hard ? 'tk-chip-mini' : 'tk-chip-main') + '">' + (entry.hard ? '大师模式宝箱' : '宝箱') + '</span>';
     if (badgeHtml) h += badgeHtml;
+    /* V1.6.2：去掉复制图标（宝箱只有 3 个名字，无需复制） */
     h += '<span class="tk-grip-acts">' +
-      '<button type="button" class="tk-icon-btn" id="chCopy" title="复制内容物名">⧉</button>' +
       '<button type="button" class="tk-close" id="chCardClose" title="关闭">×</button></span>';
     h += '</div>';
-    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(cnName(it)) + '</h3></div>';
+    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(cnName(it)) + '</h3>' +
+      (done ? '<span class="tk-done-tick" title="已完成">✓</span>' : '') + '</div>';
     if (it.en) h += '<div class="qcard-en">' + esc(it.en) + '</div>';
     h += '<div class="tk-kv"><span class="tk-k">宝箱类型</span><span class="tk-v">' +
       esc(CHEST_TYPE_CN[p[2]] || p[2] || '—') + '</span></div>';
-    if (coord) h += '<div class="tk-kv"><span class="tk-k">坐标</span><span class="tk-v">' +
-      '<span class="co-link" data-ch-locate="1" title="点击定位到该宝箱">X ' + coord[0] + ' · Z ' + coord[1] + '</span></span></div>';
+    /* V1.6.2：去掉「坐标 X/Z 数字」行——游戏内并无此坐标，对玩家无意义（保留底部「定位」按钮） */
     var totalN = entry.hard ? (it.hardChestCount || 0) : (it.chestCount || 0);
     h += '<div class="tk-kv"><span class="tk-k">数量</span><span class="tk-v">' +
       (entry.hard ? '大师模式 ' + totalN + ' 处' : '普通 ' + totalN + ' 处') + '</span></div>';
-    h += '<div class="tk-actions"><button type="button" class="btn act" id="chLocate">定位</button></div>';
+    h += '<div class="tk-actions"><button type="button" class="btn act" id="chLocate">定位</button>' +
+      '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="chDone">' + (done ? '取消完成' : '标记完成') + '</button></div>';
 
     body.innerHTML = h;
     card.classList.remove('hidden');
@@ -315,25 +336,20 @@
       card.classList.add('hidden');
       pv.mode = 'hidden'; pv.ref = null; previewNow = false;
     });
-    var cp = document.getElementById('chCopy');
-    if (cp) cp.addEventListener('click', function (e) {
+    /* 标记完成（V1.6.2）：宝箱级完成态，与装备完成态共享同一存储 */
+    var dn = document.getElementById('chDone');
+    if (dn) dn.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(cnName(it)).catch(function () {});
-      }
-    });
-    body.querySelectorAll('[data-ch-locate]').forEach(function (el) {
-      el.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        locate(p);
-        positionCard();
-      });
+      var st = window.ChestPanel.toggleDone(p);
+      openCard({ item: it, pt: p, hard: entry.hard });
+      if (map) map.draw();
+      if (typeof UI !== 'undefined' && UI.toast) UI.toast(st.done ? '已标记完成：' + cnName(it) : '已取消完成：' + cnName(it));
     });
     var lf = document.getElementById('chLocate');
     if (lf) lf.addEventListener('click', function (e) {
       e.stopPropagation();
       locate(p);
+      if (window.SpotMark) window.SpotMark.set(p);   /* V1.6.2：红点脉冲 */
       positionCard();
     });
     positionCard();
@@ -433,6 +449,7 @@
       if (map.extHoverHooks) map.extHoverHooks.push(onHoverExt);  /* V1.6.1 调整5：hover 预览 */
       var cc = document.getElementById('chestCard');
       if (window.initCardDrag && cc) window.initCardDrag(cc);     /* V1.6.1 调整i：卡片拖动 */
+      window.ChestPanel.onChange(function () { if (map) map.draw(); });  /* V1.6.2：完成态变化重绘 */
       hookSelect();
       ready = true;
       map.draw();

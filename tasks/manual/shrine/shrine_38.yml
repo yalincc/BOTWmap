@@ -1,0 +1,32 @@
+key: shrine_38
+cat: shrine
+name: 米达·罗基神庙
+en: Under a Red Moon
+region: 中央海拉鲁
+flag: null
+dlc: null
+npc: 卡西
+gx: -2764
+gz: 215
+desc: 在海拉鲁山脊瓦沙崖的龙血树上听卡西唱歌，谜底是血月之夜赤身站在祭坛上。等到血月当晚卸下全部装备站上祭坛，开启神庙。
+note: 必须血月之夜、脱光全部衣服和武器装备站到龙血树下祭坛上才开，平时来无反应。
+reward: 开启米达·罗基神庙
+steps:
+- 在瓦沙崖龙血树与卡西对话听歌接取
+- 等到血月之夜
+- 卸下全部衣服与武器装备
+- 裸身站到龙血树下祭坛上，开启米达·罗基神庙
+flowPts:
+- type: take
+  gx: -2772
+  gz: 202
+  note: 米达·罗基神庙·接取
+  actor: Npc_Musician_012
+  step: Step1
+- type: deliver
+  gx: -2764
+  gz: 215
+  note: 米达·罗基神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

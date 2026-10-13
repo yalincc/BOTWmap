@@ -1,0 +1,34 @@
+key: side_135
+cat: side
+name: EX 剑之考验
+en: EX Trial of the Sword
+region: 奥尔汀
+flag: null
+dlc: '1'
+npc: 奇异的声音
+gx: 433
+gz: -2112
+desc: DLC任务。在克洛格森林把大师之剑插回剑座即可开始剑之考验。通过初级/中级/高级全部试炼后，大师之剑永久觉醒。
+note: DLC 任务，在克洛格森林把已拔的大师之剑插回台座开启；考验内不能自带装备、全靠捡，建议先升满血量再进。
+reward: 大师之剑永久觉醒（攻击力常驻提升）
+steps:
+- 在克洛格森林把大师之剑插回剑座
+- 选择开始剑之考验
+- 通过初级、中级、高级全部试炼
+- 大师之剑永久发光觉醒
+flowPts:
+- type: take
+  gx: -4871.01
+  gz: 3825.86
+  note: 大精灵蒂拉·接取
+  actor: GreatFairyBeforeRevival
+  step: Ready
+- type: take
+  gx: 433
+  gz: -2111
+  note: 克洛格森林·接取
+  step: ToDeku
+reqs:
+- key: main_09
+  name: 英雄之剑
+unlockList: []

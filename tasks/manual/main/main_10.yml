@@ -1,0 +1,36 @@
+key: main_10
+cat: main
+name: 寻找大精灵之泉
+en: Find the Fairy Fountain
+region: 内卡鲁达
+flag: FairyFountain_Finish
+dlc: null
+npc: 皮冈
+gx: 1829
+gz: 990
+desc: 在卡卡利科村女神像旁遇到旅行画家皮冈，他听说村外有大精灵之泉却找不到。林克陪他走到 Ta'loh Naeg 神庙附近后独自上山，找到科特拉的大精灵之泉，拍照给皮冈看，他便会告知一段回忆的位置。
+note: 给大精灵之泉拍照必须先捐 100 卢比解锁后再拍，提前拍无效；皮冈要的是泉的照片不是大精灵本人，拍完回去给他看才算交差。
+reward: 解锁大精灵科特拉之泉（可强化防具）；皮冈提示一处回忆点位置
+steps:
+- 在卡卡利科村女神像旁与皮冈对话，同意同行
+- 跟随皮冈上山，过 Ta'loh Naeg 神庙后他体力不支停下
+- 继续沿路上山，找到大精灵科特拉之泉（捐 100 卢比解锁）
+- 给大精灵之泉拍照，回去展示给皮冈
+- 皮冈透露 Mount Lanayru 山脚下一处回忆点位置
+flowPts:
+- type: take
+  gx: 1828
+  gz: 987
+  note: 卡卡利科村·接取
+  actor: NPC_artist_009
+  step: Finish
+- type: deliver
+  gx: 1829
+  gz: 990
+  note: 女神像·交付
+  actor: 皮冈
+  step: Finish
+reqs:
+- key: main_06
+  name: 被封锁的记忆
+unlockList: []

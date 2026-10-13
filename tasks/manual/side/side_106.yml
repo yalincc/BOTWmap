@@ -1,0 +1,34 @@
+key: side_106
+cat: side
+name: 害怕打雷
+en: Thunder Magnet
+region: 费罗尼
+flag: null
+dlc: null
+npc: 西米纳
+gx: 1538
+gz: 3537
+desc: 在湖畔驿站与西玛对话，她抱怨附近空地一直无缘无故落雷。原来是一把插在地上的金属大剑引雷，用磁力把它拔走即可。
+note: 落雷根源是插在空地上的那把金属大剑，用磁力拔走即停雷；期间别穿金属防具，否则自己会被雷劈。
+reward: 橡胶头盔（绝缘头盔）
+steps:
+- 在湖畔驿站与西玛对话接取任务
+- 前往附近持续落雷的空地
+- 用磁力抓取器吸住插在地上的金属大剑
+- 将剑拔走移开，雷击随即停止
+- 回报西玛
+flowPts:
+- type: take
+  gx: 1540
+  gz: 3531
+  note: 湖畔驿站·接取
+  actor: Npc_LakeSideHatago006
+  step: Remove
+- type: deliver
+  gx: 1538
+  gz: 3537
+  note: 湖畔驿站·交付
+  actor: 西玛
+  step: Finish
+reqs: []
+unlockList: []

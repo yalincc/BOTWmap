@@ -1,0 +1,32 @@
+key: side_137
+cat: side
+name: 近卫兵的谣传
+en: EX Royal Guard Rumors
+region: 中央海拉鲁
+flag: null
+dlc: '2'
+npc: 传闻杂志V4
+gx: 340
+gz: 1097
+desc: DLC任务。在河畔驿站的桌上阅读「传闻杂志V4」，按提示潜入海拉鲁城堡，找到近卫兵套装三件。
+note: DLC 内容，杂志在河畔驿站；近卫兵三件套都在海拉鲁城堡内，提前备好梯子和抗酸/抗电药再潜入。
+reward: 近卫兵之帽 + 近卫兵服 + 近卫兵靴
+steps:
+- 在河畔驿站阅读传闻杂志V4
+- 按杂志提示潜入海拉鲁城堡
+- 在城堡内找到近卫兵之帽、近卫兵服、近卫兵靴三个宝箱
+flowPts:
+- type: take
+  gx: 336
+  gz: 1102
+  note: 河畔驿站·接取
+  actor: TwnObj_UmayadoBook_08
+  step: Step01
+- type: deliver
+  gx: 340
+  gz: 1097
+  note: 河畔驿站·交付
+  actor: 传闻杂志V4
+  step: Finish
+reqs: []
+unlockList: []

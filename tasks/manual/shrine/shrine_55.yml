@@ -1,0 +1,33 @@
+key: shrine_55
+cat: shrine
+name: 沃力达·诺神庙
+en: The Ancient Rito Song
+region: 海布拉
+flag: null
+dlc: null
+npc: 蓓拉
+gx: -3591
+gz: -1795
+desc: 解放风神兽后，在利特村瑞瓦利广场与贝多莉对话，再找她妹妹莱莎问全歌词。到托罗里湖南方祭坛，等太阳当头心形光柱照到时在其上点火把，开启神庙。
+note: 等太阳当头、心形光柱正好照到托罗里湖南方祭坛时，在祭坛上点燃火把或营火才开。
+reward: 开启沃力达·诺神庙
+steps:
+- 解放风神兽后，在利特村与贝多莉对话接取
+- 找她妹妹莱莎问出后半段歌词
+- 到托罗里湖南方祭坛，等太阳当头照出心形光柱
+- 在祭坛上点燃火把/营火，开启沃力达·诺神庙
+flowPts:
+- type: take
+  gx: -3632
+  gz: -1788
+  note: 利特村·接取
+  actor: Npc_HighMountain030
+  step: Sister
+- type: npc
+  gx: -3587
+  gz: -1797
+  note: 女神像·对话
+  actor: Npc_HighMountain012
+  step: Finished
+reqs: []
+unlockList: []

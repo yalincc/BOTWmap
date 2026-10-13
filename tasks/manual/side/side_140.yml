@@ -1,0 +1,32 @@
+key: side_140
+cat: side
+name: EX 拉姆达的秘宝 暴君头盔
+en: 'EX Treasure: Usurper King'
+region: 费罗尼
+flag: TreasureHunt_touzoku07_Finish
+dlc: '2'
+npc: 米斯科的EX日志2
+gx: 444
+gz: 1960
+desc: DLC任务。阅读「米斯科的EX日志2」，按线索前往指定地点，宝箱中获得暴君头盔。
+note: 日志2第三条线索，赞特头盔藏在费罗尼的骷髅池附近，建议夜里去，注意周围的怪物。
+reward: 赞特头盔（Zant's Helmet）
+steps:
+- 在戴亚村遗迹阅读米斯科的EX日志2
+- 按日志线索前往指定地点
+- 打开宝箱获得暴君头盔
+flowPts:
+- type: take
+  gx: 441
+  gz: 1956
+  note: 费罗尼·接取
+  actor: Obj_Diary_touzoku_02
+  step: Step01
+- type: deliver
+  gx: 444
+  gz: 1960
+  note: 费罗尼·交付
+  actor: 米斯科的EX日志2
+  step: Finish
+reqs: []
+unlockList: []

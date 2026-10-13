@@ -1,0 +1,33 @@
+key: side_61
+cat: side
+name: 捕捉野生马匹
+en: Wild Horses
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 弗撒兰
+gx: 1750
+gz: 1924
+desc: 在双子驿站与已登记过马匹的伦萨对话，他挑战你在两分钟内驯服一匹野马并骑回驿站。从背后悄悄靠近野马、上马后反复安抚即可。
+note: 必须先在驿站登记过马才能接；限时两分钟，从背后潜行接近马，上马后狂按安抚键直到马平静。
+reward: 紫卢比（50卢比）
+steps:
+- 在双子驿站与伦萨对话接下限时挑战
+- 在野外找到野马，从背后潜行靠近骑上去
+- 骑乘中反复按安抚键直到马平静
+- 两分钟内骑马返回伦萨处交任务
+flowPts:
+- type: take
+  gx: 1748
+  gz: 1923
+  note: 双子驿站·接取
+  actor: Npc_SouthHateru006
+  step: Finish
+- type: deliver
+  gx: 1750
+  gz: 1924
+  note: 双子驿站·交付
+  actor: 伦萨
+  step: Finish
+reqs: []
+unlockList: []

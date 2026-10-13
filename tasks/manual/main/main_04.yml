@@ -1,0 +1,38 @@
+key: main_04
+cat: main
+name: 拜访英帕
+en: Seek Out Impa
+region: 费罗尼
+flag: Find_Impa_Finish
+dlc: null
+npc: 海拉鲁国王
+gx: -811
+gz: 1964
+desc: 拿到滑翔伞后，洛阿姆国王指引林克东行前往卡卡利科村拜访英帕，了解一百年前的真相。穿越双子山地带，抵达村庄找到英帕的家。
+note: 出初始台地往东路上会遇到主动搭话的「旅行者」，其中不少是依盖队假扮的，一搭话就拔刀偷袭；不想打就直接绕开，或者靠自动存档读档避战。
+reward: ''
+steps:
+- 乘滑翔伞离开初始台地，向东前往双子山之塔
+- 沿途经过哨所遗迹、双子桥，解锁双子山之塔
+- 穿过卡卡利科桥进入卡卡利科村
+- 在村中最大的房子里与英帕对话，解锁后续主线
+flowPts:
+- type: take
+  gx: 1772
+  gz: 984
+  note: 卡卡利科村·接取
+  actor: Npc_Kakariko001
+  step: Finish
+- type: deliver
+  gx: -811
+  gz: 1964
+  note: 女神像·交付
+  step: Finish
+reqs:
+- key: main_02
+  name: 孤岛
+unlockList:
+- key: main_05
+  name: 解放神兽
+- key: main_06
+  name: 被封锁的记忆

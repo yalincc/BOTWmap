@@ -1,0 +1,32 @@
+key: side_73
+cat: side
+name: 年轻的武器迷
+en: The Weapon Connoisseur
+region: 内卡鲁达
+flag: HatenoMini_WeaponMania_Finish
+dlc: null
+npc: 纳卜
+gx: 3384
+gz: 2138
+desc: 在哈特诺村与跑来跑去的小男孩纳卜对话。他想替去世的武器迷爷爷『看』到各种传说武器，按他的要求依次展示八把武器，每展示一把都有谢礼。
+note: 8把武器要按顺序依次展示；最后一把远古短剑需先完成罗贝利（阿卡莱研究所）任务才能用材料制作。
+reward: 逐步获红/紫/银卢比，最终金卢比+钻石
+steps:
+- 在哈特诺村与纳卜对话接任务
+- 依次取得并展示：旅人之剑、火焰杖、莫力布林棍、双子弓、狂风刀
+- 再展示：远古兵装斧+、冰之枪
+- 最后展示远古短剑（需在阿卡莱研究所用材料制作），获得钻石
+flowPts:
+- type: take
+  gx: 3352
+  gz: 2138
+  note: 米亚马·迦纳神庙·接取
+  actor: Npc_HatenoVillage008
+  step: Weapon01
+- type: deliver
+  gx: 3384
+  gz: 2138
+  note: 女神像·交付
+  step: Finish
+reqs: []
+unlockList: []

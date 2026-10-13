@@ -1,0 +1,31 @@
+key: shrine_45
+cat: shrine
+name: 托·雅萨神庙
+en: Trial of Thunder
+region: 中央海拉鲁
+flag: null
+dlc: null
+npc: 奇异的声音
+gx: -2180
+gz: -808
+desc: 在罗卓高原听到僧侣声音。雷暴中找回四颗不同颜色的宝珠，按石柱图示放到对应方位的盆中，开启神庙。
+note: 四颗宝珠按石柱图示放位（紫北、红东、绿南、橙西）；高原雷暴不断，别拿金属装备乱走引雷。
+reward: 开启托·雅萨神庙
+steps:
+- 进入罗卓高原触发僧侣声音
+- 在高原四周找回紫、绿、红、橙四颗宝珠（用静止器打落）
+- 按石柱图示把紫放北、红放东、绿放南、橙放西的盆中
+- 四颗就位后开启托·雅萨神庙
+flowPts:
+- type: take
+  gx: -2269
+  gz: -903
+  note: 托·雅萨神庙·接取
+  step: Finish
+- type: deliver
+  gx: -2180
+  gz: -808
+  note: 中央海拉鲁·交付
+  step: Finish
+reqs: []
+unlockList: []

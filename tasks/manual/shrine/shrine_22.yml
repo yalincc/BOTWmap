@@ -1,0 +1,33 @@
+key: shrine_22
+cat: shrine
+name: 米兹·耀神庙
+en: The Crowned Beast
+region: 拉聂尔
+flag: null
+dlc: null
+npc: 卡西
+gx: 2590
+gz: 444
+desc: 在拉比亚平原听诗人卡西唱歌，谜底是"戴骨冠的野兽"。悄悄驯服一只高山雄鹿，骑上它站上祭坛即可开启神庙。
+note: 高山雄鹿警觉性极高，直接冲会吓跑；穿潜行套装悄悄靠近再驯服，骑上后直接赶往祭坛。
+reward: 开启米兹·耀神庙
+steps:
+- 在拉比亚平原与卡西对话听歌接取
+- 提高潜行，悄悄靠近并驯服一只高山雄鹿
+- 骑雄鹿站上平原中央的祭坛
+- 开启米兹·耀神庙
+flowPts:
+- type: take
+  gx: 2588
+  gz: 446
+  note: 米兹·耀神庙·接取
+  actor: Npc_Musician_014
+  step: Finish
+- type: deliver
+  gx: 2590
+  gz: 444
+  note: 米兹·耀神庙·交付
+  actor: 卡西
+  step: Finish
+reqs: []
+unlockList: []

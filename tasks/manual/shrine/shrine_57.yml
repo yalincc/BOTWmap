@@ -1,0 +1,33 @@
+key: shrine_57
+cat: shrine
+name: 古·阿齐托神庙
+en: The Gut Check Challenge
+region: 阿卡莱
+flag: null
+dlc: null
+npc: 巴恺忒
+gx: 2663
+gz: -3462
+desc: 在古特check岩顶，贝盖挡住神庙入口。花20卢比参赛，限时从崖底爬到岩顶并沿途捡满100卢比，即可放行开启神庙。
+note: 限时从崖底爬到岩顶还不够，沿途必须捡满100卢比，只到顶会被判失败，漏捡要重赛。
+reward: 通过古特check挑战，开启古·阿齐托神庙
+steps:
+- 在古特check岩顶与贝盖对话接取
+- 付20卢比开始挑战
+- 限时从崖底爬到岩顶，沿途捡满100卢比
+- 达成后贝盖让开，进入古·阿齐托神庙
+flowPts:
+- type: take
+  gx: 2669
+  gz: -3464
+  note: 古·阿齐托神庙·接取
+  actor: Npc_Goron_Camp001
+  step: GameReady
+- type: deliver
+  gx: 2663
+  gz: -3462
+  note: 古·阿齐托神庙·交付
+  actor: 贝盖
+  step: Finish
+reqs: []
+unlockList: []

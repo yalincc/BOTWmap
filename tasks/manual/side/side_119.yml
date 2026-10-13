@@ -1,0 +1,35 @@
+key: side_119
+cat: side
+name: 被遗忘的剑
+en: The Forgotten Sword
+region: 格鲁德
+flag: null
+dlc: null
+npc: 伯腾萨
+gx: -3762
+gz: 2884
+desc: 在格鲁德地区与博扎伊对话，他说起第八位英雄像附近有一把被遗忘的剑。前往英雄像沙丘找到那把剑并带回去。
+note: 前置是先完成「第八位英雄」（拿到雪地靴）才会触发；剑埋在第八位英雄像附近的沙地里，用磁力扫出来。
+reward: 雪地靴
+steps:
+- 与博扎伊对话接取任务
+- 前往第八位英雄像附近的沙丘
+- 在沙中找到插着的那把剑
+- 回去找博扎伊
+flowPts:
+- type: take
+  gx: -3800.28
+  gz: 2835.61
+  note: 古科·齐塞神庙·接取
+  actor: Npc_OasisHylia_002
+  step: Ready
+- type: deliver
+  gx: -3762
+  gz: 2885
+  note: 女神像·交付
+  actor: Npc_OasisHylia_002
+  step: Finish
+reqs:
+- key: side_91
+  name: 第八位英雄
+unlockList: []

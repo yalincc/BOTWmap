@@ -1,0 +1,32 @@
+key: side_125
+cat: side
+name: 暴风谷里的冰岩巨人
+en: Face the Frost Talus
+region: 海布拉
+flag: null
+dlc: null
+npc: 基藏
+gx: -3310
+gz: -1804
+desc: 在利特村与格萨内对话，暴风谷出现了一只冰岩巨人。前往暴风谷讨伐这只 Frost Talus。
+note: Frost Talus 全身覆冰，用火属性武器/火箭软化后再打头顶部矿石；用冰系只会给它加甲。
+reward: 银卢比
+steps:
+- 在利特村与格萨内对话接取
+- 前往暴风谷
+- 击败冰岩巨人（Frost Talus）
+- 回报格萨内
+flowPts:
+- type: take
+  gx: -3308
+  gz: -1803
+  note: 利特驿站·接取
+  actor: Npc_HighMountain037
+  step: Finish
+- type: take
+  gx: -3070
+  gz: -2915
+  note: 海布拉·接取
+  step: Beated
+reqs: []
+unlockList: []

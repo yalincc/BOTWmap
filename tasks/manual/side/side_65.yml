@@ -1,0 +1,35 @@
+key: side_65
+cat: side
+name: 珂珂娜厨房 3
+en: Koko Cuisine
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 珂珂娜
+gx: 1800
+gz: 1019
+desc: 完成『珂珂娜厨房2』后与煮锅旁的珂珂娜对话。她需要一块『生肉』来做硬肉酿南瓜，生肉可从狐狸、野猪身上取得。
+note: 是连锁任务，必须先完成『珂珂娜厨房2』才解锁；生肉打狐狸、野猪即可获得。
+reward: 硬肉酿南瓜（料理配方/成品）
+steps:
+- 完成上一道厨房任务后与珂珂娜对话
+- 狩猎取得生肉（狐狸/野猪等）
+- 把生肉交给珂珂娜，获得硬肉酿南瓜
+flowPts:
+- type: take
+  gx: 1825.47
+  gz: 969.96
+  note: 卡卡利科村·接取
+  actor: Npc_Kakariko003
+  step: Ready
+- type: deliver
+  gx: 1799
+  gz: 1013
+  note: 卡卡利科村·交付
+  step: Finish
+reqs:
+- key: side_66
+  name: 珂珂娜厨房 2
+unlockList:
+- key: side_64
+  name: 珂珂娜厨房 4

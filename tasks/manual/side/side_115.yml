@@ -1,0 +1,38 @@
+key: side_115
+cat: side
+name: 小妹妹的大愿望
+en: Little Sister's Big Request
+region: 奥尔汀
+flag: null
+dlc: null
+npc: 茱英
+gx: 3126
+gz: -1690
+desc: 在南阿卡莱驿站与小女孩贾娜对话，她想为生病的姐姐尽一份心。帮她完成心愿（跑腿/取药），让姐妹俩安心。
+note: 贾娜的姐姐生病，她凑不够买药钱；备好她要的卢比/指定物品帮她跑腿，任务分前后两段，别一次交完就走。
+reward: 银卢比
+steps:
+- 在南阿卡莱驿站与贾娜对话接取
+- 按她的要求帮忙跑腿
+- 达成她姐姐的心愿后回报
+flowPts:
+- type: take
+  gx: 3136
+  gz: -1666
+  note: 南阿卡莱驿站·接取
+  actor: Npc_TamourPlainHatago_003
+  step: LittleSister
+- type: npc
+  gx: 3126
+  gz: -1694
+  note: 南阿卡莱驿站·对话
+  actor: Npc_TamourPlainHatago_002
+  step: Dragonfly
+- type: npc
+  gx: 3132
+  gz: -1664
+  note: 南阿卡莱驿站·对话
+  actor: Npc_TamourPlainHatago_003
+  step: Give
+reqs: []
+unlockList: []

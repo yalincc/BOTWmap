@@ -1,0 +1,32 @@
+key: shrine_27
+cat: shrine
+name: 塔瓦·吉努神庙
+en: The Three Giant Brothers
+region: 内卡鲁达
+flag: Threebros_giant_Finish
+dlc: null
+npc: 古老的石版
+gx: 2652
+gz: 2846
+desc: 在塔纳山顶读石碑，三颗古代之球分别由三颗西诺克斯巨人看守。击败或偷取三颗球运回山顶三个祭坛凹槽，即可开启神庙。
+note: 三颗球分别挂在哈努池塘小、乌登沼泽蓝、拉贝拉湿地黑三颗西诺克斯脖子上，潜行偷球比硬打省事。
+reward: 开启塔瓦·吉努神庙
+steps:
+- 在塔纳山顶读石碑接取挑战
+- 从哈努池塘的小西诺克斯处取得第一颗球
+- 从乌登沼泽的蓝色西诺克斯、拉贝拉湿地的黑色西诺克斯处取得另两颗球
+- 将三颗球分别放入山顶三个祭坛凹槽，开启塔瓦·吉努神庙
+flowPts:
+- type: take
+  gx: 2654
+  gz: 2843
+  note: 塔瓦·吉努神庙·接取
+  actor: FldObj_SignboardStone_giant
+  step: Finish
+- type: deliver
+  gx: 2652
+  gz: 2846
+  note: 塔瓦·吉努神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

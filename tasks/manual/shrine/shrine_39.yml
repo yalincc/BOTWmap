@@ -1,0 +1,38 @@
+key: shrine_39
+cat: shrine
+name: 丘卡·纳塔神庙
+en: A Song of Storms
+region: 费罗尼
+flag: null
+dlc: null
+npc: 卡西
+gx: 2082
+gz: 3224
+desc: 在卡洛拉湖听卡西唱歌，谜底是引雷劈中山丘巨石。穿戴金属装备站到巨丘上引落闪电，击碎巨石露出神庙。
+note: 站到巨丘巨石上时穿戴或手持金属武器，雷雨天会自动引雷劈碎巨石；晴天也可等雷暴来。
+reward: 开启丘卡·纳塔神庙
+steps:
+- 在卡洛拉湖与卡西对话听歌接取
+- 找到歌中所指的大丘巨石
+- 穿戴或手持金属武器装备站到丘上引雷
+- 闪电劈碎巨石，露出丘卡·纳塔神庙
+flowPts:
+- type: take
+  gx: 2081.89
+  gz: 3226.31
+  note: 丘卡·纳塔神庙·接取
+  actor: Npc_Musician_005
+  step: Ready
+- type: take
+  gx: 2007
+  gz: 3285
+  note: 丘卡·纳塔神庙·接取
+  actor: Obj_ThunderRock
+  step: Step010
+- type: deliver
+  gx: 2007
+  gz: 3285
+  note: 丘卡·纳塔神庙·交付
+  step: Finish
+reqs: []
+unlockList: []

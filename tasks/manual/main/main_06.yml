@@ -1,0 +1,54 @@
+key: main_06
+cat: main
+name: 被封锁的记忆
+en: Locked Mementos
+region: 内卡鲁达
+flag: Hateno_SheikPad_PowerUp_Finish
+dlc: null
+npc: 英帕
+gx: 1775
+gz: 984
+desc: 英帕告诉林克希卡之石功能不全，需前往哈特诺古代研究所找普尔亚修复。林克从村外古代熔炉取来蓝色火焰，点燃研究所前的熔炉，恢复希卡之石的相机功能。
+note: 从蓝色火焰点着火把回研究所的路上千万别跑，一跑火把就灭；沿途的石灯点着后永久保留，火把灭了就近找石灯重燃即可。
+reward: 希卡之石恢复相机符文 + 海拉鲁图鉴
+steps:
+- 从卡卡利科村前往哈特诺村，登上村东的哈特诺古代研究所
+- 与普尔亚对话，得知需用蓝色火焰点燃古代熔炉
+- 持火把取蓝色火焰，沿途点亮石灯，回到研究所点燃熔炉
+- 回到普尔亚处获得相机符文与海拉鲁图鉴
+- 返回卡卡利科村向英帕复命
+flowPts:
+- type: take
+  gx: 1772
+  gz: 984
+  note: 卡卡利科村·接取
+  actor: Npc_Kakariko001
+  step: Repaired
+- type: take
+  gx: 3774
+  gz: 2126
+  note: 哈特诺古代研究所·接取
+  actor: Npc_AncientDoctor
+  step: Permit
+- type: npc
+  gx: 3445
+  gz: 1982
+  note: 女神像·对话
+  actor: TwnObj_AncientReactor_A_01
+  step: Carry
+- type: npc
+  gx: 3782
+  gz: 2125
+  note: 哈特诺古代研究所·对话
+  actor: TwnObj_AncientCivilLabo_B_01
+  step: Fired
+reqs:
+- key: main_04
+  name: 拜访英帕
+unlockList:
+- key: main_07
+  name: 记忆写真
+- key: main_10
+  name: 寻找大精灵之泉
+- key: side_77
+  name: 释放 更大的力量

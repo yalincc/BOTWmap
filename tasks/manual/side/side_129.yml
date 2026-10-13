@@ -1,0 +1,31 @@
+key: side_129
+cat: side
+name: 继承衣钵之道
+en: The Road to Respect
+region: 奥尔汀
+flag: null
+dlc: null
+npc: 呼戈
+gx: 1708
+gz: -2519
+desc: 在鼓隆城与弗戈对话，他想变得像大哥一样受人尊敬。帮他完成一连串跑腿/挑战，赢得族人的认可。
+note: 跟着弗戈的指示跑腿证明他，他要搬重物时别摔东西、别送错人；鼓隆城热，记得穿耐火装。
+reward: 银卢比
+steps:
+- 在鼓隆城与弗戈对话接取
+- 按他的要求完成各项跑腿与挑战
+- 回报弗戈
+flowPts:
+- type: take
+  gx: 1688
+  gz: -2496
+  note: 鼓隆城·接取
+  actor: Npc_Goron017
+  step: Finish
+- type: take
+  gx: 1345
+  gz: -3041
+  note: 奥尔汀·接取
+  step: Beated
+reqs: []
+unlockList: []

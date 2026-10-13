@@ -1,0 +1,34 @@
+key: side_78
+cat: side
+name: 照相机和希卡感应器
+en: Sunshroom Sensing
+region: 内卡鲁达
+flag: null
+dlc: null
+npc: 西蒙
+gx: 3785
+gz: 2116
+desc: 在哈特诺研究所升级感应器后，与普尔亚的助手西蒙对话。他先要看一张『太阳伞菇』的照片，再要你从北边的莱萨姆森林采3个太阳伞菇回来。
+note: 先拍下屋后太阳伞菇的照片给西蒙看，再去北面莱萨姆森林实地采3个，两件事别混。
+reward: 硬生命松露×3（Hearty Truffle）
+steps:
+- 在哈特诺研究所与西蒙对话接任务
+- 拍下研究所屋后的太阳伞菇给他看
+- 前往北边的莱萨姆森林采集3个太阳伞菇
+- 把蘑菇交给西蒙
+flowPts:
+- type: take
+  gx: 3778
+  gz: 2132
+  note: 哈特诺古代研究所·接取
+  actor: Npc_AncientAssistant001
+  step: Shot
+- type: deliver
+  gx: 3785
+  gz: 2116
+  note: 哈特诺古代研究所·交付
+  step: Finish
+reqs:
+- key: side_77
+  name: 释放 更大的力量
+unlockList: []
