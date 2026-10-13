@@ -315,6 +315,9 @@
     if (!card || card.classList.contains('hidden')) return;
     var el = e.target;
     if (card.contains(el)) return;
+    /* ★ V1.6.3：刚拖完卡片，这一次 click 不关卡（原实现只靠 400ms 阈值，
+       拖久了就失效 → 卡片一松手就消失，表现为「拖不动」） */
+    if (card._dragged) return;
     if (el && el.closest && el.closest('#questCard')) return;
     if (map && map.canvas && map.canvas.contains(el) && Date.now() - lastOpen < 400) return;
     closeCard();

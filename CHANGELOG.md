@@ -2,6 +2,34 @@
 
 本项目遵循语义化版本（SemVer）：`主版本.次版本.修订号`。
 
+## v1.6.3（2026-10-14）卡片拖动坐标系修复
+
+### 修复
+- **卡片拖动「拖不动 / 拖完就消失」根因修复**（`app/js/ui.js` `initCardDrag`）：原实现写 `X - offX - h.x`，而 `CardLayout.toHost(0,0)` 返回的是**负的**宿主原点 `{x:-hr.left, y:-hr.top}`，减两次等于加回去 → 按下瞬间卡片下移 **2×顶栏 = 112px**，指针脱离卡片，`mouseup` 落到 `#mapCanvas` → 「点空白关闭」逻辑把卡片关掉。改为直接 `toHost(鼠标位置 - 抓取偏移)`，由内核一次性归一
+- **拖动后抑制本次 click**：新增 `card._dragged`，各卡「点空白关闭」处理器见此标记即跳过。原实现只靠 `Date.now() - lastOpen < 400ms` 阈值保护，拖久了必失效（任务卡 / 宝箱卡两处）
+- **拖动夹取整卡不出容器**：原 `left ≤ w-60 / top ≤ h-50` 允许 350px 宽的卡被拖到只剩 60px 露在可视区（等于「拖丢了」）；改为按卡片实际尺寸夹取
+- **探索卡 `#infoCard` 拖动**：原来裸写视口坐标（定位原点却在 `#mapArea`）→ 抓起来下移一个顶栏高度 56px；改走同一内核
+- 触屏防误拖：整卡可拖模式下，触屏只允许从 `.tk-grip` 抓手起拖，其余区域留给内容滚动（卡片 `overflow-y:auto`，加 `touch-action:none` 会连滚动一起废掉）；鼠标不受影响、全卡任意处可拖
+- 拖动加 `setPointerCapture` + `pointercancel` 兜底，指针移出卡片 / 窗口不丢 `up`
+- 清理 `app/index.html` 重复闭合标签 `</head></head></head>`
+
+### 新增
+- **宝箱存档自动同步**（恢复实现）：新增 `app/data/chest_save.js`（1312 条 `crc32(flagName) → 地图像素点`，Switch romfs Dynamic 直提 885 + radar Static/AocField 423 + Wii U 事件宝箱 4，全部经 romfs 权威表核验；生成器 `source/build_chest_save.py` + 中间件 `source/chest_sync_src/` 本地保留，`source/` 不入库）；`save_upload.js` 解析循环反查（Switch/Wii U 双字节序通用）→ `chest.js` `ChestSync.loadSave` 注入存档完成集（`botwmap.chestSaveDone.v1`）→ `ChestPanel.isDone = 存档 ∪ 手动标记`；摘要 toast 增「宝箱 N」。数据字典与谱系见 BOTWroms `raw/romfs/save-flags/` + DATA-README §7/§8。验证：真实存档 Node 端到端 **138/138 精确命中 chests.js** + 无头 Chrome 冒烟（1312 就绪 / 138 注入 / 0 报错）全绿
+- **`tools/verify.js` + `tools/verify.bat`：一条命令重跑的前端验收**（自带静态服务、零安装）：`--drag` 卡片拖动专项 / `--smoke` 双端冒烟 / `--all`；端口被占用自动顺延，`--headed` 可看窗口。当前 **54 项全绿**
+- **`source/validate_quests.py`：任务 YAML 校验器**（校对哨兵）：必填 / `cat`·`dlc`·`flowPts.type` 枚举 / `region` 词表 / `reqs`·`unlockList` key 反查 / `flowPts` 坐标 判为**错误**（退出码 1）；`flag` 空、`actor` 空或英文 id、`reward` 多值、无主坐标 判为**警告**；`--check-generated` 顺带查 `quests.js` 是否已与 YAML 同步，`--detail` 逐条明细，`--cat` 只看一档
+- **任务数据校对清单**：并入 `tasks/manual/README.md`，含「要补的 key（P0/P2）」「已齐的 key」「自动校对已通过 6 项」「与 TOTKmap 的 key 差异对齐结论」
+- **首轮自动校对（152 条）**：前后置对称 0 / 控制字符 0 / 坐标越界 0 / region 与坐标一致 0 / `name`·`en` 异常 0 / key 悬空 0 —— 数据层是干净的，缺口只在 `flag` 覆盖率（89/152）与 `side_148` 一条
+- **`app/js/regions.js` 地区译名统一**：r1/r2 原写作「哈特尔」（哈特尔地区 / 东哈特尔 / 哈特尔海 / 西哈特尔，4 处），与全项目主流译名「内卡鲁达」（`data.js` 357 次 / 任务数据 45 次）不一致 → 统一为 内卡鲁达地区 / 东内卡鲁达 / 内卡鲁达海 / 西内卡鲁达；bump `regions.js rn4→rn5`
+- **待定项**（对照 TOTKmap 技术手册 §11 实核后新发现，未改）：① 无坐标任务（side_148）的【定位】按钮被整条隐藏，手册要求置灰 + title 说明原因；② 【任务连线】按 `flowPts.length>=2` 判断，未按去重坐标判断 → `side_92` / `side_95` / `side_133` 三条会画零长度线（且 `tier` 全库恒为 L1，等于废字段）。对照结论已写入 `BOTWmap任务板块技术手册-来自TOTKmapV2.5.0-20261014.md` §12
+
+### 变更
+- bump 静态资源：`ui.js 47→48` / `quest-card.js 2→3` / `chest.js 13→15`（含存档同步）/ `save_upload.js 11→12`；页脚 `BOTWMAP 1.6.3`
+
+### 验证
+- 真 Chrome 无头回归 **30 项全绿**：抓手 / 标题 / meta 行 / 来源行 / 卡片空白区 5 处起拖均 **0px 跟手误差**、松手不关闭、`manual` 置位、`_dragged` 复位；贴边夹取不出容器；探索卡 / 装备卡跟手 0 误差；手机 390×844 仍为底部抽屉定位、不被拖动；无 JS 报错
+- 一条命令跑：`tools\verify.bat --all`（Node + playwright-core，自带静态服务）
+- 任务数据体检：`validate_quests.py --check-generated` → **错误 1 条（side_148 region 空）/ 警告 345 条 / 生成物漂移 0**（YAML 与 `quests.js` 完全同步）
+
 ## v1.6.2（2026-10-13）任务板块对齐 TOTKmap（YAML 底表 / 卡片分区 / 流程连线 / 模块化）
 
 ### 新增

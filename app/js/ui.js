@@ -161,61 +161,75 @@ const UI = (() => {
     if (meta) meta.textContent = '';
   }
 
-  /* ---------- 信息卡拖拽（按住头部移动） ---------- */
+  /* ---------- 信息卡拖拽（按住头部移动） ----------
+     V1.6.3：坐标系归一改走 window.initCardDrag 统一内核（原来裸写视口坐标，
+     而卡片定位原点在 #mapArea → 抓起来下移一个顶栏高度 56px）。 */
   function initCardDrag() {
-    const card = $('infoCard');
-    const head = card.querySelector('.card-head');
+    var card = $('infoCard');
+    if (!card) return;
+    var head = card.querySelector('.card-head');
     if (!head) return;
-    head.addEventListener('pointerdown', e => {
-      if (window.innerWidth <= 760) return;             // 手机（≤760px）：底部抽屉布局，不拖拽
-      if (e.target.closest('.card-close')) return;      // 关闭按钮不触发拖拽
-      e.preventDefault();
-      const r0 = card.getBoundingClientRect();
-      const offX = e.clientX - r0.left, offY = e.clientY - r0.top;
-      const move = ev => {
-        const left = Math.max(8, Math.min(ev.clientX - offX, window.innerWidth - 60));
-        const top = Math.max(8, Math.min(ev.clientY - offY, window.innerHeight - 50));
-        card.style.left = left + 'px'; card.style.top = top + 'px';
-        card.style.right = 'auto'; card.style.bottom = 'auto';
-      };
-      const up = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-      };
-      window.addEventListener('pointermove', move);
-      window.addEventListener('pointerup', up);
-    });
+    window.initCardDrag(card, { handle: head });
   }
 
-  /* V1.6.1 调整i：共享卡片拖动（quest/equip/chest 卡复用；手机底部抽屉不拖）。
-     拖动后写 card.dataset.manual='1'，模块 positionCard 见 manual 即跳过避让重算；
-     下次 openCard / 定位跳转清除 manual 重新避让。 */
-  window.initCardDrag = function (card) {
+  /* V1.6.3 修复：卡片拖动统一内核（quest/equip/chest/info 四卡共用；手机底部抽屉不拖）。
+     ★ 根因修复（V1.6.1 遗留）：原实现写 `X - offX - h.x`，而 toHost(0,0) 返回的是
+       **负的**宿主原点 {x:-hr.left, y:-hr.top}，减两次等于加回去 → 按下瞬间卡片
+       下移 2×56=112px，指针脱离卡片 → mouseup 落到 canvas → click 判定「点在外面」
+       把卡片关掉，表现为「拖不动 / 拖完就没了」。
+       现在直接 toHost(鼠标位置 - 抓取偏移)，由内核一次性归一，不再手工加减符号。
+     ★ 拖动后写 card.dataset.manual='1'，模块 positionCard 见 manual 即跳过避让重算；
+       下次 openCard / 定位跳转清除 manual 重新避让。
+     ★ card._dragged：拖动刚结束的这一次 click 要被各卡的「点空白关闭」逻辑忽略。
+     opts.handle：只有该元素能起拖（探索卡只认 .card-head）；不传 = 整卡可拖。 */
+  window.initCardDrag = function (card, opts) {
     if (!card || card._dragInit) return;
     card._dragInit = true;
-    card.addEventListener('pointerdown', e => {
-      if (window.innerWidth <= 760) return;
-      if (e.target.closest('.tk-close, .btn, button, .co-link')) return;
+    opts = opts || {};
+    var handle = opts.handle || card;
+    /* 整卡可拖时：触屏只允许从 .tk-grip 抓手起拖，其余区域留给内容滚动
+       （卡片 overflow-y:auto，加 touch-action:none 会连滚动一起废掉） */
+    var touchGuard = !opts.handle;
+    if (!handle) return;
+
+    handle.addEventListener('pointerdown', function (e) {
+      if (window.innerWidth <= 760) return;                  /* 手机：底部抽屉，不拖 */
+      if (e.target.closest('.tk-close, .card-close, .btn, button, .co-link, a')) return;
+      if (touchGuard && e.pointerType === 'touch' && !e.target.closest('.tk-grip')) return;
       e.preventDefault();
       var r0 = card.getBoundingClientRect();
       var offX = e.clientX - r0.left, offY = e.clientY - r0.top;
-      var move = ev => {
-        /* ★ 坐标系归一：left/top 是相对卡片定位容器（#mapArea）的，
-           原实现直接写视口坐标导致拖动中卡片比指针低一个顶栏高度、松手位置也是错的 */
-        var h = window.CardLayout ? window.CardLayout.toHost(0, 0)
-          : { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
-        var left = Math.max(8, Math.min(ev.clientX - offX - h.x, h.w - 60));
-        var top = Math.max(8, Math.min(ev.clientY - offY - h.y, h.h - 50));
+      /* 指针捕获：拖动中指针移出卡片/窗口也不丢 move/up，click 仍落在卡片内 */
+      try { card.setPointerCapture(e.pointerId); } catch (err) {}
+
+      var move = function (ev) {
+        /* ★ 宿主坐标归一：left/top 相对卡片定位容器 #mapArea，不是视口 */
+        var p = window.CardLayout
+          ? window.CardLayout.toHost(ev.clientX - offX, ev.clientY - offY)
+          : { x: ev.clientX - offX, y: ev.clientY - offY, w: window.innerWidth, h: window.innerHeight };
+        /* ★ 整卡不出容器：按卡片实际尺寸夹取（原实现用 w-60 / h-50，
+           350px 宽的卡可以被拖到只剩 60px 露在可视区，等于「拖丢了」） */
+        var cw = card.offsetWidth || 300, ch = card.offsetHeight || 320;
+        var maxLeft = Math.max(8, p.w - cw - 8);
+        var maxTop = Math.max(8, p.h - ch - 8);
+        var left = Math.min(Math.max(8, p.x), maxLeft);
+        var top = Math.min(Math.max(8, p.y), maxTop);
         card.style.left = left + 'px'; card.style.top = top + 'px';
         card.style.right = 'auto'; card.style.bottom = 'auto';
         card.dataset.manual = '1';
+        card._dragged = true;
       };
-      var up = () => {
+      var up = function () {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        try { card.releasePointerCapture(e.pointerId); } catch (err) {}
+        /* 延到本次 click 之后再清除，否则关闭逻辑还是会吃掉这一下 */
+        setTimeout(function () { card._dragged = false; }, 0);
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     });
   };
 

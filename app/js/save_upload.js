@@ -12,7 +12,7 @@
  *   注：真实目录里 Cemu 的存档文件也叫 game_data.sav（位于 mlc01\usr\save\00050000\101c9300\user\80000001\<槽位>\），
  *   与 Switch 区分靠版本字段字节序，文件名不可靠。
  *
- * 覆盖：神庙 / 希卡塔 / 克洛格 / 主线回忆(13) / 神兽(4)。
+ * 覆盖：神庙 / 希卡塔 / 克洛格 / 主线回忆(13) / 神兽(4) / 任务完成标志 / 宝箱已开(1312 查表)。
  * 存档文件只在浏览器内存中处理，不离开本机。
  */
 'use strict';
@@ -34,6 +34,7 @@ const SAVE_UPLOAD = (() => {
     map = m;
     // V1.6.0 任务完成标志反查表：hash -> flagName（quest_save.js 提供 flagName -> hash）
     buildQuestHash();
+    buildChestHash();
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
     if (!input || !btn) return;
@@ -155,6 +156,15 @@ const SAVE_UPLOAD = (() => {
     Object.keys(QS).forEach(f => { questHashToFlag[QS[f]] = f; });
   }
 
+  /* V1.6.3：宝箱已开查找表（chest_save.js 提供 hash -> [px,py]，1312 条 romfs 权威派生） */
+  let chestHash2pt = null;
+  function buildChestHash() {
+    if (chestHash2pt) return;
+    const CS = (typeof CHEST_SAVE !== 'undefined') ? CHEST_SAVE : null;
+    if (!CS || !CS.hash2pt) { console.warn('[save_upload] CHEST_SAVE 宝箱查找表未加载：index.html 未引入 data/chest_save.js？'); return; }
+    chestHash2pt = CS.hash2pt;
+  }
+
   function applySave(buf, fileName) {
     if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
@@ -162,6 +172,7 @@ const SAVE_UPLOAD = (() => {
     const srcName = littleEndian ? 'Switch（Ryujinx）' : 'Wii U（Cemu）';
     const done = new Map();         // hash -> type
     const questFlags = {};          // V1.6.0: flagName -> true（任务完成标志）
+    const chestPts = [];            // V1.6.3: 已开宝箱像素点（chest_save.js 反查）
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
       const h = dv.getUint32(o, littleEndian);
@@ -170,6 +181,7 @@ const SAVE_UPLOAD = (() => {
       if (h === H_PLAYTIME) playtime = v;
       else if (h === H_KOROK_CNT) korokCnt = v;
       else if (v !== 0 && questHashToFlag && questHashToFlag[h]) questFlags[questHashToFlag[h]] = true;
+      else if (v !== 0 && chestHash2pt && chestHash2pt[h]) chestPts.push(chestHash2pt[h]);
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
@@ -204,6 +216,11 @@ const SAVE_UPLOAD = (() => {
       if (window._questRefreshRows) window._questRefreshRows();
       map.draw();
     }
+    // V1.6.3 宝箱完成同步（存档权威）：已开宝箱像素点 → 注入存档完成集 → 重绘
+    if (chestPts.length && window.ChestSync) {
+      window.ChestSync.loadSave(chestPts);
+      map.draw();
+    }
     loaded = true;
     window.__saveUploaded = true;   // 统计面板「存档已同步 ✓」行
     UI.renderStats();
@@ -214,6 +231,7 @@ const SAVE_UPLOAD = (() => {
       if (byT[k]) parts.push(CAT_CN[k] + ' ' + byT[k]);
     }
     if (qfNames.length) parts.push('任务 ' + qfNames.length);
+    if (chestPts.length) parts.push('宝箱 ' + chestPts.length);
     if (byT.memory) {
       const mp = [];
       if (memByTier.photo) mp.push('照片 ' + memByTier.photo);

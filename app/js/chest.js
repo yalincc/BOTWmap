@@ -14,7 +14,8 @@
  * ★ 与地图引擎隔离：map.js 零改动；探索收集组的 treasure 行由本模块 DOM 手术移除。
  * ★ ui.js 的 ext 命中分发只认 quest/equip：本模块包装 map._onSelect 拦截
  *   {type:'chest'}（不能丢）。
- * ★ 宝箱无存档逐项标志：本版只做图层与卡片，不做手动标记。
+ * ★ 存档同步（V1.6.3）：save_upload.js 反查 chest_save.js 命中已开宝箱 →
+ *   ChestSync.loadSave 注入存档完成集；isDone = 存档 ∪ 手动标记。
  * ============================================================ */
 (function () {
   'use strict';
@@ -88,9 +89,26 @@
   function persistChDone() { try { localStorage.setItem(K_CHDONE, JSON.stringify(Array.from(chestDone))); } catch (e) {} }
   var chListeners = [];
   function notifyCh() { chListeners.forEach(function (fn) { try { fn(); } catch (e) {} }); }
+
+  /* ---------- V1.6.3 存档同步完成集（save_upload.js 注入；与手动标记并存） ----------
+   * 数据 = data/chest_save.js（1312 条 crc32(flagName)->像素点，romfs 权威派生），
+   * loadSave 收到存档已开宝箱的像素点数组（存档权威，整集替换）；
+   * isDone = 存档 ∪ 手动。localStorage 仅作刷新后展示缓存，权威每次随存档重注入。 */
+  var K_SAVE_DONE = 'botwmap.chestSaveDone.v1';
+  var saveDone = new Set();
+  try { JSON.parse(localStorage.getItem(K_SAVE_DONE) || '[]').forEach(function (k) { saveDone.add(k); }); } catch (e) {}
+  function persistSaveDone() { try { localStorage.setItem(K_SAVE_DONE, JSON.stringify(Array.from(saveDone))); } catch (e) {} }
+  window.ChestSync = {
+    loadSave: function (pts) {
+      saveDone = new Set();
+      (pts || []).forEach(function (p) { if (p) saveDone.add(ptKey(p)); });
+      persistSaveDone(); notifyCh();
+    }
+  };
+
   /* 对外：装备完成态标记时会调 markPoints 同步宝箱完成 */
   window.ChestPanel = {
-    isDone: function (p) { return !!p && chestDone.has(ptKey(p)); },
+    isDone: function (p) { if (!p) return false; var kk = ptKey(p); return chestDone.has(kk) || saveDone.has(kk); },
     toggleDone: function (p) {
       if (!p) return null;
       var kk = ptKey(p), st;
@@ -406,6 +424,8 @@
     if (!card || card.classList.contains('hidden')) return;
     var el = e.target;
     if (card.contains(el)) return;
+    /* ★ V1.6.3：刚拖完卡片，这一次 click 不关卡（同 quest-card.js） */
+    if (card._dragged) return;
     if (el && el.closest && el.closest('#chestCard')) return;
     if (map && map.canvas && map.canvas.contains(el) && Date.now() - lastOpen < 400) return;
     closeCard();
