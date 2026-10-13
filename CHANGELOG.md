@@ -33,6 +33,9 @@
 ### 存档同步（本版零改动）
 - 按用户指示，任务 `flag` 冻结为 V1.6.1 现状（`source/quest_flags_locked.json`），`quest_save.js` 未动；`flag` 升 romfs 官方口径（94 条）与宝箱同步留待下版一并处理
 
+### 发布
+- 已推送双端 `main`（GitHub / Gitee，远端哈希 = 本地 HEAD `198bbf7`），EdgeOne 自动部署上线
+
 ### 待办
 - 宝箱存档同步（romfs 数据已备，另立项）
 - 自动预填地名是「最近地标」近似，可按需人工精修
