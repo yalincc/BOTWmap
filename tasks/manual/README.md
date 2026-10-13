@@ -81,6 +81,9 @@ C:/Users/Administrator/.workbuddy/binaries/python/envs/default/Scripts/python.ex
 - 用真实存档端到端验证（`source/verify_quest_flags.py`）：两个独立存档交叉复核，**152/152 全部可查，value 只有 0/1 二值，90 条 value=1**，两存档结果完全一致 → 官方 flag 可信，已解冻。
 - 现在 `build_quests_v2.py` 里 `flag` 归入**骨架字段**，一律取 romfs 值、不接受 YAML 覆盖。实测证据：`main_01` YAML 手写的 `SeekerEye_Finish` 在存档里是 0，romfs 的 `FirstTower_Finish` 才是 1（开塔确实完成了）——手写 flag 反而会错。
 - 配套：`app/data/quest_save.js` 补齐 11 条缺失映射（216 → **227** 条），否则网页端反查不到名字。
+- **单一真源**：`quest_save.js` 的 crc32 优先取自 BOTWroms 存档权威字典
+  `raw/romfs/save-flags/save_flags_master.json`（43723 条，由另一条管线维护），字典缺失才自算兜底；
+  生成器 `source/build_quest_save_map.py` 可重跑且幂等。交叉验证 216/227 命中字典、**0 差异**。
 
 > 结论：**152/152 全覆盖，一条都不用人工校对**。以后改 flag 只改 romfs 侧，或跑 `verify_quest_flags.py` 复核。
 

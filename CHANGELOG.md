@@ -27,6 +27,7 @@
   - 验证：新增 `source/verify_quest_flags.py`（只读），用真实 Ryujinx 存档端到端反查。两个独立存档交叉复核一致——romfs 官方 flag **152/152 全部可查**，value 只有 `{0,1}` 二值（无 `0xFFFFFFFF`/中间值，判据无歧义），90 条 value=1
   - 解冻：`build_quests_v2.py` 的 flag 冻结表（2026-10-13 定）已停用（改名 `quest_flags_locked.json.deprecated-20261014`）；`flag` 归入骨架字段，一律取 romfs 官方值、不接受 YAML 覆盖——实测 `main_01` YAML 手写的 `SeekerEye_Finish` 存档值为 0，romfs 的 `FirstTower_Finish` 才是 1
   - 配套：新增 `source/build_quest_save_map.py`，`app/data/quest_save.js` 补齐 11 条缺失映射（216 → **227** 条，含四神兽 4 条），否则网页端按 hash 反查不到 flagName
+  - **单一真源对齐**：crc32 改为优先取 BOTWroms 存档权威字典 `raw/romfs/save-flags/save_flags_master.json`（43723 条，另一条管线维护），字典缺失才自算兜底。交叉验证：本表 227 条里 216 条命中字典且 crc32 **0 差异**，本次补的 11 条全部命中字典；按字典重跑输出幂等（新增 0 条、文件无变化）
   - 效果：存档能识别的已完成任务 **39 → 90 条**（+51）
 - **对照 TOTKmap 技术手册 §11 实核**（结论写入 `BOTWmap任务板块技术手册-来自TOTKmapV2.5.0-20261014.md` §12）：10 条里 8 条通过（key 与 romfs 骨架 152 一一对应、三档无缺号、自指 0、前后置对称 0、控制字符 0、坐标越界 0），2 条不适用（多层地图 / ROM steps 清洗，BOTW 天然规避）；据此修掉下面两条：
 
