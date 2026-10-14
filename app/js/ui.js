@@ -550,6 +550,18 @@ const UI = (() => {
       html += `<div class="stat-row stat-mem"><span class="k">回忆 · DLC EX</span><span class="v">${dlcDone} / 5 ${pct(dlcDone, 5, true)}</span></div>`;
       html += `<div class="stat-bar"><i style="width:${pct(dlcDone, 5)}"></i></div>`;
     }
+    // V1.6.4：存档扩展同步（武器获得 / 图鉴登记 / 讨伐三族）
+    const sc = window.__saveCounts;
+    if (sc) {
+      html += `<div class="stat-row stat-mem"><span class="k">武器 · 获得</span><span class="v">${sc.weapon} / ${sc.weaponTotal} ${pct(sc.weapon, sc.weaponTotal, true)}</span></div>`;
+      html += `<div class="stat-bar"><i style="width:${pct(sc.weapon, sc.weaponTotal)}"></i></div>`;
+      html += `<div class="stat-row stat-mem"><span class="k">武器 · 图鉴登记</span><span class="v">${sc.pb} / ${sc.pbTotal} ${pct(sc.pb, sc.pbTotal, true)}</span></div>`;
+      html += `<div class="stat-bar"><i style="width:${pct(sc.pb, sc.pbTotal)}"></i></div>`;
+      (sc.enemy || []).forEach(e => {
+        html += `<div class="stat-row stat-mem"><span class="k">讨伐 · ${e.name}</span><span class="v">${e.done} / ${e.total} ${pct(e.done, e.total, true)}</span></div>`;
+        html += `<div class="stat-bar"><i style="width:${pct(e.done, e.total)}"></i></div>`;
+      });
+    }
     $('statsPanel').innerHTML = html;
   }
   function pct(a, b, short) {

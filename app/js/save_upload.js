@@ -38,6 +38,8 @@ const SAVE_UPLOAD = (() => {
     buildChestHash();
     // P4b：武器收集反查表：hash -> flagName（weapon_collect_save.js 的 isGet 表）
     buildWeaponHash();
+    buildPbHash();
+    buildEnemyHash();
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
     if (!input || !btn) return;
@@ -64,6 +66,7 @@ const SAVE_UPLOAD = (() => {
         if (!confirm('确定清空本地探索度记录？\n将清除本机保存的完成标记（历史存档累计与手动勾选）。\n自定义标记与在线存档同步不受影响。')) return;
         map.doneSet = new Set();
         try { localStorage.removeItem('botwmap.done.v1'); } catch (e) {}
+        window.__saveCounts = null;   // V1.6.4：扩展同步行一并撤下
         map.draw();
         UI.renderStats();
         UI.updateLayerList();
@@ -179,6 +182,43 @@ const SAVE_UPLOAD = (() => {
     Object.keys(WS.isGet).forEach(f => { weaponHashToFlag[WS.isGet[f]] = f; });
   }
 
+  /* V1.6.4：图鉴登记（PB）查找表——weapon_collect_save.js 的 pictureBook 表（flagName -> hash）。
+     拍照图鉴登记与 IsGet（获得过）是两组独立 flag：IsGet 捡到即亮，PB 要相机拍照登记。 */
+  let pbHashSet = null;
+  function buildPbHash() {
+    if (pbHashSet) return;
+    const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
+    if (!WS || !WS.pictureBook) return;
+    pbHashSet = new Set(Object.keys(WS.pictureBook).map(f => Number(WS.pictureBook[f])));
+  }
+
+  /* V1.6.4：敌人讨伐（IsDefeat）查找表——enemy_save.js hash2pt（92 条，不重生 Boss）。
+     值 = 地图像素点；家族归属按最近的大类标记（hinox/talus/molduga）就近归类（分母守恒）。 */
+  let enemyHash2pt = null;
+  let enemyFamilies = null;
+  function buildEnemyHash() {
+    if (enemyHash2pt) return;
+    const ES = (typeof ENEMY_SAVE !== 'undefined') ? ENEMY_SAVE : null;
+    if (!ES || !ES.hash2pt) { console.warn('[save_upload] ENEMY_SAVE 讨伐查找表未加载：index.html 未引入 data/enemy_save.js？'); return; }
+    enemyHash2pt = ES.hash2pt;
+    const famDefs = [['西诺克斯', 'hinox'], ['岩石巨人', 'talus'], ['莫尔德拉吉克', 'molduga']];
+    const mk = (typeof BOTW_DATA !== 'undefined' && BOTW_DATA.markers) ? BOTW_DATA.markers : [];
+    enemyFamilies = famDefs.map(function (d) {
+      return { name: d[0], mks: mk.filter(function (m) { return m.cat === d[1]; }).map(function (m) { return m.px; }), total: 0, done: 0 };
+    });
+    Object.keys(enemyHash2pt).forEach(function (k) {
+      const p = enemyHash2pt[k];
+      let bi = 0, bd = 1e18;
+      enemyFamilies.forEach(function (f, i) {
+        f.mks.forEach(function (m) {
+          const d = (m[0] - p[0]) * (m[0] - p[0]) + (m[1] - p[1]) * (m[1] - p[1]);
+          if (d < bd) { bd = d; bi = i; }
+        });
+      });
+      enemyFamilies[bi].total++;
+    });
+  }
+
   function applySave(buf, fileName) {
     if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
@@ -188,6 +228,8 @@ const SAVE_UPLOAD = (() => {
     const questFlags = {};          // V1.6.0: flagName -> true（任务完成标志）
     const chestPts = [];            // V1.6.3: 已开宝箱像素点（chest_save.js 反查）
     const weaponFlags = {};         // P4b: 武器收集 flagName -> true（IsGet_Weapon 反查）
+    let pbCnt = 0;                  // V1.6.4: 图鉴登记命中
+    const enemyPts = [];            // V1.6.4: 讨伐命中像素点（enemy_save 反查）
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
       const h = dv.getUint32(o, littleEndian);
@@ -198,6 +240,8 @@ const SAVE_UPLOAD = (() => {
       else if (v !== 0 && questHashToFlag && questHashToFlag[h]) questFlags[questHashToFlag[h]] = true;
       else if (v !== 0 && chestHash2pt && chestHash2pt[h]) chestPts.push(chestHash2pt[h]);
       else if (v !== 0 && weaponHashToFlag && weaponHashToFlag[h]) weaponFlags[weaponHashToFlag[h]] = true;
+      else if (v !== 0 && pbHashSet && pbHashSet.has(h)) pbCnt++;
+      else if (v !== 0 && enemyHash2pt && enemyHash2pt[h]) enemyPts.push(enemyHash2pt[h]);
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
@@ -245,6 +289,27 @@ const SAVE_UPLOAD = (() => {
       map.draw();
     }
     loaded = true;
+    // V1.6.4：扩展同步计数（武器获得 / 图鉴登记 / 讨伐三族）供统计面板展示
+    const ef = enemyFamilies || [];
+    ef.forEach(function (f) { f.done = 0; });
+    enemyPts.forEach(function (p) {
+      let bi = 0, bd = 1e18;
+      ef.forEach(function (f, i) {
+        f.mks.forEach(function (m) {
+          const d = (m[0] - p[0]) * (m[0] - p[0]) + (m[1] - p[1]) * (m[1] - p[1]);
+          if (d < bd) { bd = d; bi = i; }
+        });
+      });
+      if (ef[bi]) ef[bi].done++;
+    });
+    const WSC = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
+    window.__saveCounts = {
+      weapon: wfNames.length,
+      weaponTotal: (WSC && Object.keys(WSC.isGet).length) || 196,
+      pb: pbCnt,
+      pbTotal: (WSC && Object.keys(WSC.pictureBook).length) || 179,
+      enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; })
+    };
     window.__saveUploaded = true;   // 统计面板「存档已同步 ✓」行
     UI.renderStats();
 
@@ -256,6 +321,8 @@ const SAVE_UPLOAD = (() => {
     if (qfNames.length) parts.push('任务 ' + qfNames.length);
     if (chestPts.length) parts.push('宝箱 ' + chestPts.length);
     if (wfNames.length) parts.push('武器 ' + wfNames.length);
+    if (pbCnt) parts.push('图鉴 ' + pbCnt);
+    if (enemyPts.length) parts.push('讨伐 ' + enemyPts.length);
     if (byT.memory) {
       const mp = [];
       if (memByTier.photo) mp.push('照片 ' + memByTier.photo);
