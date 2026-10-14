@@ -257,7 +257,12 @@
     if (camp.f && camp.f !== camp.m) h += '<div class="qcard-en">' + esc(camp.f) + '</div>';
     h += '<div class="tk-kv"><span class="tk-k">怪物档位</span><span class="tk-v">' + esc(camp.t || '—') + '</span></div>';
     h += '<div class="tk-kv"><span class="tk-k">刷点数</span><span class="tk-v">' + ((camp.loc || []).length) + ' 处</span></div>';
-    h += '<div class="cp-foot">档位为静态布点初始档；血月后按击杀积分动态升档（黄金档为大师模式专属）</div>';
+    /* V1.6.4 实测反馈：机制提示（法师游荡 / 依盖队据点剧情性 / 血月重抽） */
+    var isWizzrobe = !!(camp.a && camp.a.indexOf('Wizzrobe') >= 0);
+    var isYiga = !!(camp.a && camp.a.indexOf('Assassin') >= 0);
+    if (isWizzrobe) h += '<div class="cp-foot">法师会游荡：找不到时在附近空域绕一圈找；被击杀后要等血月才会回来</div>';
+    if (isYiga) h += '<div class="cp-foot">依盖队据点是剧情场景：主线击败可盖大人后不再刷怪，地图上保留仅为刷点参考</div>';
+    h += '<div class="cp-foot">档位为静态布点初始档；血月后按击杀积分动态升档（黄金档为大师模式专属），手持武器也可能随血月按档位池重抽</div>';
     var ws = camp.w || [];
     h += '<div class="eq-camp-h">手持武器（= 击杀掉落）</div>';
     if (ws.length) {
