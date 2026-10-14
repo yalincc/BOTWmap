@@ -40,6 +40,11 @@ const SAVE_UPLOAD = (() => {
     buildWeaponHash();
     buildPbHash();
     buildEnemyHash();
+    // V1.6.4：恢复上次存档同步的扩展计数（localStorage 展示缓存，权威每次随存档重注入——同 ChestSync 模式）
+    try {
+      const d = JSON.parse(localStorage.getItem('botwmap.saveCounts.v1') || 'null');
+      if (d) { window.__saveCounts = d.counts || null; window.__saveUploaded = !!d.uploaded; }
+    } catch (e) {}
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
     if (!input || !btn) return;
@@ -67,6 +72,8 @@ const SAVE_UPLOAD = (() => {
         map.doneSet = new Set();
         try { localStorage.removeItem('botwmap.done.v1'); } catch (e) {}
         window.__saveCounts = null;   // V1.6.4：扩展同步行一并撤下
+        window.__saveUploaded = false;
+        try { localStorage.removeItem('botwmap.saveCounts.v1'); } catch (e) {}
         map.draw();
         UI.renderStats();
         UI.updateLayerList();
@@ -310,6 +317,7 @@ const SAVE_UPLOAD = (() => {
       pbTotal: (WSC && Object.keys(WSC.pictureBook).length) || 179,
       enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; })
     };
+    try { localStorage.setItem('botwmap.saveCounts.v1', JSON.stringify({ uploaded: true, counts: window.__saveCounts })); } catch (e) {}
     window.__saveUploaded = true;   // 统计面板「存档已同步 ✓」行
     UI.renderStats();
 
