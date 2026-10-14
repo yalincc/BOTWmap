@@ -910,8 +910,38 @@ const UI = (() => {
     $('cardCat').textContent = cat.cn || mk.cat;
     $('cardCat').style.borderColor = cfg.color;
     $('cardCat').style.color = cfg.color;
-    $('cardName').textContent = mk.name;
+    /* V1.6.4：Boss 四族统一标题 #N + 名字（类内序号，方便陈述问题）+ head 加 ‹›/[复制] */
+    const BOSS_CATS = ['lynel', 'hinox', 'talus', 'molduga'];
+    const isBoss = BOSS_CATS.indexOf(mk.cat) >= 0;
+    let bossIdx = -1, bossSib = null;
+    if (isBoss) {
+      bossSib = map.data.markers.filter(x => x.cat === mk.cat);
+      bossIdx = bossSib.indexOf(mk);
+      $('cardName').textContent = '#' + (bossIdx + 1) + ' ' + mk.name;
+    } else {
+      $('cardName').textContent = mk.name;
+    }
     $('cardEn').textContent = mk.en || '';
+    /* Boss head 控件：‹ › 翻同类 Boss（跳转视角并选卡）+ [复制] */
+    const head = document.querySelector('#infoCard .card-head');
+    if (head && isBoss) {
+      head.querySelectorAll('.card-nav').forEach(el => el.remove());
+      const mkCopy = mk;
+      const mkSib = bossSib, mkIdx = bossIdx;
+      const mkPrev = document.createElement('button');
+      mkPrev.className = 'card-nav'; mkPrev.textContent = '‹'; mkPrev.title = '上一个' + (cat.cn || '');
+      mkPrev.style.cssText = 'background:none;border:0.5px solid rgba(255,255,255,.25);border-radius:6px;color:rgba(255,255,255,.7);width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1';
+      mkPrev.onclick = (e) => { e.stopPropagation(); const t = mkSib[(mkIdx - 1 + mkSib.length) % mkSib.length]; map.view.x = map.w / 2 - t.px[0] * map.view.scale; map.view.y = map.h / 2 - t.px[1] * map.view.scale; map.draw(); map._onSelect({ marker: t }); };
+      const mkNext = mkPrev.cloneNode(true); mkNext.textContent = '›'; mkNext.title = '下一个' + (cat.cn || '');
+      mkNext.onclick = (e) => { e.stopPropagation(); const t = mkSib[(mkIdx + 1) % mkSib.length]; map.view.x = map.w / 2 - t.px[0] * map.view.scale; map.view.y = map.h / 2 - t.px[1] * map.view.scale; map.draw(); map._onSelect({ marker: t }); };
+      const mkCopyBtn = document.createElement('button');
+      mkCopyBtn.className = 'card-nav'; mkCopyBtn.textContent = '[复制]'; mkCopyBtn.title = '复制名称与序号';
+      mkCopyBtn.style.cssText = 'background:none;border:0.5px solid rgba(255,255,255,.25);border-radius:6px;color:rgba(255,255,255,.7);height:22px;cursor:pointer;font-size:11px;padding:0 6px';
+      mkCopyBtn.onclick = (e) => { e.stopPropagation(); const txt = '#' + (mkIdx + 1) + ' ' + mkCopy.name; if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt); toast('已复制：' + txt); } };
+      head.insertBefore(mkPrev, head.querySelector('.card-close'));
+      head.insertBefore(mkNext, head.querySelector('.card-close'));
+      head.insertBefore(mkCopyBtn, head.querySelector('.card-close'));
+    }
     showBaseRows();
     hideMaterialOnly();
     $('cardRegion').innerHTML = '区域<b>' + (mk.region || '—') + '</b>';

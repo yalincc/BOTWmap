@@ -267,7 +267,8 @@
       (order < CAMP_ORDER.length - 1 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpNext" title="下一个营地">›</button>' : '') +
       '<button type="button" class="tk-close" id="cpCardClose" title="关闭">×</button></span>';
     h += '</div>';
-    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(camp.m || camp.a || '怪物营地') + '</h3></div>';
+    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(camp.m || camp.a || '怪物营地') + '</h3>' +
+      '<button type="button" class="tk-copy" id="cpCopy" title="复制 #序号 + 名称">[复制]</button></div>';
     if (camp.f && camp.f !== camp.m) h += '<div class="qcard-en">' + esc(camp.f) + '</div>';
     h += '<div class="tk-kv"><span class="tk-k">怪物档位</span><span class="tk-v">' + esc(camp.t || '—') + '</span></div>';
     h += '<div class="tk-kv"><span class="tk-k">刷点数</span><span class="tk-v">' + ((camp.loc || []).length) + ' 处</span></div>';
@@ -297,6 +298,12 @@
         var w = DEX[el.dataset.wid];
         if (w && window.EquipPanel && window.EquipPanel.openCard) window.EquipPanel.openCard(w);
       });
+    });
+    var cpCp = document.getElementById('cpCopy');
+    if (cpCp) cpCp.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var txt = '#' + (order + 1) + ' ' + (camp.m || camp.a || '怪物营地');
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt); if (typeof UI !== 'undefined' && UI.toast) UI.toast('已复制：' + txt); }
     });
     var pv2 = document.getElementById('cpPrev');
     if (pv2) pv2.addEventListener('click', function (e) { e.stopPropagation(); var n = CAMP_ORDER[order - 1]; if (n) openCard(n, entry); });
@@ -336,11 +343,20 @@
   });
 
   /* ---------- 莱尼尔标记信息增强（营地不画图标，信息挂在 lynel 标记卡上） ---------- */
-  /* V1.6.4：推广到莱尼尔/西诺克斯/岩石巨人/莫尔德拉吉克四族标记（Boss 专属掉落段） */
+  /* V1.6.4：Boss 专属掉落段——四族标记；只匹配同族营地（修竞技场多点混杂：那个点位
+     堆了几十种营地，按位置匹配会把全场武器都拉进来） */
   var ENH_CATS = ['lynel', 'hinox', 'talus', 'molduga'];
-  function campsNearMarker(px) {
+  var CAT_ACTOR = {
+    lynel: /^Enemy_Lynel/,
+    hinox: /^Enemy_Hinox/,
+    talus: /^Enemy_Golem/,
+    molduga: /^Enemy_(Molduga|Sandworm)/
+  };
+  function campsNearMarker(px, cat) {
+    var re = CAT_ACTOR[cat] || null;
     var out = [];
     CW.all.forEach(function (c) {
+      if (re && !(re.test(c.a || ''))) return;   /* 家族过滤：标记只认同族营地 */
       var hit = (c.loc || []).some(function (p) {
         var dx = p[0] - px[0], dy = p[1] - px[1];
         return dx * dx + dy * dy < 100 * 100;
@@ -351,7 +367,7 @@
   }
 
   function enhanceLynelCard(mk) {
-    var camps = campsNearMarker(mk.px || [0, 0]);
+    var camps = campsNearMarker(mk.px || [0, 0], mk.cat);
     if (!camps.length) return;
     var ce = document.getElementById('cardExtra');
     if (!ce) return;

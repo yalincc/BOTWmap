@@ -208,25 +208,41 @@ const SAVE_UPLOAD = (() => {
   let pbHashToFlag = null;
   /* V1.6.4：材料图鉴 = PB_Item(53) + PB_Animal(59) 两族合并 = 112（游戏内图鉴材料页签口径）
      怪物图鉴 = PB_Enemy（84） */
+  /* JS 版 crc32（对 flagName 现算 hash，数据文件只存名字省体积） */
+  let CRC_TABLE = null;
+  function crc32(str) {
+    if (!CRC_TABLE) {
+      CRC_TABLE = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        CRC_TABLE[n] = c >>> 0;
+      }
+    }
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < str.length; i++) {
+      const b = str.charCodeAt(i) & 0xFF;
+      crc = CRC_TABLE[(crc ^ b) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  /* V1.6.4：材料/怪物图鉴名单来自 data/pb_lists.js（PB_LISTS，romfs 权威字典派生）。
+     注意：weapon_collect_save.js 的 pictureBook 表只含武器族，材料/怪物必须用 PB_LISTS。 */
   let pbMatSet = null;
   function buildPbMat() {
     if (pbMatSet) return;
-    const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
     pbMatSet = new Set();
-    if (!WS || !WS.pictureBook) return;
-    Object.keys(WS.pictureBook).forEach(function (f) {
-      if (/^IsRegisteredPictureBook_(Item|Animal)_/.test(f)) pbMatSet.add(Number(WS.pictureBook[f]));
-    });
+    const PL = (typeof PB_LISTS !== 'undefined') ? PB_LISTS : null;
+    if (!PL || !PL.mat) { console.warn('[save_upload] PB_LISTS 未加载：index.html 未引入 data/pb_lists.js？'); return; }
+    PL.mat.forEach(function (f) { pbMatSet.add(crc32(f)); });
   }
   let pbEnemySet = null;
   function buildPbEnemy() {
     if (pbEnemySet) return;
-    const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
     pbEnemySet = new Set();
-    if (!WS || !WS.pictureBook) return;
-    Object.keys(WS.pictureBook).forEach(function (f) {
-      if (/^IsRegisteredPictureBook_Enemy_/.test(f)) pbEnemySet.add(Number(WS.pictureBook[f]));
-    });
+    const PL = (typeof PB_LISTS !== 'undefined') ? PB_LISTS : null;
+    if (!PL || !PL.enemy) { console.warn('[save_upload] PB_LISTS 未加载'); return; }
+    PL.enemy.forEach(function (f) { pbEnemySet.add(crc32(f)); });
   }
   function buildPbHash() {
     if (pbHashToFlag) return;
@@ -396,7 +412,7 @@ const SAVE_UPLOAD = (() => {
       pbTotal: (WSC && Object.keys(WSC.pictureBook).length) || 179,
       pbMat: pbMatCnt,
       pbEnemy: pbEnemyCnt,
-      pbEnemyTotal: 84,
+      pbEnemyTotal: (typeof PB_LISTS !== "undefined" && PB_LISTS.enemy) ? PB_LISTS.enemy.length : 84,
       enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; })
     };
     try { localStorage.setItem('botwmap.saveCounts.v1', JSON.stringify({ uploaded: true, counts: window.__saveCounts })); } catch (e) {}
