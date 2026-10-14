@@ -596,7 +596,8 @@ const UI = (() => {
     const hits = [];
     for (const it of searchIndex) {
       if (hits.length >= 40) break;
-      if (it.name.toLowerCase().includes(ql) || it.en.toLowerCase().includes(ql) ||
+      /* P4a 防御：dex 武器 106 条无 en、9 条无 name（特殊武器/stub），字段可能为 null */
+      if ((it.name || '').toLowerCase().includes(ql) || ((it.en || '').toLowerCase().includes(ql)) ||
           (it.region && it.region.includes(q)) || (it.tower && it.tower.includes(q))) {
         hits.push(it);
       }

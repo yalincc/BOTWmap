@@ -11,6 +11,11 @@
 #chestCard{position:absolute;z-index:21;width:350px;max-width:calc(100vw - 24px);max-height:78vh;overflow-y:auto;pointer-events:auto;background:rgba(28,30,36,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:14px 16px 16px;font-size:13px;color:rgba(255,255,255,.85);}
 #chestCard.hidden{display:none;}
 @media (max-width:760px){#chestCard{left:8px;right:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;overflow-y:auto;border-color:rgba(234,194,126,.4);}}
+/* P4a：装备卡片「怪物营地掉落」段绿色变体（与大师模式紫同模式） */
+.flow-pts .fp.fp-camp{border-color:rgba(125,211,160,.5);}
+.flow-pts .fp.fp-camp .num{color:#7dd3a0;}
+.flow-pts .fp.fp-camp.is-cur{border-color:#7dd3a0;background:rgba(125,211,160,.16);}
+.eq-obtain-h.eq-camp-h{color:#7dd3a0;}
 </style>
 </head>
 <body>
@@ -347,7 +352,9 @@
 <script src="data/save_flags.js?v=1"></script>
 <script src="data/quest_save.js?v=2"></script>
 <script src="data/chest_save.js?v=1"></script>
-<script src="js/save_upload.js?v=12"></script>
+<!-- P4b：武器收集查找表（IsGet_Weapon 190 条，save_upload.js 反查） -->
+<script src="data/weapon_collect_save.js?v=1"></script>
+<script src="js/save_upload.js?v=13"></script>
 <script src="data/quests.js?v=8"></script>
 <!-- V1.6.2 · M3：任务板块拆 5 模块（data → done → canvas → flow → panel → card），quest.js 只做装配 + 门面 -->
 <script src="js/quest/quest-data.js?v=1"></script>
@@ -357,9 +364,12 @@
 <script src="js/quest/quest-panel.js?v=1"></script>
 <script src="js/quest/quest-card.js?v=4"></script>
 <script src="js/quest.js?v=25"></script>
+<!-- P4a：武器图鉴库（196 条，含营地来源）+ 营地刷点表（卡片内定位反查，L3 图层属 P4c） -->
+<script src="data/weapon_dex.js?v=1"></script>
 <script src="data/weapons.js?v=1"></script>
 <script src="data/armors.js?v=1"></script>
-<script src="js/equip.js?v=19"></script>
+<script src="data/camp_weapons.js?v=1"></script>
+<script src="js/equip.js?v=20"></script>
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
 <script src="data/chests.js?v=1"></script>
 <script src="js/chest.js?v=15"></script>

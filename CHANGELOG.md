@@ -2,6 +2,56 @@
 
 本项目遵循语义化版本（SemVer）：`主版本.次版本.修订号`。
 
+## 未发布（2026-10-14）P3 敌人讨伐 / 武器刷点存档同步数据 + P4 武器图鉴与收集接线
+
+### P4a/P4b 武器板块接线（`equip.js` 换源 + 存档收集 + 营地来源卡片）
+
+> P4 把 P3/L1/L2/L3 三层数据接进网站：装备卡片可看「什么怪掉什么装」，
+> 拖存档自动给收集过的武器打绿勾（isDone = 存档 ∪ 手动，同宝箱模式）。
+
+#### 新增
+- **武器库 90 → 196 件**（`equip.js` 数据源 `weapons.js` → `weapon_dex.js`）：合并宝箱来源 ∪ 怪物营地来源 ∪ 收集 flag key；`chestPts/hardPts` 与旧 `obtain[].pts` 同构，包兼容层后绘制/命中/定位主逻辑零改动
+- **装备卡片「怪物营地掉落」段**（绿色条目）：`camps` 已按 actor 聚合（兽神剑 = 白鬃莱尼尔 · 5 刷点一条），点击反查 `CAMP_WEAPONS` 定位到刷点 + 红点脉冲；档位标注「初始数据，血月后升档」
+- **强装 / 属性徽章**：`strong`（attack≥50 或盾 guard≥70）金色徽章；`element`（火/冰/雷）按官方简中名识别，三色徽章
+- **盾牌防御口径修正**：盾卡显示 dex `guard`（原 `def` 恒空），不再误显攻击
+- **武器收集存档同步（P4b）**：`weapon_collect_save.js`（isGet 190 条）→ `save_upload.js` 反查 → `EquipDone.loadSave` 注入存档完成集（`botwmap.equipSaveDone.v1` 持久化）；`isDone = 存档 ∪ 手动`；摘要 toast 增「武器 N」
+- **`normItem` 入口归一**：`EquipPanel.openCard` 兼容外部传入的裸 dex 条目（无 id/kind/obtain），按 name 反查补全；新增 `EquipPanel.item(id)` 查询
+
+#### 修复
+- **搜索 null 防御**（`ui.js doSearch`）：dex 106 条无 `en`、9 条无 `name`（特殊武器/ stub），原 `it.en.toLowerCase()` 直接抛错导致搜索全废；`name`/`en` 双兜底 + 搜索索引跳过无 name 条目 + 卡片标题「名称待补充」
+- **`persistEqDone` 误删恢复**：重写 EquipDone 双集结构时丢了函数定义，手动标记装备完成会抛 `ReferenceError`（真存档 e2e 抓出，verify 常驻用例不覆盖手动 toggle，已补 e2e 用例）
+
+#### 变更
+- bump 静态资源：`equip.js 19→20` / `save_upload.js 12→13`；`index.html` 引入 `weapon_dex.js` / `weapon_collect_save.js` / `camp_weapons.js`；装备卡片营地段样式内联（不动 `style.css`）
+
+#### 验证
+- `tools/verify.js --p4` **22 项全绿**：三表计数（196 / 190+179 / 555+54）、装备组 3 行（163/33/31）、兽神剑卡（强装徽章 / 攻击 58 / 营地聚合 1 条 / 定位生效）、盾防御口径、纯营地武器定位文案、fixture 存档注入 163 件端到端（isDone / 持久化 / 绿勾）、搜索命中
+- `tools/e2e_save_p4.js` 真实存档（slot0）**8/8 全绿**：toast 摘要「武器 163」、localStorage 存档集 163、兽神剑绿勾、手动标记叠加、营地条目真实定位
+- `tools/verify.js --all` **82/82 全绿**（drag 30 + smoke 30 + p4 22），无回归
+
+### P3 敌人讨伐 / 武器刷点存档同步数据（纯数据层，网站 0 改动）
+
+> 只做数据、未动网站（无 `index.html` 接线 / 无 JS 改动）；数据件与宝箱/任务同步表同构，
+> 接入时在 `save_upload.js` 解析循环加一类反查 + 对应图层更新即可，解析核心不用动。
+> 谱系与验证详见 BOTWroms `raw/romfs/DATA-README.md` §9。
+
+### 新增
+- **`app/data/enemy_save.js`**（92 条）：敌人讨伐同步查找表 `crc32(flagName) → [px,py]`。
+  覆盖 `IsDefeat` 全量 = 西诺克斯 43 / 岩石巨人 44 / 莫尔德拉吉克 5（不重生 Boss）。
+  语义已实测证实：6 个真实存档槽位 10~11 条 `value=1`（已讨伐）且跨槽位一致、持久化
+- **`app/data/weapon_save.js`**（2319 条）：武器刷点同步查找表。覆盖 `WeaponDrop` 全量
+  （HashId 集合为营地敌人对象的子集）。⚠️ **语义未证实**：6 槽位实测 0/2319 `=1`
+  （同存档对照组 TBox 138 / Enemy 111 / IsDefeat 10 / Weapon 1），疑血月重置或游戏不写此表，
+  接入前需拿"刚捡过营地武器"的存档实测
+- 生成管线（`source/`，不入库）：`build_p3_save.py`（分类参数化，加一类改一行）、
+  `probe_p3_sync.py`（radar 全量对象提取 → `p3_sync_src/radar_objs.json` 194687 条）、
+  `verify_p3_sync.py`（端到端反查 + 位置双重复验）
+
+### 验证（`verify_p3_sync.py`，真实存档 × 6 槽位）
+- 坐标：两类 flag 的 HashId **100% 命中** radar 对象（缺 0）；端到端反查两表**全部可查**
+- 位置复验 1：enemy 92 点 vs `data.js` Boss 标记 —— 85/92 同类且 <300px，**中位距离 0.4px**
+- 位置复验 2：weapon 2319 点 vs `monster-weapons.json` 701 营地 —— **中位距离 0.0px**，2174 个贴身 50px 内
+
 ## v1.6.3（2026-10-14）卡片拖动修复 + 任务存档同步解冻 + 宝箱存档自动同步
 
 ### 修复

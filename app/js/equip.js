@@ -1,14 +1,22 @@
 /* ============================================================
- * 旷野之息互动地图 · 装备板块（V1.6.0）
+ * 旷野之息互动地图 · 装备板块（V1.6.0 / P4 升级）
  * ------------------------------------------------------------
- * 将「装备」并入探索面板（不加侧栏 Tab）：装备组 2 分类 =
- *   武器（90 件：单手剑/双手剑/长枪/弓/盾）/ 防具（31 件：头/衣/裤）
- * 收录范围（用户拍板）：只收【宝箱】与【任务奖励】来源的装备；
- *   商店购买 / 掉落等不收。当前数据源 = 宝箱库（chests.js 聚合），
- *   任务奖励（obtain kind:'quest'）后续填充。
+ * 将「装备」并入探索面板（不加侧栏 Tab）：装备组 3 分类 =
+ *   武器（196 件：单手剑/双手剑/长枪/弓/盾，V1.6.4 起含怪物营地掉落来源）
+ *   防具（31 件：头/衣/裤）
+ * 收录范围（用户拍板）：宝箱 / 任务奖励 / 怪物营地掉落三种来源；
+ *   商店购买不收。数据源（V1.6.4）：
+ *   - data/weapon_dex.js（WEAPON_DEX，196 条：weapons.js 宝箱来源
+ *     ∪ monster-weapons.json 营地来源 ∪ 收集 flag key）
+ *   - data/armors.js（BOTW_ARMORS，防具不变）
+ *   - data/camp_weapons.js（CAMP_WEAPONS，卡片内"怪物营地"段定位反查；
+ *     L3 营地图层绘制属后续 P4c，本版只做卡片内跳转）
  * 地图上画装备获取点（宝箱点位，Canvas 外部图层，经 map.js
  *   _extDraw / extHits 钩子），大师模式点位预留 hardPts 不画。
- * 点击装备点 / 搜索命中 → 装备卡片（类型 / 属性 / 获取宝箱列表 + 定位跳转）
+ * 点击装备点 / 搜索命中 → 装备卡片（类型 / 属性 / 获取宝箱列表 +
+ *   怪物营地掉落段 + 定位跳转）。
+ * 存档同步（P4b）：save_upload.js 反查 weapon_collect_save.js（IsGet_Weapon
+ *   190 条）→ EquipDone.loadSave 注入存档完成集；isDone = 存档 ∪ 手动标记。
  *
  * ★ 与地图引擎隔离：不侵入 map.js 业务逻辑，只注册绘制/命中回调。
  * ============================================================ */
@@ -16,13 +24,17 @@
   'use strict';
 
   /* ---------- 数据 ---------- */
-  var WEAPON_ITEMS = (typeof BOTW_WEAPONS !== 'undefined' && BOTW_WEAPONS.items) ? BOTW_WEAPONS.items : {};
+  /* P4a：武器切到 dex 图鉴库（196 条，含 camps 营地来源与 chestPts/hardPts） */
+  var WEAPON_ITEMS = (typeof WEAPON_DEX !== 'undefined' && WEAPON_DEX.items) ? WEAPON_DEX.items : {};
   var ARMOR_ITEMS = (typeof BOTW_ARMORS !== 'undefined' && BOTW_ARMORS.items) ? BOTW_ARMORS.items : {};
   /* 装备大分类（用户拍板）：武器 / 盾牌 / 防具（上衣·裤子）。
-     weapons.js 里 type='盾' 的 16 件从武器拆出，独立成「盾牌」分类。 */
+     dex 里 type='盾' 的 33 件从武器拆出，独立成「盾牌」分类。 */
   var CAT_NAME = { weapon: '武器', shield: '盾牌', armor: '防具' };
   var CAT_COLOR = { weapon: '#d9a066', shield: '#7fb2e0', armor: '#c084d9' };
   var CAT_ORDER = ['weapon', 'shield', 'armor'];
+
+  /* 属性徽章配色（dex element 字段：火/冰/雷） */
+  var ELEM_COLOR = { '火': '#e8574a', '冰': '#5fb8e6', '雷': '#b48ce8' };
 
   /* 分类图标（TOTKmap 资源，已复制到本项目 assets/icons/；96x96 透明底彩色剪影，直接使用无需抠白） */
   var ICON_SRC = {
@@ -46,15 +58,21 @@
   }
   /* 面板分类行图标：透明底 PNG 原图直接显示（无需抠白/dataURL 替换） */
 
-  /* 展平装备列表：每件一个条目；type='盾' 归入盾牌分类 */
+  /* 展平装备列表：每件一个条目；type='盾' 归入盾牌分类。
+     P4a：dex 的 chestPts/hardPts 与 weapons.js obtain[].pts 同构（[px,py,type]），
+     包一层 obtain 兼容结构，paint/hit/locate 主逻辑零改动。 */
   var ITEMS = [];
   Object.keys(WEAPON_ITEMS).forEach(function (id) {
     var w = WEAPON_ITEMS[id];
     var kind = (w.type === '盾') ? 'shield' : 'weapon';
     ITEMS.push({
       id: id, kind: kind, name: w.name, en: w.en, type: w.type,
-      atk: w.atk, def: (w.def != null ? w.def : null), durability: w.durability,
-      hard: !!w.hard, obtain: w.obtain || []
+      atk: (w.atk != null ? w.atk : null), guard: (w.guard != null ? w.guard : null),
+      durability: (w.dur != null ? w.dur : null),
+      element: w.element || null, strong: !!w.strong, stub: !!w.stub,
+      hard: !!w.hard,
+      camps: w.camps || [],                                   // P4a：怪物营地来源（[{m,f,t,a,n}]）
+      obtain: [{ kind: 'chest', pts: w.chestPts || [], hardPts: w.hardPts || [] }]
     });
   });
   Object.keys(ARMOR_ITEMS).forEach(function (id) {
@@ -71,16 +89,32 @@
   var K_LAYERS = 'botwmap.equipLayers.v1';
   var eLayers = { weapon: true, shield: true, armor: true };
 
-  /* ---------- 完成态（V1.6.2 手动，localStorage；与宝箱完成态联动） ---------- */
+  /* ---------- 完成态（V1.6.2 手动 localStorage；P4b 存档注入集） ---------- */
   var K_EQDONE = 'botwmap.equipDone.v1';
+  var K_EQSAVE = 'botwmap.equipSaveDone.v1';   /* P4b：存档来源完成集（IsGet_Weapon 反查命中），同 chestSaveDone 模式 */
   var equipDone = new Set();
   try { JSON.parse(localStorage.getItem(K_EQDONE) || '[]').forEach(function (k) { equipDone.add(k); }); } catch (e) {}
+  var equipSaveDone = new Set();               /* P4b：存档权威完成集（localStorage 持久化，跨会话保留） */
+  try { JSON.parse(localStorage.getItem(K_EQSAVE) || '[]').forEach(function (k) { equipSaveDone.add(k); }); } catch (e) {}
   function persistEqDone() {
     try { localStorage.setItem(K_EQDONE, JSON.stringify(Array.from(equipDone))); } catch (e) {}
   }
+  function persistEqSaveDone() {
+    try { localStorage.setItem(K_EQSAVE, JSON.stringify(Array.from(equipSaveDone))); } catch (e) {}
+  }
   var eqListeners = [];
   var EquipDone = {
-    isDone: function (id) { return !!id && equipDone.has(id); },
+    isDone: function (id) { return !!id && (equipDone.has(id) || equipSaveDone.has(id)); },
+    /* P4b：存档注入（save_upload.js 反查 IsGet_Weapon 命中后调用；keys = dex key 数组）。
+       与宝箱 ChestSync.loadSave 同语义：存档集整体替换 + 持久化 + 通知重绘。 */
+    loadSave: function (keys) {
+      equipSaveDone = new Set();
+      (keys || []).forEach(function (k) { if (k) equipSaveDone.add(k); });
+      persistEqSaveDone();
+      eqListeners.forEach(function (fn) { try { fn(); } catch (e) {} });
+      return equipSaveDone.size;
+    },
+    saveCount: function () { return equipSaveDone.size; },
     /* 标记/取消：标记完成时同步把该装备所有宝箱点（普通 + 大师）也存进「宝箱完成」 */
     toggle: function (it) {
       if (!it || !it.id) return null;
@@ -233,12 +267,14 @@
     return best ? { type: 'equip', equip: best, _r: best, _p: null } : null;
   }
 
-  /* 定位：飞到装备首个获取点（或指定点） */
+  /* 定位：飞到装备首个获取点（或指定点）；P4a：无宝箱点的纯营地掉落武器回落营地首个刷点 */
   function locate(it, idx) {
     if (!map || !it) return;
-    var ob = it.obtain[0];
-    if (!ob || !ob.pts || !ob.pts.length) return;
-    var p = ob.pts[idx || 0];
+    var p = null;
+    for (var k = 0; k < it.obtain.length; k++) {
+      if (it.obtain[k] && it.obtain[k].pts && it.obtain[k].pts.length) { p = it.obtain[k].pts[idx || 0]; break; }
+    }
+    if (!p) { var cp = locateCampPt(it, 0); if (cp) p = cp; }
     if (!p) return;
     locateByPoint(p);
   }
@@ -260,6 +296,22 @@
       var sp = map.m2s(p);
       map.layoutCard(card, sp[0], sp[1]);
     }
+  }
+
+  /* P4a：装备卡片营地条目 → CAMP_WEAPONS 反查该 (actor, 武器) 的首个刷点像素坐标。
+     CAMP_WEAPONS.all 每条 = {i, m, w(武器key数组), loc(像素坐标), f, t, a(actor), hot?} */
+  function locateCampPt(it, idx) {
+    var c = it.camps && it.camps[idx];
+    if (!c || !c.a) return null;
+    var CW = (typeof CAMP_WEAPONS !== 'undefined') ? CAMP_WEAPONS : null;
+    if (!CW || !CW.all) return null;
+    for (var i = 0; i < CW.all.length; i++) {
+      var camp = CW.all[i];
+      if (camp.a !== c.a) continue;
+      if ((camp.w || []).indexOf(it.id) < 0) continue;
+      if (camp.loc && camp.loc.length) return camp.loc[0];
+    }
+    return null;
   }
 
   /* 剑形标记（武器）：剑尖朝上 + 护手 + 剑柄 */
@@ -360,7 +412,36 @@
   var pv = { mode: 'hidden', ref: null };
   var previewNow = false;
 
-  function openCard(it) {
+  /* P4a：openCard 入口归一——外部（搜索/测试/其他模块）可能传 dex 原始条目
+     （有 type/camps 无 kind/obtain），就地补全成内部等价条目 */
+  function normItem(it) {
+    if (!it) return it;
+    if (it.kind && it.obtain) return it;              // 已是 ITEMS 条目
+    /* 有 id 优先查全量库；裸 dex 条目无 id 时按 name 反查（补回 id，供定位/完成态用） */
+    var w = it, id = it.id || null;
+    if (typeof WEAPON_DEX !== 'undefined' && WEAPON_DEX.items) {
+      if (id && WEAPON_DEX.items[id]) { w = WEAPON_DEX.items[id]; }
+      else if (!id && it.name) {
+        var ks = Object.keys(WEAPON_DEX.items);
+        for (var i = 0; i < ks.length; i++) {
+          if (WEAPON_DEX.items[ks[i]].name === it.name) { id = ks[i]; w = WEAPON_DEX.items[ks[i]]; break; }
+        }
+      }
+    }
+    return {
+      id: id,
+      kind: w.part ? 'armor' : (w.type === '盾') ? 'shield' : 'weapon',
+      name: w.name, en: w.en, type: w.type, part: w.part, def: w.def, set: w.set,
+      atk: (w.atk != null ? w.atk : null), guard: (w.guard != null ? w.guard : null),
+      durability: (w.dur != null ? w.dur : null),
+      element: w.element || null, strong: !!w.strong, stub: !!w.stub, hard: !!w.hard,
+      camps: w.camps || [],
+      obtain: w.obtain || [{ kind: 'chest', pts: w.chestPts || [], hardPts: w.hardPts || [] }]
+    };
+  }
+
+  function openCard(rawIt) {
+    var it = normItem(rawIt);
     var card = document.getElementById('equipCard');
     var body = document.getElementById('equipCardBody');
     if (!card || !body) return;
@@ -377,21 +458,25 @@
     h += '<div class="tk-grip">';
     h += '<span class="tk-chip ' + chipCls + '">' + esc(kindCn) + (sub ? ' · ' + esc(sub) : '') + '</span>';
     if (it.hard) h += '<span class="q-badge-hard" style="background:rgba(139,92,246,.16);border-color:#8a5cf6;color:#b18cff">大师模式</span>';
+    /* P4a：属性徽章（火/冰/雷）+ 强装徽章（attack>=50 或盾 guard>=70） */
+    if (it.element) h += '<span class="q-badge-hard" style="background:' + (ELEM_COLOR[it.element] || '#888') + '22;border-color:' + (ELEM_COLOR[it.element] || '#888') + ';color:' + (ELEM_COLOR[it.element] || '#ccc') + '">' + esc(it.element) + '属性</span>';
+    if (it.strong) h += '<span class="q-badge-hard" style="background:rgba(242,201,76,.14);border-color:#f2c94c;color:#f2c94c">强装</span>';
     h += '<span class="tk-grip-acts">' +
       '<button type="button" class="tk-close" id="eqCardClose" title="关闭">×</button></span>';
     h += '</div>';
     /* 标题行：装备名 + [复制]（V1.6.2：⧉ 图标改文字，紧跟名字）+ 完成绿勾 */
     h += '<div class="tk-title-row">' +
-      '<h3 class="tk-name">' + esc(it.name) + '</h3>' +
+      '<h3 class="tk-name">' + esc(it.name || '名称待补充') + '</h3>' +
       '<button type="button" class="tk-copy" id="eqCopy" title="复制装备名">[复制]</button>' +
       (done ? '<span class="tk-done-tick" title="已完成">✓</span>' : '') +
       '</div>';
     if (it.en) h += '<div class="qcard-en">' + esc(it.en) + '</div>';
-    /* 属性（V1.6.2：盾显示 防御 + 耐久，不再误显攻击） */
+    if (it.stub) h += '<div class="tk-none">该武器暂无静态数据（仅有收集标记，图鉴信息待补充）</div>';
+    /* 属性（V1.6.2：盾显示 防御 + 耐久，不再误显攻击；P4a：盾防御取 dex guard 字段） */
     if (it.kind === 'weapon' || it.kind === 'shield') {
       if (sub) h += '<div class="tk-kv"><span class="tk-k">类型</span><span class="tk-v">' + esc(sub) + '</span></div>';
       if (it.kind === 'shield') {
-        h += '<div class="tk-kv"><span class="tk-k">防御</span><span class="tk-v">' + (it.def != null ? it.def : '<span class="tk-pending">待补充</span>') + '</span></div>';
+        h += '<div class="tk-kv"><span class="tk-k">防御</span><span class="tk-v">' + (it.guard != null ? it.guard : '<span class="tk-pending">待补充</span>') + '</span></div>';
       } else {
         h += '<div class="tk-kv"><span class="tk-k">攻击</span><span class="tk-v">' + (it.atk != null ? it.atk : '<span class="tk-pending">待补充</span>') + '</span></div>';
       }
@@ -419,11 +504,21 @@
     var obtainHtml = '';
     if (normalPts.length) obtainHtml += '<div class="eq-obtain-h">普通模式宝箱<span class="tk-src">' + normalPts.length + ' 处</span></div>' + ptsHtml(normalPts, 'fp-normal', 0);
     if (hardPts.length) obtainHtml += '<div class="eq-obtain-h fp-hard-h">大师模式宝箱<span class="tk-src">' + hardPts.length + ' 处</span></div>' + ptsHtml(hardPts, 'fp-hard', normalPts.length);
-    if (!obtainHtml) obtainHtml = '<div class="tk-none">暂无宝箱获取点（任务奖励待补充）</div>';
-    h += '<div class="tk-sec"><div class="tk-sec-t">获取来源</div><div class="tk-sec-b">' + obtainHtml + '</div></div>';
+    /* P4a：怪物营地掉落段（dex camps 已按 actor 聚合；点击反查 CAMP_WEAPONS 定位到刷点） */
+    var campHtml = '';
+    if (it.camps && it.camps.length) {
+      campHtml = '<div class="eq-obtain-h eq-camp-h">怪物营地掉落<span class="tk-src">' + it.camps.length + ' 种怪物</span></div>' +
+        '<div class="flow-pts">' + it.camps.map(function (c, i) {
+          return '<span class="fp fp-camp" data-eq-camp="' + i + '" title="点击定位到' + esc(c.t || c.m) + '的刷点（' + c.n + ' 处；档位为初始数据，血月后怪物档位会升）">' +
+            '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(c.t || c.m) + ' · ' + c.n + '刷点</span></span>';
+        }).join('') + '</div>';
+    }
+    if (!obtainHtml && !campHtml) obtainHtml = '<div class="tk-none">暂无获取点（商店购买 / 纯野外掉落不收录）</div>';
+    h += '<div class="tk-sec"><div class="tk-sec-t">获取来源</div><div class="tk-sec-b">' + obtainHtml + campHtml + '</div></div>';
 
     h += '<div class="tk-actions">';
     if (allPts.length) h += '<button type="button" class="btn act" id="eqLocateFirst">定位</button>';
+    else if (it.camps && it.camps.length) h += '<button type="button" class="btn act" id="eqLocateFirst" title="定位到该武器的营地刷点">定位到刷点</button>';
     h += '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="eqDone">' + (done ? '取消完成' : '标记完成') + '</button>';
     h += '</div>';
 
@@ -448,7 +543,26 @@
     if (lf) lf.addEventListener('click', function (e) {
       e.stopPropagation();
       if (allPts.length) locateByPoint(allPts[0]);
+      else {
+        /* P4a：无宝箱点的纯营地掉落武器 → 定位到首个营地刷点 */
+        var cp0 = locateCampPt(it, 0);
+        if (cp0) { locateByPoint(cp0); if (window.SpotMark) window.SpotMark.set(cp0); }
+        else if (typeof UI !== 'undefined' && UI.toast) UI.toast('未找到该武器的营地刷点坐标');
+      }
       positionCard();
+    });
+    /* P4a：营地条目点击 → 反查 CAMP_WEAPONS 定位 + 红点脉冲 */
+    body.querySelectorAll('.fp[data-eq-camp]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var cp = locateCampPt(it, +btn.dataset.eqCamp);
+        if (!cp) { if (typeof UI !== 'undefined' && UI.toast) UI.toast('未找到该营地刷点坐标'); return; }
+        body.querySelectorAll('.fp.is-cur').forEach(function (x) { x.classList.remove('is-cur'); });
+        btn.classList.add('is-cur');
+        locateByPoint(cp);
+        if (window.SpotMark) window.SpotMark.set(cp);
+        positionCard();
+      });
     });
     /* 获取点：点击定位 + 高亮当前点（V1.6.2） */
     body.querySelectorAll('.fp[data-eq-pt]').forEach(function (btn) {
@@ -524,11 +638,13 @@
   /* ---------- 搜索（装备并入 ui.js 索引） ---------- */
   var equipSearch = null;
   function buildEquipSearch() {
-    equipSearch = ITEMS.map(function (it) {
+    equipSearch = ITEMS.filter(function (it) { return !!it.name; }).map(function (it) {
       var first = null;
       for (var k = 0; k < it.obtain.length; k++) {
         if (it.obtain[k] && it.obtain[k].pts && it.obtain[k].pts.length) { first = it.obtain[k].pts[0]; break; }
       }
+      /* P4a：纯营地掉落武器无宝箱点 → 回落营地首个刷点，保证搜索命中可定位 */
+      if (!first) { var cp = locateCampPt(it, 0); if (cp) first = cp; }
       return {
         e: it, kind: it.kind, name: it.name, en: it.en,
         catCn: '装备·' + CAT_NAME[it.kind], pts: first,
@@ -545,7 +661,13 @@
     locate: locate,
     openCard: openCard,
     buildEquipSearch: buildEquipSearch,
-    EquipDone: EquipDone
+    EquipDone: EquipDone,
+    /* P4a：按 id 取内部条目（已含 obtain 兼容层与 camps） */
+    item: function (id) {
+      for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i];
+      return null;
+    },
+    items: function () { return ITEMS; }
   };
 
   function init() {

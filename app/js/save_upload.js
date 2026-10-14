@@ -12,7 +12,8 @@
  *   注：真实目录里 Cemu 的存档文件也叫 game_data.sav（位于 mlc01\usr\save\00050000\101c9300\user\80000001\<槽位>\），
  *   与 Switch 区分靠版本字段字节序，文件名不可靠。
  *
- * 覆盖：神庙 / 希卡塔 / 克洛格 / 主线回忆(13) / 神兽(4) / 任务完成标志 / 宝箱已开(1312 查表)。
+ * 覆盖：神庙 / 希卡塔 / 克洛格 / 主线回忆(13) / 神兽(4) / 任务完成标志 / 宝箱已开(1312 查表) /
+ * 武器收集(P4b：IsGet_Weapon 190 查表，注入装备完成集)。
  * 存档文件只在浏览器内存中处理，不离开本机。
  */
 'use strict';
@@ -35,6 +36,8 @@ const SAVE_UPLOAD = (() => {
     // V1.6.0 任务完成标志反查表：hash -> flagName（quest_save.js 提供 flagName -> hash）
     buildQuestHash();
     buildChestHash();
+    // P4b：武器收集反查表：hash -> flagName（weapon_collect_save.js 的 isGet 表）
+    buildWeaponHash();
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
     if (!input || !btn) return;
@@ -165,6 +168,17 @@ const SAVE_UPLOAD = (() => {
     chestHash2pt = CS.hash2pt;
   }
 
+  /* P4b：武器收集查找表 hash -> flagName（weapon_collect_save.js 的 isGet 表，190 条）。
+     以 IsGet_Weapon_* 为主口径（实测覆盖最宽）；flagName 去前缀后 = weapon_dex.js 的 key。 */
+  let weaponHashToFlag = null;
+  function buildWeaponHash() {
+    if (weaponHashToFlag) return;
+    const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
+    if (!WS || !WS.isGet) { console.warn('[save_upload] WEAPON_COLLECT_SAVE 武器收集表未加载：index.html 未引入 data/weapon_collect_save.js？'); return; }
+    weaponHashToFlag = {};
+    Object.keys(WS.isGet).forEach(f => { weaponHashToFlag[WS.isGet[f]] = f; });
+  }
+
   function applySave(buf, fileName) {
     if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
@@ -173,6 +187,7 @@ const SAVE_UPLOAD = (() => {
     const done = new Map();         // hash -> type
     const questFlags = {};          // V1.6.0: flagName -> true（任务完成标志）
     const chestPts = [];            // V1.6.3: 已开宝箱像素点（chest_save.js 反查）
+    const weaponFlags = {};         // P4b: 武器收集 flagName -> true（IsGet_Weapon 反查）
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
       const h = dv.getUint32(o, littleEndian);
@@ -182,6 +197,7 @@ const SAVE_UPLOAD = (() => {
       else if (h === H_KOROK_CNT) korokCnt = v;
       else if (v !== 0 && questHashToFlag && questHashToFlag[h]) questFlags[questHashToFlag[h]] = true;
       else if (v !== 0 && chestHash2pt && chestHash2pt[h]) chestPts.push(chestHash2pt[h]);
+      else if (v !== 0 && weaponHashToFlag && weaponHashToFlag[h]) weaponFlags[weaponHashToFlag[h]] = true;
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
@@ -221,6 +237,13 @@ const SAVE_UPLOAD = (() => {
       window.ChestSync.loadSave(chestPts);
       map.draw();
     }
+    // P4b 武器收集同步（存档权威）：IsGet_Weapon 命中 → 去前缀成 dex key
+    // （IsGet_Weapon_Sword_043 → Weapon_Sword_043）→ 注入装备完成集（存档 ∪ 手动）
+    const wfNames = Object.keys(weaponFlags);
+    if (wfNames.length && window.EquipPanel && window.EquipPanel.EquipDone) {
+      window.EquipPanel.EquipDone.loadSave(wfNames.map(n => n.replace(/^IsGet_Weapon_/, 'Weapon_')));
+      map.draw();
+    }
     loaded = true;
     window.__saveUploaded = true;   // 统计面板「存档已同步 ✓」行
     UI.renderStats();
@@ -232,6 +255,7 @@ const SAVE_UPLOAD = (() => {
     }
     if (qfNames.length) parts.push('任务 ' + qfNames.length);
     if (chestPts.length) parts.push('宝箱 ' + chestPts.length);
+    if (wfNames.length) parts.push('武器 ' + wfNames.length);
     if (byT.memory) {
       const mp = [];
       if (memByTier.photo) mp.push('照片 ' + memByTier.photo);
