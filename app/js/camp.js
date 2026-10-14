@@ -344,6 +344,15 @@
       (c.w || []).forEach(function (k) { h += weaponRow(k); });
     });
     ce.insertAdjacentHTML('beforeend', h);
+    /* V1.6.4 防御：偶发信息卡落在容器左上角（定位锚失效），越界则扶正到地图中部 */
+    var ic = document.getElementById('infoCard');
+    if (ic && map) {
+      var r = ic.getBoundingClientRect();
+      if (r.left < 4 && r.top < 4) {
+        ic.style.left = Math.round(map.w * 0.5) + 'px';
+        ic.style.top = Math.round(map.h * 0.35) + 'px';
+      }
+    }
   }
 
   /* ---------- map._onSelect 包装（最外层：camp → chest → ui） ---------- */

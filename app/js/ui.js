@@ -519,22 +519,23 @@ const UI = (() => {
     if (synced) html += `<div class="stat-sync">存档已同步 ✓</div>`;
 
     /* V1.6.4 改版：分组双列纯数字网格（老大拍板；进度条去掉） */
-    const grid = rows => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 14px">${rows}</div>`;
-    const label = t => `<div style="color:#eac27e;font-size:12px;font-weight:500;margin:8px 0 4px">${t}</div>`;
-    const row = (n, d, t) => `<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:rgba(255,255,255,.6)">${n}</span><span>${d} / ${t}</span></div>`;
+    const grid = rows => `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px">${rows}</div>`;
+    const label = t => `<div style="color:#eac27e;font-size:11px;font-weight:500;margin:7px 0 3px;letter-spacing:.5px">${t}</div>`;
+    const row = (n, d, t) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:12px;line-height:1.5"><span style="color:rgba(255,255,255,.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span><span style="flex:none">` + d + '/' + t + `</span></div>`;
 
     /* —— 探索（存档优先，本地标点兜底）—— */
     const exp = [];
+    const scE = (window.__saveCounts && window.__saveCounts.explore) || {};
     [['shrine', '神庙', 'shrine'], ['tower', '希卡塔', 'tower'], ['beast', '神兽', 'beast']].forEach(([key, name, lck]) => {
-      const saved = (lc && lc[lck]) ? lc[lck] : null;
-      const [d, t] = saved ? saved : catCount(key);
+      const saved = (lc && lc[lck]) ? lc[lck] : (scE[lck] != null ? [scE[lck], null] : null);
+      const [d, t] = saved && saved[1] != null ? saved : catCount(key);
       if (t) exp.push([name, d, t]);
     });
-    const kSaved = (lc && lc.korok) ? lc.korok : null;
-    const [kd, kt] = kSaved ? kSaved : catCount('seed');
+    const kSaved = (lc && lc.korok) ? lc.korok : (scE.korok != null ? [scE.korok, null] : null);
+    const [kd, kt] = kSaved && kSaved[1] != null ? kSaved : catCount('seed');
     if (kt) exp.push(['克洛格', kd, kt]);
     const m = memoryCounts();
-    const mSaved = k => (lc && lc[k]) ? lc[k][0] : null;
+    const mSaved = k => (lc && lc[k]) ? lc[k][0] : (scE[k] != null ? scE[k] : null);
     const photoDone = mSaved('memory_photo') != null ? mSaved('memory_photo') : m.photo[0];
     const finalDone = mSaved('memory_final') != null ? mSaved('memory_final') : m.final[0];
     if (m.photo[1] || photoDone) exp.push(['照片记忆', photoDone, 12]);

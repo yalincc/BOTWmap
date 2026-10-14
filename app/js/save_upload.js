@@ -43,7 +43,17 @@ const SAVE_UPLOAD = (() => {
     // V1.6.4：恢复上次存档同步的扩展计数（localStorage 展示缓存，权威每次随存档重注入——同 ChestSync 模式）
     try {
       const d = JSON.parse(localStorage.getItem('botwmap.saveCounts.v1') || 'null');
-      if (d) { window.__saveCounts = d.counts || null; window.__saveUploaded = !!d.uploaded; }
+      if (d) {
+        window.__saveCounts = d.counts || null;
+        window.__saveUploaded = !!d.uploaded;
+        // V1.6.4：恢复讨伐点亮集（saveLoaded 态下 _mkDone 只认 liveDone，必须随缓存恢复）
+        if (d.counts && d.counts.liveIds && d.counts.liveIds.length) {
+          if (!map.liveDone) map.liveDone = new Set();
+          d.counts.liveIds.forEach(function (id) { map.liveDone.add(id); });
+          UI.renderStats();
+          map.draw();
+        }
+      }
     } catch (e) {}
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
@@ -345,6 +355,13 @@ const SAVE_UPLOAD = (() => {
     }
     const WSC = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
     window.__saveCounts = {
+      explore: {
+        shrine: byT.shrine || 0, tower: byT.tower || 0, beast: byT.beast || 0,
+        korok: byT.korok || 0,
+        memory_photo: memByTier.photo || 0, memory_final: memByTier.final || 0,
+        memory_auto: memByTier.auto || 0, memory_dlc: memByTier.dlc || 0
+      },
+      liveIds: enemyHitIds,
       chest: chestPts.length,
       weapon: wfNames.length,
       weaponTotal: (WSC && Object.keys(WSC.isGet).length) || 196,
