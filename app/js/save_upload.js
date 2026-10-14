@@ -213,14 +213,14 @@ const SAVE_UPLOAD = (() => {
     const famDefs = [['西诺克斯', 'hinox'], ['岩石巨人', 'talus'], ['莫尔德拉吉克', 'molduga']];
     const mk = (typeof BOTW_DATA !== 'undefined' && BOTW_DATA.markers) ? BOTW_DATA.markers : [];
     enemyFamilies = famDefs.map(function (d) {
-      return { name: d[0], mks: mk.filter(function (m) { return m.cat === d[1]; }).map(function (m) { return m.px; }), total: 0, done: 0 };
+      return { name: d[0], mks: mk.filter(function (m) { return m.cat === d[1]; }), total: 0, done: 0 };
     });
     Object.keys(enemyHash2pt).forEach(function (k) {
       const p = enemyHash2pt[k];
       let bi = 0, bd = 1e18;
       enemyFamilies.forEach(function (f, i) {
         f.mks.forEach(function (m) {
-          const d = (m[0] - p[0]) * (m[0] - p[0]) + (m[1] - p[1]) * (m[1] - p[1]);
+          const d = (m.px[0] - p[0]) * (m.px[0] - p[0]) + (m.px[1] - p[1]) * (m.px[1] - p[1]);
           if (d < bd) { bd = d; bi = i; }
         });
       });
@@ -233,7 +233,7 @@ const SAVE_UPLOAD = (() => {
     const dv = new DataView(buf);
     const littleEndian = detectEndian(dv, fileName);
     if (littleEndian === null) {
-      UI.toast('这不是旷野之息的存档（版本标识不匹配）——王国之泪等其它游戏的存档无法解析');
+      UI.toast('这不是旷野之息的存档（版本标识不匹配）——王国之泪等其它游戏的存档无法解析', 6000);
       return;
     }
     const srcName = littleEndian ? 'Switch（Ryujinx）' : 'Wii U（Cemu）';
@@ -305,16 +305,29 @@ const SAVE_UPLOAD = (() => {
     // V1.6.4：扩展同步计数（武器获得 / 图鉴登记 / 讨伐三族）供统计面板展示
     const ef = enemyFamilies || [];
     ef.forEach(function (f) { f.done = 0; });
+    const enemyHitIds = [];
     enemyPts.forEach(function (p) {
-      let bi = 0, bd = 1e18;
+      let bi = 0, bd = 1e18, bmk = null;
       ef.forEach(function (f, i) {
         f.mks.forEach(function (m) {
-          const d = (m[0] - p[0]) * (m[0] - p[0]) + (m[1] - p[1]) * (m[1] - p[1]);
-          if (d < bd) { bd = d; bi = i; }
+          const d = (m.px[0] - p[0]) * (m.px[0] - p[0]) + (m.px[1] - p[1]) * (m.px[1] - p[1]);
+          if (d < bd) { bd = d; bi = i; bmk = m; }
         });
       });
       if (ef[bi]) ef[bi].done++;
+      /* V1.6.4：讨伐上地图——命中的固定点位标记点亮（<300px 才有标记对应，7/92 无标记不亮） */
+      if (bmk && bd < 300 * 300) enemyHitIds.push(bmk.id);
     });
+    if (enemyHitIds.length) {
+      if (!map.liveDone) map.liveDone = new Set();
+      enemyHitIds.forEach(function (id) {
+        map.liveDone.add(id);
+        if (!map.doneSet.has(id)) map.doneSet.add(id);   // 讨伐是永久成就，离线兜底也保持
+      });
+      UI.persistDone();
+      UI.updateLayerList();
+      map.draw();
+    }
     const WSC = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
     window.__saveCounts = {
       weapon: wfNames.length,

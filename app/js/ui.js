@@ -926,7 +926,8 @@ const UI = (() => {
     if (mk.cat === 'objective' && ex.sub) extra += '<div class="row">目标<b>' + esc(ex.sub) + '</b></div>';
     if (mk.cat === 'beast') extra += '<div class="row">类型<b>神兽·讨伐</b></div>';
     // 存档同步状态（神庙 / 塔 / 克洛格 / 主线回忆 / 神兽 有存档 flag）
-    if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed' || mk.cat === 'memory' || mk.cat === 'beast') {
+    if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed' || mk.cat === 'memory' || mk.cat === 'beast' ||
+        mk.cat === 'hinox' || mk.cat === 'talus' || mk.cat === 'molduga') {   /* V1.6.4：讨伐三族显示存档态 */
       if (liveDone) extra += '<div class="row">存档<b style="color:#7dffa0">游戏内已收集 ✓</b></div>';
       else if (map.live && map.live.counts) extra += '<div class="row">存档<b style="color:#e8b04a">游戏内未收集</b></div>';
     }
@@ -1403,12 +1404,12 @@ const UI = (() => {
 
   /* ---------- toast ---------- */
   let toastTimer = null;
-  function toast(msg) {
+  function toast(msg, ms) {
     const t = $('toast');
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+    toastTimer = setTimeout(() => t.classList.remove('show'), ms || 2200);
   }
 
   return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn, refreshNavButton };
