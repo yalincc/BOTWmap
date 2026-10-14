@@ -1666,6 +1666,7 @@ class BotwMap {
       if (ex.type === 'quest' && ex.quest) return { kind: '任务', name: ex.quest.name || '' };
       if (ex.type === 'equip' && ex.equip) return { kind: '装备', name: ex.equip.name || '' };
       if (ex.type === 'chest' && ex.item) return { kind: '宝箱', name: ex.item.contentCn || ex.item.en || '' };
+      if (ex.type === 'camp' && ex._name) return { kind: '营地', name: ex._name };   /* V1.6.4 P4c：营地悬停（名 + 掉落物由 camp.js 拼好） */
     }
     return null;
   }

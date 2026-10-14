@@ -69,6 +69,21 @@
     });
   });
   var SUB_NAME = { hot: '营地刷点·精选', all: '营地刷点·全部' };
+  /* 图钉图标（job_08，星星气泡 pin；针尖锚在营地据点上，大小随缩放同宝箱） */
+  var PIN_ICON = 'assets/icons/camp_pin.png';
+  var pinImg = new Image();
+  pinImg.src = PIN_ICON;
+  /* 悬停名称条文案：名字 + 掉落物（map.js _hoverLabel 对 camp 类型读 _name） */
+  var _labelCache = {};
+  function campLabel(c) {
+    if (_labelCache[c.i]) return _labelCache[c.i];
+    var ws = (c.w || []).slice(0, 3).map(function (k) {
+      var w = DEX[k];
+      return (w && (w.name || w.en)) || '';
+    }).filter(Boolean).join('/');
+    var more = (c.w || []).length > 3 ? ' 等' + c.w.length + '件' : '';
+    return (_labelCache[c.i] = (c.m || c.a || '怪物营地') + (ws ? ' · 掉 ' + ws + more : ''));
+  }
   var SUB_COLOR = { hot: '#e0703a', all: '#7d8fa6' };   /* hot 橙红 / 普通灰蓝 */
   var SUB_ORDER = ['hot', 'all'];
 
@@ -96,7 +111,7 @@
       r.className = 'lrow' + (cLayers[sub] ? ' on' : '');
       r.dataset.ccat = sub;
       r.innerHTML =
-        '<span class="cp-row-ic" style="background:' + SUB_COLOR[sub] + '"></span>' +
+        '<img class="lg-ic" src="' + PIN_ICON + '" alt="" loading="lazy">' +
         '<span class="lname">' + SUB_NAME[sub] + '</span>' +
         '<span class="lprog">' + n + '</span>';
       r.title = '点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）';
@@ -134,34 +149,21 @@
         if (p[0] < x0 || p[0] > x1 || p[1] < y0 || p[1] > y1) continue;
         var sx = map.view.x + p[0] * scale, sy = map.view.y + p[1] * scale;
         ctx.save();
-        /* 圆底 */
-        ctx.beginPath();
-        ctx.arc(sx, sy, rad, 0, Math.PI * 2);
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.92;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = 'rgba(255,255,255,.85)';
-        ctx.stroke();
-        /* 白色剑形（竖刃 + 护手 + 柄尾） */
-        var h = rad * 0.62;
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = Math.max(1.5, rad * 0.16);
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(sx, sy + h * 0.55);
-        ctx.lineTo(sx, sy - h * 0.65);
-        ctx.stroke();
-        ctx.lineWidth = Math.max(1.2, rad * 0.12);
-        ctx.beginPath();
-        ctx.moveTo(sx - h * 0.42, sy + h * 0.28);
-        ctx.lineTo(sx + h * 0.42, sy + h * 0.28);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(sx - h * 0.2, sy + h * 0.72);
-        ctx.lineTo(sx + h * 0.2, sy + h * 0.72);
-        ctx.stroke();
+        if (pinImg.complete && pinImg.naturalWidth) {
+          /* 图钉：针尖锚在据点位置，图标体在正上方（同宝箱尺寸随缩放） */
+          ctx.drawImage(pinImg, sx - size / 2, sy - size, size, size);
+        } else {
+          /* 图标未加载兜底：色圆点 */
+          ctx.beginPath();
+          ctx.arc(sx, sy, rad, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.globalAlpha = 0.92;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = 'rgba(255,255,255,.85)';
+          ctx.stroke();
+        }
         ctx.restore();
       }
     });
@@ -170,21 +172,23 @@
   /* ---------- 命中：营地聚簇点（屏幕 12px 容差），返回 {type:'camp', camp, entry} ---------- */
   function hit(mx, my) {
     if (!map) return null;
-    var tol = (window.CardLayout.markerSize(map.view.scale) / 2 + 4) / map.view.scale;
+    var size = window.CardLayout.markerSize(map.view.scale);
+    var lift = (size / 2) / map.view.scale;   /* 图钉头部中心在锚点上方半个图标高 */
+    var tol = (size / 2 + 4) / map.view.scale;
     var best = null, bd = 1e18;
     SUB_ORDER.forEach(function (sub) {
       if (!cLayers[sub]) return;
       var list = SUB[sub];
       for (var i = 0; i < list.length; i++) {
         var p = list[i].pt;
-        var dx = p[0] - mx, dy = p[1] - my;
+        var dx = p[0] - mx, dy = (p[1] - lift) - my;
         if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) {
           var d = dx * dx + dy * dy;
           if (d < bd) { bd = d; best = list[i]; }
         }
       }
     });
-    return best ? { type: 'camp', camp: best.camp, entry: best, _r: best.camp, _p: best.loc } : null;
+    return best ? { type: 'camp', camp: best.camp, entry: best, _r: best.camp, _name: campLabel(best.camp), _p: best.loc } : null;
   }
 
   /* ---------- 定位：飞到营地首个刷点 ---------- */
