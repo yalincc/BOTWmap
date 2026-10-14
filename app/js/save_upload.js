@@ -150,13 +150,15 @@ const SAVE_UPLOAD = (() => {
    * 两个平台的存档文件都叫 game_data.sav，文件名无法区分（真实 Cemu 存档即 BE 的 game_data.sav），
    * 识别以版本字段为准；兜底默认小端。 */
   function detectEndian(dv, fileName) {
+    /* V1.6.4：版本字段无法识别 → 返回 null（疑似非旷野之息存档，applySave 直接拒绝）。
+       此前兜底按小端硬解析——拖入王国之泪等其它游戏的存档会静默产出垃圾同步数据。 */
     if (dv.byteLength >= 4) {
       const vLE = dv.getUint32(0, true);
       const vBE = dv.getUint32(0, false);
       if (VALID_VERSIONS.indexOf(vLE) >= 0) return true;    // little endian
       if (VALID_VERSIONS.indexOf(vBE) >= 0) return false;   // big endian
     }
-    return true;
+    return null;
   }
 
   /* V1.6.0：任务完成标志反查表 hash -> flagName（存档扁平表按 hash 检索，需要反向索引） */
@@ -230,6 +232,10 @@ const SAVE_UPLOAD = (() => {
     if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
     const littleEndian = detectEndian(dv, fileName);
+    if (littleEndian === null) {
+      UI.toast('这不是旷野之息的存档（版本标识不匹配）——王国之泪等其它游戏的存档无法解析');
+      return;
+    }
     const srcName = littleEndian ? 'Switch（Ryujinx）' : 'Wii U（Cemu）';
     const done = new Map();         // hash -> type
     const questFlags = {};          // V1.6.0: flagName -> true（任务完成标志）
