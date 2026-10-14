@@ -28,6 +28,35 @@
   --danger: #e0665f;
   --radius: 10px;
   --shadow: 0 8px 24px rgba(0,0,0,.45);
+
+  /* ===== BOTWmap Design Tokens（V1.6.5 卡片系统重构） ===== */
+  --fd-gold: #f2c94c;                /* 克洛格金：主强调色（标题/主按钮/选中） */
+  --fd-gold-light: #e6cd8f;          /* 浅金：hover/次级强调 */
+  --fd-gold-dim: #a38745;            /* 深金：边框/暗调文字 */
+  --fd-gold-bg: #2e2712;             /* 金棕底：激活底色 */
+  --fd-shiekah-blue: #4cd4f2;        /* 希卡科技蓝：神庙/塔域/主线专属 */
+  --fd-shiekah-blue-bg: rgba(76, 212, 242, .14);
+  --fd-ok: #4ade80;                  /* 绿勾完成 */
+  --fd-ok-btn: #3aa76d;              /* 完成按钮底色 */
+  --fd-danger: #e0665f;              /* 危险/删除/警示 */
+
+  /* 卡片质感（墨绿黑半透明毛玻璃） */
+  --fd-bg-card: rgba(14, 20, 16, .96);
+  --fd-border-card: rgba(163, 135, 69, .32);
+  --fd-border-lt: rgba(255, 255, 255, .08);
+  --fd-shadow-card: 0 8px 32px rgba(0,0,0,.55);
+
+  /* 文字五级灰阶（自然绿微冷调） */
+  --fd-text-1: #f2f7f0;              /* L1: 面板标题/卡片主名 */
+  --fd-text-2: #d2ded0;              /* L2: 正文/值 */
+  --fd-text-3: #93a68f;              /* L3: 键名/说明 */
+  --fd-text-4: #60715d;              /* L4: 占位/暗辅助 */
+  --fd-text-5: rgba(255, 255, 255, .32); /* L5: 缺省/禁用 */
+
+  --fd-r-card: 10px;
+  --fd-r-ctl: 6px;
+  --fd-r-sm: 4px;
+  --fd-r-pill: 20px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
@@ -455,58 +484,85 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .hq .hq-dot.warn { color: #e8b04a; }
 .hq .hq-dot.off { color: #c97a7a; }
 
-/* ---------- 淇℃伅鍗＄墖 ---------- */
+/* ---------- 信息卡片（V1.6.5 卡片系统升级） ---------- */
 #infoCard {
-  position: absolute; z-index: 20; width: 300px; background: var(--panel-solid);
-  border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
-  padding: 14px 16px; font-size: 13px;
+  position: absolute; z-index: 20; width: 310px;
+  background: var(--fd-bg-card);
+  border: 1px solid var(--fd-border-card);
+  border-radius: var(--fd-r-card);
+  box-shadow: var(--fd-shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 14px 16px 16px;
+  font-size: 13px;
+  color: var(--fd-text-1);
 }
 .card-head {
   display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
   cursor: move; touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .chip {
-  display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px;
-  background: rgba(242,201,76,.10); color: var(--gold); border: 1px solid rgba(242,201,76,.35);
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: var(--fd-r-pill); font-size: 11px; font-weight: 500;
+  background: rgba(242,201,76,.12); color: var(--fd-gold); border: 1px solid rgba(242,201,76,.35);
 }
-.card-close { background: none; border: none; color: var(--text-dim); font-size: 20px; cursor: pointer; line-height: 1; }
-.card-close:hover { color: var(--text); }
-#cardName { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
-#cardEn { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; word-break: break-all; }
+.card-close {
+  background: none; border: none; color: var(--fd-text-3); font-size: 19px; cursor: pointer; line-height: 1;
+  width: 22px; height: 22px; border-radius: var(--fd-r-sm); transition: .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.card-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+#cardName {
+  font-size: 17px; font-weight: 700; margin-bottom: 3px; color: var(--fd-text-1);
+  line-height: 1.35; word-break: break-word;
+}
+#cardEn { font-size: 12px; color: var(--fd-text-3); margin-bottom: 10px; word-break: break-all; }
 
 /* 材料卡片（TOTK 风格，v1.4.0）：图鉴图 + 区域/坐标/位置 meta + 用途 */
 .card-img {
-  display: block; width: 150px; height: 150px; margin: 6px auto 4px;
-  object-fit: contain; background: rgba(255,255,255,.06);
-  border: 1px solid var(--border); border-radius: 10px; padding: 6px;
+  display: block; width: 150px; height: 150px; margin: 6px auto 6px;
+  object-fit: contain; background: rgba(255,255,255,.05);
+  border: 1px solid var(--fd-border-lt); border-radius: 8px; padding: 4px;
   cursor: zoom-in;
 }
 .card-meta { margin: 8px 0 2px; }
-.meta-row { display: flex; align-items: center; margin: 3px 0; font-size: 12.5px; }
-.meta-label { color: var(--text-dim); flex: 0 0 44px; }
-.meta-val { color: var(--text); word-break: break-all; }
-.card-usage { margin: 8px 0 2px; font-size: 12.5px; }
-.usage-label { color: var(--text-dim); margin-right: 6px; }
-#cardUsageVal { color: var(--gold); }
-.card-body .row { margin: 3px 0; color: var(--text-dim); }
-.card-body .row b { color: var(--text); font-weight: 500; margin-left: 4px; }
-.card-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-.card-actions button {
-  flex: 1; min-width: 0; border-radius: 8px; padding: 10px 4px; font-size: 13px;
-  cursor: pointer; border: 1px solid transparent; font-family: inherit;
+.meta-row, .card-body .row {
+  display: flex; align-items: baseline; gap: 8px; margin: 3px 0;
+  font-size: 12.5px; line-height: 1.65;
 }
-.primary { background: var(--gold); color: #2e2410; font-weight: 600; }
+.meta-label, .card-body .row-label, .card-body .row > span:first-child:not(.korok-zoom) {
+  flex: 0 0 44px; color: var(--fd-text-3); letter-spacing: .25em; font-size: 12px; user-select: none;
+}
+.meta-val, .card-body .row b, .card-body .row > span:last-child {
+  flex: 1; min-width: 0; color: var(--fd-text-1); font-weight: normal; word-break: break-word;
+}
+.card-usage {
+  margin: 6px 0 2px; font-size: 12.5px; line-height: 1.65;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.usage-label { flex: 0 0 44px; color: var(--fd-text-3); letter-spacing: .25em; font-size: 12px; user-select: none; }
+#cardUsageVal { flex: 1; color: var(--fd-gold); font-weight: 500; word-break: break-word; }
+.card-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+.card-actions button {
+  flex: 1; min-width: 0; min-height: 40px; border-radius: var(--fd-r-ctl); padding: 9px 4px; font-size: 13px;
+  font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: inherit; transition: .15s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.card-actions button:active { transform: scale(.97); }
+.primary { background: var(--fd-gold); color: #2e2410; font-weight: 600; border-color: var(--fd-gold) !important; }
 .primary:hover { filter: brightness(1.1); }
-.ghost { background: transparent; border-color: var(--border) !important; color: var(--text); }
-.danger { background: transparent; border-color: var(--danger) !important; color: var(--danger); }
+.ghost { background: transparent; border-color: rgba(255,255,255,.18) !important; color: var(--fd-text-2); }
+.ghost:hover { border-color: var(--fd-gold-dim) !important; color: var(--fd-gold); }
+.danger { background: transparent; border-color: rgba(224,102,95,.4) !important; color: var(--fd-danger); }
+.danger:hover { background: rgba(224,102,95,.15); }
 .hidden { display: none !important; }
 
 /* 信息卡三按钮统一层级：导航=绿色主操作 / 收集=金色模式 / 标记完成=中性次操作 */
-#cardDone { background: transparent; border-color: var(--border); color: var(--text); font-weight: 500; }
-#cardDone:hover { border-color: var(--gold-dim); color: var(--gold-dim); }
-#cardCollect.collect { background: transparent; border-color: #c9a227; color: #ffe9a8; font-weight: 500; }
-#cardCollect.collect.on { background: #5a4a10; border-color: #ffd166; color: #ffdf7e; font-weight: 600; box-shadow: 0 0 0 1px rgba(255, 209, 102, .35); }
-#cardCollect.collect:disabled { opacity: .5; cursor: not-allowed; }
+#cardDone { background: transparent; border-color: rgba(255,255,255,.2); color: var(--fd-text-2); font-weight: 500; }
+#cardDone:hover { border-color: var(--fd-gold-dim); color: var(--fd-gold); }
+#cardCollect.collect { background: transparent; border-color: var(--fd-gold-dim); color: var(--fd-gold-light); font-weight: 500; }
+#cardCollect.collect.on { background: var(--fd-gold-bg); border-color: var(--fd-gold); color: var(--fd-gold); font-weight: 600; box-shadow: 0 0 0 1px rgba(242,201,76,.35); }
+#cardCollect.collect:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ---------- 克洛格详情块（v1.1.1） ---------- */
 .korok-badge {
@@ -652,26 +708,29 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   100% { transform: scale(1.9); opacity: 0; }
 }
 
-/* ============ 任务卡片 / 装备卡片（TOTKmap 视觉语言，V1.6.0 升级） ============ */
-#questCard, #equipCard {
+/* ============ 任务卡片 / 装备卡片 / 宝箱卡片 / 营地卡片（BOTWmap 联邦视觉） ============ */
+#questCard, #equipCard, #chestCard, #campCard {
   position: absolute; z-index: 21; width: 350px; max-width: calc(100vw - 24px);
   max-height: 78vh; overflow-y: auto; pointer-events: auto;
-  background: rgba(28,30,36,.97); border: 1px solid rgba(255,255,255,.1);
-  border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.55);
-  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-  padding: 14px 16px 16px; font-size: 13px; color: rgba(255,255,255,.85);
+  background: var(--fd-bg-card);
+  border: 1px solid var(--fd-border-card);
+  border-radius: var(--fd-r-card);
+  box-shadow: var(--fd-shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 14px 16px 16px; font-size: 13px; color: var(--fd-text-1);
   scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.14) transparent;
 }
-#questCard.hidden, #equipCard.hidden { display: none; }
-#questCard::-webkit-scrollbar, #equipCard::-webkit-scrollbar { width: 3px; }
-#questCard::-webkit-scrollbar-thumb, #equipCard::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
-#questCardBody, #equipCardBody { padding: 0; }
+#questCard.hidden, #equipCard.hidden, #chestCard.hidden, #campCard.hidden { display: none; }
+#questCard::-webkit-scrollbar, #equipCard::-webkit-scrollbar, #chestCard::-webkit-scrollbar, #campCard::-webkit-scrollbar { width: 3px; }
+#questCard::-webkit-scrollbar-thumb, #equipCard::-webkit-scrollbar-thumb, #chestCard::-webkit-scrollbar-thumb, #campCard::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
+#questCardBody, #equipCardBody, #chestCardBody, #campCardBody { padding: 0; }
 
-/* 顶部：tk-grip 抓手 + 分类徽章 + 操作（TOTKmap 原版视觉） */
+/* 顶部：tk-grip 抓手 + 分类徽章 + 操作 */
 .tk-grip {
   display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
   cursor: grab; padding: 2px 0; margin-left: -2px; margin-right: -2px;
-  border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 6px;
+  border-bottom: 1px solid var(--fd-border-lt); padding-bottom: 6px;
   touch-action: none;
 }
 .tk-grip:active { cursor: grabbing; }
@@ -685,18 +744,17 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   background: rgba(255,255,255,.08); color: rgba(255,255,255,.7);
   white-space: nowrap;
 }
-.tk-chip-main { background: rgba(234,194,126,.16); color: #eac27e; }
+.tk-chip-main { background: rgba(242,201,76,.12); color: var(--fd-gold); }
 .tk-chip-imp  { background: rgba(126,200,169,.16); color: #7ec8a9; }
-.tk-chip-sub  { background: rgba(111,179,224,.16); color: #6fb3e0; }
+.tk-chip-sub  { background: var(--fd-shiekah-blue-bg); color: var(--fd-shiekah-blue); }
 .tk-chip-mini { background: rgba(184,160,232,.16); color: #c4b0f0; }
 .tk-close {
   margin-left: auto; width: 22px; height: 22px; line-height: 1;
-  border: none; background: transparent; color: rgba(255,255,255,.45);
+  border: none; background: transparent; color: var(--fd-text-3);
   font-size: 19px; cursor: pointer; border-radius: 4px; flex: 0 0 auto;
 }
 .tk-grip-acts { display: flex; align-items: center; gap: 3px; margin-left: auto; }
 .tk-grip-acts .tk-close { margin-left: 0; }
-/* ★ 上/下一个（以及装备卡复制）小按钮：纯线条无底，不要白底（用户要求） */
 .tk-icon-btn {
   width: 22px; height: 22px; padding: 0; line-height: 1;
   border: 1px solid rgba(255,255,255,.28); background: transparent;
@@ -716,24 +774,25 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   margin: 0; min-width: 0; flex: 1; word-break: break-word;
 }
 .tk-no-badge {
-  background: #c9a227; color: #14181c; font-weight: bold; font-size: 12px;
+  background: var(--fd-gold); color: #2e2410; font-weight: bold; font-size: 12px;
   padding: 2px 7px; border-radius: 4px; flex: 0 0 auto; margin-top: 1px;
+  font-variant-numeric: tabular-nums;
 }
 .tk-copy {
   display: inline-block; border: none; background: none; padding: 0 2px;
   margin-left: 6px; color: #9a8a6c; font-size: 11px; font-weight: normal;
   line-height: 1; cursor: pointer; vertical-align: baseline;
 }
-.tk-copy:hover { color: #eac27e; }
+.tk-copy:hover { color: var(--fd-gold); }
 
 /* 关键信息（★ 区域一行、位置一行：block 纵向排列，TOTKmap 卡片结构） */
 .tk-meta { margin-bottom: 4px; display: block; }
 .tk-mrow { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.7; }
 .tk-mk { color: rgba(255,255,255,.42); flex: 0 0 52px; }
 .tk-mv { color: rgba(255,255,255,.85); flex: 1; }
-.co-link { color: #eac27e; font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; letter-spacing: .3px; }
+.co-link { color: var(--fd-gold); font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; letter-spacing: .3px; }
 .co-link:hover { text-decoration: underline; }
-.tk-plabel { color: #eac27e; font-weight: 600; font-size: 13px; letter-spacing: .3px; flex: 0 0 auto; margin-right: 8px; }
+.tk-plabel { color: var(--fd-gold); font-weight: 600; font-size: 13px; letter-spacing: .3px; flex: 0 0 auto; margin-right: 8px; }
 .tk-mtag {
   display: inline-block; font-size: 11.5px; line-height: 1.6;
   padding: 1px 7px; border-radius: 4px; flex: 0 0 auto;
@@ -742,30 +801,28 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 
 /* kv 行（前置/后续/注意/奖励） */
 .tk-kv { display: flex; gap: 8px; margin-bottom: 5px; font-size: 12.5px; }
-/* ★ 前置条件与「位置」区之间的分割线（用户要求） */
 .tk-kv-div { border-top: 1px solid rgba(255,255,255,.07); padding-top: 8px; margin-top: 8px; }
-/* ★ 任务要点正文下的第一个子项（接取）加一点间距 */
 .tk-sec-b + .tk-kv { margin-top: 6px; }
 .tk-k { color: rgba(255,255,255,.42); flex: 0 0 56px; }
 .tk-v { flex: 1; color: rgba(255,255,255,.85); }
-.tk-req { color: #eac27e; }
-.tk-req .tk-none2 { color: rgba(234,194,126,.6); }
+.tk-req { color: var(--fd-gold); }
+.tk-req .tk-none2 { color: rgba(242,201,76,.6); }
 .tk-req-link { text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
-.tk-none2 { color: rgba(255,255,255,.32); font-size: 11px; }
-.tk-dash { color: rgba(255,255,255,.5); font-weight: bold; }
-.tk-kv b, .tk-note b { color: rgba(255,255,255,.9); font-weight: 600; }
+.tk-none2 { color: var(--fd-text-5); font-size: 11px; }
+.tk-dash { color: var(--fd-text-5); font-weight: bold; }
+.tk-kv b, .tk-note b { color: #fff; font-weight: 600; }
 
 /* 分区（任务要点/流程地点） */
-.tk-sec { margin-top: 9px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.07); }
+.tk-sec { margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--fd-border-lt); }
 .tk-sec-t {
-  font-size: 11.5px; color: #9a8a6c; margin-bottom: 5px;
-  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--fd-gold-dim); margin-bottom: 5px;
+  display: flex; align-items: center; gap: 6px; letter-spacing: .2em;
 }
 .tk-src {
-  font-size: 10px; color: rgba(255,255,255,.28);
-  border: 1px solid rgba(255,255,255,.12); border-radius: 3px; padding: 0 4px;
+  font-size: 10px; color: rgba(255,255,255,.35);
+  border: 1px solid rgba(255,255,255,.12); border-radius: var(--fd-r-pill); padding: 0 5px;
 }
-.tk-sec-b { font-size: 13px; line-height: 1.65; color: rgba(255,255,255,.8); }
+.tk-sec-b { font-size: 12.5px; line-height: 1.65; color: var(--fd-text-2); }
 
 /* 官方分步（编号圆点） */
 .tk-steps { list-style: none; margin: 0; padding: 0; }
@@ -773,63 +830,69 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .tk-step-no {
   flex: 0 0 17px; height: 17px; line-height: 17px; text-align: center;
   font-size: 10.5px; border-radius: 50%;
-  background: rgba(234,194,126,.18); color: #eac27e;
+  background: rgba(242,201,76,.18); color: var(--fd-gold);
   font-variant-numeric: tabular-nums; margin-top: 2px;
 }
 .tk-step-tx { flex: 1; }
-.tk-pending { color: rgba(255,255,255,.4); font-style: italic; }
+.tk-pending { color: var(--fd-text-4); font-style: italic; }
 .tk-none {
-  font-size: 12.5px; color: rgba(255,255,255,.45);
+  font-size: 12.5px; color: var(--fd-text-4);
   background: rgba(255,255,255,.04); border-radius: 6px;
   padding: 7px 9px; line-height: 1.6;
 }
 
-/* 流程地点坐标网格（TOTKmap V2.5.0：最多 3 列自动缩放） */
+/* 流程地点坐标网格 */
 .tk-flow-t {
-  font-size: 11.5px; color: #9a8a6c; font-weight: bold;
-  letter-spacing: 1px; margin-bottom: 2px; flex: 1 1 100%; display: block;
+  font-size: 11.5px; color: var(--fd-gold-dim); font-weight: bold;
+  letter-spacing: .2em; margin-bottom: 4px; flex: 1 1 100%; display: block;
 }
 .flow-pts { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; flex: 1 1 100%; }
 .fp {
-  display: flex; align-items: center; gap: 6px; background: #232b33;
-  border: 1px solid #333d47; border-radius: 8px; padding: 6px 9px; cursor: pointer;
-  font-size: 12px; position: relative; min-width: 0;
+  display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.05);
+  border: 1px solid var(--fd-border-lt); border-radius: 8px; padding: 6px 9px; cursor: pointer;
+  font-size: 12px; position: relative; min-width: 0; transition: .15s;
 }
-.fp:hover { border-color: #eac27e; }
-.fp .num { color: #eac27e; font-weight: bold; font-size: 13px; flex: 0 0 16px; text-align: center; }
-.fp .txt { color: #dcd7cb; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.fp:hover { border-color: var(--fd-gold); background: rgba(242,201,76,.08); }
+.fp .num { color: var(--fd-gold); font-weight: bold; font-size: 13px; flex: 0 0 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.fp .txt { color: var(--fd-text-2); line-height: 1.45; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 .fp .tip { display: none; position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
-  background: #0d1114; border: 1px solid #3a434d; border-radius: 6px; padding: 4px 8px;
-  font-size: 11px; color: #eac27e; white-space: nowrap; z-index: 9; }
+  background: rgba(14,20,16,.98); border: 1px solid var(--fd-border-card); border-radius: 6px; padding: 4px 8px;
+  font-size: 11px; color: var(--fd-gold); white-space: nowrap; z-index: 9; box-shadow: var(--fd-shadow-card); }
 .fp:hover .tip { display: block; }
-.fp .tip .xy { color: #b8b2a6; }
+.fp .tip .xy { color: var(--fd-text-3); font-variant-numeric: tabular-nums; }
 
-/* V1.6.2 卡片流程地点：序号按流程点类型着色（接取/交付=绿、战斗=红、NPC=金、其他=蓝） */
+/* 流程点序号着色 */
 .flow-pts .fp.fp-t-take .num, .flow-pts .fp.fp-t-deliver .num { color: #7dd3a0; }
 .flow-pts .fp.fp-t-battle .num { color: #ff8a8a; }
-.flow-pts .fp.fp-t-npc .num { color: #eac27e; }
+.flow-pts .fp.fp-t-npc .num { color: var(--fd-gold); }
 .flow-pts .fp.fp-t-other .num { color: #9fc6ff; }
 
-/* V1.6.2 装备卡片：获取点点击高亮 + 大师模式宝箱（紫） */
-.flow-pts .fp.is-cur { border-color: #eac27e; background: rgba(234,194,126,.14); }
+/* 装备卡片：获取点点击高亮 + 大师模式宝箱（紫） */
+.flow-pts .fp.is-cur { border-color: var(--fd-gold); background: rgba(242,201,76,.14); }
 .flow-pts .fp.fp-hard { border-color: rgba(139,92,246,.5); }
 .flow-pts .fp.fp-hard .num { color: #b18cff; }
 .flow-pts .fp.fp-hard.is-cur { border-color: #8a5cf6; background: rgba(139,92,246,.16); }
 .eq-obtain-h.fp-hard-h { color: #b18cff; }
 
-/* 底部操作：金色渐变主题（TOTKmap 原版） */
+/* 底部操作：金色统一操作栏 */
 .tk-actions { display: flex; gap: 8px; margin-top: 14px; }
-.tk-actions .btn { flex: 1; min-height: 40px; border-radius: 8px; padding: 9px 4px; font-size: 13px;
-  cursor: pointer; border: 1px solid #c9a227; font-family: inherit;
-  background: linear-gradient(180deg, #e0b64e, #c9a227); color: #14181c; font-weight: bold; }
-.tk-actions .btn.act:hover { filter: brightness(1.08); }
-.tk-actions .btn.act.tk-ghost { background: rgba(201,162,39,.12); color: #eac27e; border: 1px solid rgba(201,162,39,.55); font-weight: bold; }
-.tk-actions .btn.act.tk-ghost:hover { background: rgba(201,162,39,.22); filter: none; }
-.tk-actions .btn.act.is-on { background: rgba(234,194,126,.16); border-color: rgba(234,194,126,.45); color: #eac27e; }
+.tk-actions .btn {
+  flex: 1; min-height: 40px; border-radius: var(--fd-r-ctl); padding: 9px 4px; font-size: 13px;
+  cursor: pointer; border: 1px solid var(--fd-gold); font-family: inherit;
+  background: var(--fd-gold); color: #2e2410; font-weight: bold; transition: .15s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tk-actions .btn:active { transform: scale(.97); }
+.tk-actions .btn.act:hover { filter: brightness(1.1); }
+.tk-actions .btn.act.tk-ghost {
+  background: transparent; color: var(--fd-gold-light); border: 1px solid rgba(163,135,69,.5); font-weight: bold;
+}
+.tk-actions .btn.act.tk-ghost:hover { background: rgba(242,201,76,.12); border-color: var(--fd-gold); color: #fff; }
+.tk-actions .btn.act.is-on { background: rgba(242,201,76,.16); border-color: var(--fd-gold); color: var(--fd-gold); }
 .tk-actions .btn.act.is-off { opacity: .36; cursor: not-allowed; }
-.tk-actions .btn.done { border: 1px solid #c9a227; background: linear-gradient(180deg,#e0b64e,#c9a227); color: #14181c; font-weight: bold; }
-.tk-actions .btn.done:hover { filter: brightness(1.08); }
-.tk-actions .btn.done.is-done { background: rgba(63,156,82,.16); border-color: rgba(63,156,82,.42); color: #8fd79c; cursor: default; }
+.tk-actions .btn.done { border: 1px solid var(--fd-gold); background: var(--fd-gold); color: #2e2410; font-weight: bold; }
+.tk-actions .btn.done:hover { filter: brightness(1.1); }
+.tk-actions .btn.done.is-done { background: rgba(58,167,109,.16); border-color: rgba(74,222,128,.42); color: #8fd79c; cursor: default; }
 .tk-actions .btn.done.is-done:disabled { opacity: 1; }
 
 /* 完成勾（绿色实心 + 白勾） */
@@ -839,36 +902,177 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   background: #3f9c52; color: #fff; font-size: 12px; font-weight: 700; line-height: 1;
 }
 
-/* 装备专属：分类行图标 + 获取来源坐标（复用 flow-pts 网格） */
+/* 装备专属：分类行图标 + 获取来源坐标 */
 .eq-lrow-ic { width: 18px; height: 18px; object-fit: contain; flex: 0 0 auto; align-self: center; }
 .eq-obtain-h {
-  font-size: 11.5px; color: rgba(255,255,255,.6);
+  font-size: 11.5px; color: var(--fd-text-3);
   display: flex; align-items: center; gap: 6px; margin: 4px 0 6px;
 }
-.qcard-en { font-size: 12px; color: rgba(255,255,255,.45); margin-bottom: 10px; word-break: break-all; }
+.qcard-en { font-size: 12px; color: var(--fd-text-3); margin-bottom: 10px; word-break: break-all; }
 .q-badge-hard {
-  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: var(--fd-r-pill);
   font-size: 10.5px; background: rgba(192,132,217,.14); border: 1px solid #8a5aa8; color: #c084d9;
 }
 .qcard-src {
-  margin-top: 10px; font-size: 11px; color: rgba(255,255,255,.35);
-  padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.12);
+  margin-top: 10px; font-size: 11px; color: var(--fd-text-4);
+  padding-top: 8px; border-top: 1px dashed var(--fd-border-lt);
 }
-.q-obtain-more { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 3px; }
+.q-obtain-more { font-size: 11px; color: var(--fd-text-4); margin-top: 3px; }
 .q-hard-note {
-  margin-top: 8px; font-size: 11px; color: rgba(255,255,255,.4);
-  padding-top: 8px; border-top: 1px dashed rgba(255,255,255,.12);
+  margin-top: 8px; font-size: 11px; color: var(--fd-text-4);
+  padding-top: 8px; border-top: 1px dashed var(--fd-border-lt);
 }
 
-
-/* 手机端：任务卡 / 装备卡底部抽屉（与 #infoCard 一致） */
+/* 手机端：全站卡片统一底部抽屉（≤760px 贴底） */
 @media (max-width: 760px) {
-  #questCard, #equipCard {
+  #infoCard, #questCard, #equipCard, #chestCard, #campCard {
     left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; max-width: none;
     max-height: 55vh; overflow-y: auto;
-    border-color: rgba(234,194,126,.4);
-    box-shadow: 0 0 0 1px rgba(234,194,126,.25), rgba(0,0,0,.55);
+    border-color: var(--fd-gold-dim);
+    box-shadow: 0 0 0 1px rgba(242,201,76,.25), var(--fd-shadow-card);
   }
-  /* 手机抽屉：获取来源坐标沿用 grid 1-3 列自适应（窄屏自动降列） */
 }
+
+/* =====================================================================
+ * BOTWmap 卡片联邦体系（V1.6.5 重构）
+ * 遵循六段骨架：Grip → Head → Title → Meta(fd-row) → Body(fd-sec) → Actions
+ * ===================================================================== */
+
+/* 卡片通用外壳（毛玻璃墨绿黑） */
+.fd-card {
+  --card-bg: var(--fd-bg-card);
+  --card-bd: var(--fd-border-card);
+  --card-accent: var(--fd-gold);
+  --card-label: var(--fd-text-3);
+  --card-value: var(--fd-text-1);
+
+  background: var(--card-bg);
+  border: 1px solid var(--card-bd);
+  border-radius: var(--fd-r-card);
+  box-shadow: var(--fd-shadow-card);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 14px 16px 16px;
+  font-size: 13px;
+  color: var(--card-value);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.14) transparent;
+}
+
+/* 头部：分类 Chip + 翻页 + 关闭 */
+.fd-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; user-select: none;
+}
+.fd-card-head-left { display: flex; align-items: center; gap: 6px; }
+.fd-card-head-acts { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.fd-card-close {
+  width: 22px; height: 22px; padding: 0; line-height: 1; border: none;
+  background: transparent; color: var(--fd-text-3); font-size: 19px;
+  cursor: pointer; border-radius: var(--fd-r-sm); transition: .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.fd-card-close:hover { color: #fff; background: rgba(255,255,255,.1); }
+
+/* 标题行：序号/徽章 + 主名称 + 复制 */
+.fd-card-titlerow {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
+}
+.fd-card-name {
+  font-size: 17px; font-weight: 700; line-height: 1.35; color: var(--fd-text-1);
+  word-break: break-word; flex: 1; min-width: 0; margin: 0;
+}
+.fd-copy {
+  flex: 0 0 auto; padding: 1px 6px; border-radius: var(--fd-r-sm); cursor: pointer;
+  background: transparent; font-size: 11px; line-height: 1.5; transition: .15s;
+  border: 1px solid rgba(163,135,69,.45); color: var(--fd-gold-light);
+}
+.fd-copy:hover { color: #fff; border-color: var(--fd-gold); background: rgba(242,201,76,.12); }
+.fd-card-en { font-size: 12px; color: var(--fd-text-3); margin-top: -4px; margin-bottom: 8px; word-break: break-all; }
+
+/* 翻页微按钮（‹ ›） */
+.fd-nav-btn {
+  width: 22px; height: 22px; padding: 0; line-height: 1;
+  border: 1px solid rgba(255,255,255,.2); background: transparent;
+  color: var(--fd-text-3); font-size: 13px; border-radius: var(--fd-r-sm);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: .15s;
+}
+.fd-nav-btn:hover { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.4); }
+
+/* 零件 1：FD-ROW · 键值行（统一 44px label，彻底消除犬牙交错） */
+.fd-row {
+  display: flex; align-items: baseline; gap: 8px; margin: 3px 0;
+  font-size: 12.5px; line-height: 1.65;
+}
+.fd-l {
+  flex: 0 0 44px; color: var(--card-label);
+  letter-spacing: .25em; user-select: none; font-size: 12px;
+}
+.fd-v {
+  flex: 1; min-width: 0; color: var(--card-value); word-break: break-word;
+}
+.fd-v-accent { color: var(--fd-gold); font-weight: 500; }
+.fd-v-blue   { color: var(--fd-shiekah-blue); font-weight: 500; }
+.fd-empty    { color: var(--fd-text-5); }
+.fd-dim      { color: var(--fd-text-4); font-size: 11.5px; margin-left: 4px; }
+.fd-num      { font-variant-numeric: tabular-nums; }
+.fd-arrow    { color: #7ec8a9; font-weight: 600; margin: 0 2px; }
+
+/* 零件 2：FD-SEC · 二级分区 */
+.fd-sec {
+  border-top: 1px solid var(--fd-border-lt); padding: 8px 0 2px; margin-top: 8px;
+}
+.fd-sec:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+.fd-sec-t {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 5px;
+  font-size: 11.5px; letter-spacing: .2em; color: var(--fd-gold-dim);
+}
+.fd-sec-b { font-size: 12.5px; line-height: 1.65; color: var(--fd-text-2); }
+.fd-src {
+  margin-left: auto; padding: 1px 5px; border-radius: var(--fd-r-pill); letter-spacing: 0;
+  font-size: 10px; color: rgba(255,255,255,.35); border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.05);
+}
+
+/* 零件 3：FD-CHIP · 分类标签 */
+.fd-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--fd-r-pill); white-space: nowrap;
+  font-size: 11px; line-height: 1.5; font-weight: 500;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.75);
+  border: 1px solid transparent;
+}
+.fd-chip-gold    { background: rgba(242,201,76,.12); color: var(--fd-gold); border-color: rgba(242,201,76,.35); }
+.fd-chip-shiekah { background: var(--fd-shiekah-blue-bg); color: var(--fd-shiekah-blue); border-color: rgba(76,212,242,.35); }
+.fd-chip-blue    { background: rgba(111,179,224,.16); color: #6fb3e0; border-color: rgba(111,179,224,.35); }
+.fd-chip-green   { background: rgba(126,200,169,.16); color: #7ec8a9; border-color: rgba(126,200,169,.35); }
+.fd-chip-purple  { background: rgba(184,160,232,.16); color: #c4b0f0; border-color: rgba(184,160,232,.35); }
+.fd-chip-warn    { background: rgba(224,102,95,.15); color: #ffa49e; border-color: rgba(224,102,95,.35); }
+
+/* 零件 4：FD-ACT · 底部统一操作栏 */
+.fd-actions { display: flex; gap: 8px; margin-top: 12px; }
+.fd-actions .btn, .fd-actions button {
+  flex: 1; min-width: 0; min-height: 40px; padding: 9px 4px;
+  border-radius: var(--fd-r-ctl); font-size: 13px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; font-family: inherit;
+  transition: .15s; display: inline-flex; align-items: center; justify-content: center;
+}
+.fd-actions .btn:active, .fd-actions button:active { transform: scale(.97); }
+.fd-actions .btn.primary {
+  background: var(--fd-gold); color: #2e2410; border-color: var(--fd-gold);
+}
+.fd-actions .btn.primary:hover { filter: brightness(1.1); }
+.fd-actions .btn.ghost {
+  background: transparent; border-color: rgba(255,255,255,.18); color: var(--fd-text-2);
+}
+.fd-actions .btn.ghost:hover { border-color: var(--fd-gold-dim); color: var(--fd-gold); }
+.fd-actions .btn.done-btn {
+  background: rgba(58,167,109,.16); border-color: rgba(74,222,128,.4); color: #8fd79c;
+}
+.fd-actions .btn.danger {
+  background: transparent; border-color: rgba(224,102,95,.4); color: var(--fd-danger);
+}
+.fd-actions .btn.danger:hover { background: rgba(224,102,95,.15); }
+
 

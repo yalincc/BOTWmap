@@ -5,16 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=53&b=1641016">
-<!-- V1.6.1 宝箱卡片：与 #questCard/#equipCard 同款视觉（不动 style.css，内联在 index.html） -->
+<link rel="stylesheet" href="css/style.css?v=54&b=1641016">
 <style>
-#chestCard{position:absolute;z-index:21;width:350px;max-width:calc(100vw - 24px);max-height:78vh;overflow-y:auto;pointer-events:auto;background:rgba(28,30,36,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:14px 16px 16px;font-size:13px;color:rgba(255,255,255,.85);}
-#chestCard.hidden{display:none;}
-@media (max-width:760px){#chestCard{left:8px;right:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;overflow-y:auto;border-color:rgba(234,194,126,.4);}}
-/* V1.6.4 P4c 营地卡片：与 #chestCard 同款视觉 */
-#campCard{position:absolute;z-index:21;width:350px;max-width:calc(100vw - 24px);max-height:78vh;overflow-y:auto;pointer-events:auto;background:rgba(28,30,36,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:14px 16px 16px;font-size:13px;color:rgba(255,255,255,.85);}
-#campCard.hidden{display:none;}
-@media (max-width:760px){#campCard{left:8px;right:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;overflow-y:auto;border-color:rgba(224,112,58,.45);}}
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
 .cp-wlink:hover{background:rgba(125,211,160,.14);border-color:rgba(125,211,160,.6);}
@@ -300,30 +292,30 @@
       </div>
     </div>
 
-    <!-- 信息卡片 -->
-    <div id="infoCard" class="hidden">
-      <div class="card-head">
-        <span id="cardCat" class="chip"></span>
-        <button id="cardClose" class="card-close">×</button>
+    <!-- 信息卡片（V1.6.5 卡片系统重构） -->
+    <div id="infoCard" class="fd-card hidden">
+      <div class="card-head fd-card-head">
+        <span id="cardCat" class="chip fd-chip"></span>
+        <button id="cardClose" class="card-close fd-card-close" aria-label="关闭">×</button>
       </div>
-      <h3 id="cardName"></h3>
-      <div id="cardEn" class="card-en"></div>
-      <!-- 材料卡片（TOTK 风格，v1.4.0）：图鉴图 + 区域/坐标/位置 meta + 用途 -->
+      <h3 id="cardName" class="fd-card-name"></h3>
+      <div id="cardEn" class="card-en fd-card-en"></div>
+      <!-- 材料卡片：图鉴图 + 区域/坐标/位置 meta + 用途 -->
       <img id="cardImg" class="card-img hidden" src="" alt="">
       <div id="cardMeta" class="card-meta hidden">
-        <div class="meta-row"><span class="meta-label">区域</span><span class="meta-val" id="cardMetaRegion"></span></div>
-        <div class="meta-row"><span class="meta-label">坐标</span><span class="meta-val" id="cardMetaCoord"></span></div>
-        <div class="meta-row"><span class="meta-label">位置</span><span class="meta-val" id="cardMetaPos"></span></div>
+        <div class="meta-row fd-row"><span class="meta-label fd-l">区域</span><span class="meta-val fd-v" id="cardMetaRegion"></span></div>
+        <div class="meta-row fd-row"><span class="meta-label fd-l">坐标</span><span class="meta-val fd-v fd-num" id="cardMetaCoord"></span></div>
+        <div class="meta-row fd-row"><span class="meta-label fd-l">位置</span><span class="meta-val fd-v" id="cardMetaPos"></span></div>
       </div>
-      <div id="cardUsage" class="card-usage hidden"><span class="usage-label">用途</span><span id="cardUsageVal"></span></div>
+      <div id="cardUsage" class="card-usage fd-row hidden"><span class="usage-label fd-l">用途</span><span id="cardUsageVal" class="fd-v fd-v-accent"></span></div>
       <div class="card-body">
-        <div id="cardRegion" class="row"></div>
-        <div id="cardTower" class="row"></div>
-        <div id="cardCoord" class="row"></div>
+        <div id="cardRegion" class="row fd-row"></div>
+        <div id="cardTower" class="row fd-row"></div>
+        <div id="cardCoord" class="row fd-row"></div>
         <div id="cardKorok" class="hidden"></div>
-        <div id="cardExtra" class="row"></div>
+        <div id="cardExtra" class="row fd-row"></div>
       </div>
-      <div class="card-actions">
+      <div class="card-actions fd-actions">
         <button id="cardNav" class="primary nav hidden">导航</button>
         <button id="cardCollect" class="primary collect hidden">收集</button>
         <button id="cardDone" class="primary">标记完成</button>

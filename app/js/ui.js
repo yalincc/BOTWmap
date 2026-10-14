@@ -856,9 +856,9 @@ const UI = (() => {
     $('cardUsage').classList.remove('hidden');
     hideBaseRows();
     let extra = '';
-    extra += '<div class="row">图鉴编号<b>' + esc(m.entry) + '</b></div>';
-    if (m.count === 0) extra += '<div class="row">说明<b style="color:#e8b04a">无 MainField 固定刷点（动态生成 / 仅栖息地）</b></div>';
-    extra += '<div class="row">图层<b>' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（点击侧栏「材料」分类下的行开启）') + '</b></div>';
+    extra += '<div class="row fd-row"><span class="fd-l">编号</span><span class="fd-v fd-num">' + esc(m.entry) + '</span></div>';
+    if (m.count === 0) extra += '<div class="row fd-row"><span class="fd-l">说明</span><span class="fd-v" style="color:#e8b04a">无固定刷点（动态生成 / 仅栖息地）</span></div>';
+    extra += '<div class="row fd-row"><span class="fd-l">图层</span><span class="fd-v">' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（点击侧栏「材料」行开启）') + '</span></div>';
     $('cardExtra').innerHTML = extra;
     $('cardKorok').classList.add('hidden');
     $('cardKorok').innerHTML = '';
@@ -892,7 +892,7 @@ const UI = (() => {
     $('cardCat').style.color = '#ffd700';
     let html = '<div class="korok-shot-wrap"><img class="korok-shot" data-src="assets/korok/' + esc(k.img) + '" alt="克洛格 No.' + k.no + ' 位置截图"><span class="korok-zoom">查看原图</span></div>';
     const hint = k.hint_cn || k.hint_en || '';
-    html += '<div class="row">解法<b>' + esc(hint) + '</b></div>';
+    html += '<div class="row fd-row"><span class="fd-l">解法</span><span class="fd-v fd-v-accent">' + esc(hint) + '</span></div>';
     el.innerHTML = html;
     const img = el.querySelector('.korok-shot');
     if (img) {
@@ -947,30 +947,30 @@ const UI = (() => {
     }
     showBaseRows();
     hideMaterialOnly();
-    $('cardRegion').innerHTML = '区域<b>' + (mk.region || '—') + '</b>';
-    $('cardTower').innerHTML = '塔域<b>' + (mk.tower || '—') + '</b>';
-    $('cardCoord').innerHTML = '游戏坐标<b>X ' + gx + ' · Z ' + gz + '</b>';
+    $('cardRegion').innerHTML = '<span class="fd-l">区域</span><span class="fd-v">' + esc(mk.region || '—') + '</span>';
+    $('cardTower').innerHTML = '<span class="fd-l">塔域</span><span class="fd-v">' + esc(mk.tower || '—') + '</span>';
+    $('cardCoord').innerHTML = '<span class="fd-l">坐标</span><span class="fd-v fd-num">X ' + gx + ' · Z ' + gz + '</span>';
     renderKorokBlock(mk);
     let extra = '';
     const ex = mk.extra || {};
-    if (mk.cat === 'seed' && ex.korok_loc) extra += '<div class="row">位置提示<b>' + esc(ex.korok_loc) + '</b></div>';
+    if (mk.cat === 'seed' && ex.korok_loc) extra += '<div class="row fd-row"><span class="fd-l">位置</span><span class="fd-v">' + esc(ex.korok_loc) + '</span></div>';
     if (mk.cat === 'shrine') {
-      if (ex.is_dlc) extra += '<div class="row">类型<b>英杰之诗 DLC 神庙</b></div>';
-      if (ex.icon === 'shrine_resurrection.png') extra += '<div class="row">类型<b>复苏神庙</b></div>';
-      if (ex.type) extra += '<div class="row">试炼<b>' + esc(ex.type) + '</b></div>';
-      if (ex.treasure) extra += '<div class="row">宝藏<b>' + esc(ex.treasure) + '</b></div>';
-      if (ex.quest) extra += '<div class="row">神庙任务<b>' + esc(ex.quest) + '</b></div>';
+      if (ex.is_dlc) extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-blue">英杰之诗 DLC 神庙</span></div>';
+      if (ex.icon === 'shrine_resurrection.png') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-blue">复苏神庙</span></div>';
+      if (ex.type) extra += '<div class="row fd-row"><span class="fd-l">试炼</span><span class="fd-v fd-v-accent">' + esc(ex.type) + '</span></div>';
+      if (ex.treasure) extra += '<div class="row fd-row"><span class="fd-l">宝藏</span><span class="fd-v">' + esc(ex.treasure) + '</span></div>';
+      if (ex.quest) extra += '<div class="row fd-row"><span class="fd-l">任务</span><span class="fd-v">' + esc(ex.quest) + '</span></div>';
     }
-    if (mk.cat === 'memory' && ex.memory_title_en) extra += '<div class="row">回忆<b>#' + ex.memory_no + ' · ' + esc(ex.memory_title_en) + '</b></div>';
-    if (mk.cat === 'memory' && ex.tier === 'final') extra += '<div class="row">类型<b>最终回忆：需找齐 12 张照片后回英帕处激活</b></div>';
-    if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row">任务<b>' + esc(ex.quest_en) + '</b></div>';
-    if (mk.cat === 'objective' && ex.sub) extra += '<div class="row">目标<b>' + esc(ex.sub) + '</b></div>';
-    if (mk.cat === 'beast') extra += '<div class="row">类型<b>神兽·讨伐</b></div>';
+    if (mk.cat === 'memory' && ex.memory_title_en) extra += '<div class="row fd-row"><span class="fd-l">回忆</span><span class="fd-v">#' + ex.memory_no + ' · ' + esc(ex.memory_title_en) + '</span></div>';
+    if (mk.cat === 'memory' && ex.tier === 'final') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-accent">最终回忆：需找齐 12 张照片后回英帕处激活</span></div>';
+    if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row fd-row"><span class="fd-l">任务</span><span class="fd-v">' + esc(ex.quest_en) + '</span></div>';
+    if (mk.cat === 'objective' && ex.sub) extra += '<div class="row fd-row"><span class="fd-l">目标</span><span class="fd-v">' + esc(ex.sub) + '</span></div>';
+    if (mk.cat === 'beast') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-accent">神兽·讨伐</span></div>';
     // 存档同步状态（神庙 / 塔 / 克洛格 / 主线回忆 / 神兽 有存档 flag）
     if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed' || mk.cat === 'memory' || mk.cat === 'beast' ||
         mk.cat === 'hinox' || mk.cat === 'talus' || mk.cat === 'molduga') {   /* V1.6.4：讨伐三族显示存档态 */
-      if (liveDone) extra += '<div class="row">存档<b style="color:#7dffa0">游戏内已收集 ✓</b></div>';
-      else if (map.live && map.live.counts) extra += '<div class="row">存档<b style="color:#e8b04a">游戏内未收集</b></div>';
+      if (liveDone) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#7dffa0">游戏内已收集 ✓</span></div>';
+      else if (map.live && map.live.counts) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#e8b04a">游戏内未收集</span></div>';
     }
     $('cardExtra').innerHTML = extra;
     $('cardDone').classList.toggle('hidden', done);
@@ -1008,10 +1008,10 @@ const UI = (() => {
     $('cardEn').textContent = '';
     showBaseRows();
     hideMaterialOnly();
-    $('cardRegion').innerHTML = '区域<b>自定义</b>';
-    $('cardTower').innerHTML = '坐标<b>X ' + gx + ' · Z ' + gz + '</b>';
+    $('cardRegion').innerHTML = '<span class="fd-l">区域</span><span class="fd-v">自定义</span>';
+    $('cardTower').innerHTML = '<span class="fd-l">坐标</span><span class="fd-v fd-num">X ' + gx + ' · Z ' + gz + '</span>';
     $('cardCoord').innerHTML = '';
-    $('cardExtra').innerHTML = c.note ? '<div class="row">备注<b>' + esc(c.note) + '</b></div>' : '';
+    $('cardExtra').innerHTML = c.note ? '<div class="row fd-row"><span class="fd-l">备注</span><span class="fd-v">' + esc(c.note) + '</span></div>' : '';
     $('cardKorok').classList.add('hidden');
     $('cardKorok').innerHTML = '';
     $('cardDone').classList.add('hidden');
