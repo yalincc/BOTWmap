@@ -85,7 +85,9 @@
   /* 搜索索引（供 ui.js doSearch 调用） */
   function buildSearch() {
     global.__questSearch = D.QUESTS.map(function (q) {
-      return { q: q, name: q.name, en: q.en, catCn: '任务·' + (D.CAT_NAME[q.cat] || q.cat), pts: q.pts };
+      var seq = (q.no != null) ? q.no : (q.key || '');
+      var searchName = (seq ? '#' + seq + ' ' : '') + q.name;
+      return { q: q, name: q.name, seq: seq, searchName: searchName, en: q.en, catCn: '任务·' + (D.CAT_NAME[q.cat] || q.cat), pts: q.pts };
     });
   }
 

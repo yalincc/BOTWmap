@@ -461,6 +461,7 @@
     /* P4a：属性徽章（火/冰/雷）+ 强装徽章（attack>=50 或盾 guard>=70） */
     if (it.element) h += '<span class="q-badge-hard" style="background:' + (ELEM_COLOR[it.element] || '#888') + '22;border-color:' + (ELEM_COLOR[it.element] || '#888') + ';color:' + (ELEM_COLOR[it.element] || '#ccc') + '">' + esc(it.element) + '属性</span>';
     if (it.strong) h += '<span class="q-badge-hard" style="background:rgba(242,201,76,.14);border-color:#f2c94c;color:#f2c94c">强装</span>';
+    if (done) h += '<span class="tk-done-tick" title="已完成">✓</span>';
     var eIdx = -1;
     for (var ii = 0; ii < ITEMS.length; ii++) { if (ITEMS[ii].id === it.id) { eIdx = ii; break; } }
     h += '<span class="tk-grip-acts">' +
@@ -468,11 +469,10 @@
       (eIdx < ITEMS.length - 1 && eIdx >= 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqNext" title="下一件装备">›</button>' : '') +
       '<button type="button" class="tk-close" id="eqCardClose" title="关闭">×</button></span>';
     h += '</div>';
-    /* 标题行：装备名 + [复制]（V1.6.2：⧉ 图标改文字，紧跟名字）+ 完成绿勾 */
+    /* 标题行：装备名 + [复制]（V1.6.2：⧉ 图标改文字，紧跟名字） */
     h += '<div class="tk-title-row">' +
       '<h3 class="tk-name">' + (eIdx >= 0 ? '#' + (eIdx + 1) + ' ' : '') + esc(it.name || '名称待补充') + '</h3>' +
       '<button type="button" class="tk-copy" id="eqCopy" title="复制装备名">[复制]</button>' +
-      (done ? '<span class="tk-done-tick" title="已完成">✓</span>' : '') +
       '</div>';
     if (it.en) h += '<div class="qcard-en">' + esc(it.en) + '</div>';
     if (it.stub) h += '<div class="tk-none">该武器暂无静态数据（仅有收集标记，图鉴信息待补充）</div>';
@@ -664,8 +664,11 @@
       }
       /* P4a：纯营地掉落武器无宝箱点 → 回落营地首个刷点，保证搜索命中可定位 */
       if (!first) { var cp = locateCampPt(it, 0); if (cp) first = cp; }
+      var eIdx = ITEMS.indexOf(it);
+      var seq = eIdx >= 0 ? (eIdx + 1) : '';
+      var searchName = (seq ? '#' + seq + ' ' : '') + it.name;
       return {
-        e: it, kind: it.kind, name: it.name, en: it.en,
+        e: it, kind: it.kind, name: it.name, seq: seq, searchName: searchName, en: it.en,
         catCn: '装备·' + CAT_NAME[it.kind], pts: first,
         region: ''
       };

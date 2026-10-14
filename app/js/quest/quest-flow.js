@@ -101,7 +101,7 @@
     });
   }
 
-  /* 可见地图区（扣掉左侧栏 + 打开的任务卡），避免流程点被 UI 盖住 */
+  /* 可见地图区（扣掉左侧栏），避免流程点被左侧栏盖住 */
   function availRect() {
     var L = 0, T = 0, R = map.w, B = map.h;
     var sb = document.getElementById('sidebar');
@@ -109,12 +109,13 @@
       var r = sb.getBoundingClientRect();
       if (r.width > 0 && r.left <= 4) L = Math.max(L, r.right);
     }
-    var card = document.getElementById('questCard');
-    if (card && !card.classList.contains('hidden')) {
-      var cr = card.getBoundingClientRect();
-      if (cr.top > map.h * 0.3 && cr.bottom > map.h * 0.72) B = Math.min(B, cr.top - 10);          /* 底部抽屉 */
-      else if (cr.left > map.w * 0.5) R = Math.min(R, cr.left - 12);                              /* 卡片在右半 */
-      else if (cr.right < map.w * 0.5) L = Math.max(L, cr.right + 12);                             /* 卡片在左半 */
+    /* 仅手机端抽屉扣掉下半屏 */
+    if (window.innerWidth <= 760) {
+      var card = document.getElementById('questCard');
+      if (card && !card.classList.contains('hidden')) {
+        var cr = card.getBoundingClientRect();
+        if (cr.top > map.h * 0.3) B = Math.min(B, cr.top - 10);
+      }
     }
     if (R - L < 220) R = Math.min(map.w, L + 220);
     if (B - T < 170) B = Math.min(map.h, T + 170);
@@ -143,6 +144,13 @@
     map.view.x = cx - (minx + maxx) / 2 * s;
     map.view.y = cy - (miny + maxy) / 2 * s;
     map.draw();
+
+    /* PC 端连线居中后，卡片避让到连线侧边（避免挡住居中的连线） */
+    var card = document.getElementById('questCard');
+    if (card && map.layoutCard && window.innerWidth > 760) {
+      card.dataset.manual = '';
+      map.layoutCard(card, cx, cy);
+    }
   }
 
   /* ---------- 对外 ---------- */

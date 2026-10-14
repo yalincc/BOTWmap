@@ -486,7 +486,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 
 /* ---------- 信息卡片（V1.6.5 卡片系统升级） ---------- */
 #infoCard {
-  position: absolute; z-index: 20; width: 310px;
+  position: absolute; z-index: 20; width: 350px; max-width: calc(100vw - 24px);
   background: var(--fd-bg-card);
   border: 1px solid var(--fd-border-card);
   border-radius: var(--fd-r-card);
@@ -498,8 +498,16 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   color: var(--fd-text-1);
 }
 .card-head {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
-  cursor: move; touch-action: none; user-select: none; -webkit-user-select: none;
+  display: flex; align-items: center; gap: 6px; margin-bottom: 8px;
+  cursor: grab; padding: 2px 0; margin-left: -2px; margin-right: -2px;
+  border-bottom: 1px solid var(--fd-border-lt); padding-bottom: 6px;
+  touch-action: none;
+}
+.card-head:active { cursor: grabbing; }
+.card-head::before {
+  content: ""; flex: 0 0 auto; width: 11px; height: 9px; opacity: .4;
+  background-image: radial-gradient(currentColor 1px, transparent 1.1px);
+  background-size: 3.5px 3.5px; color: rgba(255,255,255,.9);
 }
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
@@ -513,10 +521,11 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 }
 .card-close:hover { color: #fff; background: rgba(255,255,255,.1); }
 #cardName {
-  font-size: 17px; font-weight: 700; margin-bottom: 3px; color: var(--fd-text-1);
-  line-height: 1.35; word-break: break-word;
+  font-size: 15px; font-weight: 700; margin-bottom: 0; color: var(--fd-text-1);
+  line-height: 1.35; word-break: break-word; flex: 1; min-width: 0;
 }
-#cardEn { font-size: 12px; color: var(--fd-text-3); margin-bottom: 10px; word-break: break-all; }
+#cardEn { font-size: 12px; color: var(--fd-text-3); margin-bottom: 8px; word-break: break-all; }
+#cardExtra { display: block; width: 100%; }
 
 /* 材料卡片（TOTK 风格，v1.4.0）：图鉴图 + 区域/坐标/位置 meta + 用途 */
 .card-img {

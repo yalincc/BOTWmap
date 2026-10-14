@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=54&b=1641016">
+<link rel="stylesheet" href="css/style.css?v=55&b=1641016">
 <style>
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
@@ -294,12 +294,18 @@
 
     <!-- 信息卡片（V1.6.5 卡片系统重构） -->
     <div id="infoCard" class="fd-card hidden">
-      <div class="card-head fd-card-head">
-        <span id="cardCat" class="chip fd-chip"></span>
-        <button id="cardClose" class="card-close fd-card-close" aria-label="关闭">×</button>
+      <div class="card-head fd-card-head tk-grip">
+        <span id="cardCat" class="chip fd-chip tk-chip"></span>
+        <span id="cardDoneTick" class="tk-done-tick hidden" title="已完成">✓</span>
+        <span class="tk-grip-acts" id="cardHeadActs">
+          <button id="cardClose" class="card-close fd-card-close tk-close" aria-label="关闭">×</button>
+        </span>
       </div>
-      <h3 id="cardName" class="fd-card-name"></h3>
-      <div id="cardEn" class="card-en fd-card-en"></div>
+      <div class="tk-title-row">
+        <h3 id="cardName" class="fd-card-name tk-name"></h3>
+        <button type="button" class="tk-copy" id="cardCopyBtn" title="复制名称">[复制]</button>
+      </div>
+      <div id="cardEn" class="card-en fd-card-en qcard-en"></div>
       <!-- 材料卡片：图鉴图 + 区域/坐标/位置 meta + 用途 -->
       <img id="cardImg" class="card-img hidden" src="" alt="">
       <div id="cardMeta" class="card-meta hidden">
@@ -313,7 +319,7 @@
         <div id="cardTower" class="row fd-row"></div>
         <div id="cardCoord" class="row fd-row"></div>
         <div id="cardKorok" class="hidden"></div>
-        <div id="cardExtra" class="row fd-row"></div>
+        <div id="cardExtra"></div>
       </div>
       <div class="card-actions fd-actions">
         <button id="cardNav" class="primary nav hidden">导航</button>
@@ -358,7 +364,7 @@
 <script src="js/map.js?v=38&b=1641016"></script>
 <script src="js/card-layout.js?v=5&b=1641016"></script>
 <script src="js/spot-mark.js?v=1&b=1641016"></script>
-<script src="js/ui.js?v=56&b=1641016"></script>
+<script src="js/ui.js?v=57&b=1641016"></script>
 <script src="js/main.js?v=10&b=1641016"></script>
 <script src="js/live.js?v=14&b=1641016"></script>
 <script src="data/save_flags.js?v=1&b=1641016"></script>
@@ -374,8 +380,8 @@
 <script src="js/quest/quest-data.js?v=1&b=1641016"></script>
 <script src="js/quest/quest-done.js?v=1&b=1641016"></script>
 <script src="js/quest/quest-canvas.js?v=1&b=1641016"></script>
-<script src="js/quest/quest-flow.js?v=2&b=1641016"></script>
-<script src="js/quest/quest-panel.js?v=1&b=1641016"></script>
+<script src="js/quest/quest-flow.js?v=3&b=1641016"></script>
+<script src="js/quest/quest-panel.js?v=2&b=1641016"></script>
 <script src="js/quest/quest-card.js?v=4&b=1641016"></script>
 <script src="js/quest.js?v=25&b=1641016"></script>
 <!-- P4a：武器图鉴库（196 条，含营地来源）+ 营地刷点表（卡片内定位反查，L3 图层属 P4c） -->
@@ -383,7 +389,7 @@
 <script src="data/weapons.js?v=1&b=1641016"></script>
 <script src="data/armors.js?v=1&b=1641016"></script>
 <script src="data/camp_weapons.js?v=1&b=1641016"></script>
-<script src="js/equip.js?v=24&b=1641016"></script>
+<script src="js/equip.js?v=25&b=1641016"></script>
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
 <script src="data/chests.js?v=1&b=1641016"></script>
 <script src="js/chest.js?v=15&b=1641016"></script>
