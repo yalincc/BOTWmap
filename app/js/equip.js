@@ -508,11 +508,13 @@
     var obtainHtml = '';
     if (normalPts.length) obtainHtml += '<div class="eq-obtain-h">普通模式宝箱<span class="tk-src">' + normalPts.length + ' 处</span></div>' + ptsHtml(normalPts, 'fp-normal', 0);
     if (hardPts.length) obtainHtml += '<div class="eq-obtain-h fp-hard-h">大师模式宝箱<span class="tk-src">' + hardPts.length + ' 处</span></div>' + ptsHtml(hardPts, 'fp-hard', normalPts.length);
-    /* P4a：怪物营地掉落段（dex camps 已按 actor 聚合；点击反查 CAMP_WEAPONS 定位到刷点） */
+    /* P4a：怪物营地掉落段（dex camps 已按 actor 聚合；点击反查 CAMP_WEAPONS 定位到刷点）
+       V1.6.4：默认收起为一行（老大反馈占位太大），点表头展开/收起列表 */
     var campHtml = '';
     if (it.camps && it.camps.length) {
-      campHtml = '<div class="eq-obtain-h eq-camp-h">怪物营地掉落<span class="tk-src">' + it.camps.length + ' 种怪物</span></div>' +
-        '<div class="flow-pts">' + it.camps.map(function (c, i) {
+      campHtml = '<div class="eq-obtain-h eq-camp-h" id="eqCampToggle" style="cursor:pointer" title="点击展开 / 收起怪物清单">' +
+        '怪物营地掉落<span class="tk-src">' + it.camps.length + ' 种怪物 ▸</span></div>' +
+        '<div class="flow-pts" id="eqCampList" style="display:none">' + it.camps.map(function (c, i) {
           return '<span class="fp fp-camp" data-eq-camp="' + i + '" title="点击定位到' + esc(c.t || c.m) + '的刷点（' + c.n + ' 处；档位为初始数据，血月后怪物档位会升）">' +
             '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(c.t || c.m) + ' · ' + c.n + '刷点</span></span>';
         }).join('') + '</div>';
@@ -558,6 +560,15 @@
         else if (typeof UI !== 'undefined' && UI.toast) UI.toast('未找到该武器的营地刷点坐标');
       }
       positionCard();
+    });
+    /* V1.6.4：营地段展开/收起 */
+    var tg = document.getElementById('eqCampToggle');
+    if (tg) tg.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var list = document.getElementById('eqCampList');
+      var open = list.style.display !== 'none';
+      list.style.display = open ? 'none' : '';
+      tg.querySelector('.tk-src').textContent = it.camps.length + ' 种怪物 ' + (open ? '▸' : '▾');
     });
     /* P4a：营地条目点击 → 反查 CAMP_WEAPONS 定位 + 红点脉冲 */
     body.querySelectorAll('.fp[data-eq-camp]').forEach(function (btn) {
