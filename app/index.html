@@ -11,6 +11,18 @@
 #chestCard{position:absolute;z-index:21;width:350px;max-width:calc(100vw - 24px);max-height:78vh;overflow-y:auto;pointer-events:auto;background:rgba(28,30,36,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:14px 16px 16px;font-size:13px;color:rgba(255,255,255,.85);}
 #chestCard.hidden{display:none;}
 @media (max-width:760px){#chestCard{left:8px;right:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;overflow-y:auto;border-color:rgba(234,194,126,.4);}}
+/* V1.6.4 P4c 营地卡片：与 #chestCard 同款视觉 */
+#campCard{position:absolute;z-index:21;width:350px;max-width:calc(100vw - 24px);max-height:78vh;overflow-y:auto;pointer-events:auto;background:rgba(28,30,36,.97);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:14px 16px 16px;font-size:13px;color:rgba(255,255,255,.85);}
+#campCard.hidden{display:none;}
+@media (max-width:760px){#campCard{left:8px;right:8px;bottom:8px;top:auto;width:auto;max-width:none;max-height:55vh;overflow-y:auto;border-color:rgba(224,112,58,.45);}}
+/* P4c：营地行图标（侧栏小圆点）+ 卡片内补充样式 */
+.cp-row-ic{display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 6px 0 2px;flex:none;border:1.5px solid rgba(255,255,255,.85);box-sizing:border-box;}
+.cp-wmeta{font-style:normal;color:rgba(255,255,255,.55);margin-left:6px;}
+.cp-foot{font-size:11px;color:rgba(255,255,255,.45);line-height:1.5;margin:6px 0 2px;}
+.cp-empty{font-size:12px;color:rgba(255,255,255,.4);padding:4px 0;}
+.cp-lynel-h{margin:10px 0 4px;padding-top:8px;border-top:1px solid rgba(125,211,160,.35);color:#7dd3a0;font-size:12px;font-weight:600;}
+.cp-lynel-row{display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:12px;}
+.cp-lynel-tier{color:rgba(255,255,255,.5);font-size:11px;}
 /* P4a：装备卡片「怪物营地掉落」段绿色变体（与大师模式紫同模式） */
 .flow-pts .fp.fp-camp{border-color:rgba(125,211,160,.5);}
 .flow-pts .fp.fp-camp .num{color:#7dd3a0;}
@@ -331,6 +343,11 @@
     <div id="chestCard" class="hidden">
       <div id="chestCardBody"></div>
     </div>
+
+    <!-- 营地卡片（V1.6.4 / P4c）：点怪物营地图标查看怪物/档位/手持武器清单 -->
+    <div id="campCard" class="hidden">
+      <div id="campCardBody"></div>
+    </div>
   </main>
 
 </div>
@@ -373,6 +390,7 @@
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
 <script src="data/chests.js?v=1"></script>
 <script src="js/chest.js?v=15"></script>
+<script src="js/camp.js?v=1"></script>
 </body>
 </html>
 
