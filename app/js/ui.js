@@ -196,13 +196,26 @@ const UI = (() => {
       if (window.innerWidth <= 760) return;                  /* 手机：底部抽屉，不拖 */
       if (e.target.closest('.tk-close, .card-close, .btn, button, .co-link, a')) return;
       if (touchGuard && e.pointerType === 'touch' && !e.target.closest('.tk-grip')) return;
-      e.preventDefault();
-      var r0 = card.getBoundingClientRect();
-      var offX = e.clientX - r0.left, offY = e.clientY - r0.top;
-      /* 指针捕获：拖动中指针移出卡片/窗口也不丢 move/up，click 仍落在卡片内 */
-      try { card.setPointerCapture(e.pointerId); } catch (err) {}
+      /* ★ V1.6.4 修复（老大实测「装备卡所有位置点无法定位」根因）：
+         原实现 pointerdown 立即 preventDefault + setPointerCapture，
+         真实点击卡片内非按钮内容（获取点位行 / 营地武器链 / 流程点）时，
+         click 被重定向到卡片本体，行监听器永远收不到（合成 el.click() 绕过
+         指针系统，所以 verify 一直全绿——盲区）。
+         改为「移动超 5px 才起拖」：按下只记起点；真拖起来再捕获+禁选中。 */
+      var sx0 = e.clientX, sy0 = e.clientY, pid = e.pointerId, started = false;
+      var offX = 0, offY = 0, r0 = null;
 
       var move = function (ev) {
+        if (!started) {
+          if (Math.abs(ev.clientX - sx0) + Math.abs(ev.clientY - sy0) < 5) return;
+          started = true;
+          r0 = card.getBoundingClientRect();
+          offX = sx0 - r0.left; offY = sy0 - r0.top;   /* 用按下点算偏移，move 中途换算不抖 */
+          try { card.setPointerCapture(pid); } catch (err) {}
+          card.style.userSelect = 'none';
+          card._dragged = true;
+        }
+        ev.preventDefault();
         /* ★ 宿主坐标归一：left/top 相对卡片定位容器 #mapArea，不是视口 */
         var p = window.CardLayout
           ? window.CardLayout.toHost(ev.clientX - offX, ev.clientY - offY)
@@ -217,13 +230,15 @@ const UI = (() => {
         card.style.left = left + 'px'; card.style.top = top + 'px';
         card.style.right = 'auto'; card.style.bottom = 'auto';
         card.dataset.manual = '1';
-        card._dragged = true;
       };
       var up = function () {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', up);
         window.removeEventListener('pointercancel', up);
-        try { card.releasePointerCapture(e.pointerId); } catch (err) {}
+        if (started) {
+          try { card.releasePointerCapture(pid); } catch (err) {}
+          card.style.userSelect = '';
+        }
         /* 延到本次 click 之后再清除，否则关闭逻辑还是会吃掉这一下 */
         setTimeout(function () { card._dragged = false; }, 0);
       };

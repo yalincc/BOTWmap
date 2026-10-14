@@ -69,8 +69,8 @@
     });
   });
   var SUB_NAME = { hot: '营地刷点·精选', all: '营地刷点·全部' };
-  /* 图钉图标（job_08，星星气泡 pin；针尖锚在营地据点上，大小随缩放同宝箱） */
-  var PIN_ICON = 'assets/icons/camp_pin.png';
+  /* 营地图标（map_12 靶心；icon 底部锚在营地据点上，大小随缩放同宝箱） */
+  var PIN_ICON = 'assets/icons/camp_target.png';
   var pinImg = new Image();
   pinImg.src = PIN_ICON;
   /* 悬停名称条文案：名字 + 掉落物（map.js _hoverLabel 对 camp 类型读 _name） */
@@ -270,6 +270,15 @@
     body.innerHTML = h;
     card.classList.remove('hidden');
 
+    /* 武器清单直绑（除 document 级委托外的双保险：闭包内逐行 addEventListener） */
+    body.querySelectorAll('.cp-wlink[data-wid]').forEach(function (el) {
+      el.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        card.classList.add('hidden');
+        var w = DEX[el.dataset.wid];
+        if (w && window.EquipPanel && window.EquipPanel.openCard) window.EquipPanel.openCard(w);
+      });
+    });
     var closer = document.getElementById('cpCardClose');
     if (closer) closer.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -399,6 +408,7 @@
       if (window.initCardDrag && cc) window.initCardDrag(cc);
       hookSelect();
       ready = true;
+      if (window.console && console.log) console.log('[BOTWmap] camp.js v3 ready（图层钩子已注册）');
       map.draw();
     };
     if (document.readyState === 'loading') {

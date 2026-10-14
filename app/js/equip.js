@@ -509,9 +509,8 @@
     if (it.camps && it.camps.length) {
       campHtml = '<div class="eq-obtain-h eq-camp-h">怪物营地掉落<span class="tk-src">' + it.camps.length + ' 种怪物</span></div>' +
         '<div class="flow-pts">' + it.camps.map(function (c, i) {
-          /* V1.6.4：紧凑数字 chip（占位过大反馈），怪物/档位/刷点数进悬停提示 */
-          return '<span class="fp fp-camp" data-eq-camp="' + i + '" title="怪物：' + esc(c.m || c.t || '—') + '（档位：' + esc(c.t || '—') + ' · ' + c.n + ' 刷点）· 点击定位到刷点（初始档，血月后升档）">' +
-            '<span class="num">' + (i + 1) + '</span></span>';
+          return '<span class="fp fp-camp" data-eq-camp="' + i + '" title="点击定位到' + esc(c.t || c.m) + '的刷点（' + c.n + ' 处；档位为初始数据，血月后怪物档位会升）">' +
+            '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(c.t || c.m) + ' · ' + c.n + '刷点</span></span>';
         }).join('') + '</div>';
     }
     if (!obtainHtml && !campHtml) obtainHtml = '<div class="tk-none">暂无获取点（商店购买 / 纯野外掉落不收录）</div>';
