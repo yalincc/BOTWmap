@@ -39,6 +39,8 @@ const SAVE_UPLOAD = (() => {
     // P4b：武器收集反查表：hash -> flagName（weapon_collect_save.js 的 isGet 表）
     buildWeaponHash();
     buildPbHash();
+    buildPbMat();
+    buildPbEnemy();
     buildEnemyHash();
     // V1.6.4：恢复上次存档同步的扩展计数（localStorage 展示缓存，权威每次随存档重注入——同 ChestSync 模式）
     try {
@@ -204,6 +206,28 @@ const SAVE_UPLOAD = (() => {
   /* V1.6.4：图鉴登记（PB）查找表——weapon_collect_save.js 的 pictureBook 表（flagName -> hash）。
      拍照图鉴登记与 IsGet（获得过）是两组独立 flag：IsGet 捡到即亮，PB 要相机拍照登记。 */
   let pbHashToFlag = null;
+  /* V1.6.4：材料图鉴 = PB_Item(53) + PB_Animal(59) 两族合并 = 112（游戏内图鉴材料页签口径）
+     怪物图鉴 = PB_Enemy（84） */
+  let pbMatSet = null;
+  function buildPbMat() {
+    if (pbMatSet) return;
+    const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
+    pbMatSet = new Set();
+    if (!WS || !WS.pictureBook) return;
+    Object.keys(WS.pictureBook).forEach(function (f) {
+      if (/^IsRegisteredPictureBook_(Item|Animal)_/.test(f)) pbMatSet.add(Number(WS.pictureBook[f]));
+    });
+  }
+  let pbEnemySet = null;
+  function buildPbEnemy() {
+    if (pbEnemySet) return;
+    const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
+    pbEnemySet = new Set();
+    if (!WS || !WS.pictureBook) return;
+    Object.keys(WS.pictureBook).forEach(function (f) {
+      if (/^IsRegisteredPictureBook_Enemy_/.test(f)) pbEnemySet.add(Number(WS.pictureBook[f]));
+    });
+  }
   function buildPbHash() {
     if (pbHashToFlag) return;
     const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
@@ -253,6 +277,7 @@ const SAVE_UPLOAD = (() => {
     const chestPts = [];            // V1.6.3: 已开宝箱像素点（chest_save.js 反查）
     const weaponFlags = {};         // P4b: 武器收集 flagName -> true（IsGet_Weapon 反查）
     const pbFlags = {};             // V1.6.4: 图鉴登记 flagName（绿勾口径 = 图鉴登记，老大拍板）
+    let pbMatCnt = 0, pbEnemyCnt = 0;
     const enemyPts = [];            // V1.6.4: 讨伐命中像素点（enemy_save 反查）
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
@@ -265,6 +290,8 @@ const SAVE_UPLOAD = (() => {
       else if (v !== 0 && chestHash2pt && chestHash2pt[h]) chestPts.push(chestHash2pt[h]);
       else if (v !== 0 && weaponHashToFlag && weaponHashToFlag[h]) weaponFlags[weaponHashToFlag[h]] = true;
       else if (v !== 0 && pbHashToFlag && pbHashToFlag[h]) pbFlags[pbHashToFlag[h]] = true;
+      else if (v !== 0 && pbMatSet && pbMatSet.has(h)) pbMatCnt++;
+      else if (v !== 0 && pbEnemySet && pbEnemySet.has(h)) pbEnemyCnt++;
       else if (v !== 0 && enemyHash2pt && enemyHash2pt[h]) enemyPts.push(enemyHash2pt[h]);
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
@@ -367,6 +394,9 @@ const SAVE_UPLOAD = (() => {
       weaponTotal: (WSC && Object.keys(WSC.isGet).length) || 196,
       pb: pbNames.length,
       pbTotal: (WSC && Object.keys(WSC.pictureBook).length) || 179,
+      pbMat: pbMatCnt,
+      pbEnemy: pbEnemyCnt,
+      pbEnemyTotal: 84,
       enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; })
     };
     try { localStorage.setItem('botwmap.saveCounts.v1', JSON.stringify({ uploaded: true, counts: window.__saveCounts })); } catch (e) {}

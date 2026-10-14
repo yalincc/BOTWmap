@@ -461,12 +461,16 @@
     /* P4a：属性徽章（火/冰/雷）+ 强装徽章（attack>=50 或盾 guard>=70） */
     if (it.element) h += '<span class="q-badge-hard" style="background:' + (ELEM_COLOR[it.element] || '#888') + '22;border-color:' + (ELEM_COLOR[it.element] || '#888') + ';color:' + (ELEM_COLOR[it.element] || '#ccc') + '">' + esc(it.element) + '属性</span>';
     if (it.strong) h += '<span class="q-badge-hard" style="background:rgba(242,201,76,.14);border-color:#f2c94c;color:#f2c94c">强装</span>';
+    var eIdx = -1;
+    for (var ii = 0; ii < ITEMS.length; ii++) { if (ITEMS[ii].id === it.id) { eIdx = ii; break; } }
     h += '<span class="tk-grip-acts">' +
+      (eIdx > 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqPrev" title="上一件装备">‹</button>' : '') +
+      (eIdx < ITEMS.length - 1 && eIdx >= 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqNext" title="下一件装备">›</button>' : '') +
       '<button type="button" class="tk-close" id="eqCardClose" title="关闭">×</button></span>';
     h += '</div>';
     /* 标题行：装备名 + [复制]（V1.6.2：⧉ 图标改文字，紧跟名字）+ 完成绿勾 */
     h += '<div class="tk-title-row">' +
-      '<h3 class="tk-name">' + esc(it.name || '名称待补充') + '</h3>' +
+      '<h3 class="tk-name">' + (eIdx >= 0 ? '#' + (eIdx + 1) + ' ' : '') + esc(it.name || '名称待补充') + '</h3>' +
       '<button type="button" class="tk-copy" id="eqCopy" title="复制装备名">[复制]</button>' +
       (done ? '<span class="tk-done-tick" title="已完成">✓</span>' : '') +
       '</div>';
@@ -525,6 +529,10 @@
     body.innerHTML = h;
     card.classList.remove('hidden');
 
+    var ep = document.getElementById('eqPrev');
+    if (ep) ep.addEventListener('click', function (e2) { e2.stopPropagation(); openCard(ITEMS[eIdx - 1]); });
+    var en = document.getElementById('eqNext');
+    if (en) en.addEventListener('click', function (e2) { e2.stopPropagation(); openCard(ITEMS[eIdx + 1]); });
     var closer = document.getElementById('eqCardClose');
     if (closer) closer.addEventListener('click', function (e) {
       e.stopPropagation();

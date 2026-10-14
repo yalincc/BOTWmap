@@ -86,6 +86,16 @@
   }
   var SUB_COLOR = { hot: '#e0703a', all: '#7d8fa6' };   /* hot 橙红 / 普通灰蓝 */
   var SUB_ORDER = ['hot', 'all'];
+  /* 导航序号表：全营地按 i 排序（卡片 ‹› 翻页 + #N 序号）；标记 id 按类分组（Boss 序号） */
+  var CAMP_ORDER = CW.all.slice().sort(function (a, b) { return a.i - b.i; });
+  var CAMP_IDX = {};
+  CAMP_ORDER.forEach(function (c, i) { CAMP_IDX[c.i] = i; });
+  var MK_BY_CAT = {};
+  if (typeof BOTW_DATA !== 'undefined' && BOTW_DATA.markers) {
+    BOTW_DATA.markers.forEach(function (m) {
+      (MK_BY_CAT[m.cat] = MK_BY_CAT[m.cat] || []).push(m.id);
+    });
+  }
 
   /* 莱尼尔营地（全量并入 lynel 标记，不画图标） */
   function isLynelCamp(c) { return !!(c.a && c.a.indexOf('Enemy_Lynel') === 0); }
@@ -248,10 +258,14 @@
     });
 
     var h = '';
+    var order = CAMP_IDX[camp.i] != null ? CAMP_IDX[camp.i] : 0;
     h += '<div class="tk-grip">';
-    h += '<span class="tk-chip tk-chip-main">怪物营地</span>';
+    h += '<span class="tk-chip tk-chip-main">怪物营地 #' + (order + 1) + '</span>';
     if (hotIds[camp.i]) h += '<span class="q-badge-hard" style="background:rgba(224,112,58,.16);border-color:#e0703a;color:#f09a68">精选刷点</span>';
-    h += '<span class="tk-grip-acts"><button type="button" class="tk-close" id="cpCardClose" title="关闭">×</button></span>';
+    h += '<span class="tk-grip-acts">' +
+      (order > 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpPrev" title="上一个营地">‹</button>' : '') +
+      (order < CAMP_ORDER.length - 1 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpNext" title="下一个营地">›</button>' : '') +
+      '<button type="button" class="tk-close" id="cpCardClose" title="关闭">×</button></span>';
     h += '</div>';
     h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(camp.m || camp.a || '怪物营地') + '</h3></div>';
     if (camp.f && camp.f !== camp.m) h += '<div class="qcard-en">' + esc(camp.f) + '</div>';
@@ -268,7 +282,7 @@
     if (ws.length) {
       ws.forEach(function (k) { h += weaponRow(k); });
     } else {
-      h += '<div class="cp-empty">该营地未登记手持武器</div>';
+      h += '<div class="cp-empty">不掉武器（该 Boss 击杀掉落素材）</div>';
     }
     h += '<div class="tk-actions"><button type="button" class="btn act" id="cpLocate">定位</button></div>';
 
@@ -284,6 +298,10 @@
         if (w && window.EquipPanel && window.EquipPanel.openCard) window.EquipPanel.openCard(w);
       });
     });
+    var pv2 = document.getElementById('cpPrev');
+    if (pv2) pv2.addEventListener('click', function (e) { e.stopPropagation(); var n = CAMP_ORDER[order - 1]; if (n) openCard(n, entry); });
+    var nx2 = document.getElementById('cpNext');
+    if (nx2) nx2.addEventListener('click', function (e) { e.stopPropagation(); var n = CAMP_ORDER[order + 1]; if (n) openCard(n, entry); });
     var closer = document.getElementById('cpCardClose');
     if (closer) closer.addEventListener('click', function (e) {
       e.stopPropagation();
@@ -337,20 +355,43 @@
     if (!camps.length) return;
     var ce = document.getElementById('cardExtra');
     if (!ce) return;
-    var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
+    /* Boss 序号：按所属大类标记顺序编号，方便陈述问题 */
+    var sib = MK_BY_CAT[mk.cat] || [];
+    var num = sib.indexOf(mk.id) + 1;
+    var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）· ' + (num ? '#' + num + ' ' : '') + esc(mk.name || '') + '</div>';
     camps.forEach(function (c) {
       h += '<div class="cp-lynel-row"><b>' + esc(c.m || c.a) + '</b>' +
         '<span class="cp-lynel-tier">' + esc(c.t || '') + '</span></div>';
-      (c.w || []).forEach(function (k) { h += weaponRow(k); });
+      if ((c.w || []).length) {
+        (c.w || []).forEach(function (k) { h += weaponRow(k); });
+      } else {
+        h += '<div class="cp-empty">不掉武器（该 Boss 击杀掉落素材）</div>';
+      }
     });
     ce.insertAdjacentHTML('beforeend', h);
+    /* 防遮挡：若信息卡盖住了点击的标记，把卡水平推到标记另一侧 */
+    try {
+      var ic = document.getElementById('infoCard');
+      if (ic && map) {
+        var sp = map.m2s(mk.px);
+        var mrect = map.canvas.getBoundingClientRect();
+        var area = ic.parentElement.getBoundingClientRect();
+        var r = ic.getBoundingClientRect();
+        var mx = mrect.left - area.left + sp[0], my = mrect.top - area.top + sp[1];
+        var cx = r.left - area.left;
+        if (mx > cx && mx < cx + r.width && my > r.top - area.top && my < r.top - area.top + r.height) {
+          var nx = (mx + r.width + 24 < map.w) ? (mx + 24) : (mx - r.width - 24);
+          ic.style.left = Math.max(8, Math.round(nx)) + 'px';
+        }
+      }
+    } catch (e) {}
     /* V1.6.4 防御：偶发信息卡落在容器左上角（定位锚失效），越界则扶正到地图中部 */
-    var ic = document.getElementById('infoCard');
-    if (ic && map) {
-      var r = ic.getBoundingClientRect();
-      if (r.left < 4 && r.top < 4) {
-        ic.style.left = Math.round(map.w * 0.5) + 'px';
-        ic.style.top = Math.round(map.h * 0.35) + 'px';
+    var ic2 = document.getElementById('infoCard');
+    if (ic2 && map) {
+      var r2 = ic2.getBoundingClientRect();
+      if (r2.left < 4 && r2.top < 4) {
+        ic2.style.left = Math.round(map.w * 0.5) + 'px';
+        ic2.style.top = Math.round(map.h * 0.35) + 'px';
       }
     }
   }

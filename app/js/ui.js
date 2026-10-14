@@ -560,8 +560,8 @@ const UI = (() => {
       if (sc.chest != null) col.push(['宝箱', sc.chest, 1312]);
       if (sc.weapon != null) col.push(['武器获得', sc.weapon, sc.weaponTotal]);
       if (sc.pb != null) col.push(['图鉴·装备', sc.pb, sc.pbTotal]);
-      col.push(['图鉴·材料', null, null]);
-      col.push(['图鉴·怪物', null, null]);
+      if (sc.pbMat != null) col.push(['图鉴·材料', sc.pbMat, 112]);
+      if (sc.pbEnemy != null) col.push(['图鉴·怪物', sc.pbEnemy, sc.pbEnemyTotal || 84]);
       html += label('收集') + grid(col.map(([n, d, t]) => {
         if (d == null) return `<div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.35)">${n}</span><span style="color:rgba(255,255,255,.35)">待接</span></div>`;
         return row(n, d, t);
