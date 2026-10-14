@@ -518,10 +518,13 @@ const UI = (() => {
     let html = '';
     if (synced) html += `<div class="stat-sync">存档已同步 ✓</div>`;
 
-    /* V1.6.4 改版：分组双列纯数字网格（老大拍板；进度条去掉） */
-    const grid = rows => `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 12px">${rows}</div>`;
-    const label = t => `<div style="color:#eac27e;font-size:11px;font-weight:500;margin:7px 0 3px;letter-spacing:.5px">${t}</div>`;
-    const row = (n, d, t) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:12px;line-height:1.5"><span style="color:rgba(255,255,255,.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span><span style="flex:none">` + d + '/' + t + `</span></div>`;
+    /* V1.6.4 改版：分组双列纯数字网格；排版对齐侧栏（行=村庄行 12px/数值 11px，
+       组标题=设施地点标题样式，第二列加竖分割线） */
+    const grid = rows => `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 0">${rows}</div>`;
+    const label = t => `<div style="font-size:13px;font-weight:500;color:rgba(255,255,255,.92);margin:8px 0 4px">${t}</div>`;
+    const row = (n, d, t, col2) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;line-height:1.6;` +
+      (col2 ? 'border-left:1px solid rgba(255,255,255,.14);padding-left:10px;' : '') +
+      `"><span style="color:rgba(255,255,255,.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span><span style="flex:none;font-size:11px;color:rgba(255,255,255,.85)">` + d + '/' + t + `</span></div>`;
 
     /* —— 探索（存档优先，本地标点兜底）—— */
     const exp = [];
@@ -540,7 +543,7 @@ const UI = (() => {
     const finalDone = mSaved('memory_final') != null ? mSaved('memory_final') : m.final[0];
     if (m.photo[1] || photoDone) exp.push(['照片记忆', photoDone, 12]);
     if (m.final[1] || finalDone) exp.push(['最终回忆', finalDone, 1]);
-    html += label('探索') + grid(exp.map(r => row(...r)).join(''));
+    html += label('探索') + grid(exp.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
 
     /* —— 任务（4 类；QuestData/QuestDone 由任务板块提供）—— */
     const QD = window.QuestDone, QDD = window.QuestData;
@@ -550,7 +553,7 @@ const UI = (() => {
         QDD.QUESTS.forEach(q => { if (QDD.inRow(cat, q)) { t++; if (QD.isDone(q.key)) d++; } });
         return t ? [name, d, t] : null;
       }).filter(Boolean);
-      if (qrows.length) html += label('任务') + grid(qrows.map(r => row(...r)).join(''));
+      if (qrows.length) html += label('任务') + grid(qrows.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
     }
 
     /* —— 收集 / 讨伐（随存档同步出现；localStorage 展示缓存兜底）—— */
@@ -562,12 +565,12 @@ const UI = (() => {
       if (sc.pb != null) col.push(['图鉴·装备', sc.pb, sc.pbTotal]);
       if (sc.pbMat != null) col.push(['图鉴·材料', sc.pbMat, 112]);
       if (sc.pbEnemy != null) col.push(['图鉴·怪物', sc.pbEnemy, sc.pbEnemyTotal || 84]);
-      html += label('收集') + grid(col.map(([n, d, t]) => {
-        if (d == null) return `<div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.35)">${n}</span><span style="color:rgba(255,255,255,.35)">待接</span></div>`;
-        return row(n, d, t);
+      html += label('收集') + grid(col.map(([n, d, t], i) => {
+        if (d == null) return `<div style="display:flex;justify-content:space-between;font-size:12px;` + (i % 2 === 1 ? 'border-left:1px solid rgba(255,255,255,.14);padding-left:10px;' : '') + `"><span style="color:rgba(255,255,255,.35)">` + n + `</span><span style="color:rgba(255,255,255,.35)">待接</span></div>`;
+        return row(n, d, t, i % 2 === 1);
       }).join(''));
       if (sc.enemy && sc.enemy.length) {
-        html += label('讨伐') + grid(sc.enemy.map(e => row(e.name, e.done, e.total)).join(''));
+        html += label('讨伐') + grid(sc.enemy.map((e, i) => row(e.name, e.done, e.total, i % 2 === 1)).join(''));
       }
     }
     $('statsPanel').innerHTML = html;
