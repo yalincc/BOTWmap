@@ -4,7 +4,7 @@
  * 怪物营地(血月刷新) × 手持武器(=击杀掉落)外部图层，回答「去哪刷什么武器」。
  * 数据 = data/camp_weapons.js（CAMP_WEAPONS；hot 54 / all 555，hot ⊆ all 按 id）。
  *   - 精选（hot）默认开、全部默认关；全部 = all 去掉 hot 的 501 条（防重复画）
- *   - 一营地一图标（画刷点质心，不按武器拆图标）；点击出 #campCard
+ *   - 一图标=一营地据点（刷点就近 200px 聚簇，不按武器拆图标）；点击出 #campCard
  *   - ★ 莱尼尔并入：actor Enemy_Lynel* 的 11 个营地不画图标（26/28 刷点
  *     与 data.js lynel 23 标记 <100px），点击 lynel 标记时在信息卡追加
  *     「营地掉落」段（信息增强，不重复画）
@@ -26,32 +26,54 @@
   var hotIds = {};
   (CW.hot || []).forEach(function (c) { hotIds[c.i] = true; });
 
-  /* 绘制清单：hot 子层 = CW.hot；all 子层 = all 去掉 hot（互斥防重画） */
-  var SUB = {
-    hot: (CW.hot || []).slice(),
-    all: CW.all.filter(function (c) { return !hotIds[c.i]; })
-  };
+  /* ---------- 刷点聚簇：就近 200px 归簇，一图标=一营地据点 ----------
+   * 数据按 (actor,武器集) 跨区域聚合，实测 264 条营地刷点跨度 >400px（最大跨全图），
+   * 单质心图标会落在无意义位置；聚簇后 hot 127 刷点 -> 112 图标、all 4014 -> 约 2485 图标
+   * （站点常态 8687 点无压力）。点击定位跳簇内最近真实刷点。 */
+  var CLUSTER_R = 200;
+  function clusterLocs(loc) {
+    var raw = [];
+    (loc || []).forEach(function (p) {
+      var best = null, bd = CLUSTER_R * CLUSTER_R;
+      for (var i = 0; i < raw.length; i++) {
+        var dx = raw[i].x - p[0], dy = raw[i].y - p[1];
+        var d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = raw[i]; }
+      }
+      if (best) { best.sx += p[0]; best.sy += p[1]; best.n++; best.pts.push(p); }
+      else raw.push({ x: p[0], y: p[1], sx: p[0], sy: p[1], n: 1, pts: [p] });
+    });
+    return raw.map(function (c) {
+      var pt = [c.sx / c.n, c.sy / c.n];
+      var near = c.pts[0], bd = 1e18;
+      c.pts.forEach(function (p) {
+        var d = (p[0] - pt[0]) * (p[0] - pt[0]) + (p[1] - pt[1]) * (p[1] - pt[1]);
+        if (d < bd) { bd = d; near = p; }
+      });
+      return { pt: pt, loc: near, n: c.n };
+    });
+  }
+
+  /* 绘制清单：hot 子层 = hot 营地聚簇；all 子层 = all 去掉 hot（互斥防重画） */
+  var SUB = { hot: [], all: [] };
+  (CW.hot || []).forEach(function (c) {
+    if (isLynelCamp(c)) return;
+    clusterLocs(c.loc).forEach(function (cl) {
+      SUB.hot.push({ camp: c, pt: cl.pt, loc: cl.loc, cn: cl.n });
+    });
+  });
+  CW.all.forEach(function (c) {
+    if (isLynelCamp(c) || hotIds[c.i]) return;
+    clusterLocs(c.loc).forEach(function (cl) {
+      SUB.all.push({ camp: c, pt: cl.pt, loc: cl.loc, cn: cl.n });
+    });
+  });
   var SUB_NAME = { hot: '营地刷点·精选', all: '营地刷点·全部' };
   var SUB_COLOR = { hot: '#e0703a', all: '#7d8fa6' };   /* hot 橙红 / 普通灰蓝 */
   var SUB_ORDER = ['hot', 'all'];
 
   /* 莱尼尔营地（全量并入 lynel 标记，不画图标） */
   function isLynelCamp(c) { return !!(c.a && c.a.indexOf('Enemy_Lynel') === 0); }
-
-  function centroid(loc) {
-    if (!loc || !loc.length) return null;
-    var ax = 0, ay = 0;
-    for (var i = 0; i < loc.length; i++) { ax += loc[i][0]; ay += loc[i][1]; }
-    return [ax / loc.length, ay / loc.length];
-  }
-
-  /* 预计算：各营地 → 质心 + 是否莱尼尔（莱尼尔营地全部跳过绘制/命中） */
-  SUB_ORDER.forEach(function (sub) {
-    SUB[sub] = SUB[sub].filter(function (c) {
-      c._ctr = centroid(c.loc);
-      return !!c._ctr && !isLynelCamp(c);
-    });
-  });
 
   /* ---------- 图层开关（hot 默认开 / all 默认关，localStorage 记忆） ---------- */
   var K_LAYERS = 'botwmap.campLayers.v1';
@@ -108,7 +130,7 @@
       var rad = size / 2 - 2;
       var list = SUB[sub];
       for (var i = 0; i < list.length; i++) {
-        var p = list[i]._ctr;
+        var p = list[i].pt;
         if (p[0] < x0 || p[0] > x1 || p[1] < y0 || p[1] > y1) continue;
         var sx = map.view.x + p[0] * scale, sy = map.view.y + p[1] * scale;
         ctx.save();
@@ -145,7 +167,7 @@
     });
   }
 
-  /* ---------- 命中：营地质心（屏幕 12px 容差），返回 {type:'camp', camp} ---------- */
+  /* ---------- 命中：营地聚簇点（屏幕 12px 容差），返回 {type:'camp', camp, entry} ---------- */
   function hit(mx, my) {
     if (!map) return null;
     var tol = (window.CardLayout.markerSize(map.view.scale) / 2 + 4) / map.view.scale;
@@ -154,7 +176,7 @@
       if (!cLayers[sub]) return;
       var list = SUB[sub];
       for (var i = 0; i < list.length; i++) {
-        var p = list[i]._ctr;
+        var p = list[i].pt;
         var dx = p[0] - mx, dy = p[1] - my;
         if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) {
           var d = dx * dx + dy * dy;
@@ -162,7 +184,7 @@
         }
       }
     });
-    return best ? { type: 'camp', camp: best, _r: best, _p: (best.loc && best.loc[0]) || null } : null;
+    return best ? { type: 'camp', camp: best.camp, entry: best, _r: best.camp, _p: best.loc } : null;
   }
 
   /* ---------- 定位：飞到营地首个刷点 ---------- */
@@ -207,7 +229,8 @@
       elemHtml + stub + '</div>';
   }
 
-  function openCard(camp) {
+  function openCard(camp, entry) {
+    var anchor = (entry && entry.loc) || (camp.loc && camp.loc[0]) || null;
     var card = document.getElementById('campCard');
     var body = document.getElementById('campCardBody');
     if (!card || !body || !camp) return;
@@ -251,13 +274,13 @@
     var lf = document.getElementById('cpLocate');
     if (lf) lf.addEventListener('click', function (e) {
       e.stopPropagation();
-      var p = (camp.loc && camp.loc[0]) || null;
+      var p = anchor;
       locate(p);
       if (window.SpotMark) window.SpotMark.set(p);
     });
     /* 卡片定位：统一走 map.layoutCard 避让 */
     if (map && map.m2s) {
-      var p0 = (camp.loc && camp.loc[0]) || null;
+      var p0 = anchor;
       if (p0) {
         var sp = map.m2s(p0);
         map.layoutCard(card, sp[0], sp[1]);
@@ -311,7 +334,7 @@
     if (map._onSelect.__campWrapped) return;
     var orig = map._onSelect;
     var wrapped = function (sel) {
-      if (sel && sel.ext && sel.ext.type === 'camp') { openCard(sel.ext.camp); return; }
+      if (sel && sel.ext && sel.ext.type === 'camp') { openCard(sel.ext.camp, sel.ext.entry); return; }
       if (sel && sel.marker && sel.marker.cat === 'lynel') {
         orig.call(map, sel);
         enhanceLynelCard(sel.marker);
