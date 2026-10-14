@@ -318,10 +318,11 @@
   });
 
   /* ---------- 莱尼尔标记信息增强（营地不画图标，信息挂在 lynel 标记卡上） ---------- */
+  /* V1.6.4：推广到莱尼尔/西诺克斯/岩石巨人/莫尔德拉吉克四族标记（Boss 专属掉落段） */
+  var ENH_CATS = ['lynel', 'hinox', 'talus', 'molduga'];
   function campsNearMarker(px) {
     var out = [];
     CW.all.forEach(function (c) {
-      if (!isLynelCamp(c)) return;
       var hit = (c.loc || []).some(function (p) {
         var dx = p[0] - px[0], dy = p[1] - px[1];
         return dx * dx + dy * dy < 100 * 100;
@@ -353,7 +354,7 @@
     var orig = map._onSelect;
     var wrapped = function (sel) {
       if (sel && sel.ext && sel.ext.type === 'camp') { openCard(sel.ext.camp, sel.ext.entry); return; }
-      if (sel && sel.marker && sel.marker.cat === 'lynel') {
+      if (sel && sel.marker && ENH_CATS.indexOf(sel.marker.cat) >= 0) {
         orig.call(map, sel);
         enhanceLynelCard(sel.marker);
         return;

@@ -193,12 +193,13 @@ const SAVE_UPLOAD = (() => {
 
   /* V1.6.4：图鉴登记（PB）查找表——weapon_collect_save.js 的 pictureBook 表（flagName -> hash）。
      拍照图鉴登记与 IsGet（获得过）是两组独立 flag：IsGet 捡到即亮，PB 要相机拍照登记。 */
-  let pbHashSet = null;
+  let pbHashToFlag = null;
   function buildPbHash() {
-    if (pbHashSet) return;
+    if (pbHashToFlag) return;
     const WS = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
     if (!WS || !WS.pictureBook) return;
-    pbHashSet = new Set(Object.keys(WS.pictureBook).map(f => Number(WS.pictureBook[f])));
+    pbHashToFlag = {};
+    Object.keys(WS.pictureBook).forEach(f => { pbHashToFlag[Number(WS.pictureBook[f])] = f; });
   }
 
   /* V1.6.4：敌人讨伐（IsDefeat）查找表——enemy_save.js hash2pt（92 条，不重生 Boss）。
@@ -241,7 +242,7 @@ const SAVE_UPLOAD = (() => {
     const questFlags = {};          // V1.6.0: flagName -> true（任务完成标志）
     const chestPts = [];            // V1.6.3: 已开宝箱像素点（chest_save.js 反查）
     const weaponFlags = {};         // P4b: 武器收集 flagName -> true（IsGet_Weapon 反查）
-    let pbCnt = 0;                  // V1.6.4: 图鉴登记命中
+    const pbFlags = {};             // V1.6.4: 图鉴登记 flagName（绿勾口径 = 图鉴登记，老大拍板）
     const enemyPts = [];            // V1.6.4: 讨伐命中像素点（enemy_save 反查）
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
@@ -253,7 +254,7 @@ const SAVE_UPLOAD = (() => {
       else if (v !== 0 && questHashToFlag && questHashToFlag[h]) questFlags[questHashToFlag[h]] = true;
       else if (v !== 0 && chestHash2pt && chestHash2pt[h]) chestPts.push(chestHash2pt[h]);
       else if (v !== 0 && weaponHashToFlag && weaponHashToFlag[h]) weaponFlags[weaponHashToFlag[h]] = true;
-      else if (v !== 0 && pbHashSet && pbHashSet.has(h)) pbCnt++;
+      else if (v !== 0 && pbHashToFlag && pbHashToFlag[h]) pbFlags[pbHashToFlag[h]] = true;
       else if (v !== 0 && enemyHash2pt && enemyHash2pt[h]) enemyPts.push(enemyHash2pt[h]);
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
@@ -297,26 +298,40 @@ const SAVE_UPLOAD = (() => {
     // P4b 武器收集同步（存档权威）：IsGet_Weapon 命中 → 去前缀成 dex key
     // （IsGet_Weapon_Sword_043 → Weapon_Sword_043）→ 注入装备完成集（存档 ∪ 手动）
     const wfNames = Object.keys(weaponFlags);
-    if (wfNames.length && window.EquipPanel && window.EquipPanel.EquipDone) {
-      window.EquipPanel.EquipDone.loadSave(wfNames.map(n => n.replace(/^IsGet_Weapon_/, 'Weapon_')));
+    const pbNames = Object.keys(pbFlags);
+    // V1.6.4：绿勾口径改图鉴登记（老大拍板：只有在图鉴里有的才打勾）；武器·获得计数仍用 IsGet
+    if (pbNames.length && window.EquipPanel && window.EquipPanel.EquipDone) {
+      window.EquipPanel.EquipDone.loadSave(pbNames.map(n => n.replace('IsRegisteredPictureBook_Weapon_', 'Weapon_')));
       map.draw();
     }
     loaded = true;
     // V1.6.4：扩展同步计数（武器获得 / 图鉴登记 / 讨伐三族）供统计面板展示
     const ef = enemyFamilies || [];
     ef.forEach(function (f) { f.done = 0; });
-    const enemyHitIds = [];
-    enemyPts.forEach(function (p) {
-      let bi = 0, bd = 1e18, bmk = null;
+    /* V1.6.4：1:1 贪心匹配（全候选按距离排序，一点一标记，防两点抢同一最近标记） */
+    const cand = [];
+    enemyPts.forEach(function (p, pi) {
       ef.forEach(function (f, i) {
         f.mks.forEach(function (m) {
           const d = (m.px[0] - p[0]) * (m.px[0] - p[0]) + (m.px[1] - p[1]) * (m.px[1] - p[1]);
-          if (d < bd) { bd = d; bi = i; bmk = m; }
+          if (d < 300 * 300) cand.push({ d: d, pi: pi, mk: m, fi: i });
         });
       });
-      if (ef[bi]) ef[bi].done++;
-      /* V1.6.4：讨伐上地图——命中的固定点位标记点亮（<300px 才有标记对应，7/92 无标记不亮） */
-      if (bmk && bd < 300 * 300) enemyHitIds.push(bmk.id);
+    });
+    cand.sort(function (a, b) { return a.d - b.d; });
+    const usedPt = {}, usedMk = {}, ptFam = {};
+    let enemyHitCount = 0;
+    const enemyHitIds = [];
+    cand.forEach(function (c) {
+      if (usedPt[c.pi] || usedMk[c.mk.id]) return;
+      usedPt[c.pi] = true; usedMk[c.mk.id] = true;
+      enemyHitIds.push(c.mk.id);
+      ptFam[c.pi] = c.fi;
+      enemyHitCount++;
+    });
+    enemyPts.forEach(function (p, pi) {
+      const fi = ptFam[pi];
+      if (fi != null) ef[fi].done++;
     });
     if (enemyHitIds.length) {
       if (!map.liveDone) map.liveDone = new Set();
@@ -330,9 +345,10 @@ const SAVE_UPLOAD = (() => {
     }
     const WSC = (typeof WEAPON_COLLECT_SAVE !== 'undefined') ? WEAPON_COLLECT_SAVE : null;
     window.__saveCounts = {
+      chest: chestPts.length,
       weapon: wfNames.length,
       weaponTotal: (WSC && Object.keys(WSC.isGet).length) || 196,
-      pb: pbCnt,
+      pb: pbNames.length,
       pbTotal: (WSC && Object.keys(WSC.pictureBook).length) || 179,
       enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; })
     };
@@ -348,8 +364,8 @@ const SAVE_UPLOAD = (() => {
     if (qfNames.length) parts.push('任务 ' + qfNames.length);
     if (chestPts.length) parts.push('宝箱 ' + chestPts.length);
     if (wfNames.length) parts.push('武器 ' + wfNames.length);
-    if (pbCnt) parts.push('图鉴 ' + pbCnt);
-    if (enemyPts.length) parts.push('讨伐 ' + enemyPts.length);
+    if (pbNames.length) parts.push('图鉴 ' + pbNames.length);
+    if (enemyPts.length) parts.push('讨伐 ' + enemyHitCount);
     if (byT.memory) {
       const mp = [];
       if (memByTier.photo) mp.push('照片 ' + memByTier.photo);

@@ -513,54 +513,61 @@ const UI = (() => {
     return [photo + final, m.photo[1] + m.final[1]];
   }
   function renderStats() {
-    const focus = ['shrine', 'tower', 'beast', 'seed'];  // v1.2.1：探索度去掉宝箱栏（无用）
-    let html = '';
-    // 存档同步状态行：live 服务已载入存档进度 或 本会话上传过存档（离线且未上传时不显示）
     const lc = map.live && map.live.counts;
-    if (lc || window.__saveUploaded) {
-      html += `<div class="stat-sync">存档已同步 ✓</div>`;
-    }
-    for (const key of focus) {
-      const cat = map.data.categories.find(c => c.key === key);
-      if (!cat) continue;
-      // 有存档 counts 以存档为准（live /progress 或上传），否则按本地标点完成统计
-      // （v1.4.1：神庙/塔/神兽/克洛格与回忆行同口径，修复历史存档累计值掩盖当前档进度）
-      const lck = key === 'seed' ? 'korok' : key;
+    const synced = !!(lc || window.__saveCounts || window.__saveUploaded);
+    let html = '';
+    if (synced) html += `<div class="stat-sync">存档已同步 ✓</div>`;
+
+    /* V1.6.4 改版：分组双列纯数字网格（老大拍板；进度条去掉） */
+    const grid = rows => `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 14px">${rows}</div>`;
+    const label = t => `<div style="color:#eac27e;font-size:12px;font-weight:500;margin:8px 0 4px">${t}</div>`;
+    const row = (n, d, t) => `<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:rgba(255,255,255,.6)">${n}</span><span>${d} / ${t}</span></div>`;
+
+    /* —— 探索（存档优先，本地标点兜底）—— */
+    const exp = [];
+    [['shrine', '神庙', 'shrine'], ['tower', '希卡塔', 'tower'], ['beast', '神兽', 'beast']].forEach(([key, name, lck]) => {
       const saved = (lc && lc[lck]) ? lc[lck] : null;
       const [d, t] = saved ? saved : catCount(key);
-      if (!t) continue;
-      html += `<div class="stat-row"><span class="k">${cat.cn}</span><span class="v">${d} / ${t} ${pct(d, t, true)}</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(d, t)}"></i></div>`;
-    }
-    // 回忆分档 4 行：照片记忆 / 最终 / 主线自动 / DLC EX
+      if (t) exp.push([name, d, t]);
+    });
+    const kSaved = (lc && lc.korok) ? lc.korok : null;
+    const [kd, kt] = kSaved ? kSaved : catCount('seed');
+    if (kt) exp.push(['克洛格', kd, kt]);
     const m = memoryCounts();
-    if (m.photo[1] || m.final[1] || m.auto[1] || m.dlc[1]) {
-      // 显示口径：有存档 counts 以存档为准（live 服务 / 逐点 flag），否则用手动标记
-      const savedOf = k => (lc && lc[k]) ? lc[k][0] : null;
-      const photoDone = savedOf('memory_photo') != null ? savedOf('memory_photo') : m.photo[0];
-      const finalDone = savedOf('memory_final') != null ? savedOf('memory_final') : m.final[0];
-      const autoDone = savedOf('memory_auto') != null ? savedOf('memory_auto') : m.auto[0];
-      const dlcDone = savedOf('memory_dlc') != null ? savedOf('memory_dlc') : m.dlc[0];
-      html += `<div class="stat-row stat-mem"><span class="k">回忆 · 照片记忆</span><span class="v">${photoDone} / 12 ${pct(photoDone, 12, true)}</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(photoDone, 12)}"></i></div>`;
-      html += `<div class="stat-row stat-mem"><span class="k">回忆 · 最终</span><span class="v">${finalDone} / 1</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(finalDone, 1)}"></i></div>`;
-      html += `<div class="stat-row stat-mem"><span class="k">回忆 · 主线自动</span><span class="v">${autoDone} / 5 ${pct(autoDone, 5, true)}</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(autoDone, 5)}"></i></div>`;
-      html += `<div class="stat-row stat-mem"><span class="k">回忆 · DLC EX</span><span class="v">${dlcDone} / 5 ${pct(dlcDone, 5, true)}</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(dlcDone, 5)}"></i></div>`;
+    const mSaved = k => (lc && lc[k]) ? lc[k][0] : null;
+    const photoDone = mSaved('memory_photo') != null ? mSaved('memory_photo') : m.photo[0];
+    const finalDone = mSaved('memory_final') != null ? mSaved('memory_final') : m.final[0];
+    if (m.photo[1] || photoDone) exp.push(['照片记忆', photoDone, 12]);
+    if (m.final[1] || finalDone) exp.push(['最终回忆', finalDone, 1]);
+    html += label('探索') + grid(exp.map(r => row(...r)).join(''));
+
+    /* —— 任务（4 类；QuestData/QuestDone 由任务板块提供）—— */
+    const QD = window.QuestDone, QDD = window.QuestData;
+    if (QD && QDD && QDD.QUESTS) {
+      const qrows = [['main', '主线挑战'], ['side', '支线任务'], ['shrine', '神庙挑战'], ['dlc', 'DLC 任务']].map(([cat, name]) => {
+        let t = 0, d = 0;
+        QDD.QUESTS.forEach(q => { if (QDD.inRow(cat, q)) { t++; if (QD.isDone(q.key)) d++; } });
+        return t ? [name, d, t] : null;
+      }).filter(Boolean);
+      if (qrows.length) html += label('任务') + grid(qrows.map(r => row(...r)).join(''));
     }
-    // V1.6.4：存档扩展同步（武器获得 / 图鉴登记 / 讨伐三族）
+
+    /* —— 收集 / 讨伐（随存档同步出现；localStorage 展示缓存兜底）—— */
     const sc = window.__saveCounts;
     if (sc) {
-      html += `<div class="stat-row stat-mem"><span class="k">武器 · 获得</span><span class="v">${sc.weapon} / ${sc.weaponTotal} ${pct(sc.weapon, sc.weaponTotal, true)}</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(sc.weapon, sc.weaponTotal)}"></i></div>`;
-      html += `<div class="stat-row stat-mem"><span class="k">武器 · 图鉴登记</span><span class="v">${sc.pb} / ${sc.pbTotal} ${pct(sc.pb, sc.pbTotal, true)}</span></div>`;
-      html += `<div class="stat-bar"><i style="width:${pct(sc.pb, sc.pbTotal)}"></i></div>`;
-      (sc.enemy || []).forEach(e => {
-        html += `<div class="stat-row stat-mem"><span class="k">讨伐 · ${e.name}</span><span class="v">${e.done} / ${e.total} ${pct(e.done, e.total, true)}</span></div>`;
-        html += `<div class="stat-bar"><i style="width:${pct(e.done, e.total)}"></i></div>`;
-      });
+      const col = [];
+      if (sc.chest != null) col.push(['宝箱', sc.chest, 1312]);
+      if (sc.weapon != null) col.push(['武器获得', sc.weapon, sc.weaponTotal]);
+      if (sc.pb != null) col.push(['图鉴·装备', sc.pb, sc.pbTotal]);
+      col.push(['图鉴·材料', null, null]);
+      col.push(['图鉴·怪物', null, null]);
+      html += label('收集') + grid(col.map(([n, d, t]) => {
+        if (d == null) return `<div style="display:flex;justify-content:space-between"><span style="color:rgba(255,255,255,.35)">${n}</span><span style="color:rgba(255,255,255,.35)">待接</span></div>`;
+        return row(n, d, t);
+      }).join(''));
+      if (sc.enemy && sc.enemy.length) {
+        html += label('讨伐') + grid(sc.enemy.map(e => row(e.name, e.done, e.total)).join(''));
+      }
     }
     $('statsPanel').innerHTML = html;
   }
