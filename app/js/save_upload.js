@@ -86,6 +86,10 @@ const SAVE_UPLOAD = (() => {
         window.__saveCounts = null;   // V1.6.4：扩展同步行一并撤下
         window.__saveUploaded = false;
         try { localStorage.removeItem('botwmap.saveCounts.v1'); } catch (e) {}
+        /* V1.6.5：任务绿勾两源一并清（手动标记 + 存档快照），否则任务点残留绿勾无清理路径 */
+        try { localStorage.removeItem('botwmap.questDone.v1'); } catch (e) {}
+        try { localStorage.removeItem('botwmap.questSave.v1'); } catch (e) {}
+        if (window.QuestDone && window.QuestDone.clearAll) window.QuestDone.clearAll();
         map.draw();
         UI.renderStats();
         UI.updateLayerList();

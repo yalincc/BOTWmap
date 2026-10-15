@@ -192,9 +192,11 @@
         map.view.x = map.w / 2 - p[0] * map.view.scale;
         map.view.y = map.h / 2 - p[1] * map.view.scale;
         map.draw();
-        if (place.mk) {   /* V1.6.5 Q6：神庙挑战位置 → 关任务卡、定位并打开神庙卡（互跳闭环） */
+        if (place.mk) {   /* V1.6.5 Q6：神庙挑战位置 → 关任务卡、定位并打开神庙卡（互跳闭环 + 脉冲特效） */
           if (global.QuestPanel && global.QuestPanel.closeCard) global.QuestPanel.closeCard();
           if (map._onSelect) map._onSelect({ marker: place.mk });
+          if (map.pulseAt) map.pulseAt(p[0], p[1]);
+          if (global.SpotMark) global.SpotMark.set(p);
         } else {
           if (map.pulseAt) map.pulseAt(p[0], p[1]);
           if (global.SpotMark) global.SpotMark.set(p);

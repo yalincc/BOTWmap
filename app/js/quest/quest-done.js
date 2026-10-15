@@ -13,8 +13,9 @@
   var QUESTS = D ? D.QUESTS : [];
 
   var K_DONE = 'botwmap.questDone.v1';
+  var K_SAVE = 'botwmap.questSave.v1';   // V1.6.5：存档 flag 完成集快照（F5 刷新后恢复，老大反馈刷绿勾丢失）
   var manualSet = new Set();   // 手动标记（localStorage）
-  var saveSet = new Set();     // 存档解析（save_upload 注入）
+  var saveSet = new Set();     // 存档解析（save_upload 注入 + localStorage 快照）
   var listeners = [];
 
   function loadDone() {
@@ -26,13 +27,23 @@
   function persistDone() {
     try { localStorage.setItem(K_DONE, JSON.stringify(Array.from(manualSet))); } catch (e) {}
   }
+  /* V1.6.5：存档完成集快照（上传存档 → loadSave 后落盘，刷新恢复，避免绿勾全丢） */
+  function loadSaveSet() {
+    try {
+      var d = JSON.parse(localStorage.getItem(K_SAVE) || '[]');
+      d.forEach(function (k) { saveSet.add(k); });
+    } catch (e) {}
+  }
+  function persistSaveSet() {
+    try { localStorage.setItem(K_SAVE, JSON.stringify(Array.from(saveSet))); } catch (e) {}
+  }
   function notify() {
     listeners.forEach(function (fn) { try { fn(); } catch (e) {} });
   }
 
   var QuestDone = {
-    /* 启动调用：把 localStorage 的手动标记读进内存 */
-    init: function () { loadDone(); },
+    /* 启动调用：把 localStorage 的手动标记 + 存档快照读进内存 */
+    init: function () { loadDone(); loadSaveSet(); },
     isDone: function (key) { return !!key && (saveSet.has(key) || manualSet.has(key)); },
     /* 完成来源：save=存档（权威，不可取消） / manual=手动 / ''=未完成 */
     srcOf: function (key) {
@@ -58,9 +69,16 @@
           if (q.flag && flags[q.flag]) saveSet.add(q.key);
         });
       }
+      persistSaveSet();   /* V1.6.5：快照落盘，F5 后绿勾不丢 */
       notify();
     },
     onChange: function (fn) { listeners.push(fn); },
+    /* V1.6.5：清空本地完成记录（「清除本地探索度」按钮调用；下次上传存档重新同步） */
+    clearAll: function () {
+      manualSet.clear(); saveSet.clear();
+      persistDone(); persistSaveSet();
+      notify();
+    },
     doneCount: function (cat) {
       var n = 0;
       QUESTS.forEach(function (q) { if ((!cat || q.cat === cat) && QuestDone.isDone(q.key)) n++; });

@@ -1013,21 +1013,12 @@ const UI = (() => {
       if (liveDone) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#7dffa0">游戏内已收集 ✓</span></div>';
       else if (map.live && map.live.counts) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#e8b04a">游戏内未收集</span></div>';
     }
-    /* V1.6.5：人马当前档推导（Q2 老大拍板）——存档分级击杀计数（Defeated_Enemy_Lynel_*_Num，全局
-       累计）→ 血月阶梯；莱尼尔是血月重生怪、无点级讨伐 flag，绿勾不可行，以计数 + 推导档代替。
-       布点档为下限：当前档 = max(布点初始档, 阶梯(总击杀))。阈值待真实存档校准（社区口径 4/12/20）。 */
+    /* V1.6.5：人马讨伐 + 当前阶段（Q2 老大拍板拆两行；布点档在卡片标题，不重复） */
     if (mk.cat === 'lynel') {
-      const lc = (window.__saveCounts && window.__saveCounts.lynelCnt) || null;
-      if (lc) {
-        const total = (lc.junior || 0) + (lc.middle || 0) + (lc.senior || 0) + (lc.dark || 0) + (lc.gold || 0);
-        const TIER_NAME = { 1: '莱尼尔', 2: '蓝鬃莱尼尔', 3: '白鬃莱尼尔', 4: '白银莱尼尔' };
-        const BASE = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
-        const ladder = total >= 20 ? 4 : total >= 12 ? 3 : total >= 4 ? 2 : 1;
-        const base = BASE[mk.name] || 1;
-        const cur = Math.max(base, ladder);
-        let line = '已讨伐 ' + total + ' 只 · 当前推导档：' + TIER_NAME[cur];
-        if (cur > base) line += '（布点 ' + TIER_NAME[base] + '，血月已升档）';
-        extra += '<div class="row fd-row"><span class="fd-l">讨伐</span><span class="fd-v fd-v-accent">' + esc(line) + '</span></div>';
+      const lt = window.__lynelTierOf ? window.__lynelTierOf(mk.name) : null;
+      if (lt) {
+        extra += '<div class="row fd-row"><span class="fd-l">讨伐</span><span class="fd-v fd-num">已讨伐 ' + lt.total + ' 只</span></div>';
+        extra += '<div class="row fd-row"><span class="fd-l">阶段</span><span class="fd-v fd-v-accent">' + esc(lt.name[lt.cur]) + (lt.upgraded ? '（血月已升档）' : '') + '</span></div>';
       }
     }
     $('cardExtra').innerHTML = extra;
@@ -1507,6 +1498,20 @@ const UI = (() => {
     });
   }
 
+  /* ---------- 人马档位推导（V1.6.5 Q2）：卡片行 + camp.js 掉落段共用 ---------- */
+  /* 阈值锚点：老大存档（2026-10-14）总击杀 26（红6蓝4白6银10）实测白鬃 → 白银阈值 >26 暂定 30，待再校准 */
+  window.__lynelTierOf = function (mkName) {
+    const lc = (window.__saveCounts && window.__saveCounts.lynelCnt) || null;
+    if (!lc) return null;
+    const total = (lc.junior || 0) + (lc.middle || 0) + (lc.senior || 0) + (lc.dark || 0) + (lc.gold || 0);
+    const name = { 1: '莱尼尔', 2: '蓝鬃莱尼尔', 3: '白鬃莱尼尔', 4: '白银莱尼尔' };
+    const BASE = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
+    const ladder = total >= 30 ? 4 : total >= 10 ? 3 : total >= 4 ? 2 : 1;
+    const base = BASE[mkName] || 1;
+    const cur = Math.max(base, ladder);
+    return { total: total, base: base, cur: cur, name: name, upgraded: cur > base };
+  };
+
   /* ---------- 神庙卡「挑战」行 → 神庙挑战卡互跳（V1.6.5 Q6：data-q-open 直接放 quest.key） ---------- */
   const infoCardEl = document.getElementById('infoCard');
   if (infoCardEl) infoCardEl.addEventListener('click', function (e) {
@@ -1515,6 +1520,15 @@ const UI = (() => {
     e.stopPropagation();   /* 防冒泡到 document「点空白关卡」：hideInfo 后 target 已不在卡内，会把刚开的任务卡关掉 */
     hideInfo();
     window.QuestPanel.openCard(el.dataset.qOpen);
+    /* V1.6.5 Q6：定位到任务点 + 脉冲（与装备卡定位同款特效，老大要求双向都有） */
+    let q = null;
+    (window.__questSearch || []).forEach(function (t) { if (!q && t.q && t.q.key === el.dataset.qOpen) q = t.q; });
+    if (q && q.pts && q.pts.length && window.QuestCanvas) {
+      window.QuestCanvas.locate(q);
+      const mp = window.__botwMap;
+      if (mp && mp.pulseAt) mp.pulseAt(q.pts[0][0], q.pts[0][1]);
+      if (window.SpotMark) window.SpotMark.set(q.pts[0]);
+    }
   });
 
   /* ---------- toast ---------- */

@@ -375,18 +375,39 @@
     if (!ce) return;
     /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
     var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
-    /* V1.6.5 修 Q3：段标题已含标记名（#N 蓝鬃莱尼尔），营地行不再重复怪物名；
-       仅当附近存在多个不同名营地（混合档位）时才标注区分；t 字段 609/609 与 m 相同，仅防御性保留 */
-    camps.forEach(function (c) {
-      var label = (camps.length > 1 && c.m && c.m !== mk.name) ? c.m : '';
-      if (label) h += '<div class="cp-lynel-row"><b>' + esc(label) + '</b>' +
-        (c.t && c.t !== c.m ? '<span class="cp-lynel-tier">' + esc(c.t) + '</span>' : '') + '</div>';
-      if ((c.w || []).length) {
-        (c.w || []).forEach(function (k) { h += weaponRow(k); });
-      } else {
-        h += '<div class="cp-empty">不掉武器（该 Boss 击杀掉落素材）</div>';
-      }
-    });
+    /* V1.6.5 Q2：血月升档 → 武器池按推导档重抽（老大实测：布点蓝鬃推导白鬃后，实际掉兽神系列而非
+       兽王系列）。推导档池 = CAMP_WEAPONS 中推导档 actor 的手持武器并集；未升档时保持布点清单 */
+    var lt = window.__lynelTierOf ? window.__lynelTierOf(mk.name) : null;
+    var TIER_ACTOR = { 2: 'Enemy_Lynel_Middle', 3: 'Enemy_Lynel_Senior', 4: 'Enemy_Lynel_Dark' };
+    var BASE_TIER = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
+    var curTier = 0;
+    if (lt && lt.upgraded && TIER_ACTOR[lt.cur] && lt.cur > (BASE_TIER[mk.name] || 1)) curTier = lt.cur;
+    var poolW = null;
+    if (curTier) {
+      var pre = TIER_ACTOR[curTier], seen = {};
+      poolW = [];
+      CW.all.forEach(function (c) {
+        if ((c.a || '').indexOf(pre) !== 0) return;
+        (c.w || []).forEach(function (k) { if (!seen[k]) { seen[k] = 1; poolW.push(k); } });
+      });
+    }
+    if (curTier) h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）· 按「' + lt.name[curTier] + '」阶段推导</div>';
+    /* V1.6.5 修 Q3：段标题已含卡片 Title 的怪物名，营地行仅多营地混合档位时标注区分 */
+    if (curTier && poolW && poolW.length) {
+      poolW.forEach(function (k) { h += weaponRow(k); });
+    } else {
+      if (curTier) h += '<div class="cp-empty">该阶段暂无营地武器池数据，以下为布点初始清单</div>';
+      camps.forEach(function (c) {
+        var label = (camps.length > 1 && c.m && c.m !== mk.name) ? c.m : '';
+        if (label) h += '<div class="cp-lynel-row"><b>' + esc(label) + '</b>' +
+          (c.t && c.t !== c.m ? '<span class="cp-lynel-tier">' + esc(c.t) + '</span>' : '') + '</div>';
+        if ((c.w || []).length) {
+          (c.w || []).forEach(function (k) { h += weaponRow(k); });
+        } else {
+          h += '<div class="cp-empty">不掉武器（该 Boss 击杀掉落素材）</div>';
+        }
+      });
+    }
     ce.insertAdjacentHTML('beforeend', h);
     /* 防遮挡：若信息卡盖住了点击的标记，把卡水平推到标记另一侧 */
     try {
