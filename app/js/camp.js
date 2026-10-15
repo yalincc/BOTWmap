@@ -350,7 +350,7 @@
   var ENH_CATS = ['lynel', 'hinox', 'talus', 'molduga'];
   var CAT_ACTOR = {
     lynel: /^Enemy_Lynel/,
-    hinox: /^Enemy_Hinox/,
+    hinox: /^Enemy_Giant/,   /* 西诺克斯 romfs 内部名 = Enemy_Giant（IsDefeat_Enemy_Giant_* 印证）；写 Hinox 匹配 0 条 */
     talus: /^Enemy_Golem/,
     molduga: /^Enemy_(Molduga|Sandworm)/
   };
@@ -373,10 +373,8 @@
     if (!camps.length) return;
     var ce = document.getElementById('cardExtra');
     if (!ce) return;
-    /* Boss 序号：按所属大类标记顺序编号，方便陈述问题 */
-    var sib = MK_BY_CAT[mk.cat] || [];
-    var num = sib.indexOf(mk.id) + 1;
-    var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）· ' + (num ? '#' + num + ' ' : '') + esc(mk.name || '') + '</div>';
+    /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
+    var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
     /* V1.6.5 修 Q3：段标题已含标记名（#N 蓝鬃莱尼尔），营地行不再重复怪物名；
        仅当附近存在多个不同名营地（混合档位）时才标注区分；t 字段 609/609 与 m 相同，仅防御性保留 */
     camps.forEach(function (c) {

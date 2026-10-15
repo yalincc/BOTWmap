@@ -295,6 +295,12 @@ const SAVE_UPLOAD = (() => {
     const pbFlags = {};             // V1.6.4: 图鉴登记 flagName（绿勾口径 = 图鉴登记，老大拍板）
     let pbMatCnt = 0, pbEnemyCnt = 0;
     const enemyPts = [];            // V1.6.4: 讨伐命中像素点（enemy_save 反查）
+    /* V1.6.5：莱尼尔分级击杀计数器（全局累计；血月按总击杀数阶梯升档，推导见 ui.js） */
+    const lynelCntHash = {};
+    ['Junior', 'Middle', 'Senior', 'Dark', 'Gold'].forEach(function (t) {
+      lynelCntHash[crc32('Defeated_Enemy_Lynel_' + t + '_Num')] = t.toLowerCase();
+    });
+    const lynelCnt = { junior: 0, middle: 0, senior: 0, dark: 0, gold: 0 };
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
       const h = dv.getUint32(o, littleEndian);
@@ -309,6 +315,7 @@ const SAVE_UPLOAD = (() => {
       else if (v !== 0 && pbMatSet && pbMatSet.has(h)) pbMatCnt++;
       else if (v !== 0 && pbEnemySet && pbEnemySet.has(h)) pbEnemyCnt++;
       else if (v !== 0 && enemyHash2pt && enemyHash2pt[h]) enemyPts.push(enemyHash2pt[h]);
+      else if (v !== 0 && lynelCntHash[h]) lynelCnt[lynelCntHash[h]] = v;
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
@@ -413,7 +420,8 @@ const SAVE_UPLOAD = (() => {
       pbMat: pbMatCnt,
       pbEnemy: pbEnemyCnt,
       pbEnemyTotal: (typeof PB_LISTS !== "undefined" && PB_LISTS.enemy) ? PB_LISTS.enemy.length : 84,
-      enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; })
+      enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; }),
+      lynelCnt: lynelCnt   /* V1.6.5：人马分级击杀计数（ui.js 推导当前档；随 saveCounts 持久化） */
     };
     try { localStorage.setItem('botwmap.saveCounts.v1', JSON.stringify({ uploaded: true, counts: window.__saveCounts })); } catch (e) {}
     window.__saveUploaded = true;   // 统计面板「存档已同步 ✓」行

@@ -63,6 +63,16 @@
       if (idx > 0 && PLACE_ACTS.indexOf(n.slice(idx + 1)) >= 0) n = n.slice(0, idx);
       place = { name: n.trim(), px: [f.gx * 2 + 12000, f.gz * 2 + 10000] };
     });
+    /* V1.6.5 Q6（老大拍板）：神庙挑战「位置」统一为神庙本身——任务名与神庙标记名 42/42 全同，
+       位置行显示神庙名，点击定位并打开神庙卡（挑战↔神庙互跳）；消除「有些是地名、有些是神庙」 */
+    var shrineMk = null;
+    if (q.cat === 'shrine' && window.__botwMap && window.__botwMap.data && window.__botwMap.data.markers) {
+      var _mks = window.__botwMap.data.markers;
+      for (var _i = 0; _i < _mks.length; _i++) {
+        if (_mks[_i].cat === 'shrine' && _mks[_i].name === q.name) { shrineMk = _mks[_i]; break; }
+      }
+    }
+    if (shrineMk) place = { name: shrineMk.name, px: shrineMk.px, mk: shrineMk };
     var chipCls = q.cat === 'main' ? 'tk-chip-main' : q.cat === 'side' ? 'tk-chip-imp' : 'tk-chip-sub';
     /* 同档序列：先按数据字段 no 升序；no 缺失时保持数组原序（稳定兜底，新旧数据兼容） */
     var sameCat = QUESTS.filter(function (x) { return x.cat === q.cat; });
@@ -99,7 +109,7 @@
     /* 关键信息：区域一行、位置一行（★ 英文名暂不显示，TOTKmap 卡片无英文行） */
     h += '<div class="tk-meta">';
     if (q.region) h += '<div class="tk-mrow"><span class="tk-mk">区域</span><span class="tk-mv">' + esc(q.region) + '</span></div>';
-    if (place) h += '<div class="tk-mrow"><span class="tk-mk">位置</span><span class="co-link" data-q-locate="1" title="点击定位到该地点">' + esc(place.name) + '</span></div>';
+    if (place) h += '<div class="tk-mrow"><span class="tk-mk">位置</span><span class="co-link" data-q-locate="1" title="' + (place.mk ? '点击定位并打开该神庙' : '点击定位到该地点') + '">' + esc(place.name) + '</span></div>';
     h += '</div>';
     /* 前置 / 解锁（key 关联制：渲染 q.reqs / q.unlockList，空 → 「无」；
        ★ 样式统一：同字号同色，仅链接语义区分；前置上方加分割线
@@ -182,8 +192,13 @@
         map.view.x = map.w / 2 - p[0] * map.view.scale;
         map.view.y = map.h / 2 - p[1] * map.view.scale;
         map.draw();
-        if (map.pulseAt) map.pulseAt(p[0], p[1]);
-        if (global.SpotMark) global.SpotMark.set(p);
+        if (place.mk) {   /* V1.6.5 Q6：神庙挑战位置 → 关任务卡、定位并打开神庙卡（互跳闭环） */
+          if (global.QuestPanel && global.QuestPanel.closeCard) global.QuestPanel.closeCard();
+          if (map._onSelect) map._onSelect({ marker: place.mk });
+        } else {
+          if (map.pulseAt) map.pulseAt(p[0], p[1]);
+          if (global.SpotMark) global.SpotMark.set(p);
+        }
         positionCard();
       });
     });

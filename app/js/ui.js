@@ -991,7 +991,16 @@ const UI = (() => {
       if (ex.icon === 'shrine_resurrection.png') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-blue">复苏神庙</span></div>';
       if (ex.type) extra += '<div class="row fd-row"><span class="fd-l">试炼</span><span class="fd-v fd-v-accent">' + esc(ex.type) + '</span></div>';
       if (ex.treasure) extra += '<div class="row fd-row"><span class="fd-l">宝藏</span><span class="fd-v">' + esc(ex.treasure) + '</span></div>';
-      if (ex.quest) extra += '<div class="row fd-row"><span class="fd-l">任务</span><span class="fd-v">' + esc(ex.quest) + '</span></div>';
+      /* V1.6.5 Q6：神庙卡「挑战」行 → 按神庙名反查神庙挑战（quest.name === 神庙名，42/42 全命中），
+         点击打开挑战卡；data.js 的 ex.quest 是旧任务体系字段、与新任务名可能不一致
+         （如 迪拉·玛神庙 vs「沙漠迷宫」），不作为关联键 */
+      if (mk.cat === 'shrine') {
+        let sq = null;
+        (window.__questSearch || []).forEach(function (t) {
+          if (!sq && t.q && t.q.cat === 'shrine' && t.q.name === mk.name) sq = t.q;
+        });
+        if (sq) extra += '<div class="row fd-row"><span class="fd-l">挑战</span><span class="fd-v"><span class="co-link" data-q-open="' + esc(sq.key) + '" title="点击打开对应神庙挑战卡">' + esc(sq.name) + '</span></span></div>';
+      }
     }
     if (mk.cat === 'memory' && ex.memory_title_en) extra += '<div class="row fd-row"><span class="fd-l">回忆</span><span class="fd-v">#' + ex.memory_no + ' · ' + esc(ex.memory_title_en) + '</span></div>';
     if (mk.cat === 'memory' && ex.tier === 'final') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-accent">最终回忆：需找齐 12 张照片后回英帕处激活</span></div>';
@@ -1003,6 +1012,23 @@ const UI = (() => {
         mk.cat === 'hinox' || mk.cat === 'talus' || mk.cat === 'molduga') {   /* V1.6.4：讨伐三族显示存档态 */
       if (liveDone) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#7dffa0">游戏内已收集 ✓</span></div>';
       else if (map.live && map.live.counts) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#e8b04a">游戏内未收集</span></div>';
+    }
+    /* V1.6.5：人马当前档推导（Q2 老大拍板）——存档分级击杀计数（Defeated_Enemy_Lynel_*_Num，全局
+       累计）→ 血月阶梯；莱尼尔是血月重生怪、无点级讨伐 flag，绿勾不可行，以计数 + 推导档代替。
+       布点档为下限：当前档 = max(布点初始档, 阶梯(总击杀))。阈值待真实存档校准（社区口径 4/12/20）。 */
+    if (mk.cat === 'lynel') {
+      const lc = (window.__saveCounts && window.__saveCounts.lynelCnt) || null;
+      if (lc) {
+        const total = (lc.junior || 0) + (lc.middle || 0) + (lc.senior || 0) + (lc.dark || 0) + (lc.gold || 0);
+        const TIER_NAME = { 1: '莱尼尔', 2: '蓝鬃莱尼尔', 3: '白鬃莱尼尔', 4: '白银莱尼尔' };
+        const BASE = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
+        const ladder = total >= 20 ? 4 : total >= 12 ? 3 : total >= 4 ? 2 : 1;
+        const base = BASE[mk.name] || 1;
+        const cur = Math.max(base, ladder);
+        let line = '已讨伐 ' + total + ' 只 · 当前推导档：' + TIER_NAME[cur];
+        if (cur > base) line += '（布点 ' + TIER_NAME[base] + '，血月已升档）';
+        extra += '<div class="row fd-row"><span class="fd-l">讨伐</span><span class="fd-v fd-v-accent">' + esc(line) + '</span></div>';
+      }
     }
     $('cardExtra').innerHTML = extra;
     $('cardDone').classList.toggle('hidden', done);
@@ -1480,6 +1506,16 @@ const UI = (() => {
       toast('地名样式已恢复默认');
     });
   }
+
+  /* ---------- 神庙卡「挑战」行 → 神庙挑战卡互跳（V1.6.5 Q6：data-q-open 直接放 quest.key） ---------- */
+  const infoCardEl = document.getElementById('infoCard');
+  if (infoCardEl) infoCardEl.addEventListener('click', function (e) {
+    const el = e.target && e.target.closest ? e.target.closest('[data-q-open]') : null;
+    if (!el || !el.dataset.qOpen || !window.QuestPanel) return;
+    e.stopPropagation();   /* 防冒泡到 document「点空白关卡」：hideInfo 后 target 已不在卡内，会把刚开的任务卡关掉 */
+    hideInfo();
+    window.QuestPanel.openCard(el.dataset.qOpen);
+  });
 
   /* ---------- toast ---------- */
   let toastTimer = null;
