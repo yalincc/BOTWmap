@@ -101,11 +101,12 @@
     if (q.region) h += '<div class="tk-mrow"><span class="tk-mk">区域</span><span class="tk-mv">' + esc(q.region) + '</span></div>';
     if (place) h += '<div class="tk-mrow"><span class="tk-mk">位置</span><span class="co-link" data-q-locate="1" title="点击定位到该地点">' + esc(place.name) + '</span></div>';
     h += '</div>';
-    /* 前置条件 / 后续解锁（key 关联制：渲染 q.reqs / q.unlockList，空 → 「无」；
-       ★ 样式统一：同字号同色，仅链接语义区分；前置上方加分割线） */
-    h += '<div class="tk-kv tk-kv-div"><span class="tk-k">前置条件</span><span class="tk-v">' +
+    /* 前置 / 解锁（key 关联制：渲染 q.reqs / q.unlockList，空 → 「无」；
+       ★ 样式统一：同字号同色，仅链接语义区分；前置上方加分割线
+       ★ V1.6.5：label 缩短为 2 字，严格守住 44px 对齐基线（完整语义在 hover title）） */
+    h += '<div class="tk-kv tk-kv-div"><span class="tk-k">前置</span><span class="tk-v">' +
       linkList(q.reqs, '点击查看前置任务') + '</span></div>';
-    h += '<div class="tk-kv"><span class="tk-k">后续解锁</span><span class="tk-v">' +
+    h += '<div class="tk-kv"><span class="tk-k">解锁</span><span class="tk-v">' +
       linkList(q.unlockList, '点击查看后续任务') + '</span></div>';
     /* 任务要点区（TOTKmap 结构：要点正文 + 接取/注意/奖励 子项）
        ★ 注意：q.note 为攻略注意事项，数据补齐后有则显示，无则不显示该行 */

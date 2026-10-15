@@ -270,8 +270,9 @@
     h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(camp.m || camp.a || '怪物营地') + '</h3>' +
       '<button type="button" class="tk-copy" id="cpCopy" title="复制 #序号 + 名称">[复制]</button></div>';
     if (camp.f && camp.f !== camp.m) h += '<div class="qcard-en">' + esc(camp.f) + '</div>';
-    h += '<div class="tk-kv"><span class="tk-k">怪物档位</span><span class="tk-v">' + esc(camp.t || '—') + '</span></div>';
-    h += '<div class="tk-kv"><span class="tk-k">刷点数</span><span class="tk-v">' + ((camp.loc || []).length) + ' 处</span></div>';
+    /* V1.6.5：label 缩短为 2 字守住 44px 基线（完整语义：怪物档位/刷点数，见卡片标题与 hover） */
+    h += '<div class="tk-kv"><span class="tk-k">档位</span><span class="tk-v">' + esc(camp.t || '—') + '</span></div>';
+    h += '<div class="tk-kv"><span class="tk-k">刷点</span><span class="tk-v">' + ((camp.loc || []).length) + ' 处</span></div>';
     /* V1.6.4 实测反馈：机制提示（法师游荡 / 依盖队据点剧情性 / 血月重抽） */
     var isWizzrobe = !!(camp.a && camp.a.indexOf('Wizzrobe') >= 0);
     var isYiga = !!(camp.a && camp.a.indexOf('Assassin') >= 0);
