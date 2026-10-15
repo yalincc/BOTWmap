@@ -36,6 +36,7 @@ screenshot/
 
 # 过程文档(md)不入库：README 例外
 *.md
+!docs/releases/*.md   # 版本报告入库（白名单例外）
 !README.md
 !live-go/README.md
 !live/README.md
