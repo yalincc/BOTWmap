@@ -375,28 +375,41 @@
     if (!ce) return;
     /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
     var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
-    /* V1.6.5 Q2：血月升档 → 武器池按推导档重抽（老大实测：布点蓝鬃推导白鬃后，实际掉兽神系列而非
-       兽王系列）。推导档池 = CAMP_WEAPONS 中推导档 actor 的手持武器并集；未升档时保持布点清单 */
-    var lt = window.__lynelTierOf ? window.__lynelTierOf(mk.name) : null;
+    /* V1.6.5 Q2：血月升档 → 武器池按推导档重抽。三条约束（老大实测拍板）：
+       ① 仅莱尼尔（西诺克斯/岩石巨人/莫尔德拉吉克等套莱尼尔推导是 bug——曾致莫尔德显示兽神五件套）；
+       ② 只保留与布点营地相同「武器类型」的推导档武器（大剑型人马只掉大剑+弓，不出剑/枪/盾；
+          Weapon_ 前缀 → 类型，与 monster-weapons weapons.category 同口径）；
+       ③ 段标题保持纯文案，推导阶段由信息卡「阶段」行表达 */
+    var lt = (mk.cat === 'lynel' && window.__lynelTierOf) ? window.__lynelTierOf(mk.name) : null;
     var TIER_ACTOR = { 2: 'Enemy_Lynel_Middle', 3: 'Enemy_Lynel_Senior', 4: 'Enemy_Lynel_Dark' };
     var BASE_TIER = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
     var curTier = 0;
     if (lt && lt.upgraded && TIER_ACTOR[lt.cur] && lt.cur > (BASE_TIER[mk.name] || 1)) curTier = lt.cur;
+    function wcat(k) {
+      if (k.indexOf('Weapon_Lsword_') === 0) return '双手剑';
+      if (k.indexOf('Weapon_Sword_') === 0) return '单手剑';
+      if (k.indexOf('Weapon_Spear_') === 0) return '枪';
+      if (k.indexOf('Weapon_Bow_') === 0) return '弓';
+      if (k.indexOf('Weapon_Shield_') === 0) return '盾';
+      return '';
+    }
     var poolW = null;
     if (curTier) {
-      var pre = TIER_ACTOR[curTier], seen = {};
+      var pre = TIER_ACTOR[curTier], seen = {}, types = {};
+      camps.forEach(function (c) { (c.w || []).forEach(function (k) { types[wcat(k)] = 1; }); });
       poolW = [];
       CW.all.forEach(function (c) {
         if ((c.a || '').indexOf(pre) !== 0) return;
-        (c.w || []).forEach(function (k) { if (!seen[k]) { seen[k] = 1; poolW.push(k); } });
+        (c.w || []).forEach(function (k) {
+          if (!seen[k] && types[wcat(k)]) { seen[k] = 1; poolW.push(k); }   /* 类型匹配：布点有该类型才收录 */
+        });
       });
     }
-    if (curTier) h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）· 按「' + lt.name[curTier] + '」阶段推导</div>';
     /* V1.6.5 修 Q3：段标题已含卡片 Title 的怪物名，营地行仅多营地混合档位时标注区分 */
     if (curTier && poolW && poolW.length) {
       poolW.forEach(function (k) { h += weaponRow(k); });
     } else {
-      if (curTier) h += '<div class="cp-empty">该阶段暂无营地武器池数据，以下为布点初始清单</div>';
+      if (curTier) h += '<div class="cp-empty">该阶段暂无同类型营地武器数据，以下为布点初始清单</div>';
       camps.forEach(function (c) {
         var label = (camps.length > 1 && c.m && c.m !== mk.name) ? c.m : '';
         if (label) h += '<div class="cp-lynel-row"><b>' + esc(label) + '</b>' +

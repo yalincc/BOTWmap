@@ -1013,12 +1013,13 @@ const UI = (() => {
       if (liveDone) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#7dffa0">游戏内已收集 ✓</span></div>';
       else if (map.live && map.live.counts) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#e8b04a">游戏内未收集</span></div>';
     }
-    /* V1.6.5：人马讨伐 + 当前阶段（Q2 老大拍板拆两行；布点档在卡片标题，不重复） */
+    /* V1.6.5：人马讨伐 + 当前阶段（Q2 老大拍板拆两行；阶段金色加粗醒目；布点档在卡片标题；
+       血月次数存档无记录（权威 flag 全集只有任务线/计时器），不显示升档来源） */
     if (mk.cat === 'lynel') {
       const lt = window.__lynelTierOf ? window.__lynelTierOf(mk.name) : null;
       if (lt) {
         extra += '<div class="row fd-row"><span class="fd-l">讨伐</span><span class="fd-v fd-num">已讨伐 ' + lt.total + ' 只</span></div>';
-        extra += '<div class="row fd-row"><span class="fd-l">阶段</span><span class="fd-v fd-v-accent">' + esc(lt.name[lt.cur]) + (lt.upgraded ? '（血月已升档）' : '') + '</span></div>';
+        extra += '<div class="row fd-row"><span class="fd-l">阶段</span><span class="fd-v fd-v-accent" style="font-weight:700">' + esc(lt.name[lt.cur]) + '</span></div>';
       }
     }
     $('cardExtra').innerHTML = extra;

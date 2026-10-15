@@ -49,12 +49,17 @@ const SAVE_UPLOAD = (() => {
         window.__saveCounts = d.counts || null;
         window.__saveUploaded = !!d.uploaded;
         // V1.6.4：恢复讨伐点亮集（saveLoaded 态下 _mkDone 只认 liveDone，必须随缓存恢复）
-        if (d.counts && d.counts.liveIds && d.counts.liveIds.length) {
-          if (!map.liveDone) map.liveDone = new Set();
-          d.counts.liveIds.forEach(function (id) { map.liveDone.add(id); });
+      if (d.counts) {
+        if (!map.liveDone) map.liveDone = new Set();
+        // V1.6.4：恢复讨伐点亮集（saveLoaded 态下 _mkDone 只认 liveDone，必须随缓存恢复）
+        (d.counts.liveIds || []).forEach(function (id) { map.liveDone.add(id); });
+        // V1.6.5：恢复可收集类完成点（神庙/塔/克洛格/回忆/神兽）——否则 F5 后探索类绿勾全灭
+        (d.counts.collectIds || []).forEach(function (id) { map.liveDone.add(id); });
+        if (((d.counts.liveIds || []).length || (d.counts.collectIds || []).length)) {
           UI.renderStats();
           map.draw();
         }
+      }
       }
     } catch (e) {}
     const input = document.getElementById('saveFile');
@@ -329,12 +334,17 @@ const SAVE_UPLOAD = (() => {
     const expandRefs = v => (Array.isArray(v[0]) ? v : [v]);
     let grew = 0;
     const byT = {}, memByTier = {};
+    /* V1.6.5：可收集类完成点快照（神庙/塔/克洛格/回忆/神兽）——_mkDone 在 saveLoaded 态只认
+       liveDone，不持久化这份集合的话 F5 后探索类绿勾全灭（老大反馈） */
+    const COLLECT_TYPES = ['shrine', 'tower', 'korok', 'memory', 'beast'];
+    const collectIds = [];
     for (const v of done.values()) {
       for (const ref of expandRefs(v)) {
         const t = ref[0], id = ref[1], tier = ref[2];
         byT[t] = (byT[t] || 0) + 1;
         if (t === 'memory') memByTier[tier || '?'] = (memByTier[tier || '?'] || 0) + 1;
         if (id) {
+          if (COLLECT_TYPES.indexOf(t) >= 0) collectIds.push(id);
           if (!map.liveDone) map.liveDone = new Set();
           map.liveDone.add(id);          // 存档来源已完成（供 _mkDone 回忆类存档优先判定）
           if (!map.doneSet.has(id)) { map.doneSet.add(id); grew++; }
@@ -425,6 +435,7 @@ const SAVE_UPLOAD = (() => {
       pbEnemy: pbEnemyCnt,
       pbEnemyTotal: (typeof PB_LISTS !== "undefined" && PB_LISTS.enemy) ? PB_LISTS.enemy.length : 84,
       enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; }),
+      collectIds: collectIds,   /* V1.6.5：可收集类完成点快照（刷新恢复探索类绿勾） */
       lynelCnt: lynelCnt   /* V1.6.5：人马分级击杀计数（ui.js 推导当前档；随 saveCounts 持久化） */
     };
     try { localStorage.setItem('botwmap.saveCounts.v1', JSON.stringify({ uploaded: true, counts: window.__saveCounts })); } catch (e) {}
