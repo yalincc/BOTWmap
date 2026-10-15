@@ -25,7 +25,7 @@ const CAT_CFG = {
   talus:      { color:'#8d99a6', shape:'talus',     order:2, lz:0.8,  icon:'icons_20.png', isz:[26,30] },
   hinox:      { color:'#7ac97a', shape:'hinox',     order:2, lz:0.8,  icon:'icons_12.png', isz:[29,30] },
   lynel:      { color:'#ff6b5e', shape:'lynel',     order:2, lz:0.7,  icon:'icons_24.png', isz:[26,30] },
-  molduga:    { color:'#f2d45c', shape:'molduga',   order:2, lz:0.8,  icon:'icons_17.png', isz:[29,30] },
+  molduga:    { color:'#f2d45c', shape:'molduga',   order:2, lz:0.8,  icon:'molduga.png' },
   guardian:   { color:'#e05e5e', shape:'guardian',  order:2, lz:0.8,  icon:'icons_35.png', isz:[32,26] },
   /* V1.4.3 新增敌人（数据源 enemies.js，图标 = romfs 官方图鉴缩略） */
   bokoblin:   { color:'#c98a4a', shape:'dot',       order:2, lz:0.8,  icon:'icons_36.png', isz:[28,28] },

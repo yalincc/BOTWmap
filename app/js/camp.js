@@ -270,8 +270,9 @@
     h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(camp.m || camp.a || '怪物营地') + '</h3>' +
       '<button type="button" class="tk-copy" id="cpCopy" title="复制 #序号 + 名称">[复制]</button></div>';
     if (camp.f && camp.f !== camp.m) h += '<div class="qcard-en">' + esc(camp.f) + '</div>';
-    /* V1.6.5：label 缩短为 2 字守住 44px 基线（完整语义：怪物档位/刷点数，见卡片标题与 hover） */
-    h += '<div class="tk-kv"><span class="tk-k">档位</span><span class="tk-v">' + esc(camp.t || '—') + '</span></div>';
+    /* V1.6.5 修 Q3：t 字段与 m（标题怪物名）逐条相同（609/609），档位列纯重复——
+       仅当将来数据出现 t≠m 才渲染；血月升档机制见卡内脚注 */
+    if (camp.t && camp.t !== camp.m) h += '<div class="tk-kv"><span class="tk-k">档位</span><span class="tk-v">' + esc(camp.t) + '</span></div>';
     h += '<div class="tk-kv"><span class="tk-k">刷点</span><span class="tk-v">' + ((camp.loc || []).length) + ' 处</span></div>';
     /* V1.6.4 实测反馈：机制提示（法师游荡 / 依盖队据点剧情性 / 血月重抽） */
     var isWizzrobe = !!(camp.a && camp.a.indexOf('Wizzrobe') >= 0);
@@ -376,9 +377,12 @@
     var sib = MK_BY_CAT[mk.cat] || [];
     var num = sib.indexOf(mk.id) + 1;
     var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）· ' + (num ? '#' + num + ' ' : '') + esc(mk.name || '') + '</div>';
+    /* V1.6.5 修 Q3：段标题已含标记名（#N 蓝鬃莱尼尔），营地行不再重复怪物名；
+       仅当附近存在多个不同名营地（混合档位）时才标注区分；t 字段 609/609 与 m 相同，仅防御性保留 */
     camps.forEach(function (c) {
-      h += '<div class="cp-lynel-row"><b>' + esc(c.m || c.a) + '</b>' +
-        '<span class="cp-lynel-tier">' + esc(c.t || '') + '</span></div>';
+      var label = (camps.length > 1 && c.m && c.m !== mk.name) ? c.m : '';
+      if (label) h += '<div class="cp-lynel-row"><b>' + esc(label) + '</b>' +
+        (c.t && c.t !== c.m ? '<span class="cp-lynel-tier">' + esc(c.t) + '</span>' : '') + '</div>';
       if ((c.w || []).length) {
         (c.w || []).forEach(function (k) { h += weaponRow(k); });
       } else {
