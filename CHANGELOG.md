@@ -44,6 +44,10 @@
   - 移除自启检查更新弹窗；
   - 增加语义版本号严格大小比较，彻底修复本地已是 v3.1.1 却反向提示更新 v3.1.0 的 Bug。
 
+### 补记（2026-10-15 晚 · release 资产更新）
+- **程序图标替换为 Sheikah 眼**：v3.1.1 首发（含 v3.1.0）误带 Wails 默认 W 图标，本次将 `xnavi-gui\build\windows\icon.ico` / `build\appicon.png` 更新为 Sheikah 眼并重建 exe（commit `d1a2163`），本地 RELEASE 与 GitHub release 资产已同步替换；旧版 exe 留底 `RELEASE\xnavi-v3.1.1\xnavi.exe.orig`，新图标留档 `xnavi-icon.ico`
+  - 完整 SOP（生成→重建→`tools\check-exe-icon.py` 校验→发布同步）见 `开发手册.md §7.1`
+
 ## [V1.6.5] - 2026-10-15 卡片 UI 系统全面升级与交互缺陷修复
 
 ### 小修（2026-10-15 晚 · 不更新版本号）

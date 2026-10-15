@@ -33,6 +33,8 @@ $env:Path = 'D:\tools\go\bin;' + $env:Path
 Set-Location ..\xnavi-gui; & 'D:\tools\go\gopath\bin\wails.exe' build -skipbindings
 ```
 
+> **换程序图标**：完整流程（icon.ico/appicon.png 生成 → 重建 → `tools\check-exe-icon.py` 校验 → release 同步 + 留底）见 `开发手册.md §7.1`。
+
 ## 运行
 
 `xnavi-gui\build\bin\xnavi.exe`（或命令行 `xnavi-core.exe [port] [--game=auto|botw] [--no-open]`）
