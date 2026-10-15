@@ -368,9 +368,16 @@
     return out;
   }
 
+  /* V1.6.5：人工实测映射（上游布点缺失的点位）。Lynel23 = 大师模式/Mod 限定生成的人马
+     （普通模式布点源无此条目），老大实测白鬃阶段掉兽神大剑+兽神弓（类型=双手剑+弓，升档类型不变） */
+  var LYNEL_OVERRIDES = {
+    Lynel23: { w: ['Weapon_Lsword_018', 'Weapon_Bow_032'], note: '该点位为大师模式/Mod 限定生成，上游无布点数据；组合来自游戏实测' }
+  };
+
   function enhanceLynelCard(mk) {
     var camps = campsNearMarker(mk.px || [0, 0], mk.cat);
-    if (!camps.length) return;
+    var ov = (mk.cat === 'lynel' && LYNEL_OVERRIDES[mk.id]) || null;
+    if (!camps.length && !ov) return;
     var ce = document.getElementById('cardExtra');
     if (!ce) return;
     /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
@@ -405,7 +412,10 @@
       });
     }
     /* V1.6.5 修 Q3：段标题已含卡片 Title 的怪物名，营地行仅多营地混合档位时标注区分 */
-    if (curTier && poolW && poolW.length) {
+    if (ov) {   /* V1.6.5：人工实测映射优先（上游布点缺失点位，如 Lynel23 大师模式/Mod 生成） */
+      if (ov.note) h += '<div class="cp-empty">' + esc(ov.note) + '</div>';
+      (ov.w || []).forEach(function (k) { h += weaponRow(k); });
+    } else if (curTier && poolW && poolW.length) {
       poolW.forEach(function (k) { h += weaponRow(k); });
     } else {
       if (curTier) h += '<div class="cp-empty">该阶段暂无同类型营地武器数据，以下为布点初始清单</div>';
