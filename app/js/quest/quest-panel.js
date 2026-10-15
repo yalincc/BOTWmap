@@ -69,6 +69,7 @@
       D.setAll(!allOn);
       grp.querySelectorAll('.lrow[data-qcat]').forEach(function (r) { r.classList.toggle('on', !allOn); });
     });
+    if (global.__syncLayerBtns) global.__syncLayerBtns();
 
     /* 完成态变化时刷新 4 行计数（卡片标记 / 载入存档后调用） */
     global._questRefreshRows = function () {

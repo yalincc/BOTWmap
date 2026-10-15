@@ -66,4 +66,4 @@
 
 ## 版本
 
-**当前版本：BOTWmap v1.6.5**（更新明细见 CHANGELOG.md）
+**当前版本：BOTWmap v1.6.6**（更新明细见 CHANGELOG.md）

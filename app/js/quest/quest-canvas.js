@@ -43,6 +43,8 @@
       var ql = D.qLayerOf(q);
       if (!on[ql] || !q.pts || !q.pts.length) continue;
       var done = global.QuestDone.isDone(q.key);
+      /* V1.6.6：设置里勾了「隐藏已完成的任务」→ 直接跳过（与命中同步，见 hit()） */
+      if (done && window.BOTW_SETTINGS.hideCat('quest')) continue;
       var img = D.ICONS[ql];
       var hasImg = img && img.complete && img.naturalWidth;
       for (var j = 0; j < q.pts.length; j++) {
@@ -77,6 +79,8 @@
       var q = D.QUESTS[i];
       var ql = D.qLayerOf(q);
       if (!D.qLayers[ql] || !q.pts || !q.pts.length) continue;
+      /* V1.6.6：隐藏的已完成任务不参与命中 */
+      if (window.BOTW_SETTINGS.hideCat('quest') && global.QuestDone.isDone(q.key)) continue;
       for (var j = 0; j < q.pts.length; j++) {
         var p = q.pts[j];
         var dx = p[0] - mx, dy = p[1] - my;

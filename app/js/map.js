@@ -46,9 +46,45 @@ const CAT_CFG = {
 const CAT_GROUP = {
   '探索收集': ['shrine','tower','beast','lab','seed','memory','treasure'],
   '设施地点': ['village','stable','inn','store','armor','dye','jewelry','fountain','statue','pot','settlement'],
-  '敌人':     ['lynel','hinox','talus','molduga','guardian','bokoblin','moblin','lizalfos','keese','chuchu','octorok','wizzrobe','yiga','dragon','pebblit'],
+  // V1.6.6：dragon 无点位、只画飞行轨迹，不属于「怪」，移出敌人组 → 改由设置面板「龙飞行轨迹」开关控制
+  '敌人':     ['lynel','hinox','talus','molduga','guardian','bokoblin','moblin','lizalfos','keese','chuchu','octorok','wizzrobe','yiga','pebblit'],
   '任务':     ['mainquest','shrinequest','sidequest','objective'],
 };
+
+/* ---------- 全局显示设置（V1.6.6 设置面板重构）----------
+ * 统一收进 botwmap.settings.v1，取代原先散落的 regionShow / korokPaths 两个 key。
+ * 各绘制层（marker / chest / equip / quest）统一查 hideCat()，保证绘制与命中口径一致。
+ * 可隐藏类目：shrine 神庙 / tower 希卡塔 / beast 神兽 / seed 克洛格 / memory 回忆
+ *              chest 宝箱 / equip 装备 / quest 任务（后三者走各自绘制层） */
+const K_SETTINGS = 'botwmap.settings.v1';
+const DEFAULT_SETTINGS = {
+  doneMode: 'dim',   // 'dim' 默认（已完成的点变灰仍显示） | 'hide' 隐藏
+  hideCats: { shrine: 1, seed: 1, memory: 1, chest: 1, tower: 0, beast: 0, equip: 0, quest: 0 },
+  dragonPath: true,
+  regionShow: true,
+};
+window.BOTW_SETTINGS = {
+  D: DEFAULT_SETTINGS,   // 「恢复默认」用
+  s: Object.assign({}, DEFAULT_SETTINGS, { hideCats: Object.assign({}, DEFAULT_SETTINGS.hideCats) }),
+  load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(K_SETTINGS) || 'null');
+      if (raw) {
+        this.s = Object.assign({}, DEFAULT_SETTINGS, raw);
+        this.s.hideCats = Object.assign({}, DEFAULT_SETTINGS.hideCats, raw.hideCats || {});
+      }
+    } catch (e) {}
+    // 旧 key 一次性迁移（V1.6.6 之前散落的开关，读过一次后即以新 key 为准）
+    try {
+      if (localStorage.getItem('botwmap.regionShow.v1') === '0') this.s.regionShow = false;
+    } catch (e) {}
+    return this.s;
+  },
+  save() { try { localStorage.setItem(K_SETTINGS, JSON.stringify(this.s)); } catch (e) {} },
+  /* 该类目「已完成的点」是否应隐藏 —— 绘制与命中必须同时走这里，否则会出现「看不见但点得到」 */
+  hideCat(cat) { return this.s.doneMode === 'hide' && !!this.s.hideCats[cat]; },
+};
+window.BOTW_SETTINGS.load();
 
 /* 材料追踪层（v1.1.0）：6 类采集材料的类目视觉配置 */
 const MAT_CAT_CFG = {
@@ -99,7 +135,6 @@ class BotwMap {
     this.regionStyle = { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
     this.showRegions = true;   // 地名显示开关（设置弹层可切换，持久化到 localStorage）
     // 克洛格轨迹（v1.1.4）：数据源 korok_paths.js（97 条多点轨迹，应用像素坐标）；开关默认开
-    this.showKorokPaths = true;
     this.KOROK_PATHS = (typeof KOROK_PATHS !== 'undefined' && KOROK_PATHS.items) ? KOROK_PATHS.items : [];
     this._pathById = new Map();
     for (const p of this.KOROK_PATHS) this._pathById.set(p.id, p);
@@ -325,6 +360,8 @@ class BotwMap {
         // V1.6.1：旧 treasure 标记（data.js 1315 点）停用，统一由 chest.js 三组
         // （普通 1167 / DLC 27 / 大师模式 118）绘制与命中；此处一处跳过同时停绘制+命中拦截
         if (mk.cat === 'treasure') continue;
+        // V1.6.6：已完成标记隐藏（先判廉价的 hideCat，再判完成态）
+        if (window.BOTW_SETTINGS.hideCat(mk.cat) && this._mkDone(mk)) continue;
         // V1.4.3：小岩石人默认隐藏（hide 标记，设置里可开启）
         // 回忆：地图上只标注 13 个照片回忆点（照片12 + 最终1）；主线自动 / DLC 回忆随任务触发，不标注
         if (mk.cat === 'memory' && !(mk.extra && (mk.extra.tier === 'photo' || mk.extra.tier === 'final'))) continue;
@@ -620,7 +657,8 @@ class BotwMap {
 
   _drawKorokPaths(ctx, vis) {
     const scale = this.view.scale;
-    if (!this.showKorokPaths || scale < this._korokPathMinScale() || !this.enabled.has('seed') || !this.KOROK_PATHS.length) return;
+    // V1.6.6 第二轮：克洛格轨迹跟随「克洛格(seed)」图层勾选，不再单独设开关
+    if (scale < this._korokPathMinScale() || !this.enabled.has('seed') || !this.KOROK_PATHS.length) return;
     const { w, h } = this;
     ctx.save();
     ctx.lineJoin = 'round';
@@ -670,7 +708,8 @@ class BotwMap {
   /* 龙飞行轨迹（v1.4.3）：3 条龙路线平滑曲线，颜色按 data color 字段；任意缩放显示（含全图 100%） */
   _drawDragonPaths(ctx) {
     const scale = this.view.scale;
-    if (!this.enabled.has('dragon') || !this.DRAGON_PATHS.length) return;
+    // V1.6.6：改由设置面板「龙飞行轨迹」开关控制（原为图层面板敌人组 dragon 勾选）
+    if (!window.BOTW_SETTINGS.s.dragonPath || !this.DRAGON_PATHS.length) return;
     const { w, h } = this;
     const COLORS = { farosh: 'rgba(232,190,64,.92)', dinraal: 'rgba(232,96,64,.92)', naydra: 'rgba(88,168,240,.92)' };
     const EDGE = { farosh: 'rgba(110,85,20,.65)', dinraal: 'rgba(110,40,20,.65)', naydra: 'rgba(30,80,140,.65)' };
@@ -748,7 +787,7 @@ class BotwMap {
   }
 
   _hitKorokPath(mx, my) {
-    if (!this.showKorokPaths || this.view.scale < this._korokPathMinScale() || !this.enabled.has('seed')) return null;
+    if (this.view.scale < this._korokPathMinScale() || !this.enabled.has('seed')) return null;
     const tol = 12 / this.view.scale;
     let best = null, bd = 1e18;
     for (const p of this.KOROK_PATHS) {
@@ -765,7 +804,7 @@ class BotwMap {
 
   /* 龙轨迹命中（v1.4.3）：鼠标距离轨迹折线 ≤ 阈值即命中，返回龙对象 */
   _hitDragonPath(mx, my) {
-    if (!this.enabled.has('dragon') || !this.DRAGON_PATHS.length) return null;
+    if (!window.BOTW_SETTINGS.s.dragonPath || !this.DRAGON_PATHS.length) return null;
     const tol = 10 / this.view.scale;   // 屏幕 10px 阈值（≈线宽+余量），换算成地图距离
     let best = null, bd = 1e18;
     for (const p of this.DRAGON_PATHS) {

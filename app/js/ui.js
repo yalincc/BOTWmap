@@ -314,6 +314,8 @@ const UI = (() => {
     });
     $('checkAll').addEventListener('click', () => setAllLayers(true));
     $('uncheckAll').addEventListener('click', () => setAllLayers(false));
+    // 任何图层行 / 组按钮点击后，补刷新外部模块组（装备/宝箱/任务）的按钮文字
+    wrap.addEventListener('click', () => { setTimeout(syncExtGroupBtns, 0); });
     buildMatLayerGroup();
     updateLayerList();
   }
@@ -419,17 +421,55 @@ const UI = (() => {
 
   const MAT_GROUPS = ['植物', '蘑菇', '水果', '昆虫', '鱼', '矿物'];
 
+  /* V1.6.6：全选 / 清空 —— 联动全部图层模块（原先只清 marker 层，装备/宝箱/任务/营地纹丝不动）
+     材料（74 种 13524 点）不参与：一键全开会很卡，它本来也是按需勾选的性质 */
   function setAllLayers(on) {
     if (on) map.data.categories.forEach(c => map.enabled.add(c.key));
     else map.enabled.clear();
     document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', on));
-    saveLayers(); updateLayerList(); map.draw(); renderStats();
+    saveLayers();
+    const call = (obj, fn) => { try { if (obj && typeof obj[fn] === 'function') obj[fn](on); } catch (e) {} };
+    call(window.EquipPanel, 'setAll');
+    call(window.ChestPanel, 'setAll');
+    call(window.CampPanel, 'setAll');
+    if (window.QuestData && typeof window.QuestData.setAll === 'function') {
+      try {
+        window.QuestData.setAll(on);
+        document.querySelectorAll('#layerList .lrow[data-qcat]').forEach(r => r.classList.toggle('on', on));
+      } catch (e) {}
+    }
+    updateLayerList(); map.draw(); renderStats();
   }
 
+  /* V1.6.6：装备 / 宝箱 / 任务三组是各自模块建的，历史上从没人给它们的组按钮写过文字
+     （ui.js 只管 CAT_GROUP 四组 + 材料），导致按钮一直是个空白扁圆 —— 这里统一补上并随状态更新 */
+  function syncExtGroupBtns() {
+    const wrap = $('layerList');
+    if (!wrap) return;
+    const defs = [
+      { group: '装备', keys: ['weapon', 'shield', 'armor'], get: k => !!(window.EquipPanel && window.EquipPanel.isOn(k)) },
+      { group: '宝箱', keys: ['normal', 'dlc', 'hard'], get: k => !!(window.ChestPanel && window.ChestPanel.isOn(k)) },
+      { group: '任务', keys: ['main', 'side', 'shrine', 'dlc'], get: k => !!(window.QuestData && window.QuestData.isOn(k)) },
+    ];
+    defs.forEach(d => {
+      const btn = wrap.querySelector('.lg-btn[data-group="' + d.group + '"]');
+      if (!btn) return;
+      const on = d.keys.filter(d.get).length;
+      btn.textContent = on === d.keys.length ? '清空本组' : (on === 0 ? '全选本组' : '全选（' + on + '/' + d.keys.length + '）');
+      btn.style.opacity = on === d.keys.length ? '1' : '0.75';
+    });
+  }
+  window.__syncLayerBtns = syncExtGroupBtns;
+
   function updateLayerList() {
-    let shown = 0;
-    map.data.categories.forEach(c => { if (map.enabled.has(c.key)) shown++; });
-    $('layerCount').textContent = shown + '/' + map.data.categories.length + ' 图层';
+    // V1.6.6：dragon 已从敌人组移出（无点位、改由设置开关控制），计数同步排除，避免"面板没有但计数里有"
+    let shown = 0, total = 0;
+    map.data.categories.forEach(c => {
+      if (c.key === 'dragon') return;
+      total++;
+      if (map.enabled.has(c.key)) shown++;
+    });
+    $('layerCount').textContent = shown + '/' + total + ' 图层';
     // 分组按钮状态
     const wrap = $('layerList');
     for (const [group, keys] of Object.entries(CAT_GROUP)) {
@@ -448,6 +488,7 @@ const UI = (() => {
       el.textContent = total;
       el.style.color = 'var(--text-dim)';
     }
+    syncExtGroupBtns();
     // 材料组按钮 + 行统计
     if (map.MATS) {
       const mbtn = wrap.querySelector('.lg-btn[data-group="材料"]');
@@ -1172,10 +1213,6 @@ const UI = (() => {
     $('zoomOut').addEventListener('click', () => { map.zoomAt(map.w / 2, map.h / 2, 1 / 1.5); });
     $('zoomFit').addEventListener('click', () => { map.fit(); map.draw(); });
     wirePinForm();
-    $('btnMeasure').addEventListener('click', () => {
-      if (map.mode === 'measure') { map.setMode('browse'); }
-      else { map.setMode('measure'); }
-    });
     $('btnPin').addEventListener('click', () => {
       if (map.mode === 'pin') map.setMode('browse');
       else map.setMode('pin');
@@ -1238,18 +1275,13 @@ const UI = (() => {
   }
 
   function onModeChange(mode) {
-    $('btnMeasure').classList.toggle('active', mode === 'measure');
     $('btnPin').classList.toggle('active', mode === 'pin');
     const hint = $('modeHint');
-    if (mode === 'measure') {
-      hint.textContent = '测量模式：点击地图打点，双击结束，Esc 退出';
-      hint.classList.remove('hidden');
-    } else if (mode === 'pin') {
+    if (mode === 'pin') {
       hint.textContent = '标记模式：点击地图放置自定义标记，Esc 退出';
       hint.classList.remove('hidden');
     } else {
       hint.classList.add('hidden');
-      $('btnMeasure').classList.remove('active');
       $('btnPin').classList.remove('active');
     }
   }
@@ -1336,10 +1368,8 @@ const UI = (() => {
       const ml = JSON.parse(localStorage.getItem(K_MAT_LAYERS) || '[]');
       ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
     } catch (e) {}
-    // 地名显示开关
-    map.showRegions = localStorage.getItem(K_REGION_SHOW) !== '0';
-    // 克洛格轨迹开关（v1.1.4）
-    map.showKorokPaths = localStorage.getItem(K_KOROK_PATHS) !== '0';
+    // V1.6.6：显示设置统一走 window.BOTW_SETTINGS（旧 key 已在那里迁移过）
+    map.showRegions = !!window.BOTW_SETTINGS.s.regionShow;
     // 同步行状态与图层计数
     document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
     document.querySelectorAll('#layerList .mat-item').forEach(r => r.classList.toggle('on', map.matIds.has(+r.dataset.matid)));
@@ -1388,7 +1418,7 @@ const UI = (() => {
   function initStyle() {
     loadStyle();
     const box = $('settingsBox');
-    const openBox = () => { box.classList.remove('hidden'); syncStyle(); };
+    const openBox = () => { box.classList.remove('hidden'); syncStyle(); syncSettings(); };
     const closeBox = () => box.classList.add('hidden');
     $('btnSettings').addEventListener('click', openBox);
     $('stClose').addEventListener('click', closeBox);
@@ -1403,8 +1433,6 @@ const UI = (() => {
       };
       // 地名显示
       setOpt('stShowOptions', map.showRegions ? 'show' : 'hide');
-      // 克洛格轨迹（v1.1.4）
-      setOpt('stShowPaths', map.showKorokPaths ? 'show' : 'hide');
       // 文字颜色
       const txHex = rgbToHex(st.tx);
       if (txHex === rgbToHex(DEFAULT_STYLE.tx)) setOpt('stTxOptions', 'default');
@@ -1441,24 +1469,75 @@ const UI = (() => {
       map.draw();
       syncStyle();
     }
-    // 地名显示开关
+
+    /* ---------- V1.6.6 行为开关：已完成标记 / 龙轨迹 / 小岩石人 / 折叠样式 ---------- */
+    const S = window.BOTW_SETTINGS;
+    const HIDE_CAT_DEF = [
+      ['shrine', '神庙'], ['seed', '克洛格'], ['memory', '回忆'], ['chest', '宝箱'],
+      ['tower', '希卡塔'], ['beast', '神兽'], ['equip', '装备'], ['quest', '任务'],
+    ];
+    const setOptBtn = (sel, v) => {
+      document.querySelectorAll('#' + sel + ' .st-opt').forEach(b => b.classList.toggle('sel', b.dataset.v === v));
+    };
+    function syncSettings() {
+      setOptBtn('stDoneMode', S.s.doneMode);
+      setOptBtn('stDragonPath', S.s.dragonPath ? 'show' : 'hide');
+      $('stHideCats').classList.toggle('hidden', S.s.doneMode !== 'hide');
+    }
+    // 类目 chips
+    const chipsWrap = $('stHideChips');
+    HIDE_CAT_DEF.forEach(([key, cn]) => {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'st-chip' + (S.s.hideCats[key] ? ' on' : '');
+      c.textContent = cn;
+      c.dataset.cat = key;
+      c.addEventListener('click', () => {
+        S.s.hideCats[key] = S.s.hideCats[key] ? 0 : 1;
+        c.classList.toggle('on', !!S.s.hideCats[key]);
+        S.save(); map.draw();
+      });
+      chipsWrap.appendChild(c);
+    });
+    // 已完成标记：灰化 / 隐藏
+    document.querySelectorAll('#stDoneMode .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        S.s.doneMode = b.dataset.v;
+        S.save(); map.draw(); syncSettings();
+      });
+    });
+    // 龙飞行轨迹（V1.6.6 从图层面板敌人组移到设置）
+    document.querySelectorAll('#stDragonPath .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        S.s.dragonPath = b.dataset.v === 'show';
+        S.save(); map.draw(); syncSettings();
+      });
+    });
+    // V1.6.6 第二轮：小岩石人开关移除 —— 它属于敌人大类，跟随敌人图层勾选即可
+    // 地名文字样式折叠
+    const styleBody = $('stStyleBody');
+    $('stStyleToggle').addEventListener('click', () => {
+      const open = styleBody.classList.contains('hidden');
+      styleBody.classList.toggle('hidden', !open);
+      $('stStyleTri').textContent = open ? '▾' : '▸';
+    });
+    // 图层面板「隐藏标记」按钮 → 直接打开设置面板（V1.6.6 第二轮：替代原左侧栏提醒条）
+    const btnHideMark = $('btnHideMark');
+    if (btnHideMark) btnHideMark.addEventListener('click', () => {
+      box.classList.remove('hidden'); syncStyle(); syncSettings();
+    });
+    syncSettings();
+    // 地名显示开关（V1.6.6：持久化统一走 window.BOTW_SETTINGS）
     document.querySelectorAll('#stShowOptions .st-opt').forEach(b => {
       b.addEventListener('click', () => {
         map.showRegions = b.dataset.v === 'show';
-        try { localStorage.setItem(K_REGION_SHOW, map.showRegions ? '1' : '0'); } catch (e) {}
+        S.s.regionShow = map.showRegions;
+        S.save();
         map.draw();
         syncStyle();
       });
     });
-    // 克洛格轨迹开关（v1.1.4）
-    document.querySelectorAll('#stShowPaths .st-opt').forEach(b => {
-      b.addEventListener('click', () => {
-        map.showKorokPaths = b.dataset.v === 'show';
-        try { localStorage.setItem(K_KOROK_PATHS, map.showKorokPaths ? '1' : '0'); } catch (e) {}
-        map.draw();
-        syncStyle();
-      });
-    });
+    // V1.6.6 第二轮：克洛格轨迹开关移除 —— 跟随「克洛格」图层勾选，勾了就画轨迹（老大拍板方案 A）
     // V1.4.3b：龙轨迹开关移除（改由图层面板「龙」分类勾选控制）
     // 文字颜色
     document.querySelectorAll('#stTxOptions .st-opt[data-v]').forEach(b => {
@@ -1490,12 +1569,15 @@ const UI = (() => {
     // 恢复默认
     $('stReset').addEventListener('click', () => {
       map.regionStyle = Object.assign({}, DEFAULT_STYLE);
+      S.s.doneMode = S.D.doneMode;
+      S.s.hideCats = Object.assign({}, S.D.hideCats);
+      S.s.dragonPath = true; S.s.regionShow = true;
       map.showRegions = true;
-      map.showKorokPaths = true;
-      try { localStorage.setItem(K_REGION_SHOW, '1'); } catch (e) {}
-      try { localStorage.setItem(K_KOROK_PATHS, '1'); } catch (e) {}
-      saveStyle(); map.draw(); syncStyle();
-      toast('地名样式已恢复默认');
+      S.save(); saveStyle(); map.draw(); syncStyle(); syncSettings();
+      chipsWrap.querySelectorAll('.st-chip').forEach(c => {
+        c.classList.toggle('on', !!S.s.hideCats[c.dataset.cat]);
+      });
+      toast('设置已恢复默认');
     });
   }
 

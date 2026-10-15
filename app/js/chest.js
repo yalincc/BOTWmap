@@ -107,7 +107,18 @@
   };
 
   /* 对外：装备完成态标记时会调 markPoints 同步宝箱完成 */
+  /* V1.6.6：全开 / 全关宝箱三子类（供图层面板「全选 / 清空」联动调用） */
+  function setAllChest(on) {
+    SUB_ORDER.forEach(function (s) { cLayers[s] = !!on; });
+    try { localStorage.setItem(K_LAYERS, JSON.stringify(cLayers)); } catch (e) {}
+    var w = document.getElementById('layerList');
+    if (w) w.querySelectorAll('.lrow[data-cat^="chest_"]').forEach(function (r) { r.classList.toggle('on', !!on); });
+    drawExt();
+  }
+
   window.ChestPanel = {
+    setAll: setAllChest,
+    isOn: function (sub) { return !!cLayers[sub]; },
     isDone: function (p) { if (!p) return false; var kk = ptKey(p); return chestDone.has(kk) || saveDone.has(kk); },
     toggleDone: function (p) {
       if (!p) return null;
@@ -183,16 +194,14 @@
 
     gBtn.addEventListener('click', function () {
       var allOn = SUB_ORDER.every(function (s) { return cLayers[s]; });
-      SUB_ORDER.forEach(function (s) { cLayers[s] = !allOn; });
-      lrows.querySelectorAll('.lrow[data-cat]').forEach(function (rowEl) { rowEl.classList.toggle('on', !allOn); });
-      try { localStorage.setItem(K_LAYERS, JSON.stringify(cLayers)); } catch (err) {}
-      drawExt();
+      setAllChest(!allOn);
     });
 
     /* 3) 插入到「探索收集」组之前（即装备组之后） */
     var anchor = wrap.querySelector('.lg-group[data-group="探索收集"]');
     if (anchor) wrap.insertBefore(grp, anchor);
     else wrap.appendChild(grp);
+    if (window.__syncLayerBtns) window.__syncLayerBtns();
   }
 
   function drawExt() {
@@ -224,6 +233,8 @@
         if (px[0] < x0 || px[0] > x1 || px[1] < y0 || px[1] > y1) continue;
         var sx = map.view.x + px[0] * scale, sy = map.view.y + px[1] * scale;
         var isDone = window.ChestPanel.isDone(px);
+        /* V1.6.6：设置里勾了「隐藏已完成的宝箱」→ 直接跳过（与命中同步，见 hit()） */
+        if (isDone && window.BOTW_SETTINGS.hideCat('chest')) continue;
         ctx.save();
         ctx.globalAlpha = isDone ? 0.65 : 1;   /* V1.6.2：完成态降透明 */
         if (hasImg) {
@@ -252,6 +263,8 @@
       for (var i = 0; i < list.length; i++) {
         var entry = list[i];
         var p = entry.pt;
+        /* V1.6.6：隐藏的已完成宝箱不参与命中（否则会点到看不见的幽灵点） */
+        if (window.BOTW_SETTINGS.hideCat('chest') && window.ChestPanel.isDone(p)) continue;
         var dx = p[0] - mx, dy = p[1] - my;
         if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) {
           var d = dx * dx + dy * dy;

@@ -1,7 +1,9 @@
-# V1.6.6 重做方案（怪物层重建 · 分阶段交付）
+# 怪物层重建方案（分阶段交付）
+
+> 文件名沿革：原名 `V1.6.6-REDO-PLAN.md`（2026-10-16 文档体系整理时去掉版本号 —— **计划类文档不领版本号**，版本号只在发布那一刻生成，见 `../spec/DEV-HANDBOOK.md` §3.2）。
 
 > **状态**：方案已确认（2026-10-15 22:40），本轮执行 **P0-P2**。
-> **前置阅读**：`docs/releases/V1.6.6.md`（回档报告 + 九坑表）、`docs/releases/V1.6.6-HANDOFF.md`（数据件/管线/接线清单）。
+> **前置阅读**：`docs/releases/UNPUBLISHED-v1.6.6.md`（回档报告 + 九坑表）、`docs/notes/HANDOFF-ENEMY-TIER.md`（数据件/管线/接线清单）。
 > **数据口径权威**：`E:\WorkSpace\BOTWroms\raw\romfs\DATA-README.md` §12。
 
 ---
@@ -131,6 +133,6 @@ V1.6.6（怪物层换源官方缩放链，根治幽灵怪）于 2026-10-15 18:49
 4. **DATA-README §12 口径同步**：怨念锚点过滤 + markers 3845 是否回写 romfs 侧（待老大定）
 5. **命名澄清**：本方案 P3/P4/P5 与项目历史 P3/P4（v1.6.3 装备数据层/营地刷图层）**撞名**，沟通须加限定词
 
-## 附：不可遗忘的九坑（重做时逐条核对，详见 V1.6.6.md §4）
+## 附：不可遗忘的九坑（重做时逐条核对，详见 `docs/releases/UNPUBLISHED-v1.6.6.md` §4）
 
 1. loc 嵌套口径（根因级）2. cat 拼写 Moriblin/Octarock 3. killScores 在 enemy-scaling.json 4. camps.weapons 是 `{item,count}` 数组 5. index 对齐非 id 6. camp hit 坐标口径 = 地图像素 7. 小怪标记与营地刷点同源重合（click 被抢）8. 初始化时序 9. apply 异常被 try 吞

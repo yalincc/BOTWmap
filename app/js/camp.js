@@ -497,9 +497,19 @@
   });
 
   /* ---------- 对外（verify / 调试钩子） ---------- */
+  /* V1.6.6：全开 / 全关营地两子类（供图层面板「全选 / 清空」联动调用） */
+  function setAllCamp(on) {
+    SUB_ORDER.forEach(function (s) { cLayers[s] = !!on; });
+    try { localStorage.setItem(K_LAYERS, JSON.stringify(cLayers)); } catch (e) {}
+    var w = document.getElementById('layerList');
+    if (w) w.querySelectorAll('.lrow[data-ccat]').forEach(function (r) { r.classList.toggle('on', !!on); });
+    drawExt();
+  }
+
   window.CampPanel = {
     isOn: function (sub) { return !!cLayers[sub]; },
     toggle: function (sub) { if (sub in cLayers) { cLayers[sub] = !cLayers[sub]; drawExt(); } },
+    setAll: setAllCamp,
     openCard: openCard,
     locate: locate,
     lynelCamps: function () { return CW.all.filter(isLynelCamp).length; },

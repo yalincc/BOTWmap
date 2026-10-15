@@ -1,4 +1,8 @@
-# BOTWmap V1.6.6 版本报告（2026-10-15）
+# BOTWmap V1.6.6 版本报告（2026-10-15）· ⚠️ 未发布
+
+> **⚠️ 状态：未发布** —— 本版曾写完但**随回档撤下，从未上线**，因此 **V1.6.6 仍是空号**，可被后续版本正常使用。
+> 文件名沿革：原名 `V1.6.6.md`（2026-10-16 改为 `UNPUBLISHED-` 前缀，避免空号被误占）。
+> 现重做方案见 `../backlog/ENEMY-TIER-REBUILD.md`；交接清单见 `../notes/HANDOFF-ENEMY-TIER.md`。
 
 ## 1. 版本概述
 
@@ -66,5 +70,5 @@
 - **当前 HEAD**：901abc4 = tag `v1.6.5`（上一确认版本）
 - 数据件：`app/data/enemy-tiers/`（回档后已移除，重生成：`source/build_botwmap_tiers.py`，源数据在 `E:\WorkSpace\BOTWroms\raw\romfs\` §12）
 - 知识库：DATA-README.md §12（数据口径权威文档）
-- **接手文档：docs/releases/V1.6.6-HANDOFF.md**（数据件/管线/前端接线清单/九坑速查——重做从这里开始）
+- **接手文档：docs/notes/HANDOFF-ENEMY-TIER.md**（数据件/管线/前端接线清单/九坑速查——重做从这里开始）
 - 保留资产：`stash@{0}`（回档前工作区改动）；LYNEL_OVERRIDES 人工映射思路（V1.6.5 的 7ec6edf 已含）

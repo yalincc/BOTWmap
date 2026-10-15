@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=55&b=1641016">
+<link rel="stylesheet" href="css/style.css?v=58&b=1641016">
 <style>
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
@@ -38,7 +38,6 @@
     </div>
     <div class="tools">
       <button id="btnSidebar" class="tool" title="显示 / 隐藏图层面板"><span class="ico">☰</span><span class="label">图层</span></button>
-      <button id="btnMeasure" class="tool" title="点击地图打点，测量两点间游戏距离（米）"><span class="ico">📏</span><span class="label">测量</span></button>
       <button id="btnPin" class="tool" title="在地图上添加自定义标记"><span class="ico">📍</span><span class="label">标记</span></button>
       <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接"><span class="ico">🔗</span><span class="label">分享</span></button>
       <button id="btnReset" class="tool" title="重置到全图视图"><span class="ico">🏠</span><span class="label">全图</span></button>
@@ -69,8 +68,9 @@
     </div>
 
     <div class="layer-actions">
-      <button id="checkAll" class="mini">全选图层</button>
-      <button id="uncheckAll" class="mini">清空图层</button>
+      <button id="checkAll" class="mini">全选</button>
+      <button id="uncheckAll" class="mini">清空</button>
+      <button id="btnHideMark" class="mini" title="设置已完成标记是否隐藏">标记设置</button>
       <span id="layerCount" class="hint"></span>
     </div>
 
@@ -102,7 +102,7 @@
     </div>
 
     <footer class="side-foot">
-      <p class="foot-version">BOTWMAP 1.6.5 © 2026 yalincc</p>
+      <p class="foot-version">BOTWMAP 1.6.6 © 2026 yalincc</p>
       <p>GitHub <a href="https://github.com/yalincc/BOTWmap" target="_blank" rel="noopener">https://github.com/yalincc/BOTWmap</a></p>
     </footer>
   </aside>
@@ -217,19 +217,33 @@
       <button id="lbClose" class="card-close" title="关闭">×</button>
     </div>
 
-    <!-- 设置弹层（地名样式） -->
+    <!-- 设置弹层（V1.6.6：行为开关优先，地名样式折叠收起） -->
     <div id="settingsBox" class="hidden">
       <div class="sb-head">地图设置
         <button id="stClose" class="card-close">×</button>
       </div>
+
+      <!-- 完成标记：默认 / 隐藏 + 类目 chips -->
       <div class="st-group">
-        <div class="st-label">克洛格轨迹</div>
-        <div class="st-options" id="stShowPaths">
+        <div class="st-label">完成标记</div>
+        <div class="st-options" id="stDoneMode">
+          <button class="st-opt" data-v="dim">默认</button>
+          <button class="st-opt" data-v="hide">隐藏</button>
+        </div>
+        <div class="st-cats hidden" id="stHideCats">
+          <div class="st-slabel" style="width:auto">完成标记类型</div>
+          <div class="st-chips" id="stHideChips"></div>
+        </div>
+      </div>
+
+      <div class="st-group">
+        <div class="st-label">龙的轨迹</div>
+        <div class="st-options" id="stDragonPath">
           <button class="st-opt" data-v="show">显示</button>
           <button class="st-opt" data-v="hide">隐藏</button>
         </div>
       </div>
-      <!-- V1.4.3b：龙飞行轨迹开关移除，改由图层面板「龙」分类（特殊怪）勾选控制 -->
+
       <div class="st-group">
         <div class="st-label">地名显示</div>
         <div class="st-options" id="stShowOptions">
@@ -237,6 +251,11 @@
           <button class="st-opt" data-v="hide">隐藏</button>
         </div>
       </div>
+
+      <!-- 地名文字样式：低频微调，默认折叠 -->
+      <div class="st-group">
+        <button type="button" id="stStyleToggle" class="st-fold">地名文字样式 <span id="stStyleTri">▸</span></button>
+        <div id="stStyleBody" class="hidden">
       <div class="st-group">
         <div class="st-label">地名文字颜色</div>
         <div class="st-options" id="stTxOptions">
@@ -287,8 +306,10 @@
           <span id="stBgAlphaV" class="st-sval">0%</span>
         </div>
       </div>
+        </div>
+      </div>
       <div class="st-foot">
-        <button id="stReset" class="mini">恢复默认</button>
+        <button id="stReset" class="mini">恢复默认设置</button>
       </div>
     </div>
 
@@ -361,10 +382,10 @@
 <script src="js/supercluster.min.js"></script>
 <script src="js/materials.js?v=1&b=1641016"></script>
 <script src="js/regions.js?v=rn5&b=1641016"></script>
-<script src="js/map.js?v=42&b=1641016"></script>
+<script src="js/map.js?v=44&b=1641016"></script>
 <script src="js/card-layout.js?v=5&b=1641016"></script>
 <script src="js/spot-mark.js?v=1&b=1641016"></script>
-<script src="js/ui.js?v=61&b=1641016"></script>
+<script src="js/ui.js?v=67&b=1641016"></script>
 <script src="js/main.js?v=10&b=1641016"></script>
 <script src="js/live.js?v=18&b=1641016"></script>
 <script src="data/save_flags.js?v=1&b=1641016"></script>
@@ -379,9 +400,9 @@
 <!-- V1.6.2 · M3：任务板块拆 5 模块（data → done → canvas → flow → panel → card），quest.js 只做装配 + 门面 -->
 <script src="js/quest/quest-data.js?v=1&b=1641016"></script>
 <script src="js/quest/quest-done.js?v=3&b=1641016"></script>
-<script src="js/quest/quest-canvas.js?v=2&b=1641016"></script>
+<script src="js/quest/quest-canvas.js?v=3&b=1641016"></script>
 <script src="js/quest/quest-flow.js?v=3&b=1641016"></script>
-<script src="js/quest/quest-panel.js?v=2&b=1641016"></script>
+<script src="js/quest/quest-panel.js?v=3&b=1641016"></script>
 <script src="js/quest/quest-card.js?v=7&b=1641016"></script>
 <script src="js/quest.js?v=25&b=1641016"></script>
 <!-- P4a：武器图鉴库（196 条，含营地来源）+ 营地刷点表（卡片内定位反查，L3 图层属 P4c） -->
@@ -389,11 +410,11 @@
 <script src="data/weapons.js?v=1&b=1641016"></script>
 <script src="data/armors.js?v=1&b=1641016"></script>
 <script src="data/camp_weapons.js?v=1&b=1641016"></script>
-<script src="js/equip.js?v=27&b=1641016"></script>
+<script src="js/equip.js?v=30&b=1641016"></script>
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
 <script src="data/chests.js?v=1&b=1641016"></script>
-<script src="js/chest.js?v=15&b=1641016"></script>
-<script src="js/camp.js?v=15&b=1641016"></script>
+<script src="js/chest.js?v=20&b=1641016"></script>
+<script src="js/camp.js?v=16&b=1641016"></script>
 </body>
 </html>
 

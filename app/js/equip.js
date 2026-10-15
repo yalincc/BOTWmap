@@ -186,11 +186,10 @@
 
     gBtn.addEventListener('click', function () {
       var allOn = CAT_ORDER.every(function (c) { return eLayers[c]; });
-      CAT_ORDER.forEach(function (c) { eLayers[c] = !allOn; });
-      grp.querySelectorAll('.lrow[data-ecat]').forEach(function (r) { r.classList.toggle('on', !allOn); });
-      try { localStorage.setItem(K_LAYERS, JSON.stringify(eLayers)); } catch (e) {}
-      drawExt();
+      setAllEquip(!allOn);
     });
+    /* 组按钮刚建好，主动让 ui.js 补上「全选本组 / 清空本组」文字（否则是个空白扁圆） */
+    if (window.__syncLayerBtns) window.__syncLayerBtns();
   }
 
   function drawExt() {
@@ -218,6 +217,8 @@
       if (!on[it.kind]) continue;
       var color = CAT_COLOR[it.kind] || '#888';
       var done = EquipDone.isDone(it.id);
+      /* V1.6.6：设置里勾了「隐藏已完成的装备」→ 直接跳过（与命中同步，见 hit()） */
+      if (done && window.BOTW_SETTINGS.hideCat('equip')) continue;
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
         if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
@@ -251,6 +252,8 @@
     for (var i = 0; i < ITEMS.length; i++) {
       var it = ITEMS[i];
       if (!eLayers[it.kind]) continue;
+      /* V1.6.6：隐藏的已完成装备点不参与命中 */
+      if (window.BOTW_SETTINGS.hideCat('equip') && EquipDone.isDone(it.id)) continue;
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
         if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
@@ -676,10 +679,20 @@
     window.__equipSearch = equipSearch;
   }
 
+  /* V1.6.6：全开 / 全关本组（供图层面板「全选 / 清空」联动调用） */
+  function setAllEquip(on) {
+    CAT_ORDER.forEach(function (c) { eLayers[c] = !!on; });
+    try { localStorage.setItem(K_LAYERS, JSON.stringify(eLayers)); } catch (e) {}
+    var w = document.getElementById('layerList');
+    if (w) w.querySelectorAll('.lrow[data-ecat]').forEach(function (r) { r.classList.toggle('on', !!on); });
+    drawExt();
+  }
+
   /* ---------- 对外 ---------- */
   window.EquipPanel = {
     isOn: function (cat) { return !!eLayers[cat]; },
     toggle: function (cat) { eLayers[cat] = !eLayers[cat]; drawExt(); },
+    setAll: setAllEquip,
     locate: locate,
     openCard: openCard,
     buildEquipSearch: buildEquipSearch,
