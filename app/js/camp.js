@@ -375,16 +375,15 @@
     if (!ce) return;
     /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
     var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
-    /* V1.6.5 Q2：血月升档 → 武器池按推导档重抽。三条约束（老大实测拍板）：
-       ① 仅莱尼尔（西诺克斯/岩石巨人/莫尔德拉吉克等套莱尼尔推导是 bug——曾致莫尔德显示兽神五件套）；
-       ② 只保留与布点营地相同「武器类型」的推导档武器（大剑型人马只掉大剑+弓，不出剑/枪/盾；
-          Weapon_ 前缀 → 类型，与 monster-weapons weapons.category 同口径）；
+    /* V1.6.5 Q2：掉落段统一按「当前阶段 + 布点类型」渲染（老大拍板：只显示当前阶段的掉落物，
+       白银布点未升档也走当前档池，修 #22 白银 4×3=12 件堆叠）。当前阶段 = max(布点档, 血月阶梯)；
+       池 = 该阶段 actor 的手持武器并集 ∩ 布点类型集合（大剑型只出大剑系；Weapon_ 前缀 → 类型，
+       与 weapons.category 同口径）。① 仅莱尼尔（其他 Boss 套莱尼尔推导是 bug）；② 池空才回退布点清单；
        ③ 段标题保持纯文案，推导阶段由信息卡「阶段」行表达 */
     var lt = (mk.cat === 'lynel' && window.__lynelTierOf) ? window.__lynelTierOf(mk.name) : null;
-    var TIER_ACTOR = { 2: 'Enemy_Lynel_Middle', 3: 'Enemy_Lynel_Senior', 4: 'Enemy_Lynel_Dark' };
+    var TIER_ACTOR = { 1: 'Enemy_Lynel_Junior', 2: 'Enemy_Lynel_Middle', 3: 'Enemy_Lynel_Senior', 4: 'Enemy_Lynel_Dark' };
     var BASE_TIER = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
-    var curTier = 0;
-    if (lt && lt.upgraded && TIER_ACTOR[lt.cur] && lt.cur > (BASE_TIER[mk.name] || 1)) curTier = lt.cur;
+    var curTier = (lt && TIER_ACTOR[lt.cur]) ? lt.cur : 0;
     function wcat(k) {
       if (k.indexOf('Weapon_Lsword_') === 0) return '双手剑';
       if (k.indexOf('Weapon_Sword_') === 0) return '单手剑';

@@ -83,11 +83,36 @@ const LIVE = (() => {
     if (cbStop) cbStop.addEventListener('click', () => { stopCollectMode(); UI.toast('已结束收集模式'); });
 
     loadProgress();
-    setInterval(poll, 600);
-    setInterval(loadProgress, 20000);
+    startPolling();
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) loadProgress();
     });
+  }
+
+  /* ---------- 轮询退避（V1.6.5）：定位器（xnavi live）未开时 600ms 轮询会刷屏
+     ERR_CONNECTION_REFUSED——连续失败 3 次即停，30s 探测一次，恢复后自动重启轮询 ---------- */
+  let pollTimer = null, probeTimer = null, progressTimer = null, failCnt = 0;
+  function startPolling() {
+    if (pollTimer) return;
+    failCnt = 0;
+    pollTimer = setInterval(poll, 600);
+    if (!progressTimer) progressTimer = setInterval(loadProgress, 20000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+    if (!probeTimer) {
+      probeTimer = setInterval(async () => {
+        try {
+          const r = await fetch(LIVE_API + '/pos?who=web&t=' + Date.now(), { cache: 'no-store' });
+          if (r.ok) {   /* 定位器恢复 → 重启正常轮询 */
+            clearInterval(probeTimer); probeTimer = null;
+            startPolling();
+            loadProgress();
+          }
+        } catch (e) { /* 仍未开，保持静默探测 */ }
+      }, 30000);
+    }
   }
 
   /* ---------- 玩家位置轮询 ---------- */
@@ -98,8 +123,17 @@ const LIVE = (() => {
       if (r.ok) p = await r.json();
     } catch (e) { p = null; }
 
+    /* V1.6.5：连续失败 3 次 → 停轮询转 30s 探测（定位器未开时不刷 ERR_CONNECTION_REFUSED） */
+    const online = !!(p && p.ok);
+    if (!online) {
+      failCnt++;
+      if (failCnt >= 3 && pollTimer) stopPolling();
+    } else {
+      failCnt = 0;
+    }
+
     const L = map.live;
-    L.online = !!(p && p.ok);
+    L.online = online;
     // V1.5.0：服务端返回 lanUrl（局域网手机镜像入口）→ 刷新面板（变化时才更新 DOM）
     const lanUrl = (p && typeof p.lanUrl === 'string' && p.lanUrl) ? p.lanUrl : '';
     if (lanUrl !== lastLanUrl) { lastLanUrl = lanUrl; renderMirror(lanUrl); }

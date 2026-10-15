@@ -1019,7 +1019,7 @@ const UI = (() => {
       const lt = window.__lynelTierOf ? window.__lynelTierOf(mk.name) : null;
       if (lt) {
         extra += '<div class="row fd-row"><span class="fd-l">讨伐</span><span class="fd-v fd-num">已讨伐 ' + lt.total + ' 只</span></div>';
-        extra += '<div class="row fd-row"><span class="fd-l">阶段</span><span class="fd-v fd-v-accent" style="font-weight:700">' + esc(lt.name[lt.cur]) + '</span></div>';
+        extra += '<div class="row fd-row"><span class="fd-l">阶段</span><span class="fd-v fd-v-accent" style="color:var(--fd-gold);font-weight:700">' + esc(lt.name[lt.cur]) + '</span></div>';
       }
     }
     $('cardExtra').innerHTML = extra;
