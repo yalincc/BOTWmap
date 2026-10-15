@@ -1,4 +1,4 @@
-﻿// 定位核心（单一状态机）。
+// 定位核心（单一状态机）。
 //
 // 蓝本：TOTKmap live-go/watch.go（V1.8.7，已真机验证"零自动扫描 + 探针监听 +
 // 冻结共识"方案）；行为基线：BotwNavi(live-go) 与 navicemu(live-cemu)。
@@ -719,7 +719,14 @@ func stateMachine() {
 
 		// Q10：冻结后台重扫——保持当前锁和位置显示，只跑扫描+探针。
 		// 玩家真移动时活副本组 mv≥3 自动切换；站立不动时扫描无果、什么都不变。
-		if bgScan && time.Since(lastBgScanAt) >= 60*time.Second {
+		bgCooldown := 60 * time.Second
+		if _, isEden := p.(edenLocator); isEden {
+			bgCooldown = currentGame.FrozenRescanAfter()
+			if bgCooldown <= 0 {
+				bgCooldown = 12 * time.Second
+			}
+		}
+		if bgScan && time.Since(lastBgScanAt) >= bgCooldown {
 			bgScan = false
 			lastBgScanAt = time.Now()
 			if loc, ok := p.(edenLocator); ok {
@@ -873,6 +880,7 @@ func stateMachine() {
 			if ver {
 				incCounter("jumps")
 				frozenN = 0
+				lastBgScanAt = time.Time{}
 				preJump = prev
 				lastJumpAt = time.Now()
 				if pnt := currentGame.MatchShrine(cur[0], cur[1], cur[2]); pnt != nil {
@@ -950,8 +958,15 @@ func stateMachine() {
 				consensusCand = 0
 				// Q10：冻结且无共识候选 → 后台重扫（不解锁）。
 				// 站立不动时副本无写入属正常；玩家真移动时探针会找到活副本并切换。
-				// 节流：与上次后台重扫间隔 ≥60s 才再次置位（防日志每秒刷屏）
-				if time.Since(lastBgScanAt) >= 60*time.Second {
+				// 节流：与上次后台重扫间隔 ≥bgCooldown 才再次置位（防日志每秒刷屏）
+				bgCooldown := 60 * time.Second
+				if _, isEden := p.(edenLocator); isEden {
+					bgCooldown = currentGame.FrozenRescanAfter()
+					if bgCooldown <= 0 {
+						bgCooldown = 12 * time.Second
+					}
+				}
+				if time.Since(lastBgScanAt) >= bgCooldown {
 					fmt.Printf("  [sm] lock frozen %.0fs -> background rescan (lock kept)\n",
 						float64(frozenN)*smTick.Seconds())
 					bgScan = true

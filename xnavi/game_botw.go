@@ -246,11 +246,11 @@ func (g *gameBotw) UnverifiedRescanAfter() time.Duration {
 //   - Cemu/Ryujinx=0（禁用）：固定偏移是跨重启验证的活副本，游戏运行期
 //     不会失效；站立不动=副本无写入属正常，30s 冻结阈值曾造成"站立期间反复后台
 //     重扫"（Q13）。真异常（块切换读数错乱）由读数失效路径处理。
-//   - Eden=30s：Eden 坐标槽会话内稳定、场景切换漂移——场景切换后旧地址可能
-//     仍返回旧坐标（内存未释放 → 红点冻结），30s 无变化触发冻结后台重扫自愈。
+//   - Eden=12s：Eden 坐标槽会话内稳定、场景切换漂移——User Heap 扫描仅 0.9s，
+//     停滞 12s 即可启动轻量级后台重扫自愈换活槽。
 func (g *gameBotw) FrozenRescanAfter() time.Duration {
 	if p := currentPlatform(); p != nil && p.Name() == "Eden" {
-		return 30 * time.Second
+		return 12 * time.Second
 	}
 	return 0
 }

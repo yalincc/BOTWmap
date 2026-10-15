@@ -184,11 +184,61 @@ func edenProcessPath(h uintptr) string {
 	return string(utf16.Decode(buf[:size]))
 }
 
+var (
+	edenArenaMu        sync.Mutex
+	cachedEdenPid      uint32
+	cachedEdenArenaLow uintptr
+)
+
+// edenFindArenaLow 寻找 Switch 虚拟机的 4GB MEM_MAPPED DRAM 区，反解 arenaLow。
+// Switch 在宿主 Windows 上通过唯一的 4GB MEM_MAPPED 提交区映射 DRAM，其后紧随 512GB Switch 虚拟地址空间。
+func edenFindArenaLow(h uintptr) uintptr {
+	if h == 0 {
+		return 0
+	}
+	addr := uintptr(0)
+	const limit = uintptr(0x7FFFFFFFFFFF)
+	for addr < limit {
+		var mbi MemoryBasicInformation
+		if !vqRetry(h, addr, &mbi) {
+			break
+		}
+		base, size := mbi.BaseAddress, mbi.RegionSize
+		if mbi.State == memCommit && mbi.Type == memMapped && size == (1<<32) {
+			return base + (1 << 32)
+		}
+		nxt := base + size
+		if nxt > addr {
+			addr = nxt
+		} else {
+			addr += 0x1000
+		}
+	}
+	return 0
+}
+
+func edenGetArenaLow(h uintptr, pid uint32) uintptr {
+	edenArenaMu.Lock()
+	defer edenArenaMu.Unlock()
+	if cachedEdenPid == pid && cachedEdenArenaLow != 0 {
+		return cachedEdenArenaLow
+	}
+	al := edenFindArenaLow(h)
+	if al != 0 {
+		cachedEdenPid = pid
+		cachedEdenArenaLow = al
+	}
+	return al
+}
+
 // ---- Eden 内存枚举 ----
 
-// edenGuestBlocks 全部已提交 RW 区域（≥64KB，MAPPED + PRIVATE）。
-// live-eden engine guestBlocks 原样移植。
-func edenGuestBlocks(h uintptr, minMB float64) []MemBlock {
+// edenGuestBlocksWithOptions 枚举 Eden 可读写内存区域。
+// heapOnly=true：仅返回落在 Switch 虚拟机用户态堆空间（User Heap：[arenaLow + 0x2000000000, arenaLow + 0x3000000000)）的块。
+//   在 Switch 64位 Horizon OS 中，所有动态游戏 Actor（包括林克角色对象与其坐标）全部分配在 User Heap 中。
+//   该空间在宿主仅约 2.65GB（相比全宿主 19.3GB 剔除了 86% 的显卡贴图/宿主杂质），秒级扫描关键！
+// heapOnly=false：枚举全宿主 ≥64KB 的 RW 区域（用于最后的兜底安全扫描）。
+func edenGuestBlocksWithOptions(h uintptr, minMB float64, heapOnly bool, pid uint32) []MemBlock {
 	if h == 0 {
 		return nil
 	}
@@ -197,10 +247,25 @@ func edenGuestBlocks(h uintptr, minMB float64) []MemBlock {
 	if minSize < floor {
 		minSize = floor
 	}
-	const limit = uintptr(0x7FFFFFFFFFFF)
-	var out []MemBlock
+	var heapLo, heapHi uintptr
+	if heapOnly {
+		al := edenGetArenaLow(h, pid)
+		if al != 0 {
+			heapLo = al + uintptr(0x2000000000)
+			heapHi = al + uintptr(0x3000000000)
+		}
+	}
+
 	addr := uintptr(0)
+	const limit = uintptr(0x7FFFFFFFFFFF)
+	if heapLo != 0 {
+		addr = heapLo
+	}
+	var out []MemBlock
 	for addr < limit {
+		if heapHi != 0 && addr >= heapHi {
+			break
+		}
 		var mbi MemoryBasicInformation
 		if !vqRetry(h, addr, &mbi) {
 			break
@@ -219,6 +284,11 @@ func edenGuestBlocks(h uintptr, minMB float64) []MemBlock {
 		}
 	}
 	return out
+}
+
+// edenGuestBlocks 兼容旧调用（全宿主枚举）。
+func edenGuestBlocks(h uintptr, minMB float64) []MemBlock {
+	return edenGuestBlocksWithOptions(h, minMB, false, 0)
 }
 
 // ---- Eden 定位：存档锚点 → 窗口扫描 → 分组打分（engine locate.go 移植）----
@@ -432,7 +502,7 @@ func edenGroupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 			return aLive
 		}
 		if a.Copies != b.Copies {
-			return a.Copies < b.Copies
+			return a.Copies > b.Copies
 		}
 		return a.Dist < b.Dist
 	})
@@ -466,43 +536,84 @@ func edenGroupHasValid(h uintptr, g *Group) bool {
 	return false
 }
 
-// edenLiveHits 移动检测：两次采样（间隔 300ms），坐标变化 >0.5m 的候选 = 活动槽。
-// 关键判据（2026-10-08 实测）：玩家/NPC 槽坐标持续变化；占位池 (6,80,100)/(30,80,100)
-// 类与静态装饰槽坐标恒定。玩家移动后"距锚点最近"失效（占位池可能比玩家近），
-// 必须优先活动槽。全死槽（玩家挂机）时回落全部候选（见 EdenLocate）。
-func edenLiveHits(h uintptr, hits []Hit) []Hit {
-	time.Sleep(300 * time.Millisecond)
-	var live []Hit
-	for _, hit := range hits {
-		d0 := currentGame.DecodeAt(h, hit.Addr)
-		if d0 == nil {
+// edenLiveGroups 组级移动检测：只对 top 分组（前 12 组）的代表地址采样。
+// 两次采样间隔 150ms。若玩家正在走动，坐标发生变化的组标记为活动组。
+// 耗时仅 ~150ms，大幅替代旧版全候选逐个采样的数十秒卡顿。
+func edenLiveGroups(h uintptr, ranked []*Group) []*Group {
+	if len(ranked) == 0 {
+		return nil
+	}
+	nGroups := len(ranked)
+	if nGroups > 12 {
+		nGroups = 12
+	}
+	type sample struct {
+		addr uintptr
+		pos  [3]float32
+	}
+	first := make([]sample, nGroups)
+	for i := 0; i < nGroups; i++ {
+		g := ranked[i]
+		if len(g.Addrs) > 0 {
+			first[i].addr = g.Addrs[0]
+			if d := currentGame.DecodeAt(h, g.Addrs[0]); d != nil {
+				first[i].pos = [3]float32{d[0], d[1], d[2]}
+			}
+		}
+	}
+	time.Sleep(150 * time.Millisecond)
+	var live []*Group
+	for i := 0; i < nGroups; i++ {
+		if first[i].addr == 0 {
 			continue
 		}
-		time.Sleep(2 * time.Millisecond) // 错开两次读，避免同一瞬间采样
-		d1 := currentGame.DecodeAt(h, hit.Addr)
+		d1 := currentGame.DecodeAt(h, first[i].addr)
 		if d1 == nil {
 			continue
 		}
-		if dist3([3]float32{d0[0], d0[1], d0[2]}, [3]float32{d1[0], d1[1], d1[2]}) > 0.5 {
-			live = append(live, hit)
+		if dist3(first[i].pos, [3]float32{d1[0], d1[1], d1[2]}) > 0.5 {
+			live = append(live, ranked[i])
 		}
 	}
 	return live
 }
 
+// pickEdenGroup 从分组打分结果选出最佳结构候选组（兼容站桩静止与轻度位移）。
+func pickEdenGroup(h uintptr, ranked []*Group, refs [][3]float32) *Group {
+	for _, g := range ranked {
+		if g.Struct <= 0 {
+			continue
+		}
+		limit := len(g.Addrs)
+		if limit > 8 {
+			limit = 8
+		}
+		for i := 0; i < limit; i++ {
+			d := currentGame.DecodeAt(h, g.Addrs[i])
+			if d == nil {
+				continue
+			}
+			// 宽容差 40m：确保组内地址与组代表基本一致，防止严重错位
+			if dist3([3]float32{d[0], d[1], d[2]}, [3]float32{g.X, g.Y, g.Z}) < 40.0 {
+				g.Addrs[0], g.Addrs[i] = g.Addrs[i], g.Addrs[0]
+				return g
+			}
+		}
+	}
+	return nil
+}
+
 // edenPlaceholderCoord 占位池坐标特征：三轴近整数（±0.02）。
-// 实测占位池槽 (6,80,100)/(30,80,100) 三轴精确整数；玩家坐标连续浮点
-// （-1449.1, 138.3, 1265.5），三轴同时近整数概率极低。
 func edenPlaceholderCoord(x, y, z float32) bool {
 	return abs32(x-float32(math.Round(float64(x)))) < 0.02 &&
 		abs32(y-float32(math.Round(float64(y)))) < 0.02 &&
 		abs32(z-float32(math.Round(float64(z)))) < 0.02
 }
 
-// edenFilterHits 候选过滤（EdenLocate 入口统一执行）：
-//   - alt≈0：静态装饰（实测装饰坐标 alt 精确为 0）；
-//   - 整数三轴：占位池 (6,80,100)/(30,80,100) 类（大量未激活 actor 默认位置）；
-//   - 三轴近相等：占位初始值（实测 (124.6,124.6,124.6)，玩家坐标不可能三轴相等）。
+// edenFilterHits 候选初筛：
+//   - alt≈0：静态装饰；
+//   - 整数三轴：占位池未激活 actor 默认位置；
+//   - 三轴近相等：占位初始值。
 func edenFilterHits(hits []Hit) []Hit {
 	out := hits[:0]
 	for _, hit := range hits {
@@ -520,37 +631,10 @@ func edenFilterHits(hits []Hit) []Hit {
 	return out
 }
 
-// edenNearestByAnchor 候选按距存档锚点升序，跳过 alt≈0 静态装饰与占位池
-// 整数坐标，取第一个。
-func edenNearestByAnchor(hits []Hit, refs [][3]float32) *Group {
-	if len(hits) == 0 {
-		return nil
-	}
-	sort.Slice(hits, func(i, j int) bool {
-		di := dist3([3]float32{hits[i].X, hits[i].Y, hits[i].Z}, refs[0])
-		dj := dist3([3]float32{hits[j].X, hits[j].Y, hits[j].Z}, refs[0])
-		if di != dj {
-			return di < dj
-		}
-		return hits[i].X < hits[j].X
-	})
-	for i := range hits {
-		if abs32(hits[i].Y) < 1.0 {
-			continue // 静态装饰（alt≈0）
-		}
-		if edenPlaceholderCoord(hits[i].X, hits[i].Y, hits[i].Z) {
-			continue // 占位池（三轴整数）
-		}
-		return &Group{Addrs: []uintptr{hits[i].Addr}, Copies: 1, Struct: 1,
-			X: hits[i].X, Y: hits[i].Y, Z: hits[i].Z, Dist: hits[i].Dist}
-	}
-	return nil
-}
-
-// EdenLocate 实现 edenLocator 接口（Eden 完整定位路径）。
-// 1) known 绝对地址秒锁（bypassKnown=false 时，读 valid 且非神庙槽即锁）；
-// 2) 全量结构扫描 → 移动检测（玩家在动 → 锁最近的活动槽）→ 全死槽回落
-//    （玩家挂机 → 锁最近的结构槽）。
+// EdenLocate 实现 edenLocator 接口（Eden 阶梯式极速定位路径）。
+// Tier 0: known 绝对地址秒锁（bypassKnown=false 时，读 valid 且非神庙槽即锁，耗时 0ms）；
+// Tier 1 & 2: Switch 虚拟机 User Heap 空间定向窄窗初筛（仅 2.65GB 真实堆，±120m → ±400m，耗时 0.2~0.5s）；
+// Tier 3: 仅当堆空间未命中时，回退全宿主 19GB 盲扫安全兜底。
 func (p *edenPlatform) EdenLocate(bypassKnown bool) *LocateResult {
 	if p.h == 0 || !hLive(p.h) {
 		if !p.Attach() {
@@ -559,15 +643,13 @@ func (p *edenPlatform) EdenLocate(bypassKnown bool) *LocateResult {
 	}
 	h := p.h
 
-	// 1) 绝对地址缓存秒锁
+	// Tier 0: 绝对地址缓存秒锁（进游戏站桩秒锁快通道，耗时 0ms）
 	if !bypassKnown {
 		for _, a := range edenKnownAddrs() {
 			d := currentGame.DecodeAt(h, a)
 			if d == nil {
 				continue
 			}
-			// 神庙/洞穴本地坐标槽跳过（knownSlotOK）：神庙槽写进 known 会把
-			// 神庙本地坐标当大地图坐标（红点画地下）。
 			if edenShrinePos([3]float32{d[0], d[1], d[2]}) {
 				continue
 			}
@@ -575,84 +657,136 @@ func (p *edenPlatform) EdenLocate(bypassKnown bool) *LocateResult {
 		}
 	}
 
-	// 2) 存档锚点 → 全量结构扫描（唯一定位路径）。
-	//    结构扫描 = 坐标合法 + 紧跟正交旋转矩阵（探针实测 Eden 玩家坐标周围
-	//    0x50 步进 actor 记录：指针头→坐标→旋转→缩放）。
-	//    候选选择（2026-10-08 实测迭代收敛）：
-	//      a. 玩家移动时 → 移动检测（两次采样）锁定"最近的活动槽"——占位池
-	//         (6,80,100)/(30,80,100) 类坐标恒定，被排除；
-	//      b. 全死槽（挂机/站立）→ 回落"距锚点最近的结构槽"。
-	//    性能：8.5GB 全扫 2.6s（含 4GB 巨型块——玩家槽会跨块漂移，不能跳过）。
+	// 存档锚点读取
 	anchors := currentGame.SaveAnchors(p)
 	if len(anchors) == 0 {
-		// 诊断日志（2026-10-08 用户反馈"no usable save anchor"）：列出尝试的存档根
-		// 与找到的 game_data.sav 数，帮助定位是"路径没覆盖"还是"存档没生成/解析失败"。
-		names := currentGame.SaveFileNames()
 		fmt.Println("  [eden] no usable save anchor found - retrying")
-		for _, root := range p.SaveRoots() {
-			n := 0
-			filepath.WalkDir(root, func(p2 string, d os.DirEntry, err error) error {
-				if err == nil && !d.IsDir() {
-					for _, nm := range names {
-						if strings.EqualFold(d.Name(), nm) {
-							n++
-							break
-						}
-					}
-				}
-				return nil
-			})
-			if n > 0 {
-				fmt.Printf("  [eden]   save root %s -> %d game_data.sav found (parse fail?)\n", root, n)
-			} else {
-				fmt.Printf("  [eden]   save root %s -> none\n", root)
-			}
-		}
 		return nil
 	}
 	refs := [][3]float32{anchors[0].Pos}
 	fmt.Printf("  [eden] save anchor: mem=(%.1f, %.1f, %.1f)\n", anchors[0].Pos[0], anchors[0].Pos[1], anchors[0].Pos[2])
 
 	t0 := time.Now()
-	big := edenGuestBlocks(h, minBlockMB)
-	var total uintptr
-	for _, b := range big {
-		total += b.Size
-	}
-	fmt.Printf("  [eden] RW regions (>=64KB): %d (%.1f GB)\n", len(big), float64(total)/1073741824.0)
+	const edenScanMinMB = 0.0625 // 64KB 下限：Eden 内存碎片化，必须扫 64KB 以上全部微型块
 
 	var best *Group
 	var shortlist []ShortlistEntry
-	hits := structuralScan(h, big, nil)
-	fmt.Printf("  [eden] structural scan: %d candidates in %.1fs\n", len(hits), time.Since(t0).Seconds())
-	hits = edenFilterHits(hits)
-	fmt.Printf("  [eden] after placeholder/decor filter: %d\n", len(hits))
-	if len(hits) > 0 {
-		// a. 移动检测优先：玩家在动 → 活动槽中距锚点最近
-		live := edenLiveHits(h, hits)
-		fmt.Printf("  [eden] live candidates (moved >0.5m): %d\n", len(live))
-		best = edenNearestByAnchor(live, refs)
-		if best == nil {
-			// b. 全死槽回落：距锚点最近的结构槽（挂机/站立不动）
-			best = edenNearestByAnchor(hits, refs)
-			fmt.Printf("  [eden] all slots static (idle) -> nearest structural fallback\n")
+
+	// Tier 1 & 2: 优先定向在 Switch User Heap (2.65GB 真实堆) 中搜索
+	al := edenGetArenaLow(h, p.pid)
+	if al != 0 {
+		heapBlocks := edenGuestBlocksWithOptions(h, edenScanMinMB, true, p.pid)
+		var heapBytes uintptr
+		for _, b := range heapBlocks {
+			heapBytes += b.Size
 		}
-		if best != nil {
-			fmt.Printf("  [eden] nearest candidate 0x%012X mem=(%.1f, %.1f, %.1f)\n",
-				best.Addrs[0], best.X, best.Y, best.Z)
+		fmt.Printf("  [eden] [heap] Switch User Heap: %d regions (%.2f GB) [arena=0x%X]\n",
+			len(heapBlocks), float64(heapBytes)/1073741824.0, al)
+
+		for _, win := range []float32{120.0, 400.0} {
+			tPass := time.Now()
+			var hits []Hit
+			edenScanAll(h, heapBlocks, refs, win, &hits)
+			fmt.Printf("  [eden] [heap] pass win=±%.0fm: %d hits in %.2fs\n", win, len(hits), time.Since(tPass).Seconds())
+			hits = edenFilterHits(hits)
+			if len(hits) == 0 {
+				continue
+			}
+			ranked, sl := edenGroupAndRank(h, hits)
+			if len(ranked) == 0 {
+				continue
+			}
+			shortlist = sl
+
+			// 玩家在动 → 优先锁活动组
+			live := edenLiveGroups(h, ranked)
+			if len(live) > 0 {
+				best = live[0]
+				fmt.Printf("  [eden] lock moving group 0x%012X copies=%d struct=%d mem=(%.1f, %.1f, %.1f)\n",
+					best.Addrs[0], best.Copies, best.Struct, best.X, best.Y, best.Z)
+				break
+			}
+
+			// 玩家站桩不动 → 选首个合法结构组
+			best = pickEdenGroup(h, ranked, refs)
+			if best != nil {
+				fmt.Printf("  [eden] lock static candidate 0x%012X copies=%d struct=%d mem=(%.1f, %.1f, %.1f)\n",
+					best.Addrs[0], best.Copies, best.Struct, best.X, best.Y, best.Z)
+				break
+			}
 		}
 	}
+
+	// Tier 3: 全宿主 19GB 盲扫（仅当 User Heap 空间两轮均未命中时安全兜底）
+	if best == nil {
+		if al != 0 {
+			fmt.Printf("  [eden] heap search missed after %.2fs, falling back to full host scan (19GB)...\n", time.Since(t0).Seconds())
+		}
+		tFallback := time.Now()
+		allBlocks := edenGuestBlocksWithOptions(h, edenScanMinMB, false, 0)
+		var total uintptr
+		for _, b := range allBlocks {
+			total += b.Size
+		}
+		fmt.Printf("  [eden] [fallback] full host RW regions: %d (%.1f GB)\n", len(allBlocks), float64(total)/1073741824.0)
+
+		for _, win := range []float32{120.0, 400.0} {
+			var hits []Hit
+			edenScanAll(h, allBlocks, refs, win, &hits)
+			fmt.Printf("  [eden] [fallback] pass win=±%.0fm: %d hits in %.1fs\n", win, len(hits), time.Since(tFallback).Seconds())
+			hits = edenFilterHits(hits)
+			if len(hits) == 0 {
+				continue
+			}
+			ranked, sl := edenGroupAndRank(h, hits)
+			if len(ranked) == 0 {
+				continue
+			}
+			shortlist = sl
+
+			live := edenLiveGroups(h, ranked)
+			if len(live) > 0 {
+				best = live[0]
+				break
+			}
+			best = pickEdenGroup(h, ranked, refs)
+			if best != nil {
+				break
+			}
+		}
+
+		// 终极全内存 sane 扫描
+		if best == nil {
+			var allHits []Hit
+			edenScanAll(h, allBlocks, refs, -1, &allHits)
+			fmt.Printf("  [eden] fallback full-RAM scan: %d candidates in %.1fs\n", len(allHits), time.Since(tFallback).Seconds())
+			allHits = edenFilterHits(allHits)
+			if len(allHits) > 0 {
+				ranked, sl := edenGroupAndRank(h, allHits)
+				shortlist = sl
+				live := edenLiveGroups(h, ranked)
+				if len(live) > 0 {
+					best = live[0]
+				} else {
+					best = pickEdenGroup(h, ranked, refs)
+				}
+			}
+		}
+	}
+
 	if best == nil {
 		fmt.Println("  [eden] FAILED: no confident candidate")
 		return nil
 	}
+
 	addr := best.Addrs[0]
 	var hud [3]float32
 	if d := currentGame.DecodeAt(h, addr); d != nil {
 		hud = [3]float32{d[0], d[1], d[2]}
 	}
-	fmt.Printf("  [eden] candidate 0x%012X copies=%d struct=%d total %.1fs\n",
+	fmt.Printf("  [eden] locked 0x%012X copies=%d struct=%d total %.1fs\n",
 		addr, best.Copies, best.Struct, time.Since(t0).Seconds())
+
 	return &LocateResult{
 		Addr:      addr,
 		Copies:    best.Copies,

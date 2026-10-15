@@ -23,7 +23,7 @@ import (
 // guiVersion 导航程序版本（三合一统一版本 v3.0.0，2026-10-07 拍板：
 // GUI 壳与导航核心 xnavi 共享同一版本号，不再各自解耦）。
 // 注意：必须与 xnavi/version.go 的 CoreVersion 保持一致。
-const guiVersion = "v3.1.0"
+const guiVersion = "v3.1.1"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -89,14 +89,33 @@ func (a *App) startup(ctx context.Context) {
 	exec.Command("taskkill", "/IM", "xnavi-core.exe", "/F").Run()
 	a.tailInit()
 	go a.eventBridge(ctx)
-	go a.checkUpdate()
-	// 手动检查更新
+	// 手动检查更新（不在启动时自动弹出）
 	runtime.EventsOn(ctx, "update:check", func(data ...interface{}) {
 		go a.checkUpdate()
 	})
 }
 
-// checkUpdate 启动时查 GitHub tags 列表，找最新 xnavi- 开头的 tag，有新版弹窗。
+// isNewerVersion 简单的 semver 版本比较：remote 是否严格大于 current
+func isNewerVersion(remote, current string) bool {
+	r := strings.TrimPrefix(remote, "v")
+	c := strings.TrimPrefix(current, "v")
+	rParts := strings.Split(r, ".")
+	cParts := strings.Split(c, ".")
+	for i := 0; i < len(rParts) && i < len(cParts); i++ {
+		var rn, cn int
+		fmt.Sscanf(rParts[i], "%d", &rn)
+		fmt.Sscanf(cParts[i], "%d", &cn)
+		if rn > cn {
+			return true
+		}
+		if rn < cn {
+			return false
+		}
+	}
+	return len(rParts) > len(cParts)
+}
+
+// checkUpdate 手动检查更新：查 GitHub tags 列表，若存在更高版本则通知前端。
 func (a *App) checkUpdate() {
 	defer func() { recover() }()
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -112,7 +131,7 @@ func (a *App) checkUpdate() {
 	for _, t := range tags {
 		if !strings.HasPrefix(t.Name, "xnavi-") { continue }
 		latest := strings.TrimPrefix(t.Name, "xnavi-")
-		if latest != guiVersion {
+		if isNewerVersion(latest, guiVersion) {
 			runtime.EventsEmit(a.ctx, "update:available", map[string]string{
 				"latest": latest,
 				"url":    "https://github.com/yalincc/BOTWmap/releases/tag/" + t.Name,

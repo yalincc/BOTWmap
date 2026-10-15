@@ -89,3 +89,6 @@ xnavi/xnavi-core-new.exe
 
 # v3.1.0 TLS 证书体系（机器相关 + 含私钥，不入库；rootCA/脚本随发布包走）
 certs/
+
+# 诊断导出与临时报告目录（不入库）
+report/

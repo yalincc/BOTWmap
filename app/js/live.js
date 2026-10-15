@@ -56,6 +56,7 @@ const LIVE = (() => {
     map.live = {
       mx: null, my: null, gx: 0, gy: 0, gz: 0,
       online: false, verified: false,
+      heading: null, lastMx: null, lastMy: null,
       trail: [], tgt: null, tdist: null, counts: null, progGen: '',
     };
     map.liveDone = new Set();
@@ -138,6 +139,29 @@ const LIVE = (() => {
     const lanUrl = (p && typeof p.lanUrl === 'string' && p.lanUrl) ? p.lanUrl : '';
     if (lanUrl !== lastLanUrl) { lastLanUrl = lanUrl; renderMirror(lanUrl); }
     if (L.online) {
+      // 朝向：若服务提供 heading 优先；否则由连续位移推算运动朝向，静止平滑保持
+      if (typeof p.heading === 'number' && !isNaN(p.heading)) {
+        L.heading = p.heading;
+      } else if (L.lastMx != null && L.lastMy != null) {
+        const dx = p.mx - L.lastMx;
+        const dy = p.my - L.lastMy;
+        const d = Math.hypot(dx, dy);
+        // 位移有效判断：0.8px ~ 120px（约 0.4m ~ 60m 走动/奔跑/风弹，排除原地静止微抖与传送）
+        if (d >= 0.8 && d <= 120) {
+          const targetAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+          if (L.heading == null) {
+            L.heading = targetAngle;
+          } else {
+            // 最短角度差平滑转向，避免 ±180° 时反向大转圈
+            let diff = (targetAngle - L.heading + 180) % 360 - 180;
+            if (diff < -180) diff += 360;
+            L.heading = (L.heading + diff * 0.45) % 360;
+          }
+        }
+      }
+      L.lastMx = p.mx;
+      L.lastMy = p.my;
+
       L.mx = p.mx; L.my = p.my;
       L.gx = p.gx; L.gy = p.gy; L.gz = p.gz;
       L.verified = !!p.verified;
@@ -158,11 +182,17 @@ const LIVE = (() => {
       }
     } else {
       lastPosKey = null;
+      if (failCnt >= 5) {
+        L.heading = null;
+        L.lastMx = null;
+        L.lastMy = null;
+      }
     }
     updateStatus();
     tickCollectMode();
     const dk = (L.online ? '1' : '0') + (L.verified ? 'v' : '') +
                (L.mx != null ? Math.round(L.mx / 2) + ':' + Math.round(L.my / 2) : '') +
+               (L.heading != null ? 'h' + Math.round(L.heading / 4) : '') +
                (L.tgt ? 't' : '') + (L.tdist != null ? Math.round(L.tdist / 10) : '');
     if (dk !== lastDrawKey) {
       lastDrawKey = dk;
@@ -585,16 +615,41 @@ const LIVE = (() => {
       ctx.restore();
     }
 
-    // 玩家红点（白描边 + 光晕；verified 后稍大）
-    const rad = L.verified ? 7 : 5;
+    // 玩家位置：有朝向（运动推算或服务提供）画角色箭头，无朝向/初始静止态画圆点
     ctx.save();
-    ctx.shadowColor = 'rgba(255,60,60,.85)'; ctx.shadowBlur = 10;
-    ctx.fillStyle = '#ff3b3b';
-    ctx.beginPath(); ctx.arc(px, py, rad, 0, Math.PI * 2); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#ffffff';
-    ctx.beginPath(); ctx.arc(px, py, rad + 2.5, 0, Math.PI * 2); ctx.stroke();
+    if (typeof L.heading === 'number') {
+      const rad = L.verified ? 8 : 6;
+      ctx.translate(px, py);
+      ctx.rotate(L.heading * Math.PI / 180);
+      ctx.shadowColor = 'rgba(255,50,50,.85)';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(rad * 1.5, 0);                 // 前方尖端（指向运动/朝向方向）
+      ctx.lineTo(-rad * 0.9, rad * 0.85);        // 右翼
+      ctx.lineTo(-rad * 0.4, 0);                 // 尾部内凹
+      ctx.lineTo(-rad * 0.9, -rad * 0.85);       // 左翼
+      ctx.closePath();
+      ctx.fillStyle = '#ff3b3b';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+    } else {
+      const rad = L.verified ? 7 : 5;
+      ctx.shadowColor = 'rgba(255,60,60,.85)';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#ff3b3b';
+      ctx.beginPath();
+      ctx.arc(px, py, rad, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(px, py, rad + 2.5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
 
     // 目标距离
