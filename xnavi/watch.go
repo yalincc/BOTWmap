@@ -336,11 +336,20 @@ func stateMachine() {
 	ppHist := [][3]float32{}
 	ppReprobe := false
 
+	// 骑乘追踪状态（BOTW 专属：马 / 大师摩托车）
+	mountActive := false
+	var mountAddr uintptr
+	var mountLastScan time.Time
+	var mountLinkPosBefore [3]float32 // 上马前林克最后的有效坐标
+
 	resetFollow := func() {
 		prev, hasPrev = [3]float32{}, false
 		moveN, invalidN, frozenN = 0, 0, 0
 		savedKnown = false
 		consensusCand = 0
+		mountActive = false
+		mountAddr = 0
+		mountLastScan = time.Time{}
 	}
 
 	tick := time.NewTicker(smTick)
@@ -455,6 +464,20 @@ func stateMachine() {
 							}
 						}
 						if d == nil {
+							// 骑乘状态检测：若当前林克正在车上/马上，固定偏移槽前 8 字节为 0/1 标志位，Z 轴有效
+							if isMount, targetZ := checkMountState(h, addr); isMount {
+								fmt.Printf("    try base=0x%X+0x%X -> riding state detected (targetZ=%.1f)\n", blk.Base, off, targetZ)
+								if mAddr, mPos, found := findMountActor(h, []MemBlock{blk}, [3]float32{}, targetZ); found {
+									mountActive = true
+									mountAddr = mAddr
+									mountLinkPosBefore = mPos
+									d = []float32{mPos[0], mPos[1], mPos[2]}
+									fmt.Printf("    try base=0x%X+0x%X -> captured mount at 0x%X mem=(%.1f, %.1f, %.1f)\n",
+										blk.Base, off, mAddr, mPos[0], mPos[1], mPos[2])
+									cands = append(cands, OffsetCand{addr, [3]float32{d[0], d[1], d[2]}})
+									continue
+								}
+							}
 							// 区分"读内存失败"与"读到但坐标非法"，原始字节直接进日志，
 							// 便于判断游戏是否处于传送/加载的数据异常期。
 							if raw := readMem(h, addr, 12); len(raw) < 12 {
@@ -479,9 +502,17 @@ func stateMachine() {
 						needConfirm := currentGame.FixedNeedsMoveConfirm()
 						fmt.Printf("  [sm] fixed offset -> lock 0x%X mem=(%.1f, %.1f, %.1f) %s\n",
 							best.Addr, best.Pos[0], best.Pos[1], best.Pos[2], detail)
-					setLock(best.Addr, !needConfirm, 0, "fixed-offset")
-					inLocked = true
-					resetFollow()
+						savedMountActive := mountActive
+						savedMountAddr := mountAddr
+						savedMountPos := mountLinkPosBefore
+						setLock(best.Addr, !needConfirm, 0, "fixed-offset")
+						inLocked = true
+						resetFollow()
+						if savedMountActive {
+							mountActive = true
+							mountAddr = savedMountAddr
+							mountLinkPosBefore = savedMountPos
+						}
 						lockSince = time.Now() // 新锁重新计时，否则 15s unverified 保险丝用旧时间戳秒杀新锁
 						if needConfirm {
 							fmt.Printf("  [sm] fixed offset locked OK [pending move confirm]\n")
@@ -791,14 +822,106 @@ func stateMachine() {
 				}
 			}
 		}
+
+		// ---- BOTW 骑乘（马/大师摩托车）动态伴生代理 ----
+		if mountActive {
+			// 正在骑乘跟随中：检测林克是否已按 X 下马
+			if v != nil {
+				// 林克主槽已恢复正常三维坐标，判定下马
+				fmt.Printf("  [mount] link dismounted -> restored player tracking mem=(%.1f, %.1f, %.1f)\n", v[0], v[1], v[2])
+				mountActive = false
+				mountAddr = 0
+			} else if isMount, targetZ := checkMountState(h, a); isMount {
+				// 持续骑乘状态：直接跟随已捕获的坐骑实体
+				if mountAddr != 0 {
+					dMount := currentGame.DecodeAt(h, mountAddr)
+					if dMount == nil {
+						for i := 0; i < 3; i++ {
+							time.Sleep(30 * time.Millisecond)
+							if dMount = currentGame.DecodeAt(h, mountAddr); dMount != nil {
+								break
+							}
+						}
+					}
+					// 只要坐骑实体坐标合法，就持续跟随（不以静态 targetZ 设限，允许跑向全图任意远）
+					if dMount != nil && gameValidTriple(dMount[0], dMount[1], dMount[2]) {
+						// 检查单帧（200ms）位移合理性（<= 100m），排除野指针突变
+						if !hasPrev || gameDist3(dMount[0], dMount[1], dMount[2], prev[0], prev[1], prev[2]) <= 100.0 {
+							v = dMount
+							mountLinkPosBefore = [3]float32{dMount[0], dMount[1], dMount[2]}
+						} else {
+							mountAddr = 0
+						}
+					} else {
+						mountAddr = 0
+					}
+				}
+				// 若未捕获或坐骑槽丢失，且距离上次扫描 >= 1s，快速重捕获
+				if mountAddr == 0 && time.Since(mountLastScan) >= 1*time.Second {
+					mountLastScan = time.Now()
+					blks := sessionBlocks(h)
+					anchorPos := mountLinkPosBefore
+					if anchorPos == ([3]float32{}) && hasPrev {
+						anchorPos = prev
+					}
+					if mAddr, mPos, found := findMountActor(h, blks, anchorPos, targetZ); found {
+						mountAddr = mAddr
+						v = []float32{mPos[0], mPos[1], mPos[2]}
+						mountLinkPosBefore = mPos
+						fmt.Printf("  [mount] re-captured mount actor at 0x%X mem=(%.1f, %.1f, %.1f)\n",
+							mAddr, mPos[0], mPos[1], mPos[2])
+					} else {
+						fmt.Printf("  [mount] search pending (targetZ=%.1f, blocks=%d)\n", targetZ, len(blks))
+					}
+				}
+			} else {
+				// 既无正常坐标也不是骑乘标志
+				mountActive = false
+				mountAddr = 0
+			}
+		} else {
+			// 步行状态下，若 v == nil，检查是否刚上马/上摩托
+			if v == nil {
+				if isMount, targetZ := checkMountState(h, a); isMount {
+					mountActive = true
+					mountLinkPosBefore = prev
+					mountLastScan = time.Now()
+					fmt.Printf("  [mount] entered riding state (targetZ=%.1f) near (%.1f, %.1f, %.1f)\n",
+						targetZ, prev[0], prev[1], prev[2])
+					blks := sessionBlocks(h)
+					if mAddr, mPos, found := findMountActor(h, blks, mountLinkPosBefore, targetZ); found {
+						mountAddr = mAddr
+						v = []float32{mPos[0], mPos[1], mPos[2]}
+						fmt.Printf("  [mount] captured mount actor at 0x%X mem=(%.1f, %.1f, %.1f) [following]\n",
+							mAddr, mPos[0], mPos[1], mPos[2])
+					} else {
+						fmt.Printf("  [mount] search pending near (%.1f, %.1f, %.1f) targetZ=%.1f (blocks=%d)\n",
+							prev[0], prev[1], prev[2], targetZ, len(blks))
+					}
+				}
+			}
+		}
+
 		if v == nil {
+			if mountActive && hasPrev {
+				// 骑乘搜索过渡期：保持上一帧有效位置，不丢锁，不飘红点
+				cur := prev
+				gx, gy, gz := currentGame.Display(cur)
+				state.mu.Lock()
+				state.ok = true
+				state.gx, state.gy, state.gz = gx, gy, gz
+				state.mx, state.my = currentGame.ToMap(gx, gy, gz)
+				state.source = "mount (searching)"
+				state.age = float64(time.Now().UnixNano()) / 1e9
+				state.mu.Unlock()
+				continue
+			}
 			invalidN++
 			state.mu.Lock()
 			state.ok = false
 			state.source = "address lost (waiting for restore)"
 			state.mu.Unlock()
-			// 进神庙/骑乘时地址暂时读不到，永远保持最后位置不飘，等游戏恢复
-			// 不重扫，不飘红点
+			// 进神庙时地址暂时读不到，保持最后位置不飘，等游戏恢复
 			_ = invalidMax
 			continue
 		}
@@ -933,6 +1056,9 @@ func stateMachine() {
 		lock.mu.RLock()
 		verified, copies, src := lock.verified, lock.copies, lock.source
 		lock.mu.RUnlock()
+		if mountActive {
+			src = "mount"
+		}
 		gx, gy, gz := currentGame.Display(cur)
 		state.mu.Lock()
 		state.ok = true
@@ -951,7 +1077,7 @@ func stateMachine() {
 		// （frozenN≥frozenTicks）时，在锚块 known 偏移里找与本锁差 >15m 的
 		// ≥consensusMin 成员一致簇作候选；候选在下一次检查"动了"（活副本证明）
 		// 才换锁——玩家站桩绝不误换，玩家一动 1~2s 内自愈。
-		if frozenEnabled && frozenN >= frozenLimit && time.Since(lastConsensusAt) >= consensusEvery {
+		if frozenEnabled && !mountActive && frozenN >= frozenLimit && time.Since(lastConsensusAt) >= consensusEvery {
 			lastConsensusAt = time.Now()
 			a2, v2, ok := consensusCopy(h, a)
 			if !ok {

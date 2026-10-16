@@ -4,13 +4,14 @@
 
 网页地图：<https://botw.yalin.site>
 
-![platform](https://img.shields.io/badge/platform-Windows-blue) ![emulator](https://img.shields.io/badge/emulator-Cemu%20%2F%20Ryujinx%20%2F%20Eden-success) ![version](https://img.shields.io/badge/version-v3.0.0-success)
+![platform](https://img.shields.io/badge/platform-Windows-blue) ![emulator](https://img.shields.io/badge/emulator-Cemu%20%2F%20Ryujinx%20%2F%20Eden-success) ![version](https://img.shields.io/badge/version-v3.1.2-success)
 
 ---
 
 ## 功能
 
 - **实时跟随**：只读模拟器内存，在网页地图上显示玩家坐标，随走路实时移动
+- **骑乘跟随（v3.1.2 新增）**：支持骑马、驾驶大师摩托车，自动捕获坐骑实体伴生定位，下马无缝切回
 - **三平台**：Cemu（Wii U 版，大端）、Ryujinx（Switch 版，小端）、Eden（Yuzu fork，小端）自动识别
 - **秒锁优先**：已知版本内存偏移直接定位，几秒钟出坐标；偏移失效时自动全内存结构扫描兜底
 - **Eden 全距离定位**：Eden 采用全量结构扫描 + 占位池过滤 + 移动检测，玩家走离存档点也能定位（无需坐标校准）
@@ -21,7 +22,7 @@
 
 ## 下载与使用
 
-1. 从 [Releases](https://github.com/yalincc/BOTWmap/releases) 下载最新版 `xnavi-v3.0.0.zip`
+1. 从 [Releases](https://github.com/yalincc/BOTWmap/releases) 下载最新版 `xnavi-v3.1.2.zip`
 2. 解压到任意目录（路径不要有中文/空格更稳妥）
 3. 先启动 Cemu / Ryujinx / Eden 之一，进入游戏（站在海拉鲁大地上，别开菜单）
 4. 双击 `xnavi.exe`
@@ -93,8 +94,8 @@ A: 确认工具顶栏显示"坐标流同步中"，然后刷新网页 https://bot
 **Q: 多个模拟器都开着会怎样？**
 A: 工具按 Auto 模式自动探测，建议只开一个。显式选择：模拟器下拉选 Cemu / Ryujinx / Eden。
 
-**Q: 骑乘（马/大师摩托）时红点不动？**
-A: 已知问题（三平台同源），骑乘时玩家坐标槽与步行不同，后续版本处理。步行/滑翔/传送均正常。
+**Q: 骑乘（马/大师摩托）时红点是否跟随？**
+A: **v3.1.2 起已完全支持！** 林克骑马或开大师摩托车时，程序会自动感知骑乘状态并捕获坐骑实体伴生定位；下马或传送自动无缝切回林克本体，全程平滑跟随。
 
 **Q: 进度数字不对？**
 A: 工具自动读主存档（Ryujinx/Eden 取最近修改的槽，Cemu 取最近修改的槽）。如果你最近玩的是别的槽，进度会不对。
