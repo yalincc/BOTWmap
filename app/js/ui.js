@@ -1475,6 +1475,7 @@ const UI = (() => {
     const HIDE_CAT_DEF = [
       ['shrine', '神庙'], ['seed', '克洛格'], ['memory', '回忆'], ['chest', '宝箱'],
       ['tower', '希卡塔'], ['beast', '神兽'], ['equip', '装备'], ['quest', '任务'],
+      ['boss', '讨伐BOSS'],
     ];
     const setOptBtn = (sel, v) => {
       document.querySelectorAll('#' + sel + ' .st-opt').forEach(b => b.classList.toggle('sel', b.dataset.v === v));

@@ -55,11 +55,12 @@ const CAT_GROUP = {
  * 统一收进 botwmap.settings.v1，取代原先散落的 regionShow / korokPaths 两个 key。
  * 各绘制层（marker / chest / equip / quest）统一查 hideCat()，保证绘制与命中口径一致。
  * 可隐藏类目：shrine 神庙 / tower 希卡塔 / beast 神兽 / seed 克洛格 / memory 回忆
- *              chest 宝箱 / equip 装备 / quest 任务（后三者走各自绘制层） */
+ *              chest 宝箱 / equip 装备 / quest 任务（后三者走各自绘制层）
+ *              boss 讨伐BOSS（= hinox/talus/molduga 三个不重生 Boss 的集合，非真实 cat） */
 const K_SETTINGS = 'botwmap.settings.v1';
 const DEFAULT_SETTINGS = {
   doneMode: 'dim',   // 'dim' 默认（已完成的点变灰仍显示） | 'hide' 隐藏
-  hideCats: { shrine: 1, seed: 1, memory: 1, chest: 1, tower: 0, beast: 0, equip: 0, quest: 0 },
+  hideCats: { shrine: 1, seed: 1, memory: 1, chest: 1, tower: 0, beast: 0, equip: 0, quest: 0, boss: 0 },
   dragonPath: true,
   regionShow: true,
 };
@@ -82,7 +83,12 @@ window.BOTW_SETTINGS = {
   },
   save() { try { localStorage.setItem(K_SETTINGS, JSON.stringify(this.s)); } catch (e) {} },
   /* 该类目「已完成的点」是否应隐藏 —— 绘制与命中必须同时走这里，否则会出现「看不见但点得到」 */
-  hideCat(cat) { return this.s.doneMode === 'hide' && !!this.s.hideCats[cat]; },
+  hideCat(cat) {
+    if (this.s.doneMode !== 'hide') return false;
+    // 讨伐BOSS 集合键：独眼巨人/岩石巨人/莫尔德拉吉克三个不重生 Boss 共用一项开关
+    if (cat === 'hinox' || cat === 'talus' || cat === 'molduga') return !!this.s.hideCats.boss;
+    return !!this.s.hideCats[cat];
+  },
 };
 window.BOTW_SETTINGS.load();
 
