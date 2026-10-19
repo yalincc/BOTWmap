@@ -1420,7 +1420,13 @@ const UI = (() => {
     const box = $('settingsBox');
     const openBox = () => { box.classList.remove('hidden'); syncStyle(); syncSettings(); };
     const closeBox = () => box.classList.add('hidden');
-    $('btnSettings').addEventListener('click', openBox);
+    $('btnSettings').addEventListener('click', () => {
+      if (!box.classList.contains('hidden')) {
+        closeBox();
+      } else {
+        openBox();
+      }
+    });
     $('stClose').addEventListener('click', closeBox);
     window.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !box.classList.contains('hidden')) closeBox();
@@ -1483,6 +1489,8 @@ const UI = (() => {
     function syncSettings() {
       setOptBtn('stDoneMode', S.s.doneMode);
       setOptBtn('stDragonPath', S.s.dragonPath ? 'show' : 'hide');
+      const dlcOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().quest || window.EnemyTiers.dlcState().dlc2));
+      setOptBtn('stDlcQuest', dlcOn ? 'show' : 'hide');
       $('stHideCats').classList.toggle('hidden', S.s.doneMode !== 'hide');
     }
     // 类目 chips
@@ -1512,6 +1520,17 @@ const UI = (() => {
       b.addEventListener('click', () => {
         S.s.dragonPath = b.dataset.v === 'show';
         S.save(); map.draw(); syncSettings();
+      });
+    });
+    // DLC2 任务怪（一击剑）
+    document.querySelectorAll('#stDlcQuest .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        const show = b.dataset.v === 'show';
+        if (window.EnemyTiers && window.EnemyTiers.setDlc) {
+          window.EnemyTiers.setDlc('quest', show);
+        }
+        map.draw();
+        syncSettings();
       });
     });
     // V1.6.6 第二轮：小岩石人开关移除 —— 它属于敌人大类，跟随敌人图层勾选即可
@@ -1573,6 +1592,7 @@ const UI = (() => {
       S.s.doneMode = S.D.doneMode;
       S.s.hideCats = Object.assign({}, S.D.hideCats);
       S.s.dragonPath = true; S.s.regionShow = true;
+      if (window.EnemyTiers && window.EnemyTiers.setDlc) window.EnemyTiers.setDlc('quest', false);
       map.showRegions = true;
       S.save(); saveStyle(); map.draw(); syncStyle(); syncSettings();
       chipsWrap.querySelectorAll('.st-chip').forEach(c => {

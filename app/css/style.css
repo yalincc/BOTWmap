@@ -352,6 +352,28 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   background: #1d1a10; border: 1px solid rgba(242,201,76,.3); border-radius: 6px; padding: 4px 9px;
   font-size: 11px; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,.45); z-index: 30; }
 
+/* 世界档位徽标（P3）：根据存档击杀积分动态推算，双端适配 */
+.su-tier-badge {
+  display: block;
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(242, 201, 76, 0.08);
+  border: 1px solid rgba(242, 201, 76, 0.28);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--gold-lite, #f2c94c);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+.su-tier-badge:hover {
+  background: rgba(242, 201, 76, 0.14);
+  border-color: rgba(242, 201, 76, 0.45);
+}
+
 /* ---------- 鍦板浘鎺т欢 ---------- */
 #zoomControls { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
 #zoomPct {

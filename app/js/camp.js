@@ -19,7 +19,9 @@
   'use strict';
 
   /* ---------- 数据 ---------- */
-  var CW = (typeof CAMP_WEAPONS !== 'undefined') ? CAMP_WEAPONS : null;
+  var CW = (typeof window !== 'undefined' && window.BOTW_TIER_CAMPS && window.BOTW_TIER_CAMPS.all && window.BOTW_TIER_CAMPS.all.length)
+    ? window.BOTW_TIER_CAMPS
+    : ((typeof CAMP_WEAPONS !== 'undefined') ? CAMP_WEAPONS : null);
   var DEX = (typeof WEAPON_DEX !== 'undefined' && WEAPON_DEX.items) ? WEAPON_DEX.items : {};
   if (!CW || !CW.all || !CW.all.length) return;   /* 数据缺失静默退出（不阻塞站点） */
 
@@ -73,12 +75,17 @@
   var PIN_ICON = 'assets/icons/camp_target.png';
   var pinImg = new Image();
   pinImg.src = PIN_ICON;
+  function cleanWeaponKey(k) {
+    return (k || '').replace(/\+\d+$/, '').replace(/-+$/, '');
+  }
+
   /* 悬停名称条文案：名字 + 掉落物（map.js _hoverLabel 对 camp 类型读 _name） */
   var _labelCache = {};
   function campLabel(c) {
     if (_labelCache[c.i]) return _labelCache[c.i];
     var ws = (c.w || []).slice(0, 3).map(function (k) {
-      var w = DEX[k];
+      var key = cleanWeaponKey(k);
+      var w = DEX[key];
       return (w && (w.name || w.en)) || '';
     }).filter(Boolean).join('/');
     var more = (c.w || []).length > 3 ? ' 等' + c.w.length + '件' : '';
@@ -90,6 +97,42 @@
   var CAMP_ORDER = CW.all.slice().sort(function (a, b) { return a.i - b.i; });
   var CAMP_IDX = {};
   CAMP_ORDER.forEach(function (c, i) { CAMP_IDX[c.i] = i; });
+
+  /* V1.6.6 / P5：tier 混装数据重灌（EnemyTiers.apply 后调用）——重建预计算并重绘，条目对象引用由调用方替换 */
+  function reload(data) {
+    if (!data || !data.all || !data.all.length) return;
+    CW = data;
+    hotIds = {};
+    (CW.hot || []).forEach(function (c) { hotIds[c.i] = true; });
+    var nHot = [], nAll = [];
+    _labelCache = {};
+    (CW.hot || []).forEach(function (c) {
+      if (isLynelCamp(c)) return;
+      clusterLocs(c.loc).forEach(function (cl) {
+        nHot.push({ camp: c, pt: cl.pt, loc: cl.loc, cn: cl.n });
+      });
+    });
+    CW.all.forEach(function (c) {
+      if (isLynelCamp(c) || hotIds[c.i]) return;
+      clusterLocs(c.loc).forEach(function (cl) {
+        nAll.push({ camp: c, pt: cl.pt, loc: cl.loc, cn: cl.n });
+      });
+    });
+    SUB = { hot: nHot, all: nAll };
+    CAMP_ORDER = CW.all.slice().sort(function (a, b) { return a.i - b.i; });
+    CAMP_IDX = {};
+    CAMP_ORDER.forEach(function (c, i) { CAMP_IDX[c.i] = i; });
+    var rows = document.querySelectorAll('#layerList .lrow[data-ccat]');
+    Array.prototype.forEach.call(rows, function (r) {
+      var sub = r.dataset.ccat;
+      var n = (sub === 'hot') ? (CW.hot || []).length : CW.all.length;
+      var lp = r.querySelector('.lprog');
+      if (lp) lp.textContent = n;
+      r.title = '点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）';
+    });
+    if (ready && map) map.draw();
+  }
+  window.CampLayer = { reload: reload };
   var MK_BY_CAT = {};
   if (typeof BOTW_DATA !== 'undefined' && BOTW_DATA.markers) {
     BOTW_DATA.markers.forEach(function (m) {
@@ -225,7 +268,8 @@
     });
   }
 
-  function weaponRow(key) {
+  function weaponRow(rawKey) {
+    var key = cleanWeaponKey(rawKey);
     var w = DEX[key];
     var label = (w && (w.name || w.en)) || key;          /* dex 兜底链：name → en → key（9 条 name=null） */
     var meta = '';
@@ -382,43 +426,12 @@
     if (!ce) return;
     /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
     var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
-    /* V1.6.5 Q2：掉落段统一按「当前阶段 + 布点类型」渲染（老大拍板：只显示当前阶段的掉落物，
-       白银布点未升档也走当前档池，修 #22 白银 4×3=12 件堆叠）。当前阶段 = max(布点档, 血月阶梯)；
-       池 = 该阶段 actor 的手持武器并集 ∩ 布点类型集合（大剑型只出大剑系；Weapon_ 前缀 → 类型，
-       与 weapons.category 同口径）。① 仅莱尼尔（其他 Boss 套莱尼尔推导是 bug）；② 池空才回退布点清单；
-       ③ 段标题保持纯文案，推导阶段由信息卡「阶段」行表达 */
-    var lt = (mk.cat === 'lynel' && window.__lynelTierOf) ? window.__lynelTierOf(mk.name) : null;
-    var TIER_ACTOR = { 1: 'Enemy_Lynel_Junior', 2: 'Enemy_Lynel_Middle', 3: 'Enemy_Lynel_Senior', 4: 'Enemy_Lynel_Dark' };
-    var BASE_TIER = { '莱尼尔': 1, '蓝鬃莱尼尔': 2, '白鬃莱尼尔': 3, '白银莱尼尔': 4 };
-    var curTier = (lt && TIER_ACTOR[lt.cur]) ? lt.cur : 0;
-    function wcat(k) {
-      if (k.indexOf('Weapon_Lsword_') === 0) return '双手剑';
-      if (k.indexOf('Weapon_Sword_') === 0) return '单手剑';
-      if (k.indexOf('Weapon_Spear_') === 0) return '枪';
-      if (k.indexOf('Weapon_Bow_') === 0) return '弓';
-      if (k.indexOf('Weapon_Shield_') === 0) return '盾';
-      return '';
-    }
-    var poolW = null;
-    if (curTier) {
-      var pre = TIER_ACTOR[curTier], seen = {}, types = {};
-      camps.forEach(function (c) { (c.w || []).forEach(function (k) { types[wcat(k)] = 1; }); });
-      poolW = [];
-      CW.all.forEach(function (c) {
-        if ((c.a || '').indexOf(pre) !== 0) return;
-        (c.w || []).forEach(function (k) {
-          if (!seen[k] && types[wcat(k)]) { seen[k] = 1; poolW.push(k); }   /* 类型匹配：布点有该类型才收录 */
-        });
-      });
-    }
-    /* V1.6.5 修 Q3：段标题已含卡片 Title 的怪物名，营地行仅多营地混合档位时标注区分 */
-    if (ov) {   /* V1.6.5：人工实测映射优先（上游布点缺失点位，如 Lynel23 大师模式/Mod 生成） */
+    /* V1.6.6 / P5：掉落段直读当前 tier 营地（camps 武器已按世界档位解析，无需前端推导）；
+       Lynel23（mod 点位，上游无布点）走 OVERRIDES 人工实测映射 */
+    if (ov) {
       if (ov.note) h += '<div class="cp-empty">' + esc(ov.note) + '</div>';
       (ov.w || []).forEach(function (k) { h += weaponRow(k); });
-    } else if (curTier && poolW && poolW.length) {
-      poolW.forEach(function (k) { h += weaponRow(k); });
     } else {
-      if (curTier) h += '<div class="cp-empty">该阶段暂无同类型营地武器数据，以下为布点初始清单</div>';
       camps.forEach(function (c) {
         var label = (camps.length > 1 && c.m && c.m !== mk.name) ? c.m : '';
         if (label) h += '<div class="cp-lynel-row"><b>' + esc(label) + '</b>' +
@@ -513,7 +526,8 @@
     openCard: openCard,
     locate: locate,
     lynelCamps: function () { return CW.all.filter(isLynelCamp).length; },
-    campsNearMarker: campsNearMarker
+    campsNearMarker: campsNearMarker,
+    reload: reload
   };
 
   /* ---------- init ---------- */
@@ -538,6 +552,12 @@
       ready = true;
       if (window.console && console.log) console.log('[BOTWmap] camp.js v3 ready（图层钩子已注册）');
       map.draw();
+      /* V1.6.6 / P5 时序保障：boot 完成后兜底刷新 tier 营地数据（若 EnemyTiers 已就绪，触发一次 apply） */
+      if (window.EnemyTiers && window.EnemyTiers.apply) {
+        window.EnemyTiers.apply();
+      } else if (window.BOTW_TIER_CAMPS && window.BOTW_TIER_CAMPS.all) {
+        reload(window.BOTW_TIER_CAMPS);
+      }
     };
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', boot, { once: true });

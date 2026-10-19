@@ -55,13 +55,31 @@ const SAVE_UPLOAD = (() => {
         (d.counts.liveIds || []).forEach(function (id) { map.liveDone.add(id); });
         // V1.6.5：恢复可收集类完成点（神庙/塔/克洛格/回忆/神兽）——否则 F5 后探索类绿勾全灭
         (d.counts.collectIds || []).forEach(function (id) { map.liveDone.add(id); });
+        // P3/P4：恢复世界档位与侧栏徽标展示，应用缩放链档位
+        if (d.counts.points != null || d.counts.chainTier) {
+          window.__chainTier = d.counts.chainTier || {};
+          window.__worldTier = d.counts.worldTier || 0;
+          window.__killPoints = d.counts.points || 0;
+          if (window.EnemyTiers && window.EnemyTiers.updateBadge) {
+            window.EnemyTiers.updateBadge({
+              level: (d.counts.worldTier != null ? d.counts.worldTier + 1 : (d.counts.tierLevel || 1)),
+              tier: d.counts.worldTier || 0,
+              points: d.counts.points || 0
+            });
+          }
+          if (window.EnemyTiers && window.EnemyTiers.apply) {
+            window.EnemyTiers.apply(window.__chainTier);
+          }
+        }
         if (((d.counts.liveIds || []).length || (d.counts.collectIds || []).length)) {
           UI.renderStats();
           map.draw();
         }
       }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('[save_upload] 恢复 saveCounts 失败:', e);
+    }
     const input = document.getElementById('saveFile');
     const btn = document.getElementById('btnSaveLoad');
     if (!input || !btn) return;
@@ -90,6 +108,15 @@ const SAVE_UPLOAD = (() => {
         try { localStorage.removeItem('botwmap.done.v1'); } catch (e) {}
         window.__saveCounts = null;   // V1.6.4：扩展同步行一并撤下
         window.__saveUploaded = false;
+        window.__chainTier = null;
+        window.__worldTier = null;
+        window.__killPoints = null;
+        if (window.EnemyTiers && window.EnemyTiers.resetBadge) {
+          window.EnemyTiers.resetBadge();
+        }
+        if (window.EnemyTiers && window.EnemyTiers.apply) {
+          window.EnemyTiers.apply({});
+        }
         try { localStorage.removeItem('botwmap.saveCounts.v1'); } catch (e) {}
         /* V1.6.5：任务绿勾两源一并清（手动标记 + 存档快照），否则任务点残留绿勾无清理路径 */
         try { localStorage.removeItem('botwmap.questDone.v1'); } catch (e) {}
@@ -310,6 +337,11 @@ const SAVE_UPLOAD = (() => {
       lynelCntHash[crc32('Defeated_Enemy_Lynel_' + t + '_Num')] = t.toLowerCase();
     });
     const lynelCnt = { junior: 0, middle: 0, senior: 0, dark: 0, gold: 0 };
+    /* P3：官方缩放选档（§12 算法）——50 条计分怪击杀数 → 世界积分 → 世界档位 */
+    const KS = (window.BOTW_SCALING && window.BOTW_SCALING.killScores) || [];
+    const ksHash = {};
+    KS.forEach(function (k) { ksHash[crc32(k.flag)] = k; });
+    const ksCnt = {};
     let playtime = 0, korokCnt = 0, entries = 0;
     for (let o = 0x0C; o + 8 <= dv.byteLength; o += 8) {
       const h = dv.getUint32(o, littleEndian);
@@ -325,9 +357,25 @@ const SAVE_UPLOAD = (() => {
       else if (v !== 0 && pbEnemySet && pbEnemySet.has(h)) pbEnemyCnt++;
       else if (v !== 0 && enemyHash2pt && enemyHash2pt[h]) enemyPts.push(enemyHash2pt[h]);
       else if (v !== 0 && lynelCntHash[h]) lynelCnt[lynelCntHash[h]] = v;
+      else if (v !== 0 && ksHash[h]) ksCnt[ksHash[h].flag] = v;
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
     if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
+
+    /* P3：世界档位计算（官方缩放算法）与徽标展示 */
+    let tierInfo = { points: 0, tier: 0, worldTier: 0, level: 1, chainTier: {} };
+    if (window.EnemyTiers && window.EnemyTiers.calcTier) {
+      tierInfo = window.EnemyTiers.calcTier(ksCnt);
+    }
+    window.__chainTier = tierInfo.chainTier;
+    window.__worldTier = tierInfo.worldTier;
+    window.__killPoints = tierInfo.points;
+    if (window.EnemyTiers && window.EnemyTiers.updateBadge) {
+      window.EnemyTiers.updateBadge(tierInfo);
+    }
+    if (window.EnemyTiers && window.EnemyTiers.apply) {
+      window.EnemyTiers.apply(window.__chainTier);
+    }
 
     // 吸收式合并：写回本地完成集合
     // flag 引用：单值 [t,id] / [t,id,tier]；多值 [[t,id],[t,id,tier],...]（英杰回忆与神兽共用 Clear_Remains*）
@@ -436,6 +484,11 @@ const SAVE_UPLOAD = (() => {
       pbEnemyTotal: (typeof PB_LISTS !== "undefined" && PB_LISTS.enemy) ? PB_LISTS.enemy.length : 84,
       enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; }),
       collectIds: collectIds,   /* V1.6.5：可收集类完成点快照（刷新恢复探索类绿勾） */
+      chainTier: tierInfo.chainTier,     /* P3：各缩放链当前档 */
+      worldTier: tierInfo.worldTier,     /* P3：最高链档（0..3） */
+      tierLevel: tierInfo.level,         /* P3：世界档位等级（1..4） */
+      points: tierInfo.points,           /* P3：世界击杀积分 */
+      ksCnt: ksCnt,                      /* P3：击杀计数表 */
       lynelCnt: lynelCnt   /* V1.6.5：人马分级击杀计数（ui.js 推导当前档；随 saveCounts 持久化） */
     };
     try { localStorage.setItem('botwmap.saveCounts.v1', JSON.stringify({ uploaded: true, counts: window.__saveCounts })); } catch (e) {}

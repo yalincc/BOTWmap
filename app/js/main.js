@@ -123,4 +123,9 @@
   }
 
   window.__botwMap = map; // 便于调试
+
+  // P4：初始化应用官方缩放怪物层（默认 tier-0，无存档时新档初始态）
+  if (window.EnemyTiers && window.EnemyTiers.apply) {
+    window.EnemyTiers.apply();
+  }
 })();
