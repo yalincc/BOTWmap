@@ -33,6 +33,14 @@
   var CAT_COLOR = { weapon: '#d9a066', shield: '#7fb2e0', armor: '#c084d9' };
   var CAT_ORDER = ['weapon', 'shield', 'armor'];
 
+  function getCatName(cat) {
+    return (window.I18N && window.I18N.t) ? window.I18N.t('cat.' + cat, CAT_NAME[cat]) : CAT_NAME[cat];
+  }
+  function getSubName(sub) {
+    if (!sub) return '';
+    return (window.I18N && window.I18N.t) ? window.I18N.t('equip.sub.' + sub, sub) : sub;
+  }
+
   /* 属性徽章配色（dex element 字段：火/冰/雷） */
   var ELEM_COLOR = { '火': '#e8574a', '冰': '#5fb8e6', '雷': '#b48ce8' };
 
@@ -149,7 +157,7 @@
     var g = document.createElement('div');
     g.className = 'lg';
     var gLabel = document.createElement('span');
-    gLabel.textContent = '装备';
+    gLabel.textContent = window.I18N ? window.I18N.t('group.装备', '装备') : '装备';
     var gBtn = document.createElement('button');
     gBtn.type = 'button';
     gBtn.className = 'lg-btn';
@@ -167,11 +175,12 @@
       var row = document.createElement('div');
       row.className = 'lrow' + (eLayers[cat] ? ' on' : '');
       row.dataset.ecat = cat;
+      var cname = getCatName(cat);
       row.innerHTML =
         '<img class="eq-lrow-ic" data-kind="' + cat + '" src="' + ICON_SRC[cat] + '" alt="">' +
-        '<span class="lname">' + CAT_NAME[cat] + '</span>' +
+        '<span class="lname">' + cname + '</span>' +
         '<span class="lprog">' + n + '</span>';
-      row.title = '点击整行切换显示 / 隐藏（' + CAT_NAME[cat] + '获取点）';
+      row.title = '点击整行切换显示 / 隐藏（' + cname + '获取点）';
       row.addEventListener('click', function () {
         eLayers[cat] = !eLayers[cat];
         row.classList.toggle('on', eLayers[cat]);
@@ -404,11 +413,29 @@
     });
   }
 
-  /* 宝箱类型中文名（V1.6.2：坐标数字玩家无感，改用宝箱类型；数据 chests.js chestTypeCn） */
+  /* 宝箱类型中文/英文名（V1.6.2：坐标数字玩家无感，改用宝箱类型；数据 chests.js chestTypeCn） */
   function chestTypeCn(p) {
     var dict = (typeof BOTW_CHESTS !== 'undefined' && BOTW_CHESTS.chestTypeCn) ? BOTW_CHESTS.chestTypeCn : {};
     var t = p && p[2];
-    return (t && dict[t]) ? dict[t] : '宝箱';
+    var cn = (t && dict[t]) ? dict[t] : '宝箱';
+    if (window.I18N && window.I18N.getLang() === 'en') {
+      var enDict = {
+        '木宝箱': 'Wooden Chest',
+        '铁宝箱': 'Iron Chest',
+        '铁宝箱（固定）': 'Iron Chest (Fixed)',
+        '石宝箱': 'Stone Chest',
+        '石宝箱（固定）': 'Stone Chest (Fixed)',
+        '英杰诗篇宝箱': "Champions' Ballad Chest",
+        '联动宝箱': 'Collab Chest',
+        '大树宝箱': 'Tree Chest',
+        '希卡宝箱': 'Sheikah Chest',
+        '赌博宝箱': 'Gambling Chest',
+        '敌人宝箱': 'Enemy Chest',
+        '宝箱': 'Chest'
+      };
+      return enDict[cn] || cn;
+    }
+    return cn;
   }
 
   /* V1.6.1 调整5：hover 预览态机 hidden | preview | fixed（同 quest.js） */
@@ -451,47 +478,65 @@
     card.dataset.manual = '';   /* V1.6.1 调整i：新卡 → 清除手动态，重新避让 */
     pv.mode = 'fixed'; pv.ref = it;   /* 点击路径默认固定态（onHoverExt 随后覆盖为 preview） */
 
-    var kindCn = CAT_NAME[it.kind] || it.kind;
+    var isEn = (window.I18N && window.I18N.getLang() === 'en');
+    var kindCn = getCatName(it.kind);
     var sub = (it.kind === 'weapon' || it.kind === 'shield') ? (it.type || '') : (it.part || '');
+    var subDisplay = getSubName(sub);
     var chipCls = 'tk-chip-' + (it.kind === 'weapon' ? 'main' : it.kind === 'shield' ? 'sub' : 'mini');
     var done = EquipDone.isDone(it.id);
 
     var h = '';
     /* 头部：分类徽章 + 大师模式徽章 + 关闭（V1.6.2：大师模式徽章从英文名后移到分类行） */
     h += '<div class="tk-grip">';
-    h += '<span class="tk-chip ' + chipCls + '">' + esc(kindCn) + (sub ? ' · ' + esc(sub) : '') + '</span>';
-    if (it.hard) h += '<span class="q-badge-hard" style="background:rgba(139,92,246,.16);border-color:#8a5cf6;color:#b18cff">大师模式</span>';
+    h += '<span class="tk-chip ' + chipCls + '">' + esc(kindCn) + (subDisplay ? ' · ' + esc(subDisplay) : '') + '</span>';
+    if (it.hard) h += '<span class="q-badge-hard" style="background:rgba(139,92,246,.16);border-color:#8a5cf6;color:#b18cff">' + (window.I18N ? window.I18N.t('equip.masterMode', '大师模式') : '大师模式') + '</span>';
     /* P4a：属性徽章（火/冰/雷）+ 强装徽章（attack>=50 或盾 guard>=70） */
-    if (it.element) h += '<span class="q-badge-hard" style="background:' + (ELEM_COLOR[it.element] || '#888') + '22;border-color:' + (ELEM_COLOR[it.element] || '#888') + ';color:' + (ELEM_COLOR[it.element] || '#ccc') + '">' + esc(it.element) + '属性</span>';
-    if (it.strong) h += '<span class="q-badge-hard" style="background:rgba(242,201,76,.14);border-color:#f2c94c;color:#f2c94c">强装</span>';
-    if (done) h += '<span class="tk-done-tick" title="已完成">✓</span>';
+    if (it.element) {
+      var elemName = isEn ? ({ '火': 'Fire', '冰': 'Ice', '雷': 'Shock' }[it.element] || it.element) : (it.element + '属性');
+      h += '<span class="q-badge-hard" style="background:' + (ELEM_COLOR[it.element] || '#888') + '22;border-color:' + (ELEM_COLOR[it.element] || '#888') + ';color:' + (ELEM_COLOR[it.element] || '#ccc') + '">' + esc(elemName) + '</span>';
+    }
+    if (it.strong) h += '<span class="q-badge-hard" style="background:rgba(242,201,76,.14);border-color:#f2c94c;color:#f2c94c">' + (window.I18N ? window.I18N.t('equip.strong', '强装') : '强装') + '</span>';
+    if (done) h += '<span class="tk-done-tick" title="' + (window.I18N ? window.I18N.t('card.saveDone', '已完成') : '已完成') + '">✓</span>';
     var eIdx = -1;
     for (var ii = 0; ii < ITEMS.length; ii++) { if (ITEMS[ii].id === it.id) { eIdx = ii; break; } }
     h += '<span class="tk-grip-acts">' +
-      (eIdx > 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqPrev" title="上一件装备">‹</button>' : '') +
-      (eIdx < ITEMS.length - 1 && eIdx >= 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqNext" title="下一件装备">›</button>' : '') +
-      '<button type="button" class="tk-close" id="eqCardClose" title="关闭">×</button></span>';
+      (eIdx > 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqPrev" title="' + (window.I18N ? window.I18N.t('card.prev', '上一个') : '上一件装备') + '">‹</button>' : '') +
+      (eIdx < ITEMS.length - 1 && eIdx >= 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="eqNext" title="' + (window.I18N ? window.I18N.t('card.next', '下一个') : '下一件装备') + '">›</button>' : '') +
+      '<button type="button" class="tk-close" id="eqCardClose" title="' + (window.I18N ? window.I18N.t('side.close', '关闭') : '关闭') + '">×</button></span>';
     h += '</div>';
+
+    var mainTitle = isEn ? (it.en || it.name || 'Unknown') : (it.name || '名称待补充');
+    var subTitle = isEn ? (it.en ? it.name : '') : (it.en || '');
+
     /* 标题行：装备名 + [复制]（V1.6.2：⧉ 图标改文字，紧跟名字） */
     h += '<div class="tk-title-row">' +
-      '<h3 class="tk-name">' + (eIdx >= 0 ? '#' + (eIdx + 1) + ' ' : '') + esc(it.name || '名称待补充') + '</h3>' +
-      '<button type="button" class="tk-copy" id="eqCopy" title="复制装备名">[复制]</button>' +
+      '<h3 class="tk-name">' + (eIdx >= 0 ? '#' + (eIdx + 1) + ' ' : '') + esc(mainTitle) + '</h3>' +
+      '<button type="button" class="tk-copy" id="eqCopy" title="' + (window.I18N ? window.I18N.t('card.copy.title', '复制装备名') : '复制装备名') + '">' + (window.I18N ? window.I18N.t('card.copy', '[复制]') : '[复制]') + '</button>' +
       '</div>';
-    if (it.en) h += '<div class="qcard-en">' + esc(it.en) + '</div>';
-    if (it.stub) h += '<div class="tk-none">该武器暂无静态数据（仅有收集标记，图鉴信息待补充）</div>';
+    if (subTitle && subTitle !== mainTitle) h += '<div class="qcard-en">' + esc(subTitle) + '</div>';
+    if (it.stub) h += '<div class="tk-none">' + (window.I18N ? window.I18N.t('equip.noStatic', '该武器暂无静态数据（仅有收集标记，图鉴信息待补充）') : '该武器暂无静态数据（仅有收集标记，图鉴信息待补充）') + '</div>';
+
+    var tType = window.I18N ? window.I18N.t('equip.type', '类型') : '类型';
+    var tPart = window.I18N ? window.I18N.t('equip.part', '部位') : '部位';
+    var tAtk = window.I18N ? window.I18N.t('equip.atk', '攻击') : '攻击';
+    var tDef = window.I18N ? window.I18N.t('equip.def', '防御') : '防御';
+    var tDur = window.I18N ? window.I18N.t('equip.durability', '耐久') : '耐久';
+    var tSet = window.I18N ? window.I18N.t('equip.set', '套装') : '套装';
+    var tPending = window.I18N ? window.I18N.t('equip.pending', '待补充') : '待补充';
+
     /* 属性（V1.6.2：盾显示 防御 + 耐久，不再误显攻击；P4a：盾防御取 dex guard 字段） */
     if (it.kind === 'weapon' || it.kind === 'shield') {
-      if (sub) h += '<div class="tk-kv"><span class="tk-k">类型</span><span class="tk-v">' + esc(sub) + '</span></div>';
+      if (subDisplay) h += '<div class="tk-kv"><span class="tk-k">' + esc(tType) + '</span><span class="tk-v">' + esc(subDisplay) + '</span></div>';
       if (it.kind === 'shield') {
-        h += '<div class="tk-kv"><span class="tk-k">防御</span><span class="tk-v">' + (it.guard != null ? it.guard : '<span class="tk-pending">待补充</span>') + '</span></div>';
+        h += '<div class="tk-kv"><span class="tk-k">' + esc(tDef) + '</span><span class="tk-v">' + (it.guard != null ? it.guard : '<span class="tk-pending">' + esc(tPending) + '</span>') + '</span></div>';
       } else {
-        h += '<div class="tk-kv"><span class="tk-k">攻击</span><span class="tk-v">' + (it.atk != null ? it.atk : '<span class="tk-pending">待补充</span>') + '</span></div>';
+        h += '<div class="tk-kv"><span class="tk-k">' + esc(tAtk) + '</span><span class="tk-v">' + (it.atk != null ? it.atk : '<span class="tk-pending">' + esc(tPending) + '</span>') + '</span></div>';
       }
-      h += '<div class="tk-kv"><span class="tk-k">耐久</span><span class="tk-v">' + (it.durability != null ? it.durability : '<span class="tk-pending">待补充</span>') + '</span></div>';
+      h += '<div class="tk-kv"><span class="tk-k">' + esc(tDur) + '</span><span class="tk-v">' + (it.durability != null ? it.durability : '<span class="tk-pending">' + esc(tPending) + '</span>') + '</span></div>';
     } else {
-      if (sub) h += '<div class="tk-kv"><span class="tk-k">部位</span><span class="tk-v">' + esc(sub) + '</span></div>';
-      h += '<div class="tk-kv"><span class="tk-k">防御</span><span class="tk-v">' + (it.def != null ? it.def : '<span class="tk-pending">待补充</span>') + '</span></div>';
-      h += '<div class="tk-kv"><span class="tk-k">套装</span><span class="tk-v">' + (it.set ? esc(it.set) : '<span class="tk-pending">待补充</span>') + '</span></div>';
+      if (subDisplay) h += '<div class="tk-kv"><span class="tk-k">' + esc(tPart) + '</span><span class="tk-v">' + esc(subDisplay) + '</span></div>';
+      var setVal = it.set ? (isEn && window.I18N ? window.I18N.armorSetOf(it.set) : it.set) : null;
+      h += '<div class="tk-kv"><span class="tk-k">' + esc(tSet) + '</span><span class="tk-v">' + (setVal ? esc(setVal) : '<span class="tk-pending">' + esc(tPending) + '</span>') + '</span></div>';
     }
 
     /* 获取来源：普通模式宝箱（黄）/ 大师模式宝箱（紫），逐点可定位 + 点击高亮 */
@@ -504,31 +549,45 @@
     var allPts = normalPts.concat(hardPts);
     function ptsHtml(list, cls, base) {
       return '<div class="flow-pts">' + list.map(function (p, i) {
-        return '<span class="fp ' + cls + '" data-eq-pt="' + (base + i) + '" title="点击定位到该宝箱（' + esc(chestTypeCn(p)) + '）">' +
-          '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(chestTypeCn(p)) + '</span></span>';
+        var tLabel = esc(chestTypeCn(p));
+        var tip = isEn ? ('Click to locate this chest (' + tLabel + ')') : ('点击定位到该宝箱（' + tLabel + '）');
+        return '<span class="fp ' + cls + '" data-eq-pt="' + (base + i) + '" title="' + tip + '">' +
+          '<span class="num">' + (i + 1) + '</span><span class="txt">' + tLabel + '</span></span>';
       }).join('') + '</div>';
     }
     var obtainHtml = '';
-    if (normalPts.length) obtainHtml += '<div class="eq-obtain-h">普通模式宝箱<span class="tk-src">' + normalPts.length + ' 处</span></div>' + ptsHtml(normalPts, 'fp-normal', 0);
-    if (hardPts.length) obtainHtml += '<div class="eq-obtain-h fp-hard-h">大师模式宝箱<span class="tk-src">' + hardPts.length + ' 处</span></div>' + ptsHtml(hardPts, 'fp-hard', normalPts.length);
+    var spotsUnit = window.I18N ? window.I18N.t('equip.spotsCount', '处') : '处';
+    var normHeader = window.I18N ? window.I18N.t('equip.normalChests', '普通模式宝箱') : '普通模式宝箱';
+    var hardHeader = window.I18N ? window.I18N.t('equip.masterChests', '大师模式宝箱') : '大师模式宝箱';
+    if (normalPts.length) obtainHtml += '<div class="eq-obtain-h">' + normHeader + '<span class="tk-src">' + normalPts.length + ' ' + spotsUnit + '</span></div>' + ptsHtml(normalPts, 'fp-normal', 0);
+    if (hardPts.length) obtainHtml += '<div class="eq-obtain-h fp-hard-h">' + hardHeader + '<span class="tk-src">' + hardPts.length + ' ' + spotsUnit + '</span></div>' + ptsHtml(hardPts, 'fp-hard', normalPts.length);
     /* P4a：怪物营地掉落段（dex camps 已按 actor 聚合；点击反查 CAMP_WEAPONS 定位到刷点）
        V1.6.4：默认收起为一行（老大反馈占位太大），点表头展开/收起列表 */
     var campHtml = '';
     if (it.camps && it.camps.length) {
-      campHtml = '<div class="eq-obtain-h eq-camp-h" id="eqCampToggle" style="cursor:pointer" title="点击展开 / 收起怪物清单">' +
-        '怪物营地掉落<span class="tk-src">' + it.camps.length + ' 种怪物 ▸</span></div>' +
+      var campHeader = window.I18N ? window.I18N.t('equip.campDrops', '怪物营地掉落') : '怪物营地掉落';
+      var monsterUnit = window.I18N ? window.I18N.t('equip.monstersCount', '种怪物') : '种怪物';
+      campHtml = '<div class="eq-obtain-h eq-camp-h" id="eqCampToggle" style="cursor:pointer" title="' + (isEn ? 'Click to expand / collapse monster list' : '点击展开 / 收起怪物清单') + '">' +
+        campHeader + '<span class="tk-src">' + it.camps.length + ' ' + monsterUnit + ' ▸</span></div>' +
         '<div class="flow-pts" id="eqCampList" style="display:none">' + it.camps.map(function (c, i) {
-          return '<span class="fp fp-camp" data-eq-camp="' + i + '" title="点击定位到' + esc(c.m || c.t) + '的刷点（' + c.n + ' 处；档位为初始数据，血月后怪物档位会升）">' +
-            '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(c.m || c.t) + ' · ' + c.n + '刷点</span></span>';
+          var mName = isEn ? (window.I18N ? window.I18N.nameOf({ name: c.m || c.t }) : (c.m || c.t)) : (c.m || c.t);
+          var cTip = isEn ? ('Click to locate ' + mName + ' spawn (' + c.n + ' spots; tiers upgrade after blood moon)') : ('点击定位到' + esc(c.m || c.t) + '的刷点（' + c.n + ' 处；档位为初始数据，血月后怪物档位会升）');
+          return '<span class="fp fp-camp" data-eq-camp="' + i + '" title="' + esc(cTip) + '">' +
+            '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(mName) + ' · ' + c.n + (isEn ? ' spots' : '刷点') + '</span></span>';
         }).join('') + '</div>';
     }
-    if (!obtainHtml && !campHtml) obtainHtml = '<div class="tk-none">暂无获取点（商店购买 / 纯野外掉落不收录）</div>';
-    h += '<div class="tk-sec"><div class="tk-sec-t">获取来源</div><div class="tk-sec-b">' + obtainHtml + campHtml + '</div></div>';
+    if (!obtainHtml && !campHtml) obtainHtml = '<div class="tk-none">' + (window.I18N ? window.I18N.t('equip.noDrops', '暂无获取点（商店购买 / 纯野外掉落不收录）') : '暂无获取点（商店购买 / 纯野外掉落不收录）') + '</div>';
+    var tObtain = window.I18N ? window.I18N.t('equip.obtain', '获取来源') : '获取来源';
+    h += '<div class="tk-sec"><div class="tk-sec-t">' + esc(tObtain) + '</div><div class="tk-sec-b">' + obtainHtml + campHtml + '</div></div>';
 
+    var tLocate = window.I18N ? window.I18N.t('equip.locate', '定位') : '定位';
+    var tLocateSpawn = window.I18N ? window.I18N.t('equip.locateSpawn', '定位到刷点') : '定位到刷点';
+    var tDone = window.I18N ? window.I18N.t('card.done', '标记完成') : '标记完成';
+    var tUndone = window.I18N ? window.I18N.t('card.undone', '取消完成') : '取消完成';
     h += '<div class="tk-actions">';
-    if (allPts.length) h += '<button type="button" class="btn act" id="eqLocateFirst">定位</button>';
-    else if (it.camps && it.camps.length) h += '<button type="button" class="btn act" id="eqLocateFirst" title="定位到该武器的营地刷点">定位到刷点</button>';
-    h += '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="eqDone">' + (done ? '取消完成' : '标记完成') + '</button>';
+    if (allPts.length) h += '<button type="button" class="btn act" id="eqLocateFirst">' + esc(tLocate) + '</button>';
+    else if (it.camps && it.camps.length) h += '<button type="button" class="btn act" id="eqLocateFirst" title="' + esc(tLocateSpawn) + '">' + esc(tLocateSpawn) + '</button>';
+    h += '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="eqDone">' + (done ? esc(tUndone) : esc(tDone)) + '</button>';
     h += '</div>';
 
     body.innerHTML = h;
@@ -547,9 +606,10 @@
     var cp = document.getElementById('eqCopy');
     if (cp) cp.addEventListener('click', function (e) {
       e.stopPropagation();
+      var cText = isEn ? (it.en || it.name) : it.name;
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(it.name).catch(function () {});
-        if (typeof UI !== 'undefined' && UI.toast) UI.toast('已复制：' + it.name);
+        navigator.clipboard.writeText(cText).catch(function () {});
+        if (typeof UI !== 'undefined' && UI.toast) UI.toast((window.I18N ? window.I18N.t('toast.copied', '已复制：') : '已复制：') + cText);
       }
     });
     var lf = document.getElementById('eqLocateFirst');
@@ -571,7 +631,8 @@
       var list = document.getElementById('eqCampList');
       var open = list.style.display !== 'none';
       list.style.display = open ? 'none' : '';
-      tg.querySelector('.tk-src').textContent = it.camps.length + ' 种怪物 ' + (open ? '▸' : '▾');
+      var monsterUnit = window.I18N ? window.I18N.t('equip.monstersCount', '种怪物') : '种怪物';
+      tg.querySelector('.tk-src').textContent = it.camps.length + ' ' + monsterUnit + ' ' + (open ? '▸' : '▾');
     });
     /* P4a：营地条目点击 → 反查 CAMP_WEAPONS 定位 + 红点脉冲 */
     body.querySelectorAll('.fp[data-eq-camp]').forEach(function (btn) {
@@ -606,8 +667,9 @@
       var st = EquipDone.toggle(it);
       openCard(it);
       if (map) map.draw();
+      var dName = isEn ? (it.en || it.name) : it.name;
       if (typeof UI !== 'undefined' && UI.toast) {
-        UI.toast(st.done ? '已标记完成：' + it.name + '（含 ' + allPts.length + ' 处宝箱）' : '已取消完成：' + it.name);
+        UI.toast(st.done ? ((window.I18N ? window.I18N.t('toast.marked', '已标记完成：') : '已标记完成：') + dName + (isEn ? ' (' + allPts.length + ' chests)' : '（含 ' + allPts.length + ' 处宝箱）')) : ((window.I18N ? window.I18N.t('toast.unmarked', '已取消完成：') : '已取消完成：') + dName));
       }
     });
     positionCard();
@@ -722,6 +784,25 @@
       var ec = document.getElementById('equipCard');
       if (window.initCardDrag && ec) window.initCardDrag(ec);     /* V1.6.1 调整i：卡片拖动 */
       EquipDone.onChange(function () { if (map) map.draw(); });   /* V1.6.2：完成态变化重绘地图 */
+      if (window.I18N && window.I18N.onChange) {
+        window.I18N.onChange(function () {
+          var grp = document.querySelector('.lg-group[data-group="装备"]');
+          if (grp) {
+            var gl = grp.querySelector('.lg span');
+            if (gl) gl.textContent = window.I18N.t('group.装备', '装备');
+            grp.querySelectorAll('.lrow[data-ecat]').forEach(function (r) {
+              var cat = r.dataset.ecat;
+              var ln = r.querySelector('.lname');
+              if (ln) ln.textContent = getCatName(cat);
+              r.title = (window.I18N.getLang() === 'en' ? 'Click row to toggle (' : '点击整行切换显示 / 隐藏（') + getCatName(cat) + (window.I18N.getLang() === 'en' ? ')' : '获取点）');
+            });
+          }
+          var card = document.getElementById('equipCard');
+          if (card && !card.classList.contains('hidden') && pv.ref) {
+            openCard(pv.ref);
+          }
+        });
+      }
       /* UI 搜索索引并入装备（buildSearchIndex 读取 __equipSearch 后需重建） */
       if (window._rebuildSearch) window._rebuildSearch();
       ready = true;

@@ -174,7 +174,10 @@
     opts = opts || {};
     var list = [], i, id, c;
     /* 用户手动拖过的卡不参与重排（manual 态），除非它就是本次定位的主卡 */
-    var movable = function (el, cid) { return isVisible(el) && (el.dataset.manual !== '1' || cid === opts.primary); };
+    var movable = function (el, cid) {
+      if (cid === opts.primary) return !!el;
+      return isVisible(el) && el.dataset.manual !== '1';
+    };
     if (opts.primary) {
       c = document.getElementById(opts.primary);
       if (movable(c, opts.primary)) list.push(c);

@@ -67,6 +67,35 @@
     return it.contentCn || CN_FALLBACK[it.content] || it.en || it.content;
   }
 
+  function getSubName(sub) {
+    if (window.I18N && window.I18N.t) {
+      return window.I18N.t('chest.sub.' + sub, SUB_NAME[sub] || sub);
+    }
+    return SUB_NAME[sub] || sub;
+  }
+
+  function chestTypeName(code) {
+    var cn = CHEST_TYPE_CN[code] || code || '—';
+    if (window.I18N && window.I18N.getLang() === 'en') {
+      var enDict = {
+        '木宝箱': 'Wooden Chest',
+        '铁宝箱': 'Iron Chest',
+        '铁宝箱（固定）': 'Iron Chest (Fixed)',
+        '石宝箱': 'Stone Chest',
+        '石宝箱（固定）': 'Stone Chest (Fixed)',
+        '英杰诗篇宝箱': "Champions' Ballad Chest",
+        '联动宝箱': 'Collab Chest',
+        '大树宝箱': 'Tree Chest',
+        '希卡宝箱': 'Sheikah Chest',
+        '赌博宝箱': 'Gambling Chest',
+        '敌人宝箱': 'Enemy Chest',
+        '宝箱': 'Chest'
+      };
+      return enDict[cn] || cn;
+    }
+    return cn;
+  }
+
   var map = null;
   var ready = false;
   /* 子开关状态：{normal, dlc, hard} 默认全开（localStorage 记忆） */
@@ -136,7 +165,8 @@
       });
       persistChDone(); notifyCh();
     },
-    onChange: function (fn) { chListeners.push(fn); }
+    onChange: function (fn) { chListeners.push(fn); },
+    openCard: openCard
   };
 
   /* ---------- 宝箱顶级大类注入（DOM 手术：ui.js buildLayerList 渲染完成后执行；
@@ -159,12 +189,12 @@
     var g = document.createElement('div');
     g.className = 'lg';
     var gLabel = document.createElement('span');
-    gLabel.textContent = '宝箱';
+    gLabel.textContent = window.I18N ? window.I18N.t('group.宝箱', '宝箱') : '宝箱';
     var gBtn = document.createElement('button');
     gBtn.type = 'button';
     gBtn.className = 'lg-btn';
     gBtn.dataset.group = '宝箱';
-    gBtn.title = '一键勾选 / 清空全部宝箱';
+    gBtn.title = (window.I18N && window.I18N.getLang() === 'en') ? 'Toggle all chests' : '一键勾选 / 清空全部宝箱';
     g.appendChild(gLabel); g.appendChild(gBtn);
     grp.appendChild(g);
     var lrows = document.createElement('div');
@@ -178,11 +208,12 @@
       r.dataset.cat = 'chest_' + sub;
       /* V1.6.2：三子类统一用各自卡通图标 */
       var iconHtml = '<img class="lg-ic" src="' + CHEST_ICON[sub] + '" alt="" loading="lazy">';
+      var sname = getSubName(sub);
       r.innerHTML =
         iconHtml +
-        '<span class="lname">' + SUB_NAME[sub] + '</span>' +
+        '<span class="lname">' + sname + '</span>' +
         '<span class="lprog">' + n + '</span>';
-      r.title = '点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 点）';
+      r.title = (window.I18N && window.I18N.getLang() === 'en') ? ('Click to toggle ' + sname + ' (' + n + ' spots)') : ('点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 点）');
       r.addEventListener('click', function () {
         cLayers[sub] = !cLayers[sub];
         r.classList.toggle('on', cLayers[sub]);
@@ -320,43 +351,63 @@
     var ec = document.getElementById('equipCard');
     if (ec) ec.classList.add('hidden');
 
+    var isEn = (window.I18N && window.I18N.getLang() === 'en');
     var attr = attrOf(it.content);
     var badgeHtml = '';
     if (entry.hard) {
-      badgeHtml = '<span class="q-badge-hard" style="background:rgba(192,132,217,.16);border-color:#8a5aa8;color:#c084d9">大师模式·浮岛平台</span>';
+      badgeHtml = '<span class="q-badge-hard" style="background:rgba(192,132,217,.16);border-color:#8a5aa8;color:#c084d9">' + (isEn ? 'Master Mode · Sky Island' : '大师模式·浮岛平台') + '</span>';
     } else if (attr === 'DLC1') {
       badgeHtml = '<span class="q-badge-hard" style="background:rgba(139,92,246,.16);border-color:#8a5cf6;color:#b18cff">DLC1</span>';
     } else if (attr === 'DLC2') {
       badgeHtml = '<span class="q-badge-hard" style="background:rgba(216,178,92,.16);border-color:#c9a04e;color:#eac27e">DLC2</span>';
     } else if (attr === '联动') {
-      badgeHtml = '<span class="q-badge-hard" style="background:rgba(126,200,169,.16);border-color:#4e9c7c;color:#7ec8a9">联动</span>';
+      badgeHtml = '<span class="q-badge-hard" style="background:rgba(126,200,169,.16);border-color:#4e9c7c;color:#7ec8a9">' + (isEn ? 'Collab' : '联动') + '</span>';
     } else if (attr === '特典') {
-      badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,209,102,.16);border-color:#b8902e;color:#ffd166">特典</span>';
+      badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,209,102,.16);border-color:#b8902e;color:#ffd166">' + (isEn ? 'Bonus' : '特典') + '</span>';
     } else if (/_Aoc|_Collabo/.test(p[2] || '')) {
       /* V1.6.2 修复：只有 DLC 宝箱点才可能显示「归属待确认」；普通宝箱一律不显示 */
-      badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,255,255,.1);border-color:#666;color:#aaa">DLC（归属待确认）</span>';
+      badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,255,255,.1);border-color:#666;color:#aaa">' + (isEn ? 'DLC (Pending)' : 'DLC（归属待确认）') + '</span>';
     }
 
     var done = window.ChestPanel.isDone(p);
+    var chipName = entry.hard
+      ? (isEn ? 'Master Mode Chest' : '大师模式宝箱')
+      : (isEn ? 'Chest' : '宝箱');
     var h = '';
     h += '<div class="tk-grip">';
-    h += '<span class="tk-chip ' + (entry.hard ? 'tk-chip-mini' : 'tk-chip-main') + '">' + (entry.hard ? '大师模式宝箱' : '宝箱') + '</span>';
+    h += '<span class="tk-chip ' + (entry.hard ? 'tk-chip-mini' : 'tk-chip-main') + '">' + chipName + '</span>';
     if (badgeHtml) h += badgeHtml;
     /* V1.6.2：去掉复制图标（宝箱只有 3 个名字，无需复制） */
     h += '<span class="tk-grip-acts">' +
-      '<button type="button" class="tk-close" id="chCardClose" title="关闭">×</button></span>';
+      '<button type="button" class="tk-close" id="chCardClose" title="' + (window.I18N ? window.I18N.t('side.close', '关闭') : '关闭') + '">×</button></span>';
     h += '</div>';
-    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(cnName(it)) + '</h3>' +
-      (done ? '<span class="tk-done-tick" title="已完成">✓</span>' : '') + '</div>';
-    if (it.en) h += '<div class="qcard-en">' + esc(it.en) + '</div>';
-    h += '<div class="tk-kv"><span class="tk-k">宝箱类型</span><span class="tk-v">' +
-      esc(CHEST_TYPE_CN[p[2]] || p[2] || '—') + '</span></div>';
+
+    var mainTitle = isEn ? (it.en || it.contentCn || it.content) : cnName(it);
+    var subTitle = isEn ? (it.contentCn || CN_FALLBACK[it.content] || '') : (it.en || '');
+
+    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(mainTitle) + '</h3>' +
+      (done ? '<span class="tk-done-tick" title="' + (window.I18N ? window.I18N.t('card.saveDone', '已完成') : '已完成') + '">✓</span>' : '') + '</div>';
+    if (subTitle && subTitle !== mainTitle) h += '<div class="qcard-en">' + esc(subTitle) + '</div>';
+
+    var tType = window.I18N ? window.I18N.t('chest.type', '宝箱类型') : '宝箱类型';
+    var tCount = window.I18N ? window.I18N.t('chest.count', '数量') : '数量';
+    h += '<div class="tk-kv"><span class="tk-k">' + tType + '</span><span class="tk-v">' +
+      esc(chestTypeName(p[2])) + '</span></div>';
+
     /* V1.6.2：去掉「坐标 X/Z 数字」行——游戏内并无此坐标，对玩家无意义（保留底部「定位」按钮） */
     var totalN = entry.hard ? (it.hardChestCount || 0) : (it.chestCount || 0);
-    h += '<div class="tk-kv"><span class="tk-k">数量</span><span class="tk-v">' +
-      (entry.hard ? '大师模式 ' + totalN + ' 处' : '普通 ' + totalN + ' 处') + '</span></div>';
-    h += '<div class="tk-actions"><button type="button" class="btn act" id="chLocate">定位</button>' +
-      '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="chDone">' + (done ? '取消完成' : '标记完成') + '</button></div>';
+    var countVal = entry.hard
+      ? (isEn ? 'Master Mode ' + totalN + ' spots' : '大师模式 ' + totalN + ' 处')
+      : (isEn ? 'Normal ' + totalN + ' spots' : '普通 ' + totalN + ' 处');
+    h += '<div class="tk-kv"><span class="tk-k">' + tCount + '</span><span class="tk-v">' +
+      countVal + '</span></div>';
+
+    var tLocate = window.I18N ? window.I18N.t('card.locate', '定位') : '定位';
+    var doneBtnText = done
+      ? (window.I18N ? window.I18N.t('card.undone', '取消完成') : '取消完成')
+      : (window.I18N ? window.I18N.t('card.done', '标记完成') : '标记完成');
+    h += '<div class="tk-actions"><button type="button" class="btn act" id="chLocate">' + tLocate + '</button>' +
+      '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="chDone">' + doneBtnText + '</button></div>';
 
     body.innerHTML = h;
     card.classList.remove('hidden');
@@ -374,7 +425,10 @@
       var st = window.ChestPanel.toggleDone(p);
       openCard({ item: it, pt: p, hard: entry.hard });
       if (map) map.draw();
-      if (typeof UI !== 'undefined' && UI.toast) UI.toast(st.done ? '已标记完成：' + cnName(it) : '已取消完成：' + cnName(it));
+      if (typeof UI !== 'undefined' && UI.toast) {
+        var toastName = isEn ? (it.en || it.contentCn || it.content) : cnName(it);
+        UI.toast(st.done ? (isEn ? 'Marked complete: ' + toastName : '已标记完成：' + toastName) : (isEn ? 'Marked incomplete: ' + toastName : '已取消完成：' + toastName));
+      }
     });
     var lf = document.getElementById('chLocate');
     if (lf) lf.addEventListener('click', function (e) {
@@ -483,6 +537,28 @@
       var cc = document.getElementById('chestCard');
       if (window.initCardDrag && cc) window.initCardDrag(cc);     /* V1.6.1 调整i：卡片拖动 */
       window.ChestPanel.onChange(function () { if (map) map.draw(); });  /* V1.6.2：完成态变化重绘 */
+      if (window.I18N && window.I18N.onChange) {
+        window.I18N.onChange(function () {
+          var grp = document.querySelector('.lg-group[data-group="宝箱"]');
+          if (grp) {
+            var gl = grp.querySelector('.lg span');
+            if (gl) gl.textContent = window.I18N.t('group.宝箱', '宝箱');
+            var gb = grp.querySelector('.lg-btn');
+            if (gb) gb.title = (window.I18N.getLang() === 'en') ? 'Toggle all chests' : '一键勾选 / 清空全部宝箱';
+            grp.querySelectorAll('.lrow[data-cat^="chest_"]').forEach(function (r) {
+              var sub = r.dataset.cat.replace('chest_', '');
+              var ln = r.querySelector('.lname');
+              if (ln) ln.textContent = getSubName(sub);
+              var n = SUB[sub] ? SUB[sub].length : 0;
+              r.title = (window.I18N.getLang() === 'en') ? ('Click to toggle ' + getSubName(sub) + ' (' + n + ' spots)') : ('点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 点）');
+            });
+          }
+          var card = document.getElementById('chestCard');
+          if (card && !card.classList.contains('hidden') && pv.ref) {
+            openCard(pv.ref);
+          }
+        });
+      }
       hookSelect();
       ready = true;
       map.draw();

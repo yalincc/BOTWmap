@@ -9,6 +9,11 @@ const UI = (() => {
 
   function init(m) {
     map = m;
+    if (window.I18N && typeof window.I18N.updateDOM === 'function') {
+      window.I18N.updateDOM();
+    }
+    const btnSave = document.getElementById('btnSaveLoad');
+    if (btnSave && window.I18N) btnSave.textContent = window.I18N.t('save.loadBtn');
     buildLayerList();
     buildSearchIndex();
     wireTools();
@@ -52,6 +57,7 @@ const UI = (() => {
   }
 
   /* ---------- 探索度（v1.2.1 内嵌折叠面板）：点击展开/收起完整统计，面板自身滚动不截断 ---------- */
+  let syncStatsToggle = null;
   function initStatsCollapse() {
     const toggle = $('statsToggle');
     const panel = $('statsPanel');
@@ -61,9 +67,11 @@ const UI = (() => {
     try { if (localStorage.getItem(KEY) === '0') open = false; } catch (e) {}
     const apply = () => {
       panel.classList.toggle('hidden', !open);
-      toggle.textContent = (open ? '▾ ' : '▸ ') + '探索度';
+      const title = (window.I18N && window.I18N.t) ? I18N.t('stats.title', '探索度').replace(/^[▤\s]+/, '') : '探索度';
+      toggle.textContent = (open ? '▾ ' : '▸ ') + title;
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     };
+    syncStatsToggle = apply;
     toggle.addEventListener('click', () => {
       open = !open;
       try { localStorage.setItem(KEY, open ? '1' : '0'); } catch (e) {}
@@ -194,7 +202,7 @@ const UI = (() => {
 
     handle.addEventListener('pointerdown', function (e) {
       if (window.innerWidth <= 760) return;                  /* 手机：底部抽屉，不拖 */
-      if (e.target.closest('.tk-close, .card-close, .btn, button, .co-link, a')) return;
+      if (e.target.closest('.tk-close, .card-close, .btn, button, .co-link, a, input, select, textarea, label, .st-opt, .st-chip, .st-fold')) return;
       if (touchGuard && e.pointerType === 'touch' && !e.target.closest('.tk-grip')) return;
       /* ★ V1.6.4 修复（老大实测「装备卡所有位置点无法定位」根因）：
          原实现 pointerdown 立即 preventDefault + setPointerCapture，
@@ -455,13 +463,19 @@ const UI = (() => {
       const btn = wrap.querySelector('.lg-btn[data-group="' + d.group + '"]');
       if (!btn) return;
       const on = d.keys.filter(d.get).length;
-      btn.textContent = on === d.keys.length ? '清空本组' : (on === 0 ? '全选本组' : '全选（' + on + '/' + d.keys.length + '）');
+      const isEn = window.I18N && window.I18N.getLang() === 'en';
+      if (isEn) {
+        btn.textContent = on === d.keys.length ? 'Clear' : (on === 0 ? 'Select' : 'Select (' + on + '/' + d.keys.length + ')');
+      } else {
+        btn.textContent = on === d.keys.length ? '清空本组' : (on === 0 ? '全选本组' : '全选（' + on + '/' + d.keys.length + '）');
+      }
       btn.style.opacity = on === d.keys.length ? '1' : '0.75';
     });
   }
   window.__syncLayerBtns = syncExtGroupBtns;
 
   function updateLayerList() {
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     // V1.6.6：dragon 已从敌人组移出（无点位、改由设置开关控制），计数同步排除，避免"面板没有但计数里有"
     let shown = 0, total = 0;
     map.data.categories.forEach(c => {
@@ -469,16 +483,44 @@ const UI = (() => {
       total++;
       if (map.enabled.has(c.key)) shown++;
     });
-    $('layerCount').textContent = shown + '/' + total + ' 图层';
+    $('layerCount').textContent = shown + '/' + total + (isEn ? ' Layers' : ' 图层');
     // 分组按钮状态
     const wrap = $('layerList');
+    const byKey = {};
+    map.data.categories.forEach(c => byKey[c.key] = c);
+
+    wrap.querySelectorAll('.lg-group[data-group]').forEach(grp => {
+      const gname = grp.dataset.group;
+      const glabel = grp.querySelector('.lg span');
+      if (glabel && gname) {
+        if (isEn) {
+          glabel.textContent = window.I18N ? window.I18N.t('group.' + gname, gname) : gname;
+        } else {
+          glabel.textContent = gname === '材料' ? '材料 · 采集' : gname;
+        }
+      }
+    });
+
     for (const [group, keys] of Object.entries(CAT_GROUP)) {
       const btn = wrap.querySelector(`.lg-btn[data-group="${group}"]`);
       if (!btn) continue;
       const on = keys.filter(k => map.enabled.has(k)).length;
-      btn.textContent = on === keys.length ? '清空本组' : (on === 0 ? '全选本组' : `全选（${on}/${keys.length}）`);
+      if (isEn) {
+        btn.textContent = on === keys.length ? 'Clear' : (on === 0 ? 'Select' : `Select (${on}/${keys.length})`);
+      } else {
+        btn.textContent = on === keys.length ? '清空本组' : (on === 0 ? '全选本组' : `全选（${on}/${keys.length}）`);
+      }
       btn.style.opacity = on === keys.length ? '1' : '0.75';
     }
+    // 更新每行的名称
+    wrap.querySelectorAll('.lrow[data-cat]').forEach(r => {
+      const c = byKey[r.dataset.cat];
+      if (c) {
+        const dispName = isEn ? (c.key === 'memory' ? 'Memories' : (c.en || c.cn)) : (c.key === 'memory' ? '照片记忆' : c.cn);
+        const nameEl = r.querySelector('.lname');
+        if (nameEl) nameEl.textContent = dispName;
+      }
+    });
     // 进度
     for (const cat of map.data.categories) {
       const el = $('prog_' + cat.key);
@@ -495,7 +537,9 @@ const UI = (() => {
       if (mbtn) {
         const total = map.MATS.materials.length;
         const on = map.matIds.size;
-        mbtn.textContent = on === total ? '清空本组' : (on === 0 ? '全选本组' : `全选（${on}/${total}）`);
+        mbtn.textContent = isEn
+          ? (on === total ? 'Clear' : (on === 0 ? 'Select' : `Select (${on}/${total})`))
+          : (on === total ? '清空本组' : (on === 0 ? '全选本组' : `全选（${on}/${total}）`));
         mbtn.style.opacity = on === total ? '1' : '0.75';
       }
       for (const cat of MAT_GROUPS) {
@@ -504,7 +548,7 @@ const UI = (() => {
         const list = map.MATS.materials.filter(m => m.cat === cat);
         const n = list.length;
         const total = list.reduce((sum, m) => sum + m.count, 0);
-        el.textContent = n ? `${n}种 · ${total}点` : '';
+        el.textContent = n ? (isEn ? `${n} types · ${total} pts` : `${n}种 · ${total}点`) : '';
       }
     }
   }
@@ -553,11 +597,17 @@ const UI = (() => {
     const final = savedOf('memory_final') != null ? savedOf('memory_final') : m.final[0];
     return [photo + final, m.photo[1] + m.final[1]];
   }
+  const BOSS_NAME_EN = {
+    '西诺克斯': 'Hinox',
+    '岩石巨人': 'Stone Talus',
+    '莫尔德拉吉克': 'Molduga'
+  };
   function renderStats() {
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     const lc = map.live && map.live.counts;
     const synced = !!(lc || window.__saveCounts || window.__saveUploaded);
     let html = '';
-    if (synced) html += `<div class="stat-sync">存档已同步 ✓</div>`;
+    if (synced) html += `<div class="stat-sync">${isEn ? 'Save Progress Synced ✓' : '存档已同步 ✓'}</div>`;
 
     /* V1.6.4 改版：分组双列纯数字网格；排版对齐侧栏（行=村庄行 12px/数值 11px，
        组标题=设施地点标题样式，第二列加竖分割线） */
@@ -570,48 +620,53 @@ const UI = (() => {
     /* —— 探索（存档优先，本地标点兜底）—— */
     const exp = [];
     const scE = (window.__saveCounts && window.__saveCounts.explore) || {};
-    [['shrine', '神庙', 'shrine'], ['tower', '希卡塔', 'tower'], ['beast', '神兽', 'beast']].forEach(([key, name, lck]) => {
+    [['shrine', isEn ? 'Shrines' : '神庙', 'shrine'], ['tower', isEn ? 'Towers' : '希卡塔', 'tower'], ['beast', isEn ? 'Divine Beasts' : '神兽', 'beast']].forEach(([key, name, lck]) => {
       const saved = (lc && lc[lck]) ? lc[lck] : (scE[lck] != null ? [scE[lck], null] : null);
       const [d, t] = saved && saved[1] != null ? saved : catCount(key);
       if (t) exp.push([name, d, t]);
     });
     const kSaved = (lc && lc.korok) ? lc.korok : (scE.korok != null ? [scE.korok, null] : null);
     const [kd, kt] = kSaved && kSaved[1] != null ? kSaved : catCount('seed');
-    if (kt) exp.push(['克洛格', kd, kt]);
+    if (kt) exp.push([isEn ? 'Koroks' : '克洛格', kd, kt]);
     const m = memoryCounts();
     const mSaved = k => (lc && lc[k]) ? lc[k][0] : (scE[k] != null ? scE[k] : null);
     const photoDone = mSaved('memory_photo') != null ? mSaved('memory_photo') : m.photo[0];
     const finalDone = mSaved('memory_final') != null ? mSaved('memory_final') : m.final[0];
-    if (m.photo[1] || photoDone) exp.push(['照片记忆', photoDone, 12]);
-    if (m.final[1] || finalDone) exp.push(['最终回忆', finalDone, 1]);
-    html += label('探索') + grid(exp.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
+    if (m.photo[1] || photoDone) exp.push([isEn ? 'Captured Memories' : '照片记忆', photoDone, 12]);
+    if (m.final[1] || finalDone) exp.push([isEn ? 'Final Memory' : '最终回忆', finalDone, 1]);
+    html += label(isEn ? 'Exploration' : '探索') + grid(exp.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
 
     /* —— 任务（4 类；QuestData/QuestDone 由任务板块提供）—— */
     const QD = window.QuestDone, QDD = window.QuestData;
     if (QD && QDD && QDD.QUESTS) {
-      const qrows = [['main', '主线挑战'], ['side', '支线任务'], ['shrine', '神庙挑战'], ['dlc', 'DLC 任务']].map(([cat, name]) => {
+      const qrows = [
+        ['main', isEn ? 'Main Quests' : '主线挑战'],
+        ['side', isEn ? 'Side Quests' : '支线任务'],
+        ['shrine', isEn ? 'Shrine Quests' : '神庙挑战'],
+        ['dlc', isEn ? 'DLC Quests' : 'DLC 任务']
+      ].map(([cat, name]) => {
         let t = 0, d = 0;
         QDD.QUESTS.forEach(q => { if (QDD.inRow(cat, q)) { t++; if (QD.isDone(q.key)) d++; } });
         return t ? [name, d, t] : null;
       }).filter(Boolean);
-      if (qrows.length) html += label('任务') + grid(qrows.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
+      if (qrows.length) html += label(isEn ? 'Quests' : '任务') + grid(qrows.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
     }
 
     /* —— 收集 / 讨伐（随存档同步出现；localStorage 展示缓存兜底）—— */
     const sc = window.__saveCounts;
     if (sc) {
       const col = [];
-      if (sc.chest != null) col.push(['宝箱', sc.chest, 1312]);
-      if (sc.weapon != null) col.push(['武器获得', sc.weapon, sc.weaponTotal]);
-      if (sc.pb != null) col.push(['图鉴·装备', sc.pb, sc.pbTotal]);
-      if (sc.pbMat != null) col.push(['图鉴·材料', sc.pbMat, 112]);
-      if (sc.pbEnemy != null) col.push(['图鉴·怪物', sc.pbEnemy, sc.pbEnemyTotal || 84]);
-      html += label('收集') + grid(col.map(([n, d, t], i) => {
-        if (d == null) return `<div style="display:flex;justify-content:space-between;font-size:12px;` + (i % 2 === 1 ? 'border-left:1px solid rgba(255,255,255,.14);padding-left:10px;' : '') + `"><span style="color:rgba(255,255,255,.35)">` + n + `</span><span style="color:rgba(255,255,255,.35)">待接</span></div>`;
+      if (sc.chest != null) col.push([isEn ? 'Chests' : '宝箱', sc.chest, 1312]);
+      if (sc.weapon != null) col.push([isEn ? 'Weapons Obtained' : '武器获得', sc.weapon, sc.weaponTotal]);
+      if (sc.pb != null) col.push([isEn ? 'Compendium · Equipment' : '图鉴·装备', sc.pb, sc.pbTotal]);
+      if (sc.pbMat != null) col.push([isEn ? 'Compendium · Materials' : '图鉴·材料', sc.pbMat, 112]);
+      if (sc.pbEnemy != null) col.push([isEn ? 'Compendium · Monsters' : '图鉴·怪物', sc.pbEnemy, sc.pbEnemyTotal || 84]);
+      html += label(isEn ? 'Collection' : '收集') + grid(col.map(([n, d, t], i) => {
+        if (d == null) return `<div style="display:flex;justify-content:space-between;font-size:12px;` + (i % 2 === 1 ? 'border-left:1px solid rgba(255,255,255,.14);padding-left:10px;' : '') + `"><span style="color:rgba(255,255,255,.35)">` + n + `</span><span style="color:rgba(255,255,255,.35)">` + (isEn ? 'Pending' : '待接') + `</span></div>`;
         return row(n, d, t, i % 2 === 1);
       }).join(''));
       if (sc.enemy && sc.enemy.length) {
-        html += label('讨伐') + grid(sc.enemy.map((e, i) => row(e.name, e.done, e.total, i % 2 === 1)).join(''));
+        html += label(isEn ? 'Subjugation' : '讨伐') + grid(sc.enemy.map((e, i) => row(isEn ? (BOSS_NAME_EN[e.name] || e.en || e.name) : e.name, e.done, e.total, i % 2 === 1)).join(''));
       }
     }
     $('statsPanel').innerHTML = html;
@@ -637,12 +692,18 @@ const UI = (() => {
           id: mk.id, mk: mk, cat: mk.cat, name: mk.name, searchName: searchName, en: mk.en,
           region: mk.region, tower: mk.tower, px: mk.px,
           catCn: (map.data.categories.find(c => c.key === mk.cat) || {}).cn || mk.cat,
+          catEn: (map.data.categories.find(c => c.key === mk.cat) || {}).en || mk.cat,
         };
       });
     // 材料追踪（v1.1.0）：74 种材料并入搜索
     if (map.MATS) {
       map.MATS.materials.forEach(m => {
-        searchIndex.push({ mat: m, cat: m.cat, name: m.cn, searchName: m.cn, en: m.en, catCn: '材料·' + m.cat, px: null });
+        searchIndex.push({
+          mat: m, cat: m.cat, name: m.cn, searchName: m.cn, en: m.en,
+          catCn: '材料·' + m.cat,
+          catEn: 'Material · ' + (MAT_CAT_CFG[m.cat] && MAT_CAT_CFG[m.cat].en ? MAT_CAT_CFG[m.cat].en : m.cat),
+          px: null
+        });
       });
     }
     // 任务板块（V1.6.0）：147 个任务并入搜索（quest.js 提供 __questSearch）
@@ -650,7 +711,9 @@ const UI = (() => {
       window.__questSearch.forEach(t => {
         searchIndex.push({
           quest: t.q, cat: t.cat, name: t.name, searchName: t.searchName || t.name, en: t.en,
-          catCn: t.catCn, px: (t.pts && t.pts[0]) || null, region: t.q.region || '',
+          catCn: t.catCn,
+          catEn: 'Quest · ' + (window.QuestData && window.QuestData.catName ? window.QuestData.catName(t.q.cat) : t.catCn),
+          px: (t.pts && t.pts[0]) || null, region: t.q.region || '',
         });
       });
     }
@@ -659,7 +722,9 @@ const UI = (() => {
       window.__equipSearch.forEach(t => {
         searchIndex.push({
           equip: t.e, cat: t.kind, name: t.name, searchName: t.searchName || t.name, en: t.en,
-          catCn: t.catCn, px: t.pts || null, region: t.region || '',
+          catCn: t.catCn,
+          catEn: 'Equip · ' + (t.e && t.e.kind ? (t.e.kind === 'weapon' ? 'Weapon' : t.e.kind === 'shield' ? 'Shield' : 'Armor') : t.catCn),
+          px: t.pts || null, region: t.region || '',
         });
       });
     }
@@ -696,14 +761,20 @@ const UI = (() => {
       if (match) hits.push(it);
     }
     const box = $('searchResults');
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     if (!hits.length) {
-      box.innerHTML = '<div class="sr-item"><span class="sr-meta">无结果</span></div>';
+      box.innerHTML = '<div class="sr-item"><span class="sr-meta">' + (isEn ? 'No results' : '无结果') + '</span></div>';
     } else {
-      box.innerHTML = hits.map(h => `
+      box.innerHTML = hits.map(h => {
+        const displayName = isEn ? (h.en || h.searchName || h.name) : (h.searchName || h.name);
+        const catMeta = isEn ? (h.catEn || h.catCn) : h.catCn;
+        const regionMeta = h.region ? (' · ' + esc(h.region)) : '';
+        return `
         <div class="sr-item ${h.mat ? '' : h.quest ? '' : h.equip ? '' : (map._mkDone(h.mk) ? 'done' : '')}" ${h.mat ? 'data-mat="' + h.mat.id + '"' : h.quest ? 'data-quest="' + h.quest.key + '"' : h.equip ? 'data-equip="' + h.equip.id + '"' : 'data-id="' + h.id + '"'}>
-          <span class="sr-name">${esc(h.searchName || h.name)}</span>
-          <span class="sr-meta">${h.catCn}${h.region ? ' · ' + esc(h.region) : ''}</span>
-        </div>`).join('');
+          <span class="sr-name">${esc(displayName)}</span>
+          <span class="sr-meta">${catMeta}${regionMeta}</span>
+        </div>`;
+      }).join('');
       // 任务命中（V1.6.0）：打开任务卡 + 定位 + 确保对应分类勾选可见
       box.querySelectorAll('.sr-item[data-quest]').forEach(el => {
         el.addEventListener('click', () => {
@@ -840,6 +911,7 @@ const UI = (() => {
   /* 最近区域：取 BOTW_REGIONS（r1-r3 地名层级）中距该点最近者 */
   function nearestRegion(px) {
     if (!px || !map.regions || !map.regions.length) return '—';
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     let best = null, bd = Infinity;
     for (const r of map.regions) {
       if (!r || !r.px || (r.lv && +r.lv > 3)) continue;
@@ -847,8 +919,10 @@ const UI = (() => {
       const d = dx * dx + dy * dy;
       if (d < bd) { bd = d; best = r; }
     }
-    return best ? (best.n || '—') : '—';
+    if (!best) return '—';
+    return isEn ? (best.en || best.name_en || best.n || '—') : (best.n || '—');
   }
+  window.__nearestRegion = nearestRegion;
   /* 材料分布中心（无点击点时作导航/区域兜底） */
   function matCenter(pts) {
     let ax = 0, ay = 0;
@@ -884,42 +958,43 @@ const UI = (() => {
 
   /* 材料详情卡（v1.4.0 TOTK 风格）：图鉴图 + 区域/坐标/位置 meta + 用途 + 导航（可停止） */
   function showMaterialCard(m, matPx) {
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     const cfg = MAT_CAT_CFG[m.cat] || {};
-    $('cardCat').textContent = m.cat;
+    $('cardCat').textContent = isEn ? (cfg.en || m.cat) : m.cat;
     $('cardCat').style.borderColor = cfg.color;
     $('cardCat').style.color = cfg.color;
-    $('cardName').textContent = m.cn;
-    $('cardEn').textContent = m.en || '';
+    $('cardName').textContent = window.I18N ? window.I18N.nameOf(m) : m.cn;
+    $('cardEn').textContent = isEn ? (m.cn || '') : (m.en || '');
     const headActs = $('cardHeadActs') || document.querySelector('#infoCard .card-head');
     if (headActs) headActs.querySelectorAll('.card-nav').forEach(el => el.remove());
     const tickEl = $('cardDoneTick');
     if (tickEl) tickEl.classList.add('hidden');
     const copyBtn = $('cardCopyBtn');
-    if (copyBtn) copyBtn.onclick = (e) => { e.stopPropagation(); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(m.cn); toast('已复制：' + m.cn); } };
+    if (copyBtn) copyBtn.onclick = (e) => { e.stopPropagation(); const txt = window.I18N ? window.I18N.nameOf(m) : m.cn; if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt); toast((window.I18N ? window.I18N.t('toast.copied', '已复制：') : '已复制：') + txt); } };
     // 图鉴图（webp；加载失败则隐藏，点击放大灯箱）
     const img = $('cardImg');
     img.src = 'assets/materials/' + m.entry + '.webp';
-    img.alt = m.cn;
+    img.alt = isEn ? (m.en || m.cn) : m.cn;
     img.onerror = () => img.classList.add('hidden');
     img.onclick = () => openLightbox(img.src, img.alt);
     img.classList.remove('hidden');
     // meta：区域 / 坐标 / 位置
     const pts = map.matPointsBy[m.id] || [];
     const navPoint = matPx || (pts.length ? matCenter(pts) : null);
-    $('cardMetaRegion').textContent = matPx ? nearestRegion(matPx) : '全图分布';
+    $('cardMetaRegion').textContent = matPx ? nearestRegion(matPx) : (isEn ? 'Worldwide' : '全图分布');
     $('cardMetaCoord').textContent = matPx
       ? 'X ' + map.gameCoord(matPx)[0] + ' · Z ' + map.gameCoord(matPx)[1]
       : '—';
-    $('cardMetaPos').textContent = matPx ? posLabel(m, pts, matPx) : (m.count ? '全图 ' + m.count + ' 个点位' : '无固定刷点');
+    $('cardMetaPos').textContent = matPx ? posLabel(m, pts, matPx) : (m.count ? (isEn ? m.count + ' locations worldwide' : '全图 ' + m.count + ' 个点位') : (isEn ? 'No fixed spawn' : '无固定刷点'));
     $('cardMeta').classList.remove('hidden');
     // 用途
     $('cardUsageVal').textContent = matUsage(m);
     $('cardUsage').classList.remove('hidden');
     hideBaseRows();
     let extra = '';
-    extra += '<div class="row fd-row"><span class="fd-l">编号</span><span class="fd-v fd-num">' + esc(m.entry) + '</span></div>';
-    if (m.count === 0) extra += '<div class="row fd-row"><span class="fd-l">说明</span><span class="fd-v" style="color:#e8b04a">无固定刷点（动态生成 / 仅栖息地）</span></div>';
-    extra += '<div class="row fd-row"><span class="fd-l">图层</span><span class="fd-v">' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">已开启</span>' : '未开启（点击侧栏「材料」行开启）') + '</span></div>';
+    extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.entry', '编号') : '编号') + '</span><span class="fd-v fd-num">' + esc(m.entry) + '</span></div>';
+    if (m.count === 0) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.desc', '说明') : '说明') + '</span><span class="fd-v" style="color:#e8b04a">' + (isEn ? 'No fixed spawn (dynamic / habitat only)' : '无固定刷点（动态生成 / 仅栖息地）') + '</span></div>';
+    extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.layer', '图层') : '图层') + '</span><span class="fd-v">' + (map.matIds.has(m.id) ? '<span style="color:#7dffa0">' + (isEn ? 'Enabled' : '已开启') + '</span>' : (isEn ? 'Disabled (click in sidebar to enable)' : '未开启（点击侧栏「材料」行开启）')) + '</span></div>';
     $('cardExtra').innerHTML = extra;
     $('cardKorok').classList.add('hidden');
     $('cardKorok').innerHTML = '';
@@ -948,12 +1023,13 @@ const UI = (() => {
     if (mk.cat !== 'seed') { el.classList.add('hidden'); el.innerHTML = ''; return; }
     const k = KOROK_ITEMS.find(x => x.id === mk.id);
     if (!k) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-    $('cardCat').textContent = '克洛格的果实 · No.' + k.no;
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
+    $('cardCat').textContent = isEn ? ('Korok Seed · No.' + k.no) : ('克洛格的果实 · No.' + k.no);
     $('cardCat').style.borderColor = '#ffd700';
     $('cardCat').style.color = '#ffd700';
-    let html = '<div class="korok-shot-wrap"><img class="korok-shot" data-src="assets/korok/' + esc(k.img) + '" alt="克洛格 No.' + k.no + ' 位置截图"><span class="korok-zoom">查看原图</span></div>';
-    const hint = k.hint_cn || k.hint_en || '';
-    html += '<div class="row fd-row"><span class="fd-l">解法</span><span class="fd-v fd-v-accent">' + esc(hint) + '</span></div>';
+    let html = '<div class="korok-shot-wrap"><img class="korok-shot" data-src="assets/korok/' + esc(k.img) + '" alt="' + (isEn ? ('Korok No.' + k.no) : ('克洛格 No.' + k.no)) + '"><span class="korok-zoom">' + (window.I18N ? window.I18N.t('card.zoom', '查看原图') : '查看原图') + '</span></div>';
+    const hint = isEn ? (k.hint_en || k.hint_cn || '') : (k.hint_cn || k.hint_en || '');
+    html += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.solution', '解法') : '解法') + '</span><span class="fd-v fd-v-accent">' + esc(hint) + '</span></div>';
     el.innerHTML = html;
     const img = el.querySelector('.korok-shot');
     if (img) {
@@ -966,26 +1042,29 @@ const UI = (() => {
   function renderCard() {
     const mk = currentMarker;
     if (!mk) return;
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     const cat = map.data.categories.find(c => c.key === mk.cat) || {};
     const cfg = CAT_CFG[mk.cat] || {};
     const [gx, gz] = map.gameCoord(mk.px);
     const done = map._mkDone(mk);
     const liveDone = map.liveDone && map.liveDone.has(mk.id);
-    $('cardCat').textContent = cat.cn || mk.cat;
+    const catName = isEn ? (cat.en || cat.cn || mk.cat) : (cat.cn || mk.cat);
+    $('cardCat').textContent = catName;
     $('cardCat').style.borderColor = cfg.color;
     $('cardCat').style.color = cfg.color;
     /* V1.6.4：Boss 四族统一标题 #N + 名字（类内序号，方便陈述问题）+ head 加 ‹›/[复制] */
     const BOSS_CATS = ['lynel', 'hinox', 'talus', 'molduga'];
     const isBoss = BOSS_CATS.indexOf(mk.cat) >= 0;
     let bossIdx = -1, bossSib = null;
+    const mkName = window.I18N ? window.I18N.nameOf(mk) : mk.name;
     if (isBoss) {
       bossSib = map.data.markers.filter(x => x.cat === mk.cat);
       bossIdx = bossSib.indexOf(mk);
-      $('cardName').textContent = '#' + (bossIdx + 1) + ' ' + mk.name;
+      $('cardName').textContent = '#' + (bossIdx + 1) + ' ' + mkName;
     } else {
-      $('cardName').textContent = mk.name;
+      $('cardName').textContent = mkName;
     }
-    $('cardEn').textContent = mk.en || '';
+    $('cardEn').textContent = isEn ? (mk.cn || '') : (mk.en || '');
     /* Boss head 控件：‹ › 翻同类 Boss（跳转视角并选卡） */
     const headActs = $('cardHeadActs') || document.querySelector('#infoCard .card-head');
     if (headActs) {
@@ -993,10 +1072,10 @@ const UI = (() => {
       if (isBoss) {
         const mkSib = bossSib, mkIdx = bossIdx;
         const mkPrev = document.createElement('button');
-        mkPrev.className = 'card-nav tk-icon-btn tk-nav'; mkPrev.textContent = '‹'; mkPrev.title = '上一个' + (cat.cn || '');
+        mkPrev.className = 'card-nav tk-icon-btn tk-nav'; mkPrev.textContent = '‹'; mkPrev.title = (window.I18N ? window.I18N.t('card.prev', '上一个') : '上一个') + ' ' + catName;
         mkPrev.onclick = (e) => { e.stopPropagation(); const t = mkSib[(mkIdx - 1 + mkSib.length) % mkSib.length]; map.view.x = map.w / 2 - t.px[0] * map.view.scale; map.view.y = map.h / 2 - t.px[1] * map.view.scale; map.draw(); map._onSelect({ marker: t }); };
         const mkNext = document.createElement('button');
-        mkNext.className = 'card-nav tk-icon-btn tk-nav'; mkNext.textContent = '›'; mkNext.title = '下一个' + (cat.cn || '');
+        mkNext.className = 'card-nav tk-icon-btn tk-nav'; mkNext.textContent = '›'; mkNext.title = (window.I18N ? window.I18N.t('card.next', '下一个') : '下一个') + ' ' + catName;
         mkNext.onclick = (e) => { e.stopPropagation(); const t = mkSib[(mkIdx + 1) % mkSib.length]; map.view.x = map.w / 2 - t.px[0] * map.view.scale; map.view.y = map.h / 2 - t.px[1] * map.view.scale; map.draw(); map._onSelect({ marker: t }); };
         headActs.insertBefore(mkPrev, $('cardClose'));
         headActs.insertBefore(mkNext, $('cardClose'));
@@ -1006,32 +1085,42 @@ const UI = (() => {
     if (copyBtn) {
       copyBtn.onclick = (e) => {
         e.stopPropagation();
-        const txt = (isBoss ? '#' + (bossIdx + 1) + ' ' : '') + mk.name;
+        const txt = (isBoss ? '#' + (bossIdx + 1) + ' ' : '') + mkName;
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(txt);
-          toast('已复制：' + txt);
+          toast((window.I18N ? window.I18N.t('toast.copied', '已复制：') : '已复制：') + txt);
         }
       };
     }
     const tickEl = $('cardDoneTick');
     if (tickEl) {
       tickEl.classList.toggle('hidden', !done);
-      tickEl.title = liveDone ? '已完成（来自存档）' : '已完成（手动标记）';
+      tickEl.title = liveDone
+        ? (isEn ? 'Completed (from save file)' : '已完成（来自存档）')
+        : (isEn ? 'Completed (manually marked)' : '已完成（手动标记）');
     }
     showBaseRows();
     hideMaterialOnly();
-    $('cardRegion').innerHTML = '<span class="fd-l">区域</span><span class="fd-v">' + esc(mk.region || '—') + '</span>';
-    $('cardTower').innerHTML = '<span class="fd-l">塔域</span><span class="fd-v">' + esc(mk.tower || '—') + '</span>';
-    $('cardCoord').innerHTML = '<span class="fd-l">坐标</span><span class="fd-v fd-num">X ' + gx + ' · Z ' + gz + '</span>';
+    const dispRegion = isEn && window.I18N ? window.I18N.regionOf(mk.region) : (mk.region || '—');
+    const dispTower = isEn && window.I18N ? window.I18N.towerOf(mk.tower) : (mk.tower || '—');
+    $('cardRegion').innerHTML = '<span class="fd-l">' + (window.I18N ? window.I18N.t('card.region', '区域') : '区域') + '</span><span class="fd-v">' + esc(dispRegion) + '</span>';
+    $('cardTower').innerHTML = '<span class="fd-l">' + (window.I18N ? window.I18N.t('card.tower', '塔域') : '塔域') + '</span><span class="fd-v">' + esc(dispTower) + '</span>';
+    $('cardCoord').innerHTML = '<span class="fd-l">' + (window.I18N ? window.I18N.t('card.coord', '坐标') : '坐标') + '</span><span class="fd-v fd-num">X ' + gx + ' · Z ' + gz + '</span>';
     renderKorokBlock(mk);
     let extra = '';
     const ex = mk.extra || {};
-    if (mk.cat === 'seed' && ex.korok_loc) extra += '<div class="row fd-row"><span class="fd-l">位置</span><span class="fd-v">' + esc(ex.korok_loc) + '</span></div>';
+    if (mk.cat === 'seed' && ex.korok_loc) {
+      const dispLoc = isEn && window.I18N ? window.I18N.regionOf(ex.korok_loc) : ex.korok_loc;
+      extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.pos', '位置') : '位置') + '</span><span class="fd-v">' + esc(dispLoc) + '</span></div>';
+    }
     if (mk.cat === 'shrine') {
-      if (ex.is_dlc) extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-blue">英杰之诗 DLC 神庙</span></div>';
-      if (ex.icon === 'shrine_resurrection.png') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-blue">复苏神庙</span></div>';
-      if (ex.type) extra += '<div class="row fd-row"><span class="fd-l">试炼</span><span class="fd-v fd-v-accent">' + esc(ex.type) + '</span></div>';
-      if (ex.treasure) extra += '<div class="row fd-row"><span class="fd-l">宝藏</span><span class="fd-v">' + esc(ex.treasure) + '</span></div>';
+      if (ex.is_dlc) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.type', '类型') : '类型') + '</span><span class="fd-v fd-v-blue">' + (window.I18N ? window.I18N.t('card.dlcShrine', '英杰之诗 DLC 神庙') : '英杰之诗 DLC 神庙') + '</span></div>';
+      if (ex.icon === 'shrine_resurrection.png') extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.type', '类型') : '类型') + '</span><span class="fd-v fd-v-blue">' + (window.I18N ? window.I18N.t('card.resurrectionShrine', '复苏神庙') : '复苏神庙') + '</span></div>';
+      if (ex.type) {
+        const dispTrial = isEn && window.I18N ? window.I18N.trialOf(ex.type, mk.en) : ex.type;
+        extra += '<div class="row fd-row"><span class="fd-l">' + (isEn ? 'Trial' : '试炼') + '</span><span class="fd-v fd-v-accent">' + esc(dispTrial) + '</span></div>';
+      }
+      if (ex.treasure) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.treasure', '宝藏') : '宝藏') + '</span><span class="fd-v">' + esc(ex.treasure) + '</span></div>';
       /* V1.6.5 Q6：神庙卡「挑战」行 → 按神庙名反查神庙挑战（quest.name === 神庙名，42/42 全命中），
          点击打开挑战卡；data.js 的 ex.quest 是旧任务体系字段、与新任务名可能不一致
          （如 迪拉·玛神庙 vs「沙漠迷宫」），不作为关联键 */
@@ -1040,32 +1129,35 @@ const UI = (() => {
         (window.__questSearch || []).forEach(function (t) {
           if (!sq && t.q && t.q.cat === 'shrine' && t.q.name === mk.name) sq = t.q;
         });
-        if (sq) extra += '<div class="row fd-row"><span class="fd-l">挑战</span><span class="fd-v"><span class="co-link" data-q-open="' + esc(sq.key) + '" title="点击打开对应神庙挑战卡">' + esc(sq.name) + '</span></span></div>';
+        if (sq) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.challenge', '挑战') : '挑战') + '</span><span class="fd-v"><span class="co-link" data-q-open="' + esc(sq.key) + '" title="' + (isEn ? 'Click to open shrine quest card' : '点击打开对应神庙挑战卡') + '">' + esc(window.I18N ? window.I18N.nameOf(sq) : sq.name) + '</span></span></div>';
       }
     }
-    if (mk.cat === 'memory' && ex.memory_title_en) extra += '<div class="row fd-row"><span class="fd-l">回忆</span><span class="fd-v">#' + ex.memory_no + ' · ' + esc(ex.memory_title_en) + '</span></div>';
-    if (mk.cat === 'memory' && ex.tier === 'final') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-accent">最终回忆：需找齐 12 张照片后回英帕处激活</span></div>';
-    if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row fd-row"><span class="fd-l">任务</span><span class="fd-v">' + esc(ex.quest_en) + '</span></div>';
-    if (mk.cat === 'objective' && ex.sub) extra += '<div class="row fd-row"><span class="fd-l">目标</span><span class="fd-v">' + esc(ex.sub) + '</span></div>';
-    if (mk.cat === 'beast') extra += '<div class="row fd-row"><span class="fd-l">类型</span><span class="fd-v fd-v-accent">神兽·讨伐</span></div>';
+    if (mk.cat === 'memory' && ex.memory_title_en) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('cat.memory', '回忆') : '回忆') + '</span><span class="fd-v">#' + ex.memory_no + ' · ' + esc(ex.memory_title_en) + '</span></div>';
+    if (mk.cat === 'memory' && ex.tier === 'final') extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.type', '类型') : '类型') + '</span><span class="fd-v fd-v-accent">' + (window.I18N ? window.I18N.t('card.finalMemory', '最终回忆：需找齐 12 张照片后回英帕处激活') : '最终回忆：需找齐 12 张照片后回英帕处激活') + '</span></div>';
+    if (mk.cat === 'shrinequest' && ex.quest_en) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.quest', '任务') : '任务') + '</span><span class="fd-v">' + esc(isEn ? (ex.quest_en || ex.quest) : (ex.quest || ex.quest_en)) + '</span></div>';
+    if (mk.cat === 'objective' && ex.sub) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.target', '目标') : '目标') + '</span><span class="fd-v">' + esc(ex.sub) + '</span></div>';
+    if (mk.cat === 'beast') extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.type', '类型') : '类型') + '</span><span class="fd-v fd-v-accent">' + (window.I18N ? window.I18N.t('card.beastBoss', '神兽·讨伐') : '神兽·讨伐') + '</span></div>';
     // 存档同步状态（神庙 / 塔 / 克洛格 / 主线回忆 / 神兽 有存档 flag）
     if (mk.cat === 'shrine' || mk.cat === 'tower' || mk.cat === 'seed' || mk.cat === 'memory' || mk.cat === 'beast' ||
         mk.cat === 'hinox' || mk.cat === 'talus' || mk.cat === 'molduga') {   /* V1.6.4：讨伐三族显示存档态 */
-      if (liveDone) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#7dffa0">游戏内已收集 ✓</span></div>';
-      else if (map.live && map.live.counts) extra += '<div class="row fd-row"><span class="fd-l">存档</span><span class="fd-v" style="color:#e8b04a">游戏内未收集</span></div>';
+      if (liveDone) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.save', '存档') : '存档') + '</span><span class="fd-v" style="color:#7dffa0">' + (window.I18N ? window.I18N.t('card.saveDone', '游戏内已收集 ✓') : '游戏内已收集 ✓') + '</span></div>';
+      else if (map.live && map.live.counts) extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.save', '存档') : '存档') + '</span><span class="fd-v" style="color:#e8b04a">' + (window.I18N ? window.I18N.t('card.saveUndone', '游戏内未收集') : '游戏内未收集') + '</span></div>';
     }
     /* V1.6.5：人马讨伐 + 当前阶段（Q2 老大拍板拆两行；阶段金色加粗醒目；布点档在卡片标题；
        血月次数存档无记录（权威 flag 全集只有任务线/计时器），不显示升档来源） */
     if (mk.cat === 'lynel') {
       const lt = window.__lynelTierOf ? window.__lynelTierOf(mk.name) : null;
       if (lt) {
-        extra += '<div class="row fd-row"><span class="fd-l">讨伐</span><span class="fd-v fd-num">已讨伐 ' + lt.total + ' 只</span></div>';
-        extra += '<div class="row fd-row"><span class="fd-l">阶段</span><span class="fd-v fd-v-accent" style="color:var(--fd-gold);font-weight:700">' + esc(lt.name[lt.cur]) + '</span></div>';
+        extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.subjugate', '讨伐') : '讨伐') + '</span><span class="fd-v fd-num">' + (isEn ? 'Defeated: ' + lt.total : '已讨伐 ' + lt.total + ' 只') + '</span></div>';
+        const dispPhase = isEn && window.I18N ? window.I18N.monsterOf(lt.name[lt.cur]) : lt.name[lt.cur];
+        extra += '<div class="row fd-row"><span class="fd-l">' + (window.I18N ? window.I18N.t('card.phase', '阶段') : '阶段') + '</span><span class="fd-v fd-v-accent" style="color:var(--fd-gold);font-weight:700">' + esc(dispPhase) + '</span></div>';
       }
     }
     $('cardExtra').innerHTML = extra;
     $('cardDone').classList.toggle('hidden', done);
+    $('cardDone').textContent = window.I18N ? window.I18N.t('card.done', '标记完成') : '标记完成';
     $('cardUndone').classList.toggle('hidden', !done);
+    $('cardUndone').textContent = window.I18N ? window.I18N.t('card.undone', '标记为未完成') : '标记为未完成';
     $('cardDelPin').classList.add('hidden');
     // 导航按钮（v1.4.0：同一目标再次点击 = 停止导航）
     $('cardNav').classList.remove('hidden');
@@ -1075,24 +1167,25 @@ const UI = (() => {
     // 收集按钮（仅回忆 / 克洛格 显示；live 层注入）
     syncCollectBtn();
     $('cardDone').onclick = () => {
-      if (mk.cat === 'memory' && map.saveLoaded()) { toast('回忆以存档为准：游戏中收集后自动同步，无需手动标记'); return; }
+      if (mk.cat === 'memory' && map.saveLoaded()) { toast(window.I18N ? window.I18N.t('toast.memorySync', '回忆以存档为准：游戏中收集后自动同步，无需手动标记') : '回忆以存档为准：游戏中收集后自动同步，无需手动标记'); return; }
       map.doneSet.add(mk.id);
       if (map.saveLoaded()) map.liveDone.add(mk.id);
-      saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已标记完成：' + mk.name);
+      saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast((window.I18N ? window.I18N.t('toast.marked', '已标记完成：') : '已标记完成：') + mkName);
     };
     $('cardUndone').onclick = () => {
-      if (mk.cat === 'memory' && map.saveLoaded()) { toast('回忆以存档为准：请以游戏内收集状态为准'); return; }
+      if (mk.cat === 'memory' && map.saveLoaded()) { toast(window.I18N ? window.I18N.t('toast.memorySyncCancel', '回忆以存档为准：请以游戏内收集状态为准') : '回忆以存档为准：请以游戏内收集状态为准'); return; }
       map.doneSet.delete(mk.id);
       if (map.saveLoaded()) map.liveDone.delete(mk.id);
-      saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast('已取消完成：' + mk.name);
+      saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast((window.I18N ? window.I18N.t('toast.unmarked', '已取消完成：') : '已取消完成：') + mkName);
     };
     positionCard();
     $('infoCard').classList.remove('hidden');
+    positionCard();
   }
 
   function showCustomInfo(c) {
     const [gx, gz] = map.gameCoord(c.px);
-    $('cardCat').textContent = '自定义标记';
+    $('cardCat').textContent = window.I18N ? window.I18N.t('card.customPin', '自定义标记') : '自定义标记';
     $('cardCat').style.borderColor = c.color;
     $('cardCat').style.color = c.color;
     $('cardName').textContent = c.name;
@@ -1102,7 +1195,7 @@ const UI = (() => {
     const tickEl = $('cardDoneTick');
     if (tickEl) tickEl.classList.add('hidden');
     const copyBtn = $('cardCopyBtn');
-    if (copyBtn) copyBtn.onclick = (e) => { e.stopPropagation(); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(c.name); toast('已复制：' + c.name); } };
+    if (copyBtn) copyBtn.onclick = (e) => { e.stopPropagation(); if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(c.name); toast((window.I18N ? window.I18N.t('toast.copied', '已复制：') : '已复制：') + c.name); } };
     showBaseRows();
     hideMaterialOnly();
     $('cardRegion').innerHTML = '<span class="fd-l">区域</span><span class="fd-v">自定义</span>';
@@ -1134,10 +1227,12 @@ const UI = (() => {
     const btn = $('cardCollect');
     const active = LIVE.isModeActive(mk.cat);
     btn.classList.toggle('on', active);
-    btn.textContent = active ? '收集中' : '收集';
+    btn.textContent = active
+      ? (window.I18N ? window.I18N.t('card.collecting', '收集中') : '收集中')
+      : (window.I18N ? window.I18N.t('card.collect', '收集') : '收集');
     btn.disabled = !(map.live && map.live.online);
     btn.onclick = () => {
-      if (active) { LIVE.stopCollectMode(); toast('已结束收集模式'); }
+      if (active) { LIVE.stopCollectMode(); toast(window.I18N && window.I18N.getLang() === 'en' ? 'Collection mode ended' : '已结束收集模式'); }
       else LIVE.startCollectMode(mk.cat, mk);
       syncCollectBtn();
     };
@@ -1149,7 +1244,9 @@ const UI = (() => {
     if (!btn || btn.classList.contains('hidden')) return;
     const t = (typeof LIVE !== 'undefined' && LIVE.currentTarget) ? LIVE.currentTarget() : null;
     const cur = navMk && navMk.px && t && t.x === navMk.px[0] && t.y === navMk.px[1];
-    btn.textContent = cur ? '停止导航' : '导航';
+    btn.textContent = cur
+      ? (window.I18N ? window.I18N.t('card.navStop', '停止导航') : '停止导航')
+      : (window.I18N ? window.I18N.t('card.nav', '导航') : '导航');
   }
 
   /* V1.6.1 卡片避让统一内核：实现迁至 js/card-layout.js（window.CardLayout）。
@@ -1168,8 +1265,14 @@ const UI = (() => {
       const r = map.canvas.getBoundingClientRect();
       let sx = map.w / 2, sy = map.h * 0.45;
       const a = window.CardLayout.getAnchor();
-      if (a) { sx = a.sx; sy = a.sy; }
-      else if (map._lastClick) { sx = map._lastClick.sx; sy = map._lastClick.sy; }
+      if (currentMarker && currentMarker.px && map && map.m2s) {
+        const sp = map.m2s(currentMarker.px);
+        sx = sp[0]; sy = sp[1];
+      } else if (a) {
+        sx = a.sx; sy = a.sy;
+      } else if (map._lastClick) {
+        sx = map._lastClick.sx; sy = map._lastClick.sy;
+      }
       window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: 'infoCard' });
       return;
     }
@@ -1181,7 +1284,12 @@ const UI = (() => {
     const guard = (sidebar && !sidebar.classList.contains('collapsed')) ? 312 : 12;
     const r = map.canvas.getBoundingClientRect();
     let ax = r.left + r.width / 2, ay = r.top + r.height * 0.45;
-    if (map._lastClick) { ax = r.left + map._lastClick.sx; ay = r.top + map._lastClick.sy; }
+    if (currentMarker && currentMarker.px && map && map.m2s) {
+      const sp = map.m2s(currentMarker.px);
+      ax = r.left + sp[0]; ay = r.top + sp[1];
+    } else if (map._lastClick) {
+      ax = r.left + map._lastClick.sx; ay = r.top + map._lastClick.sy;
+    }
     const cw = card.offsetWidth || 300;
     const ch = Math.min(card.offsetHeight || 320, vh * 0.7);
     let left = ax + 20, top = ay - ch / 2;
@@ -1415,9 +1523,11 @@ const UI = (() => {
   function rgbToHex(rgb) {
     return '#' + rgb.map(v => (v & 255).toString(16).padStart(2, '0')).join('');
   }
+  let syncSettingsFn = null;
   function initStyle() {
     loadStyle();
     const box = $('settingsBox');
+    if (window.initCardDrag && box) window.initCardDrag(box);
     const openBox = () => { box.classList.remove('hidden'); syncStyle(); syncSettings(); };
     const closeBox = () => box.classList.add('hidden');
     $('btnSettings').addEventListener('click', () => {
@@ -1487,11 +1597,23 @@ const UI = (() => {
       document.querySelectorAll('#' + sel + ' .st-opt').forEach(b => b.classList.toggle('sel', b.dataset.v === v));
     };
     function syncSettings() {
+      syncSettingsFn = syncSettings;
+      setOptBtn('stLang', window.I18N ? window.I18N.getLang() : 'zh');
       setOptBtn('stDoneMode', S.s.doneMode);
       setOptBtn('stDragonPath', S.s.dragonPath ? 'show' : 'hide');
       const dlcOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().quest || window.EnemyTiers.dlcState().dlc2));
       setOptBtn('stDlcQuest', dlcOn ? 'show' : 'hide');
+      const masterOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().hardmode || window.EnemyTiers.dlcState().master));
+      setOptBtn('stMasterMode', masterOn ? 'show' : 'hide');
       $('stHideCats').classList.toggle('hidden', S.s.doneMode !== 'hide');
+      if (chipsWrap) {
+        chipsWrap.querySelectorAll('.st-chip').forEach(c => {
+          const key = c.dataset.cat;
+          if (key && window.I18N) {
+            c.textContent = window.I18N.t('cat.' + key);
+          }
+        });
+      }
     }
     // 类目 chips
     const chipsWrap = $('stHideChips');
@@ -1507,6 +1629,13 @@ const UI = (() => {
         S.save(); map.draw();
       });
       chipsWrap.appendChild(c);
+    });
+    // 界面语言切换
+    document.querySelectorAll('#stLang .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        if (window.I18N) window.I18N.setLang(b.dataset.v);
+        syncSettings();
+      });
     });
     // 已完成标记：灰化 / 隐藏
     document.querySelectorAll('#stDoneMode .st-opt').forEach(b => {
@@ -1528,6 +1657,17 @@ const UI = (() => {
         const show = b.dataset.v === 'show';
         if (window.EnemyTiers && window.EnemyTiers.setDlc) {
           window.EnemyTiers.setDlc('quest', show);
+        }
+        map.draw();
+        syncSettings();
+      });
+    });
+    // 大师模式专属怪（空中八爪怪等）
+    document.querySelectorAll('#stMasterMode .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        const show = b.dataset.v === 'show';
+        if (window.EnemyTiers && window.EnemyTiers.setDlc) {
+          window.EnemyTiers.setDlc('hardmode', show);
         }
         map.draw();
         syncSettings();
@@ -1592,13 +1732,17 @@ const UI = (() => {
       S.s.doneMode = S.D.doneMode;
       S.s.hideCats = Object.assign({}, S.D.hideCats);
       S.s.dragonPath = true; S.s.regionShow = true;
-      if (window.EnemyTiers && window.EnemyTiers.setDlc) window.EnemyTiers.setDlc('quest', false);
+      if (window.EnemyTiers && window.EnemyTiers.setDlc) {
+        window.EnemyTiers.setDlc('quest', false);
+        window.EnemyTiers.setDlc('hardmode', false);
+      }
       map.showRegions = true;
+      if (window.I18N) window.I18N.setLang('zh');
       S.save(); saveStyle(); map.draw(); syncStyle(); syncSettings();
       chipsWrap.querySelectorAll('.st-chip').forEach(c => {
         c.classList.toggle('on', !!S.s.hideCats[c.dataset.cat]);
       });
-      toast('设置已恢复默认');
+      toast(window.I18N ? window.I18N.t('toast.settingsReset') : '设置已恢复默认');
     });
   }
 
@@ -1645,5 +1789,27 @@ const UI = (() => {
     toastTimer = setTimeout(() => t.classList.remove('show'), ms || 2200);
   }
 
-  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn, refreshNavButton };
+  /* ---------- 语言切换响应 ---------- */
+  function onLangChange(lang) {
+    if (window.I18N && typeof window.I18N.updateDOM === 'function') {
+      window.I18N.updateDOM();
+    }
+    const btn = document.getElementById('btnSaveLoad');
+    if (btn && window.I18N) btn.textContent = window.I18N.t('save.loadBtn');
+    if (typeof syncStatsToggle === 'function') syncStatsToggle();
+    if (typeof syncSettingsFn === 'function') syncSettingsFn();
+    updateLayerList();
+    renderStats();
+    if (currentMarker) {
+      renderCard();
+    }
+    if (map && typeof map.draw === 'function') {
+      map.draw();
+    }
+  }
+
+  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn, refreshNavButton, onLangChange };
 })();
+
+window.UI = UI;
+

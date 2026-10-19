@@ -79,17 +79,57 @@
     return (k || '').replace(/\+\d+$/, '').replace(/-+$/, '');
   }
 
-  /* 悬停名称条文案：名字 + 掉落物（map.js _hoverLabel 对 camp 类型读 _name） */
+  var _towersCache = null;
+  function getTowers() {
+    if (_towersCache) return _towersCache;
+    if (typeof BOTW_DATA !== 'undefined' && BOTW_DATA.markers) {
+      _towersCache = BOTW_DATA.markers.filter(function (m) { return m.cat === 'tower' && m.px; });
+    }
+    return _towersCache || [];
+  }
+
+  function nearestTower(pt) {
+    if (!pt) return null;
+    var tws = getTowers();
+    var best = null, bd = 1e18;
+    for (var i = 0; i < tws.length; i++) {
+      var tw = tws[i];
+      var dx = tw.px[0] - pt[0], dy = tw.px[1] - pt[1];
+      var d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = tw; }
+    }
+    return best;
+  }
+
+  function getSubName(sub) {
+    if (window.I18N && window.I18N.t) {
+      return window.I18N.t('camp.sub.' + sub, SUB_NAME[sub] || sub);
+    }
+    return SUB_NAME[sub] || sub;
+  }
+
+  /* 悬停名称条文案：名字 + 掉落物（map.js _hoverLabel 对 camp 类型读 _name / _name_en） */
   var _labelCache = {};
-  function campLabel(c) {
-    if (_labelCache[c.i]) return _labelCache[c.i];
+  function campLabel(c, forceEn) {
+    var isEn = (forceEn != null) ? forceEn : (window.I18N && window.I18N.getLang() === 'en');
+    var cacheKey = c.i + (isEn ? '_en' : '_zh');
+    if (_labelCache[cacheKey]) return _labelCache[cacheKey];
+    var tw = nearestTower(c.loc && c.loc[0]);
+    var tName = tw ? (isEn ? (tw.en || tw.name) : tw.name) : '';
     var ws = (c.w || []).slice(0, 3).map(function (k) {
       var key = cleanWeaponKey(k);
       var w = DEX[key];
-      return (w && (w.name || w.en)) || '';
+      return (w && (isEn ? (w.en || w.name) : (w.name || w.en))) || '';
     }).filter(Boolean).join('/');
-    var more = (c.w || []).length > 3 ? ' 等' + c.w.length + '件' : '';
-    return (_labelCache[c.i] = (c.m || c.a || '怪物营地') + (ws ? ' · 掉 ' + ws + more : ''));
+    var more = (c.w || []).length > 3 ? (isEn ? ' +' + (c.w.length - 3) + ' more' : ' 等' + c.w.length + '件') : '';
+    var res;
+    if (isEn) {
+      var campTitle = 'Monster Camp' + (tName ? ' · ' + tName : '');
+      res = campTitle + (ws ? ' · Drop ' + ws + more : '');
+    } else {
+      res = (c.m || c.a || '怪物营地') + (ws ? ' · 掉 ' + ws + more : '');
+    }
+    return (_labelCache[cacheKey] = res);
   }
   var SUB_COLOR = { hot: '#e0703a', all: '#7d8fa6' };   /* hot 橙红 / 普通灰蓝 */
   var SUB_ORDER = ['hot', 'all'];
@@ -128,7 +168,7 @@
       var n = (sub === 'hot') ? (CW.hot || []).length : CW.all.length;
       var lp = r.querySelector('.lprog');
       if (lp) lp.textContent = n;
-      r.title = '点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）';
+      r.title = (window.I18N && window.I18N.getLang() === 'en') ? ('Click to toggle ' + getSubName(sub) + ' (' + n + ' camps)') : ('点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）');
     });
     if (ready && map) map.draw();
   }
@@ -163,11 +203,12 @@
       var r = document.createElement('div');
       r.className = 'lrow' + (cLayers[sub] ? ' on' : '');
       r.dataset.ccat = sub;
+      var sname = getSubName(sub);
       r.innerHTML =
         '<img class="lg-ic" src="' + PIN_ICON + '" alt="" loading="lazy">' +
-        '<span class="lname">' + SUB_NAME[sub] + '</span>' +
+        '<span class="lname">' + sname + '</span>' +
         '<span class="lprog">' + n + '</span>';
-      r.title = '点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）';
+      r.title = (window.I18N && window.I18N.getLang() === 'en') ? ('Click to toggle ' + sname + ' (' + n + ' camps)') : ('点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）');
       r.addEventListener('click', function () {
         cLayers[sub] = !cLayers[sub];
         r.classList.toggle('on', cLayers[sub]);
@@ -241,7 +282,7 @@
         }
       }
     });
-    return best ? { type: 'camp', camp: best.camp, entry: best, _r: best.camp, _name: campLabel(best.camp), _p: best.loc } : null;
+    return best ? { type: 'camp', camp: best.camp, entry: best, _r: best.camp, _name: campLabel(best.camp, false), _name_en: campLabel(best.camp, true), _p: best.loc } : null;
   }
 
   /* ---------- 定位：飞到营地首个刷点 ---------- */
@@ -271,21 +312,25 @@
   function weaponRow(rawKey) {
     var key = cleanWeaponKey(rawKey);
     var w = DEX[key];
-    var label = (w && (w.name || w.en)) || key;          /* dex 兜底链：name → en → key（9 条 name=null） */
+    var isEn = (window.I18N && window.I18N.getLang() === 'en');
+    var label = isEn ? ((w && (w.en || w.name)) || key) : ((w && (w.name || w.en)) || key);
     var meta = '';
     if (w) {
-      if (w.type === '盾' && w.guard != null) meta = '防御 ' + w.guard;
-      else if (w.atk != null) meta = '攻击 ' + w.atk;
+      if (w.type === '盾' && w.guard != null) meta = (isEn ? 'Def ' : '防御 ') + w.guard;
+      else if (w.atk != null) meta = (isEn ? 'Atk ' : '攻击 ') + w.atk;
     }
     var elem = (w && w.element && { '火': '#e8574a', '冰': '#5fb8e6', '雷': '#b48ce8' }[w.element]) || null;
+    var elemName = w && w.element ? (isEn ? ({ '火': 'Fire', '冰': 'Ice', '雷': 'Shock' }[w.element] || w.element) : w.element) : '';
     var elemHtml = elem
-      ? '<span class="q-badge-hard" style="background:' + elem + '22;border-color:' + elem + ';color:' + elem + '">' + esc(w.element) + '</span>'
+      ? '<span class="q-badge-hard" style="background:' + elem + '22;border-color:' + elem + ';color:' + elem + '">' + esc(elemName) + '</span>'
       : '';
-    var stub = (w && w.stub) ? '<span class="q-badge-hard" style="background:rgba(255,255,255,.1);border-color:#666;color:#aaa">待补充</span>' : '';
+    var stub = (w && w.stub) ? '<span class="q-badge-hard" style="background:rgba(255,255,255,.1);border-color:#666;color:#aaa">' + (isEn ? 'Pending' : '待补充') + '</span>' : '';
     return '<div class="fp-camp cp-wlink" data-wid="' + esc(key) + '" role="button" tabindex="0">' +
       '<span class="txt">' + esc(label) + (meta ? ' <i class="cp-wmeta">' + esc(meta) + '</i>' : '') + '</span>' +
       elemHtml + stub + '</div>';
   }
+
+  var curCamp = null, curCampEntry = null;
 
   function openCard(camp, entry) {
     var anchor = (entry && entry.loc) || (camp.loc && camp.loc[0]) || null;
@@ -293,6 +338,7 @@
     var body = document.getElementById('campCardBody');
     if (!card || !body || !camp) return;
     card.dataset.manual = '';
+    curCamp = camp; curCampEntry = entry;
     lastOpen = Date.now();
 
     /* 互斥：开营地卡时关 宝箱/装备/任务/信息 卡 */
@@ -301,37 +347,50 @@
       if (el) el.classList.add('hidden');
     });
 
+    var isEn = (window.I18N && window.I18N.getLang() === 'en');
     var h = '';
     var order = CAMP_IDX[camp.i] != null ? CAMP_IDX[camp.i] : 0;
+    var chipName = isEn ? 'Monster Camp #' + (order + 1) : '怪物营地 #' + (order + 1);
     h += '<div class="tk-grip">';
-    h += '<span class="tk-chip tk-chip-main">怪物营地 #' + (order + 1) + '</span>';
-    if (hotIds[camp.i]) h += '<span class="q-badge-hard" style="background:rgba(224,112,58,.16);border-color:#e0703a;color:#f09a68">精选刷点</span>';
+    h += '<span class="tk-chip tk-chip-main">' + chipName + '</span>';
+    if (hotIds[camp.i]) h += '<span class="q-badge-hard" style="background:rgba(224,112,58,.16);border-color:#e0703a;color:#f09a68">' + (isEn ? 'Featured Camp' : '精选刷点') + '</span>';
     h += '<span class="tk-grip-acts">' +
-      (order > 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpPrev" title="上一个营地">‹</button>' : '') +
-      (order < CAMP_ORDER.length - 1 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpNext" title="下一个营地">›</button>' : '') +
-      '<button type="button" class="tk-close" id="cpCardClose" title="关闭">×</button></span>';
+      (order > 0 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpPrev" title="' + (window.I18N ? window.I18N.t('card.prev', '上一个') : '上一个营地') + '">‹</button>' : '') +
+      (order < CAMP_ORDER.length - 1 ? '<button type="button" class="tk-icon-btn tk-nav" id="cpNext" title="' + (window.I18N ? window.I18N.t('card.next', '下一个') : '下一个营地') + '">›</button>' : '') +
+      '<button type="button" class="tk-close" id="cpCardClose" title="' + (window.I18N ? window.I18N.t('side.close', '关闭') : '关闭') + '">×</button></span>';
     h += '</div>';
-    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(camp.m || camp.a || '怪物营地') + '</h3>' +
-      '<button type="button" class="tk-copy" id="cpCopy" title="复制 #序号 + 名称">[复制]</button></div>';
-    if (camp.f && camp.f !== camp.m) h += '<div class="qcard-en">' + esc(camp.f) + '</div>';
+
+    var tw = nearestTower(anchor);
+    var mainTitle = isEn
+      ? ('Monster Camp · ' + (tw ? (tw.en || tw.name) : 'Hyrule'))
+      : (camp.m || camp.a || '怪物营地');
+    var subTitle = isEn
+      ? (window.I18N ? window.I18N.monsterOf(camp.m || camp.a || '') : (camp.m || camp.a || ''))
+      : (camp.f && camp.f !== camp.m ? camp.f : '');
+
+    h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(mainTitle) + '</h3>' +
+      '<button type="button" class="tk-copy" id="cpCopy" title="' + (isEn ? 'Copy #index + name' : '复制 #序号 + 名称') + '">' + (window.I18N ? window.I18N.t('card.copy', '[复制]') : '[复制]') + '</button></div>';
+    if (subTitle && subTitle !== mainTitle) h += '<div class="qcard-en">' + esc(subTitle) + '</div>';
+
     /* V1.6.5 修 Q3：t 字段与 m（标题怪物名）逐条相同（609/609），档位列纯重复——
        仅当将来数据出现 t≠m 才渲染；血月升档机制见卡内脚注 */
-    if (camp.t && camp.t !== camp.m) h += '<div class="tk-kv"><span class="tk-k">档位</span><span class="tk-v">' + esc(camp.t) + '</span></div>';
-    h += '<div class="tk-kv"><span class="tk-k">刷点</span><span class="tk-v">' + ((camp.loc || []).length) + ' 处</span></div>';
+    if (camp.t && camp.t !== camp.m) h += '<div class="tk-kv"><span class="tk-k">' + (isEn ? 'Tier' : '档位') + '</span><span class="tk-v">' + esc(camp.t) + '</span></div>';
+    h += '<div class="tk-kv"><span class="tk-k">' + (isEn ? 'Spots' : '刷点') + '</span><span class="tk-v">' + ((camp.loc || []).length) + (isEn ? ' spots' : ' 处') + '</span></div>';
     /* V1.6.4 实测反馈：机制提示（法师游荡 / 依盖队据点剧情性 / 血月重抽） */
     var isWizzrobe = !!(camp.a && camp.a.indexOf('Wizzrobe') >= 0);
     var isYiga = !!(camp.a && camp.a.indexOf('Assassin') >= 0);
-    if (isWizzrobe) h += '<div class="cp-foot">法师会游荡：找不到时在附近空域绕一圈找；被击杀后要等血月才会回来</div>';
-    if (isYiga) h += '<div class="cp-foot">依盖队据点是剧情场景：主线击败可盖大人后不再刷怪，地图上保留仅为刷点参考</div>';
-    h += '<div class="cp-foot">档位为静态布点初始档；血月后按击杀积分动态升档（黄金档为大师模式专属），手持武器也可能随血月按档位池重抽</div>';
+    if (isWizzrobe) h += '<div class="cp-foot">' + (isEn ? 'Wizzrobes wander around. Check nearby airspace if not found; respawns on Blood Moon.' : '法师会游荡：找不到时在附近空域绕一圈找；被击杀后要等血月才会回来') + '</div>';
+    if (isYiga) h += '<div class="cp-foot">' + (isEn ? 'Yiga Hideout is a story scenario: no monsters respawn after defeating Master Kohga; retained for reference.' : '依盖队据点是剧情场景：主线击败可盖大人后不再刷怪，地图上保留仅为刷点参考') + '</div>';
+    h += '<div class="cp-foot">' + (isEn ? 'Initial tier at world start. Dynamically scales with kill points after Blood Moon (Gold tier is Master Mode only). Weapons also scale with tier pool.' : '档位为静态布点初始档；血月后按击杀积分动态升档（黄金档为大师模式专属），手持武器也可能随血月按档位池重抽') + '</div>';
     var ws = camp.w || [];
-    h += '<div class="eq-camp-h">手持武器（= 击杀掉落）</div>';
+    h += '<div class="eq-camp-h">' + (isEn ? 'Weapons Held (= Drop on Defeat)' : '手持武器（= 击杀掉落）') + '</div>';
     if (ws.length) {
       ws.forEach(function (k) { h += weaponRow(k); });
     } else {
-      h += '<div class="cp-empty">不掉武器（该 Boss 击杀掉落素材）</div>';
+      h += '<div class="cp-empty">' + (isEn ? 'No weapon drops (Boss drops materials)' : '不掉武器（该 Boss 击杀掉落素材）') + '</div>';
     }
-    h += '<div class="tk-actions"><button type="button" class="btn act" id="cpLocate">定位</button></div>';
+    var tLocate = window.I18N ? window.I18N.t('card.locate', '定位') : '定位';
+    h += '<div class="tk-actions"><button type="button" class="btn act" id="cpLocate">' + tLocate + '</button></div>';
 
     body.innerHTML = h;
     card.classList.remove('hidden');
@@ -348,8 +407,8 @@
     var cpCp = document.getElementById('cpCopy');
     if (cpCp) cpCp.addEventListener('click', function (e) {
       e.stopPropagation();
-      var txt = '#' + (order + 1) + ' ' + (camp.m || camp.a || '怪物营地');
-      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt); if (typeof UI !== 'undefined' && UI.toast) UI.toast('已复制：' + txt); }
+      var txt = '#' + (order + 1) + ' ' + mainTitle;
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(txt); if (typeof UI !== 'undefined' && UI.toast) UI.toast((isEn ? 'Copied: ' : '已复制：') + txt); }
     });
     var pv2 = document.getElementById('cpPrev');
     if (pv2) pv2.addEventListener('click', function (e) { e.stopPropagation(); var n = CAMP_ORDER[order - 1]; if (n) openCard(n, entry); });
@@ -415,7 +474,11 @@
   /* V1.6.5：人工实测映射（上游布点缺失的点位）。Lynel23 = 大师模式/Mod 限定生成的人马
      （普通模式布点源无此条目），老大实测白鬃阶段掉兽神大剑+兽神弓（类型=双手剑+弓，升档类型不变） */
   var LYNEL_OVERRIDES = {
-    Lynel23: { w: ['Weapon_Lsword_018', 'Weapon_Bow_032'], note: '该点位为大师模式/Mod 限定生成，上游无布点数据；组合来自游戏实测' }
+    Lynel23: {
+      w: ['Weapon_Lsword_018', 'Weapon_Bow_032'],
+      note: '该点位为大师模式/Mod 限定生成，上游无布点数据；组合来自游戏实测',
+      note_en: 'Master Mode / Mod exclusive spawn (no upstream placement data; verified in-game).'
+    }
   };
 
   function enhanceLynelCard(mk) {
@@ -424,12 +487,14 @@
     if (!camps.length && !ov) return;
     var ce = document.getElementById('cardExtra');
     if (!ce) return;
+    var isEn = (window.I18N && window.I18N.getLang() === 'en');
     /* V1.6.5 修 Q1：卡片 Title 段已有「#N 怪物名」，段标题不再重复拼一遍 */
-    var h = '<div class="cp-lynel-h">营地掉落（手持武器 = 击杀掉落）</div>';
+    var h = '<div class="cp-lynel-h">' + (isEn ? 'Camp Drops (Weapons Held = Drop on Defeat)' : '营地掉落（手持武器 = 击杀掉落）') + '</div>';
     /* V1.6.6 / P5：掉落段直读当前 tier 营地（camps 武器已按世界档位解析，无需前端推导）；
        Lynel23（mod 点位，上游无布点）走 OVERRIDES 人工实测映射 */
     if (ov) {
-      if (ov.note) h += '<div class="cp-empty">' + esc(ov.note) + '</div>';
+      var noteText = (isEn && ov.note_en) ? ov.note_en : ov.note;
+      if (noteText) h += '<div class="cp-empty">' + esc(noteText) + '</div>';
       (ov.w || []).forEach(function (k) { h += weaponRow(k); });
     } else {
       camps.forEach(function (c) {
@@ -439,7 +504,7 @@
         if ((c.w || []).length) {
           (c.w || []).forEach(function (k) { h += weaponRow(k); });
         } else {
-          h += '<div class="cp-empty">不掉武器（该 Boss 击杀掉落素材）</div>';
+          h += '<div class="cp-empty">' + (isEn ? 'No weapon drops (Boss drops materials)' : '不掉武器（该 Boss 击杀掉落素材）') + '</div>';
         }
       });
     }
@@ -549,6 +614,23 @@
       var cc = document.getElementById('campCard');
       if (window.initCardDrag && cc) window.initCardDrag(cc);
       hookSelect();
+      if (window.I18N && window.I18N.onChange) {
+        window.I18N.onChange(function () {
+          _labelCache = {};
+          var rows = document.querySelectorAll('#layerList .lrow[data-ccat]');
+          Array.prototype.forEach.call(rows, function (r) {
+            var sub = r.dataset.ccat;
+            var ln = r.querySelector('.lname');
+            if (ln) ln.textContent = getSubName(sub);
+            var n = (sub === 'hot') ? (CW.hot || []).length : CW.all.length;
+            r.title = (window.I18N.getLang() === 'en') ? ('Click to toggle ' + getSubName(sub) + ' (' + n + ' camps)') : ('点击切换显示 / 隐藏 ' + SUB_NAME[sub] + '（' + n + ' 个营地）');
+          });
+          var card = document.getElementById('campCard');
+          if (card && !card.classList.contains('hidden') && curCamp) {
+            openCard(curCamp, curCampEntry);
+          }
+        });
+      }
       ready = true;
       if (window.console && console.log) console.log('[BOTWmap] camp.js v3 ready（图层钩子已注册）');
       map.draw();

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=59&b=1641016">
+<link rel="stylesheet" href="css/style.css?v=62&b=1641016">
 <style>
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
@@ -32,45 +32,45 @@
   <header id="topbar">
     <div class="brand">
       <div class="brand-text">
-        <h1>旷野之息 <em>互动地图</em></h1>
-        <p class="sub">简体中文 · 多图层同显 · 收集进度追踪 · 自定义标记</p>
+        <h1 data-i18n="app.title">旷野之息 <em>互动地图</em></h1>
+        <p class="sub" data-i18n="app.subtitle">简体中文 · 多图层同显 · 收集进度追踪 · 自定义标记</p>
       </div>
     </div>
     <div class="tools">
-      <button id="btnSidebar" class="tool" title="显示 / 隐藏图层面板"><span class="ico">☰</span><span class="label">图层</span></button>
-      <button id="btnPin" class="tool" title="在地图上添加自定义标记"><span class="ico">📍</span><span class="label">标记</span></button>
-      <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接"><span class="ico">🔗</span><span class="label">分享</span></button>
-      <button id="btnReset" class="tool" title="重置到全图视图"><span class="ico">🏠</span><span class="label">全图</span></button>
-      <button id="btnSettings" class="tool" title="地图设置（地名样式等）"><span class="ico">⚙️</span><span class="label">设置</span></button>
+      <button id="btnSidebar" class="tool" title="显示 / 隐藏图层面板" data-i18n-title="tool.layer.title"><span class="ico">☰</span><span class="label" data-i18n="tool.layer">图层</span></button>
+      <button id="btnPin" class="tool" title="在地图上添加自定义标记" data-i18n-title="tool.pin.title"><span class="ico">📍</span><span class="label" data-i18n="tool.pin">标记</span></button>
+      <button id="btnShare" class="tool" title="复制当前视图与图层状态的分享链接" data-i18n-title="tool.share.title"><span class="ico">🔗</span><span class="label" data-i18n="tool.share">分享</span></button>
+      <button id="btnReset" class="tool" title="重置到全图视图" data-i18n-title="tool.reset.title"><span class="ico">🏠</span><span class="label" data-i18n="tool.reset">全图</span></button>
+      <button id="btnSettings" class="tool" title="地图设置（地名样式等）" data-i18n-title="tool.settings.title"><span class="ico">⚙️</span><span class="label" data-i18n="tool.settings">设置</span></button>
     </div>
   </header>
 
   <!-- 侧栏 -->
   <aside id="sidebar" data-tab="explore">
     <div class="side-head">
-      <span>图层与搜索</span>
-      <button id="sideClose" class="card-close" title="收起面板">×</button>
+      <span data-i18n="side.title">图层与搜索</span>
+      <button id="sideClose" class="card-close" title="收起面板" data-i18n-title="side.close">×</button>
     </div>
     <!-- 侧栏 Tab（v1.1.7）：探索 = 搜索/组合/图层/探索度/存档；材料 = 材料·采集组 -->
     <div class="side-tabs" role="tablist">
-      <button type="button" class="side-tab active" data-tab="explore" role="tab" aria-selected="true">探索</button>
-      <button type="button" class="side-tab" data-tab="material" role="tab" aria-selected="false">材料</button>
+      <button type="button" class="side-tab active" data-tab="explore" role="tab" aria-selected="true" data-i18n="side.tab.explore">探索</button>
+      <button type="button" class="side-tab" data-tab="material" role="tab" aria-selected="false" data-i18n="side.tab.material">材料</button>
     </div>
     <!-- 探索搜索 -->
     <div class="search-wrap" id="exploreSearchWrap">
-      <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off">
+      <input id="searchInput" type="text" placeholder="搜索神庙 / 地名 / 任务 / 物品…" autocomplete="off" data-i18n-placeholder="search.placeholder">
       <div id="searchResults" class="hidden"></div>
     </div>
     <!-- 材料搜索（v1.1.8）：仅搜 74 种材料 -->
     <div class="search-wrap" id="matSearchWrap">
-      <input id="matSearchInput" type="text" placeholder="搜索材料（如：生命、松露）…" autocomplete="off">
+      <input id="matSearchInput" type="text" placeholder="搜索材料（如：生命、松露）…" autocomplete="off" data-i18n-placeholder="matsearch.placeholder">
       <div id="matSearchResults" class="hidden"></div>
     </div>
 
     <div class="layer-actions">
-      <button id="checkAll" class="mini">全选</button>
-      <button id="uncheckAll" class="mini">清空</button>
-      <button id="btnHideMark" class="mini" title="设置已完成标记是否隐藏">标记设置</button>
+      <button id="checkAll" class="mini" data-i18n="layer.checkAll">全选</button>
+      <button id="uncheckAll" class="mini" data-i18n="layer.uncheckAll">清空</button>
+      <button id="btnHideMark" class="mini" title="设置已完成标记是否隐藏" data-i18n="layer.markSettings" data-i18n-title="layer.markSettings.title">标记设置</button>
       <span id="layerCount" class="hint"></span>
     </div>
 
@@ -84,33 +84,33 @@
 
     <div class="save-upload">
       <div class="su-row">
-        <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）">📂 从存档加载进度…</button>
-        <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里">?</span>
+        <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）" data-i18n="save.loadBtn" data-i18n-title="save.loadBtn.title">📂 从存档加载进度…</button>
+        <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里" data-i18n-aria="save.help">?</span>
         <span class="su-clear-wrap">
           <button id="btnClearDone" type="button" class="su-clear" aria-label="清空旧存档数据">🧹</button>
-          <span class="su-clear-tip hidden" id="suClearTip">清空旧存档数据</span>
+          <span class="su-clear-tip hidden" id="suClearTip" data-i18n="save.clearTip">清空旧存档数据</span>
         </span>
       </div>
-      <div id="worldTierBadge" class="su-tier-badge hidden" title="世界档位根据存档击杀积分推算（官方缩放算法）"></div>
+      <div id="worldTierBadge" class="su-tier-badge hidden" title="世界档位根据存档击杀积分推算（官方缩放算法）" data-i18n-title="tier.badgeTitle"></div>
       <div class="su-tip hidden" id="suTip">
-        <b>存档文件：game_data.sav（Switch 与 Wii U·Cemu 同名，上传自动识别端序）</b>
-        <div>Ryujinx（Switch 模拟器）：<br><code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code></div>
-        <div class="su-tip-sub">进入游戏 ID 目录 <code>0000000000000008\0</code> 后还有一层存档槽文件夹（0、1、2…），挑文件修改时间最新的 <code>game_data.sav</code>；找不到时 Win+R 输入 <code>%APPDATA%\Ryujinx\bis\user\save</code> 逐步进入。</div>
-        <div>Cemu（Wii U）：<br><code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\1\game_data.sav</code></div>
-        <div class="su-tip-sub">同样先进入存档槽文件夹（0、1、2…）再挑 <code>game_data.sav</code>；<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。文件只在浏览器内解析，不会上传。</div>
+        <b data-i18n-html="save.tip.file">存档文件：game_data.sav（Switch 与 Wii U·Cemu 同名，上传自动识别端序）</b>
+        <div data-i18n-html="save.tip.ryu">Ryujinx（Switch 模拟器）：<br><code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code></div>
+        <div class="su-tip-sub" data-i18n-html="save.tip.ryuSub">进入游戏 ID 目录 <code>0000000000000008\0</code> 后还有一层存档槽文件夹（0、1、2…），挑文件修改时间最新的 <code>game_data.sav</code>；找不到时 Win+R 输入 <code>%APPDATA%\Ryujinx\bis\user\save</code> 逐步进入。</div>
+        <div data-i18n-html="save.tip.cemu">Cemu（Wii U）：<br><code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\1\game_data.sav</code></div>
+        <div class="su-tip-sub" data-i18n-html="save.tip.cemuSub">同样先进入存档槽文件夹（0、1、2…）再挑 <code>game_data.sav</code>；<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。文件只在浏览器内解析，不会上传。</div>
       </div>
       <input type="file" id="saveFile" accept=".sav" hidden>
     </div>
 
     <footer class="side-foot">
-      <p class="foot-version">BOTWMAP 1.6.7 © 2026 yalincc</p>
+      <p class="foot-version">BOTWMAP 1.7.0 © 2026 yalincc</p>
       <p>GitHub <a href="https://github.com/yalincc/BOTWmap" target="_blank" rel="noopener">https://github.com/yalincc/BOTWmap</a></p>
     </footer>
   </aside>
 
   <!-- 地图 -->
   <main id="mapArea">
-    <button id="sideCollapse" class="side-collapse" title="收起侧栏" aria-label="收起侧栏">‹</button>
+    <button id="sideCollapse" class="side-collapse" title="收起侧栏" aria-label="收起侧栏" data-i18n-title="side.collapse" data-i18n-aria="side.collapse">‹</button>
     <canvas id="mapCanvas"></canvas>
     <div id="mapTip" class="map-tip hidden"></div>
     <!-- V1.6.1 悬停名称条：鼠标划过点位时在左上角显示名称（不再弹卡，点击才弹） -->
@@ -122,37 +122,37 @@
       <span id="zoomPct">100%</span>
       <button id="zoomIn">＋</button>
       <button id="zoomOut">－</button>
-      <button id="zoomFit" title="重置视图">⌂</button>
-      <button id="btnFollow" class="live-follow" title="开启后视图跟随玩家位置">🎯</button>
-      <button id="btnMirror" class="live-follow" title="手机镜像：同一 WiFi 下扫码，手机/iPad 打开同一地图">📱</button>
+      <button id="zoomFit" title="重置视图" data-i18n-title="map.zoomFit">⌂</button>
+      <button id="btnFollow" class="live-follow" title="开启后视图跟随玩家位置" data-i18n-title="map.follow">🎯</button>
+      <button id="btnMirror" class="live-follow" title="手机镜像：同一 WiFi 下扫码，手机/iPad 打开同一地图" data-i18n-title="map.mirror">📱</button>
     </div>
 
     <div id="coordReadout">X: --  Z: --</div>
-    <div id="liveStatus" class="live-status off">● 未连接</div>
+    <div id="liveStatus" class="live-status off" data-i18n="map.unconnected">● 未连接</div>
     <div id="collectBar" class="hidden">
       <span>🧭 收集模式 · <b id="collectBarCat"></b></span>
       <span class="dim" id="collectBarProg"></span>
       <span id="collectBarCur"></span>
-      <button id="collectStop" type="button">结束</button>
+      <button id="collectStop" type="button" data-i18n="map.collectStop">结束</button>
     </div>
     <!-- 手机镜像面板（V1.5.0）：同一 WiFi 下扫码/复制链接，手机/iPad 打开同源地图 -->
     <div id="mirrorPanel" class="hidden">
       <button id="mirrorClose" type="button" class="mp-close" title="关闭">×</button>
-      <div class="mp-head">📱 手机镜像 · 同一 WiFi</div>
+      <div class="mp-head" data-i18n="map.mirrorTitle">📱 手机镜像 · 同一 WiFi</div>
       <div class="mp-qr"><img id="mirrorQr" alt="手机镜像二维码" src="" draggable="false"></div>
       <div class="mp-url-wrap">
         <input id="mirrorUrl" type="text" readonly spellcheck="false">
-        <button id="mirrorCopy" type="button" title="复制链接">复制</button>
+        <button id="mirrorCopy" type="button" title="复制链接" data-i18n="map.mirrorCopy">复制</button>
       </div>
-      <p class="mp-hint">手机打开后：红点跟随 / 点图标导航 / 收集进度与电脑一致</p>
+      <p class="mp-hint" data-i18n="map.mirrorHint">手机打开后：红点跟随 / 点图标导航 / 收集进度与电脑一致</p>
     </div>
     <div id="modeHint" class="hidden"></div>
     <div id="toast"></div>
 
     <!-- 自定义标记表单 -->
     <div id="pinForm" class="hidden">
-      <div class="pf-head">添加自定义标记</div>
-      <input id="pinName" type="text" placeholder="标记名称" maxlength="30">
+      <div class="pf-head" data-i18n="pin.title">添加自定义标记</div>
+      <input id="pinName" type="text" placeholder="标记名称" maxlength="30" data-i18n-placeholder="pin.placeholder">
       <div id="pinColors" class="pf-colors">
         <button class="sw" data-c="#ff5252" style="background:#ff5252"></button>
         <button class="sw" data-c="#ffd166" style="background:#ffd166"></button>
@@ -162,51 +162,51 @@
         <button class="sw" data-c="#ff9ad5" style="background:#ff9ad5"></button>
       </div>
       <div class="pf-actions">
-        <button id="pinOk" class="primary">确定</button>
-        <button id="pinCancel" class="ghost">取消</button>
+        <button id="pinOk" class="primary" data-i18n="pin.ok">确定</button>
+        <button id="pinCancel" class="ghost" data-i18n="pin.cancel">取消</button>
       </div>
     </div>
 
     <!-- 分享弹层 -->
     <div id="shareBox" class="hidden">
-      <div class="sb-head">分享当前地图视图
+      <div class="sb-head"><span data-i18n="share.title">分享当前地图视图</span>
         <button id="sbClose" class="card-close">×</button>
       </div>
-      <p class="sb-tip">链接包含当前图层与视图位置，打开即可看到同一画面。</p>
+      <p class="sb-tip" data-i18n="share.tip">链接包含当前图层与视图位置，打开即可看到同一画面。</p>
       <input id="shareUrl" type="text" readonly onclick="this.select()">
-      <button id="sbCopy" class="primary">复制链接</button>
+      <button id="sbCopy" class="primary" data-i18n="share.copy">复制链接</button>
     </div>
 
     <!-- 帮助弹窗（Q&A） -->
     <div id="helpBox" class="hidden">
-      <div class="sb-head">使用帮助 · Q&A
-        <button id="hbClose" class="card-close" title="关闭">×</button>
+      <div class="sb-head"><span data-i18n="help.title">使用帮助 · Q&A</span>
+        <button id="hbClose" class="card-close" title="关闭" data-i18n-title="common.close">×</button>
       </div>
       <div class="hq">
-        <h4>📂 加载存档进度（网页上传）</h4>
-        <p>存档文件：<code>game_data.sav</code>（Switch 与 Wii U·Cemu 同名，上传后自动识别端序），拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
-        <p>常见存档位置：</p>
-        <p>Cemu：<code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\&lt;槽&gt;\game_data.sav</code><br>Ryujinx / Eden：<code>%APPDATA%\Ryujinx\bis\user\save\...\01007EF00011E000\&lt;槽&gt;\game_data.sav</code></p>
-        <p class="hq-note">中间的用户/标题 ID 目录每个人不一样；找不到时按 <code>Win + R</code> 粘贴上面的根路径回车，逐层进到 <code>game_data.sav</code> 为止。<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。</p>
+        <h4 data-i18n="help.q1">📂 加载存档进度（网页上传）</h4>
+        <p data-i18n-html="help.a1_1">存档文件：<code>game_data.sav</code>（Switch 与 Wii U·Cemu 同名，上传后自动识别端序），拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
+        <p data-i18n="help.a1_2">常见存档位置：</p>
+        <p data-i18n-html="help.a1_3">Cemu：<code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\&lt;槽&gt;\game_data.sav</code><br>Ryujinx / Eden：<code>%APPDATA%\Ryujinx\bis\user\save\...\01007EF00011E000\&lt;槽&gt;\game_data.sav</code></p>
+        <p class="hq-note" data-i18n-html="help.a1_note">中间的用户/标题 ID 目录每个人不一样；找不到时按 <code>Win + R</code> 粘贴上面的根路径回车，逐层进到 <code>game_data.sav</code> 为止。<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。</p>
         <hr>
-        <h4>🔄 进度是怎么同步的</h4>
-        <p>上传存档后，浏览器本地解析出神庙 / 塔 / 克洛格 / 主线回忆 / 神兽的收集状态，写进本机浏览器，<b>离线再打开也保留</b>。</p>
-        <p>用 <b>xnavi</b> 实时定位时，进度自动同步：xnavi 每 2 秒检查你的存档文件，<b>游戏保存后 ≤2 秒自动刷新</b>，与上传共用同一套进度；手动勾选是叠加，不会冲突，<b>以存档为准</b>。</p>
+        <h4 data-i18n="help.q2">🔄 进度是怎么同步的</h4>
+        <p data-i18n-html="help.a2_1">上传存档后，浏览器本地解析出神庙 / 塔 / 克洛格 / 主线回忆 / 神兽的收集状态，写进本机浏览器，<b>离线再打开也保留</b>。</p>
+        <p data-i18n-html="help.a2_2">用 <b>xnavi</b> 实时定位时，进度自动同步：xnavi 每 2 秒检查你的存档文件，<b>游戏保存后 ≤2 秒自动刷新</b>，与上传共用同一套进度；手动勾选是叠加，不会冲突，<b>以存档为准</b>。</p>
         <hr>
-        <h4>🧭 xnavi 实时定位（本机）</h4>
-        <p>下载 <a href="https://github.com/yalincc/BOTWmap/releases" target="_blank" rel="noopener">xnavi</a> 解压，先启动模拟器进游戏，双击 <code>xnavi.exe</code> → 开始定位。支持 <b>Cemu / Ryujinx / Eden</b> 三平台，自动识别，几秒锁定；游戏里走路/滑翔/传送，网页红点实时跟随。</p>
-        <p>存档自动探测；自动找不到时，在 xnavi 设置里手动填对应平台的 BOTW 存档路径即可。</p>
-        <p>回忆 / 克洛格标注的卡片里有「收集」按钮：开启后自动导航到离你最近的未收集点，收集完成（游戏内保存或手动勾选）自动前往下一个；底部横幅「结束」可随时退出。</p>
+        <h4 data-i18n="help.q3">🧭 xnavi 实时定位（本机）</h4>
+        <p data-i18n-html="help.a3_1">下载 <a href="https://github.com/yalincc/BOTWmap/releases" target="_blank" rel="noopener">xnavi</a> 解压，先启动模拟器进游戏，双击 <code>xnavi.exe</code> → 开始定位。支持 <b>Cemu / Ryujinx / Eden</b> 三平台，自动识别，几秒锁定；游戏里走路/滑翔/传送，网页红点实时跟随。</p>
+        <p data-i18n-html="help.a3_2">存档自动探测；自动找不到时，在 xnavi 设置里手动填对应平台的 BOTW 存档路径即可。</p>
+        <p data-i18n-html="help.a3_3">回忆 / 克洛格标注的卡片里有「收集」按钮：开启后自动导航到离你最近的未收集点，收集完成（游戏内保存或手动勾选）自动前往下一个；底部横幅「结束」可随时退出。</p>
         <hr>
-        <h4>📁 存档 Q&A（xnavi）</h4>
-        <p><b>提示 "no usable save anchor found"？</b> 找不到可用存档（定位锚点 + 进度同步都需要它）。通常是：模拟器目录不常见 → 设置里手动填存档路径；游戏还没保存过 → 进游戏存一次档。</p>
-        <p><b>存档槽 0-5 加载哪个？</b> xnavi 自动取最近修改的槽（BOTW 轮转写 6 槽，最近写过的最接近当前状态）；不同槽是不同时刻的存档，不要手动指定旧槽，否则进度会显示旧数据。</p>
-        <p><b>红点是读存档还是内存？</b> 读内存（只读不修改游戏），存档只做定位辅助判据 + 进度来源。</p>
+        <h4 data-i18n="help.q4">📁 存档 Q&A（xnavi）</h4>
+        <p data-i18n-html="help.a4_1"><b>提示 "no usable save anchor found"？</b> 找不到可用存档（定位锚点 + 进度同步都需要它）。通常是：模拟器目录不常见 → 设置里手动填存档路径；游戏还没保存过 → 进游戏存一次档。</p>
+        <p data-i18n-html="help.a4_2"><b>存档槽 0-5 加载哪个？</b> xnavi 自动取最近修改的槽（BOTW 轮转写 6 槽，最近写过的最接近当前状态）；不同槽是不同时刻的存档，不要手动指定旧槽，否则进度会显示旧数据。</p>
+        <p data-i18n-html="help.a4_3"><b>红点是读存档还是内存？</b> 读内存（只读不修改游戏），存档只做定位辅助判据 + 进度来源。</p>
         <hr>
-        <h4>❓ 常见问题</h4>
-        <p>为什么宝箱 / 英杰·EX 回忆一直是 0？—— 这两类在存档里没有逐项记录，只能手动勾选。</p>
-        <p>克洛格计数器和实际数量不一致？—— 以游戏内实际收集为准（逐项记录），计数器仅供参考。</p>
-        <p>手机上能用吗？—— 能，上传存档即可；实时定位（红点跟随）仅限本机 xnavi。</p>
+        <h4 data-i18n="help.q5">❓ 常见问题</h4>
+        <p data-i18n="help.a5_1">为什么宝箱 / 英杰·EX 回忆一直是 0？—— 这两类在存档里没有逐项记录，只能手动勾选。</p>
+        <p data-i18n="help.a5_2">克洛格计数器和实际数量不一致？—— 以游戏内实际收集为准（逐项记录），计数器仅供参考。</p>
+        <p data-i18n="help.a5_3">手机上能用吗？—— 能，上传存档即可；实时定位（红点跟随）仅限本机 xnavi。</p>
       </div>
     </div>
 
@@ -220,97 +220,114 @@
 
     <!-- 设置弹层（V1.6.6：行为开关优先，地名样式折叠收起） -->
     <div id="settingsBox" class="hidden">
-      <div class="sb-head">地图设置
+      <div class="sb-head"><span data-i18n="settings.title">地图设置</span>
         <button id="stClose" class="card-close">×</button>
+      </div>
+
+      <!-- 界面语言 / Language -->
+      <div class="st-group">
+        <div class="st-label" data-i18n="settings.lang">界面语言 / Language</div>
+        <div class="st-options" id="stLang">
+          <button class="st-opt" data-v="zh" data-i18n="settings.lang.zh">简体中文</button>
+          <button class="st-opt" data-v="en" data-i18n="settings.lang.en">English</button>
+        </div>
       </div>
 
       <!-- 完成标记：默认 / 隐藏 + 类目 chips -->
       <div class="st-group">
-        <div class="st-label">完成标记</div>
+        <div class="st-label" data-i18n="settings.doneMode">完成标记</div>
         <div class="st-options" id="stDoneMode">
-          <button class="st-opt" data-v="dim">默认</button>
-          <button class="st-opt" data-v="hide">隐藏</button>
+          <button class="st-opt" data-v="dim" data-i18n="settings.doneMode.default">默认</button>
+          <button class="st-opt" data-v="hide" data-i18n="settings.doneMode.hide">隐藏</button>
         </div>
         <div class="st-cats hidden" id="stHideCats">
-          <div class="st-slabel" style="width:auto">完成标记类型</div>
+          <div class="st-slabel" style="width:auto" data-i18n="settings.doneCats">完成标记类型</div>
           <div class="st-chips" id="stHideChips"></div>
         </div>
       </div>
 
       <div class="st-group">
-        <div class="st-label">龙的轨迹</div>
+        <div class="st-label" data-i18n="settings.dragonPath">龙的轨迹</div>
         <div class="st-options" id="stDragonPath">
-          <button class="st-opt" data-v="show">显示</button>
-          <button class="st-opt" data-v="hide">隐藏</button>
+          <button class="st-opt" data-v="show" data-i18n="settings.show">显示</button>
+          <button class="st-opt" data-v="hide" data-i18n="settings.hide">隐藏</button>
         </div>
       </div>
 
       <div class="st-group">
-        <div class="st-label">DLC2 任务怪（一击剑）</div>
+        <div class="st-label" data-i18n="settings.dlcQuest">DLC2 任务怪（一击剑）</div>
         <div class="st-options" id="stDlcQuest">
-          <button class="st-opt" data-v="hide">隐藏（默认）</button>
-          <button class="st-opt" data-v="show">显示</button>
+          <button class="st-opt" data-v="hide" data-i18n="settings.dlcQuest.hide">隐藏（默认）</button>
+          <button class="st-opt" data-v="show" data-i18n="settings.dlcQuest.show">显示</button>
         </div>
       </div>
 
       <div class="st-group">
-        <div class="st-label">地名显示</div>
+        <div class="st-label" data-i18n="st.masterMode.label">大师模式专属怪（空中八爪怪等）</div>
+        <div class="st-options" id="stMasterMode">
+          <button class="st-opt" data-v="hide" data-i18n="settings.dlcQuest.hide">隐藏（默认）</button>
+          <button class="st-opt" data-v="show" data-i18n="settings.dlcQuest.show">显示</button>
+        </div>
+      </div>
+
+      <div class="st-group">
+        <div class="st-label" data-i18n="settings.regionShow">地名显示</div>
         <div class="st-options" id="stShowOptions">
-          <button class="st-opt" data-v="show">显示</button>
-          <button class="st-opt" data-v="hide">隐藏</button>
+          <button class="st-opt" data-v="show" data-i18n="settings.show">显示</button>
+          <button class="st-opt" data-v="hide" data-i18n="settings.hide">隐藏</button>
         </div>
       </div>
 
       <!-- 地名文字样式：低频微调，默认折叠 -->
       <div class="st-group">
-        <button type="button" id="stStyleToggle" class="st-fold">地名文字样式 <span id="stStyleTri">▸</span></button>
+        <button type="button" id="stStyleToggle" class="st-fold"><span data-i18n="settings.regionStyle">地名文字样式</span> <span id="stStyleTri">▸</span></button>
         <div id="stStyleBody" class="hidden">
       <div class="st-group">
-        <div class="st-label">地名文字颜色</div>
+        <div class="st-label" data-i18n="settings.txColor">地名文字颜色</div>
         <div class="st-options" id="stTxOptions">
-          <button class="st-opt" data-v="default">默认（金褐）</button>
-          <button class="st-opt" data-v="#000000">黑</button>
-          <button class="st-opt" data-v="#ffffff">白</button>
-          <label class="st-opt st-picker">自定义<input type="color" id="stTxColor"></label>
+          <button class="st-opt" data-v="default" data-i18n="settings.txColor.default">默认（金褐）</button>
+          <button class="st-opt" data-v="#000000" data-i18n="settings.color.black">黑</button>
+          <button class="st-opt" data-v="#ffffff" data-i18n="settings.color.white">白</button>
+          <label class="st-opt st-picker"><span data-i18n="settings.color.custom">自定义</span><input type="color" id="stTxColor"></label>
         </div>
         <div class="st-row">
-          <span class="st-slabel">文字透明度</span>
+          <span class="st-slabel" data-i18n="settings.txAlpha">文字透明度</span>
           <input type="range" id="stTxAlpha" min="0" max="100" value="100">
           <span id="stTxAlphaV" class="st-sval">100%</span>
         </div>
       </div>
       <div class="st-group">
-        <div class="st-label">地名文字大小</div>
+        <div class="st-label" data-i18n="settings.fontSize">地名文字大小</div>
         <div class="st-options" id="stSizeOptions">
-          <button class="st-opt" data-v="small">小</button>
-          <button class="st-opt" data-v="medium">中</button>
-          <button class="st-opt" data-v="large">大</button>
+          <button class="st-opt" data-v="small" data-i18n="settings.size.small">小</button>
+          <button class="st-opt" data-v="medium" data-i18n="settings.size.medium">中</button>
+          <button class="st-opt" data-v="large" data-i18n="settings.size.large">大</button>
         </div>
       </div>
       <div class="st-group">
-        <div class="st-label">地名文字描边</div>
+        <div class="st-label" data-i18n="settings.stroke">地名文字描边</div>
         <div class="st-options" id="stStrokeOptions">
-          <button class="st-opt" data-v="none">无</button>
-          <button class="st-opt" data-v="#000000">黑</button>
-          <button class="st-opt" data-v="#ffffff">白</button>
-          <label class="st-opt st-picker">自定义<input type="color" id="stStrokeColor"></label>
+          <button class="st-opt" data-v="none" data-i18n="settings.stroke.none">无</button>
+          <button class="st-opt" data-v="#000000" data-i18n="settings.color.black">黑</button>
+          <button class="st-opt" data-v="#ffffff" data-i18n="settings.color.white">白</button>
+          <label class="st-opt st-picker"><span data-i18n="settings.color.custom">自定义</span><input type="color" id="stStrokeColor"></label>
         </div>
         <div class="st-row">
-          <span class="st-slabel">描边粗细</span>
+          <span class="st-slabel" data-i18n="settings.strokeWidth">描边粗细</span>
           <input type="range" id="stStrokeWidth" min="0" max="6" step="0.5" value="3">
           <span id="stStrokeWidthV" class="st-sval">3</span>
         </div>
       </div>
       <div class="st-group">
-        <div class="st-label">地名底色</div>
+        <div class="st-label" data-i18n="settings.bgColor">地名底色</div>
         <div class="st-options" id="stBgOptions">
-          <button class="st-opt" data-v="default">默认（无底）</button>
-          <button class="st-opt" data-v="#000000">黑</button>
-          <button class="st-opt" data-v="#ffffff">白</button>
-          <label class="st-opt st-picker">自定义<input type="color" id="stBgColor"></label>
+          <button class="st-opt" data-v="default" data-i18n="settings.bgColor.default">默认（无底）</button>
+          <button class="st-opt" data-v="#000000" data-i18n="settings.color.black">黑</button>
+          <button class="st-opt" data-v="#ffffff" data-i18n="settings.color.white">白</button>
+          <label class="st-opt st-picker"><span data-i18n="settings.color.custom">自定义</span><input type="color" id="stBgColor"></label>
         </div>
         <div class="st-row">
-          <span class="st-slabel">底色透明度</span>
+          <span class="st-slabel" data-i18n="settings.bgAlpha">底色透明度</span>
           <input type="range" id="stBgAlpha" min="0" max="100" value="0">
           <span id="stBgAlphaV" class="st-sval">0%</span>
         </div>
@@ -318,7 +335,7 @@
         </div>
       </div>
       <div class="st-foot">
-        <button id="stReset" class="mini">恢复默认设置</button>
+        <button id="stReset" class="mini" data-i18n="settings.reset">恢复默认设置</button>
       </div>
     </div>
 
@@ -333,17 +350,17 @@
       </div>
       <div class="tk-title-row">
         <h3 id="cardName" class="fd-card-name tk-name"></h3>
-        <button type="button" class="tk-copy" id="cardCopyBtn" title="复制名称">[复制]</button>
+        <button type="button" class="tk-copy" id="cardCopyBtn" title="复制名称" data-i18n="card.copy" data-i18n-title="card.copy.title">[复制]</button>
       </div>
       <div id="cardEn" class="card-en fd-card-en qcard-en"></div>
       <!-- 材料卡片：图鉴图 + 区域/坐标/位置 meta + 用途 -->
       <img id="cardImg" class="card-img hidden" src="" alt="">
       <div id="cardMeta" class="card-meta hidden">
-        <div class="meta-row fd-row"><span class="meta-label fd-l">区域</span><span class="meta-val fd-v" id="cardMetaRegion"></span></div>
-        <div class="meta-row fd-row"><span class="meta-label fd-l">坐标</span><span class="meta-val fd-v fd-num" id="cardMetaCoord"></span></div>
-        <div class="meta-row fd-row"><span class="meta-label fd-l">位置</span><span class="meta-val fd-v" id="cardMetaPos"></span></div>
+        <div class="meta-row fd-row"><span class="meta-label fd-l" data-i18n="card.region">区域</span><span class="meta-val fd-v" id="cardMetaRegion"></span></div>
+        <div class="meta-row fd-row"><span class="meta-label fd-l" data-i18n="card.coord">坐标</span><span class="meta-val fd-v fd-num" id="cardMetaCoord"></span></div>
+        <div class="meta-row fd-row"><span class="meta-label fd-l" data-i18n="card.pos">位置</span><span class="meta-val fd-v" id="cardMetaPos"></span></div>
       </div>
-      <div id="cardUsage" class="card-usage fd-row hidden"><span class="usage-label fd-l">用途</span><span id="cardUsageVal" class="fd-v fd-v-accent"></span></div>
+      <div id="cardUsage" class="card-usage fd-row hidden"><span class="usage-label fd-l" data-i18n="card.usage">用途</span><span id="cardUsageVal" class="fd-v fd-v-accent"></span></div>
       <div class="card-body">
         <div id="cardRegion" class="row fd-row"></div>
         <div id="cardTower" class="row fd-row"></div>
@@ -352,11 +369,11 @@
         <div id="cardExtra"></div>
       </div>
       <div class="card-actions fd-actions">
-        <button id="cardNav" class="primary nav hidden">导航</button>
-        <button id="cardCollect" class="primary collect hidden">收集</button>
-        <button id="cardDone" class="primary">标记完成</button>
-        <button id="cardUndone" class="ghost hidden">标记为未完成</button>
-        <button id="cardDelPin" class="danger hidden">删除标记</button>
+        <button id="cardNav" class="primary nav hidden" data-i18n="card.nav">导航</button>
+        <button id="cardCollect" class="primary collect hidden" data-i18n="card.collect">收集</button>
+        <button id="cardDone" class="primary" data-i18n="card.done">标记完成</button>
+        <button id="cardUndone" class="ghost hidden" data-i18n="card.undone">标记为未完成</button>
+        <button id="cardDelPin" class="danger hidden" data-i18n="card.delPin">删除标记</button>
       </div>
     </div>
   
@@ -383,6 +400,10 @@
 
 </div>
 
+<script src="data/i18n/zh.js?v=5&b=1641016"></script>
+<script src="data/i18n/en.js?v=6&b=1641016"></script>
+<script src="data/i18n/quests_en.js?v=1&b=1641016"></script>
+<script src="js/i18n.js?v=4&b=1641016"></script>
 <script src="js/data.js?v=5&b=1641016"></script>
 <script src="js/enemies.js?v=3&b=1641016"></script>
 <!-- 官方缩放链 tier 视图数据件与混装模块（§12 官方缩放） -->
@@ -393,17 +414,17 @@
 <script src="data/enemy-tiers/tier-3.js?v=1&b=1641016"></script>
 <script src="data/enemy-tiers/quest.js?v=1&b=1641016"></script>
 <script src="data/enemy-tiers/hardmode.js?v=1&b=1641016"></script>
-<script src="js/enemy-tiers.js?v=3&b=1641016"></script>
+<script src="js/enemy-tiers.js?v=5&b=1641016"></script>
 <script src="js/dragon_paths.js?v=3&b=1641016"></script>
 <script src="js/koroks.js?v=1&b=1641016"></script>
 <script src="js/korok_paths.js?v=1&b=1641016"></script>
 <script src="js/supercluster.min.js"></script>
 <script src="js/materials.js?v=1&b=1641016"></script>
-<script src="js/regions.js?v=rn5&b=1641016"></script>
-<script src="js/map.js?v=45&b=1641016"></script>
-<script src="js/card-layout.js?v=5&b=1641016"></script>
+<script src="js/regions.js?v=rn6&b=1641016"></script>
+<script src="js/map.js?v=48&b=1641016"></script>
+<script src="js/card-layout.js?v=6&b=1641016"></script>
 <script src="js/spot-mark.js?v=1&b=1641016"></script>
-<script src="js/ui.js?v=69&b=1641016"></script>
+<script src="js/ui.js?v=75&b=1641016"></script>
 <script src="js/main.js?v=11&b=1641016"></script>
 <script src="js/live.js?v=18&b=1641016"></script>
 <script src="data/save_flags.js?v=1&b=1641016"></script>
@@ -413,26 +434,26 @@
 <script src="data/enemy_save.js?v=1&b=1641016"></script>
 <script src="data/pb_lists.js?v=1&b=1641016"></script>
 <script src="data/weapon_collect_save.js?v=2&b=1641016"></script>
-<script src="js/save_upload.js?v=28&b=1641016"></script>
+<script src="js/save_upload.js?v=30&b=1641016"></script>
 <script src="data/quests.js?v=8&b=1641016"></script>
 <!-- V1.6.2 · M3：任务板块拆 5 模块（data → done → canvas → flow → panel → card），quest.js 只做装配 + 门面 -->
-<script src="js/quest/quest-data.js?v=1&b=1641016"></script>
+<script src="js/quest/quest-data.js?v=2&b=1641016"></script>
 <script src="js/quest/quest-done.js?v=3&b=1641016"></script>
 <script src="js/quest/quest-canvas.js?v=3&b=1641016"></script>
 <script src="js/quest/quest-flow.js?v=3&b=1641016"></script>
-<script src="js/quest/quest-panel.js?v=3&b=1641016"></script>
-<script src="js/quest/quest-card.js?v=7&b=1641016"></script>
+<script src="js/quest/quest-panel.js?v=6&b=1641016"></script>
+<script src="js/quest/quest-card.js?v=11&b=1641016"></script>
 <script src="js/quest.js?v=25&b=1641016"></script>
 <!-- P4a：武器图鉴库（196 条，含营地来源）+ 营地刷点表（卡片内定位反查，L3 图层属 P4c） -->
-<script src="data/weapon_dex.js?v=1&b=1641016"></script>
+<script src="data/weapon_dex.js?v=2&b=1641016"></script>
 <script src="data/weapons.js?v=1&b=1641016"></script>
 <script src="data/armors.js?v=1&b=1641016"></script>
 <script src="data/camp_weapons.js?v=1&b=1641016"></script>
-<script src="js/equip.js?v=30&b=1641016"></script>
+<script src="js/equip.js?v=33&b=1641016"></script>
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
-<script src="data/chests.js?v=1&b=1641016"></script>
-<script src="js/chest.js?v=20&b=1641016"></script>
-<script src="js/camp.js?v=17&b=1641016"></script>
+<script src="data/chests.js?v=2&b=1641016"></script>
+<script src="js/chest.js?v=22&b=1641016"></script>
+<script src="js/camp.js?v=20&b=1641016"></script>
 </body>
 </html>
 

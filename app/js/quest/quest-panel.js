@@ -26,12 +26,12 @@
     var g = document.createElement('div');
     g.className = 'lg';
     var gLabel = document.createElement('span');
-    gLabel.textContent = '任务';
+    gLabel.textContent = (global.I18N && global.I18N.t) ? global.I18N.t('group.任务', '任务') : '任务';
     var gBtn = document.createElement('button');
     gBtn.type = 'button';
     gBtn.className = 'lg-btn';
     gBtn.dataset.group = '任务';
-    gBtn.title = '一键勾选 / 取消本组全部任务分类';
+    gBtn.title = (global.I18N && global.I18N.getLang() === 'en') ? 'Toggle all quests' : '一键勾选 / 取消本组全部任务分类';
     g.appendChild(gLabel); g.appendChild(gBtn);
     grp.appendChild(g);
     var lrows = document.createElement('div');
@@ -44,15 +44,20 @@
       var row = document.createElement('div');
       row.className = 'lrow' + (D.qLayers[cat] ? ' on' : '');
       row.dataset.qcat = cat;
+      var cname = D.catName(cat);
       row.innerHTML =
         '<img class="lg-ic" src="' + D.CAT_ICON[cat] + '" alt="" loading="lazy">' +
-        '<span class="lname">' + D.CAT_NAME[cat] + '</span>' +
+        '<span class="lname">' + cname + '</span>' +
         '<span class="lprog" id="qprog_' + cat + '">' + done + '/' + total + '</span>';
-      row.title = '点击整行切换显示 / 隐藏';
+      row.title = (global.I18N && global.I18N.getLang() === 'en') ? ('Click row to toggle (' + cname + ')') : '点击整行切换显示 / 隐藏';
       if (cat === 'dlc') {
         var g1 = 0, g2 = 0, gc = 0;
         D.QUESTS.forEach(function (q) { if (q.dlc === '1') g1++; else if (q.dlc === '2') g2++; else if (q.dlc) gc++; });
-        row.title = 'DLC1 ' + g1 + ' 项 · DLC2 ' + g2 + ' 项 · 联动 ' + gc + ' 项（联动任务无地图点，宝箱见「探索收集」组）';
+        if (global.I18N && global.I18N.getLang() === 'en') {
+          row.title = 'DLC1: ' + g1 + ' · DLC2: ' + g2 + ' · Collab: ' + gc;
+        } else {
+          row.title = 'DLC1 ' + g1 + ' 项 · DLC2 ' + g2 + ' 项 · 联动 ' + gc + ' 项（联动任务无地图点，宝箱见「探索收集」组）';
+        }
       }
       row.addEventListener('click', function () {
         D.toggleLayer(cat);
@@ -70,6 +75,20 @@
       grp.querySelectorAll('.lrow[data-qcat]').forEach(function (r) { r.classList.toggle('on', !allOn); });
     });
     if (global.__syncLayerBtns) global.__syncLayerBtns();
+
+    if (global.I18N && global.I18N.onChange) {
+      global.I18N.onChange(function () {
+        var gEl = grp.querySelector('.lg span');
+        if (gEl) gEl.textContent = global.I18N.t('group.任务', '任务');
+        gBtn.title = (global.I18N.getLang() === 'en') ? 'Toggle all quests' : '一键勾选 / 取消本组全部任务分类';
+        grp.querySelectorAll('.lrow[data-qcat]').forEach(function (r) {
+          var cat = r.dataset.qcat;
+          var ln = r.querySelector('.lname');
+          if (ln) ln.textContent = D.catName(cat);
+          r.title = (global.I18N.getLang() === 'en') ? ('Click row to toggle (' + D.catName(cat) + ')') : '点击整行切换显示 / 隐藏';
+        });
+      });
+    }
 
     /* 完成态变化时刷新 4 行计数（卡片标记 / 载入存档后调用） */
     global._questRefreshRows = function () {

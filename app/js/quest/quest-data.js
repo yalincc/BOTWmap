@@ -89,9 +89,17 @@
     } catch (e) {}
   }
 
+  function catName(cat) {
+    if (global.I18N && global.I18N.t) {
+      return global.I18N.t('quest.cat.' + cat, CAT_NAME[cat] || cat);
+    }
+    return CAT_NAME[cat] || cat;
+  }
+
   global.QuestData = {
     QUESTS: QUESTS,
     CAT_NAME: CAT_NAME,
+    catName: catName,
     CAT_COLOR: CAT_COLOR,
     CAT_ORDER: CAT_ORDER,
     CAT_ICON: CAT_ICON,

@@ -103,7 +103,10 @@ const SAVE_UPLOAD = (() => {
         clearBtn.addEventListener('blur', () => clearTip.classList.add('hidden'));
       }
       clearBtn.addEventListener('click', () => {
-        if (!confirm('确定清空本地探索度记录？\n将清除本机保存的完成标记（历史存档累计与手动勾选）。\n自定义标记与在线存档同步不受影响。')) return;
+        const confirmMsg = (window.I18N && window.I18N.t)
+          ? window.I18N.t('save.clearConfirm', '确定清空本地探索度记录？\n将清除本机保存的完成标记（历史存档累计与手动勾选）。\n自定义标记与在线存档同步不受影响。')
+          : '确定清空本地探索度记录？\n将清除本机保存的完成标记（历史存档累计与手动勾选）。\n自定义标记与在线存档同步不受影响。';
+        if (!confirm(confirmMsg)) return;
         map.doneSet = new Set();
         try { localStorage.removeItem('botwmap.done.v1'); } catch (e) {}
         window.__saveCounts = null;   // V1.6.4：扩展同步行一并撤下
@@ -125,7 +128,10 @@ const SAVE_UPLOAD = (() => {
         map.draw();
         UI.renderStats();
         UI.updateLayerList();
-        UI.toast('已清空本地探索度记录');
+        const toastMsg = (window.I18N && window.I18N.t)
+          ? window.I18N.t('save.clearedToast', '已清空本地探索度记录')
+          : '已清空本地探索度记录';
+        UI.toast(toastMsg);
       });
     }
 
@@ -297,10 +303,10 @@ const SAVE_UPLOAD = (() => {
     const ES = (typeof ENEMY_SAVE !== 'undefined') ? ENEMY_SAVE : null;
     if (!ES || !ES.hash2pt) { console.warn('[save_upload] ENEMY_SAVE 讨伐查找表未加载：index.html 未引入 data/enemy_save.js？'); return; }
     enemyHash2pt = ES.hash2pt;
-    const famDefs = [['西诺克斯', 'hinox'], ['岩石巨人', 'talus'], ['莫尔德拉吉克', 'molduga']];
+    const famDefs = [['西诺克斯', 'hinox', 'Hinox'], ['岩石巨人', 'talus', 'Stone Talus'], ['莫尔德拉吉克', 'molduga', 'Molduga']];
     const mk = (typeof BOTW_DATA !== 'undefined' && BOTW_DATA.markers) ? BOTW_DATA.markers : [];
     enemyFamilies = famDefs.map(function (d) {
-      return { name: d[0], mks: mk.filter(function (m) { return m.cat === d[1]; }), total: 0, done: 0 };
+      return { name: d[0], en: d[2], mks: mk.filter(function (m) { return m.cat === d[1]; }), total: 0, done: 0 };
     });
     Object.keys(enemyHash2pt).forEach(function (k) {
       const p = enemyHash2pt[k];
@@ -482,7 +488,7 @@ const SAVE_UPLOAD = (() => {
       pbMat: pbMatCnt,
       pbEnemy: pbEnemyCnt,
       pbEnemyTotal: (typeof PB_LISTS !== "undefined" && PB_LISTS.enemy) ? PB_LISTS.enemy.length : 84,
-      enemy: ef.map(function (f) { return { name: f.name, done: f.done, total: f.total }; }),
+      enemy: ef.map(function (f) { return { name: f.name, en: f.en, done: f.done, total: f.total }; }),
       collectIds: collectIds,   /* V1.6.5：可收集类完成点快照（刷新恢复探索类绿勾） */
       chainTier: tierInfo.chainTier,     /* P3：各缩放链当前档 */
       worldTier: tierInfo.worldTier,     /* P3：最高链档（0..3） */

@@ -46,7 +46,6 @@
     wizzrobe: 1,
     yiga: 1,
     assassin: 1,
-    pebblit: 1,
     dragon: 1
   };
 
@@ -199,6 +198,8 @@
     st[key] = on ? 1 : 0;
     if (key === 'quest') st.dlc2 = on ? 1 : 0;
     if (key === 'dlc2') st.quest = on ? 1 : 0;
+    if (key === 'hardmode') st.master = on ? 1 : 0;
+    if (key === 'master') st.hardmode = on ? 1 : 0;
     saveDlc(st);
     apply(global.__chainTier, st);
     return st;
@@ -280,26 +281,42 @@
     return el;
   }
 
+  var lastTierInfo = null;
+
   function updateBadge(info) {
+    if (info !== undefined) lastTierInfo = info;
     var badge = getBadgeEl();
     if (!badge) return;
-    if (!info) {
+    if (!lastTierInfo) {
       badge.classList.add('hidden');
       badge.textContent = '';
       return;
     }
-    var lvl = (info.level != null) ? info.level : ((info.tier != null) ? (info.tier + 1) : 1);
-    var pts = (info.points != null) ? info.points : 0;
-    badge.textContent = '世界档位: Lv' + lvl + ' (' + pts + '分)';
-    badge.title = '世界档位根据存档击杀积分推算（官方缩放算法）\nLv1: 0~285分\nLv2: 286~941分\nLv3: 942~1555分\nLv4: 1556+分';
+    var cur = lastTierInfo;
+    var lvl = (cur.level != null) ? cur.level : ((cur.tier != null) ? (cur.tier + 1) : 1);
+    var pts = (cur.points != null) ? cur.points : 0;
+    var isEn = global.I18N && global.I18N.getLang() === 'en';
+    if (isEn) {
+      badge.textContent = 'World Tier: Lv' + lvl + ' (' + pts + ' pts)';
+      badge.title = 'World tier estimated from save file kill scores (official scaling algorithm)\nLv1: 0~285 pts\nLv2: 286~941 pts\nLv3: 942~1555 pts\nLv4: 1556+ pts';
+    } else {
+      badge.textContent = '世界档位: Lv' + lvl + ' (' + pts + '分)';
+      badge.title = '世界档位根据存档击杀积分推算（官方缩放算法）\nLv1: 0~285分\nLv2: 286~941分\nLv3: 942~1555分\nLv4: 1556+分';
+    }
     badge.classList.remove('hidden');
   }
 
   function resetBadge() {
+    lastTierInfo = null;
     updateBadge(null);
   }
 
   if (typeof document !== 'undefined') {
+    if (global.I18N && global.I18N.onChange) {
+      global.I18N.onChange(function () {
+        if (lastTierInfo) updateBadge(lastTierInfo);
+      });
+    }
     var initBadgeOnReady = function () {
       if (global.__killPoints != null || (global.__saveCounts && global.__saveCounts.points != null)) {
         var pts = (global.__killPoints != null) ? global.__killPoints : global.__saveCounts.points;

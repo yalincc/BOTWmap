@@ -514,9 +514,11 @@ class BotwMap {
       let alpha = 1;
       if (lv === 'r3' && showR4) alpha = 0.8;
       if (lv === 'r4' && showR5) alpha = 0.75;
+      const isEn = window.I18N && window.I18N.getLang() === 'en';
+      const text = isEn ? (rg.en || rg.name_en || rg.n || rg.name || '') : (rg.n || rg.name || rg.en || '');
       ctx.font = '700 ' + fs + 'px "Microsoft YaHei", sans-serif';
       if (st.bgA > 0) {
-        const tw = ctx.measureText(rg.n).width;
+        const tw = ctx.measureText(text).width;
         const padX = fs * 0.55, padY = fs * 0.28;
         const bw = tw + padX * 2, bh = fs + padY * 2;
         ctx.fillStyle = `rgba(${st.bg[0]},${st.bg[1]},${st.bg[2]},${st.bgA * alpha})`;
@@ -528,18 +530,18 @@ class BotwMap {
         ctx.strokeStyle = `rgba(${st.sc[0]},${st.sc[1]},${st.sc[2]},${st.txA * alpha})`;
         ctx.lineWidth = sw;
         ctx.lineJoin = 'round';
-        ctx.strokeText(rg.n, sx, sy + 0.5);
+        ctx.strokeText(text, sx, sy + 0.5);
       }
       ctx.fillStyle = `rgba(${st.tx[0]},${st.tx[1]},${st.tx[2]},${st.txA * alpha})`;
       // v1.3.1：金褐字三层 shadow（下方投影 + 近/远暖褐泛光），对齐 TOTKmap 地名规范
       ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
-      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.fillText(text, sx, sy + 0.5);
       ctx.shadowColor = 'rgba(30,20,0,.75)'; ctx.shadowBlur = 3; ctx.shadowOffsetY = 0;
-      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.fillText(text, sx, sy + 0.5);
       ctx.shadowColor = 'rgba(30,20,0,.55)'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 0;
-      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.fillText(text, sx, sy + 0.5);
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.fillText(rg.n, sx, sy + 0.5);
+      ctx.fillText(text, sx, sy + 0.5);
     }
   }
 
@@ -1407,6 +1409,21 @@ class BotwMap {
         this._fireHoverExt(null);
         this.draw();
       } else {
+        // 如果鼠标在侧栏、卡片、弹窗等 UI 层上方，不触发地图点位悬停，防止遮挡阅读
+        if (e.target !== cv) {
+          const hadHover = !!(this.hover || this.hoverMat || this.hoverDragon || this.hoverExt);
+          this.hover = null;
+          this.hoverMat = null;
+          this.hoverDragon = null;
+          if (this.hoverExt) {
+            this.hoverExt = null;
+            for (const fn of this.extHoverHooks) { try { fn(null); } catch (err) {} }
+          }
+          if (this._onHover) this._onHover(null);
+          this._updateHoverName(sx, sy, true);
+          if (hadHover && this.mode === 'browse') this.draw();
+          return;
+        }
         // 悬停 + 坐标读数
         const m = this.s2m(sx, sy);
         if (this._onCoord) this._onCoord(this.gameCoord(m), m);
@@ -1696,22 +1713,53 @@ class BotwMap {
     if (!this._catCnMap) {
       this._catCnMap = {};
       const cats = (this.data && this.data.categories) || [];
-      for (const c of cats) this._catCnMap[c.key] = c.cn;
+      for (const c of cats) this._catCnMap[c.key] = c;
     }
-    return this._catCnMap[cat] || '';
+    const c = this._catCnMap[cat];
+    if (!c) return '';
+    if (window.I18N && window.I18N.getLang() === 'en') {
+      return c.en || c.cn || '';
+    }
+    return c.cn || c.en || '';
   }
 
   /* 当前悬停对象的「类别 + 名称」；无悬停返回 null */
   _hoverLabel() {
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     const mk = this.hover, mat = this.hoverMat, dr = this.hoverDragon, ex = this.hoverExt;
-    if (mk) return { kind: this._catCn(mk.cat), name: mk.cn || mk.name || '' };
-    if (mat) return { kind: '材料', name: mat.cn || mat.name || '' };
-    if (dr) return { kind: '龙', name: dr.name || dr.cn || '' };
+    if (mk) {
+      const mkKind = (isEn && mk.cat === 'seed') ? 'Korok' : this._catCn(mk.cat);
+      const mkName = window.I18N ? window.I18N.nameOf(mk) : (mk.en || mk.cn || mk.name || '');
+      return {
+        kind: mkKind,
+        name: mkName
+      };
+    }
+    if (mat) return {
+      kind: isEn ? 'Material' : '材料',
+      name: (window.I18N ? window.I18N.nameOf(mat) : (isEn ? (mat.en || mat.cn || mat.name || '') : (mat.cn || mat.name || mat.en || '')))
+    };
+    if (dr) return {
+      kind: isEn ? 'Dragon' : '龙',
+      name: (window.I18N ? window.I18N.nameOf(dr) : (isEn ? (dr.en || dr.name || dr.cn || '') : (dr.name || dr.cn || dr.en || '')))
+    };
     if (ex) {
-      if (ex.type === 'quest' && ex.quest) return { kind: '任务', name: ex.quest.name || '' };
-      if (ex.type === 'equip' && ex.equip) return { kind: '装备', name: ex.equip.name || '' };
-      if (ex.type === 'chest' && ex.item) return { kind: '宝箱', name: ex.item.contentCn || ex.item.en || '' };
-      if (ex.type === 'camp' && ex._name) return { kind: '营地', name: ex._name };   /* V1.6.4 P4c：营地悬停（名 + 掉落物由 camp.js 拼好） */
+      if (ex.type === 'quest' && ex.quest) return {
+        kind: isEn ? 'Quest' : '任务',
+        name: (window.I18N ? window.I18N.nameOf(ex.quest) : (isEn ? (ex.quest.en || ex.quest.name || '') : (ex.quest.name || ex.quest.en || '')))
+      };
+      if (ex.type === 'equip' && ex.equip) return {
+        kind: isEn ? 'Equipment' : '装备',
+        name: (window.I18N ? window.I18N.nameOf(ex.equip) : (isEn ? (ex.equip.en || ex.equip.name || '') : (ex.equip.name || ex.equip.en || '')))
+      };
+      if (ex.type === 'chest' && ex.item) return {
+        kind: isEn ? 'Chest' : '宝箱',
+        name: isEn ? (ex.item.en || ex.item.contentCn || ex.item.content || '') : (ex.item.contentCn || ex.item.en || ex.item.content || '')
+      };
+      if (ex.type === 'camp' && (ex.camp || ex._name)) return {
+        kind: isEn ? 'Camp' : '营地',
+        name: isEn ? (ex._name_en || (ex.camp && ex.camp.name_en) || ex._name) : ex._name
+      };
     }
     return null;
   }
