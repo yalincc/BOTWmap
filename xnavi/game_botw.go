@@ -312,6 +312,50 @@ func logAnchorSkip(path string, playtime uint32, dones int) {
 		path, playtime, dones)
 }
 
+// ---- 存档新鲜度提示（2026-10-20 15:40，纯日志引导，不改任何判据）----
+//
+// 背景（台账 #40 / §〇.9）：冷启动首次定位慢的根因是"初始静态锁经常不是玩家"，
+// 而**站桩时玩家本身不产生任何"活组"信号**，程序只能挑"离锚点最近的 struct>0 组"，
+// 挑中的可能是 47~100m 外的静态物（石头/箱子/桥/守护者残骸）。
+//
+// 老大实测：进游戏先手工存档 → 站桩不动 → 等需要移动验证时再动。
+// 存档 mtime 新鲜时，锚点≈玩家真实位置，"离锚点最近"这个启发式就变得可信。
+// 所以本函数只做一件事：**把存档新鲜度告诉用户**，让"先存档"从口头约定变成程序引导。
+//
+// 阈值取 2 分钟：老大测试习惯是"进游戏先手工存档再测"，2 分钟内的新鲜存档
+// 锚点基本等于玩家位置；超过则锚点可能已过时（传送/跑远），提示重新存档。
+const saveFreshWindow = 2 * time.Minute
+
+// saveFreshLogged 去重：SaveAnchors 会被 EdenLocate / edenShrinePos / EdenSaveKnown
+// 多次调用，同一个存档只提示一次，避免刷屏。
+var saveFreshLogged sync.Map
+
+// logSaveFreshness 报告存档新鲜度：过旧则提示用户重新手工存档。
+func logSaveFreshness(a *SaveAnchor) {
+	if a == nil || a.Path == "" {
+		return
+	}
+	fi, err := os.Stat(a.Path)
+	if err != nil {
+		return
+	}
+	age := time.Since(fi.ModTime())
+	if age <= 0 {
+		return
+	}
+	key := a.Path
+	if _, seen := saveFreshLogged.LoadOrStore(key, true); seen {
+		return
+	}
+	if age > saveFreshWindow {
+		fmt.Printf("  [save] 存档已 %.0f 分钟前写入，建议重新手工存档（新鲜存档能让首次定位快很多）\n",
+			age.Minutes())
+		return
+	}
+	fmt.Printf("  [save] 存档新鲜（%.0f 秒前写入）—— 锚点≈玩家位置，首次定位会快很多\n",
+		age.Seconds())
+}
+
 // SaveAnchors = 原 savefile.go readSaveAnchors 逻辑原样平移。
 // 主档策略：Cemu/Eden=最新 mtime 槽（BotW 轮转写 6 槽，槽号固定不可靠，
 // 按 mtime 取最新，live-cemu 与 live-eden 双端实测）；Ryujinx=最高 playtime。
@@ -361,9 +405,11 @@ func (g *gameBotw) SaveAnchors(p Platform) []*SaveAnchor {
 			}
 		}
 		if strong != nil {
+			logSaveFreshness(strong)
 			return []*SaveAnchor{strong}
 		}
 		if played != nil {
+			logSaveFreshness(played)
 			return []*SaveAnchor{played}
 		}
 		for _, c := range cands {

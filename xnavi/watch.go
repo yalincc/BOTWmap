@@ -620,8 +620,14 @@ func stateMachine() {
 					lockSince = time.Now()
 					probing = false
 					probeGroups = nil
-					probeTag := "known cache"
-					if res.Copies > 0 && len(res.Shortlist) > 0 {
+				probeTag := "known cache"
+				if res.Copies == 0 {
+					// known 秒锁提示（2026-10-20 15:40，纯日志）：known 缓存只存绝对地址、
+					// 不存坐标（台账 §〇.9 结论：地址有效但坐标过时 → 会把你拉回上次位置）。
+					// 这里提前告知，让用户知道"位置跳回旧处"是已知行为而非故障。
+					fmt.Printf("  [hint] 已知位置缓存秒锁——若你已离开上次定位的地方，位置会跳回旧处（可删除 known_eden_botw.json 重来）\n")
+				}
+				if res.Copies > 0 && len(res.Shortlist) > 0 {
 						probing = true
 						probeGroups = res.Shortlist
 						probeMoved = make([]int, len(probeGroups))
@@ -631,8 +637,17 @@ func stateMachine() {
 						probeLast = time.Now()
 						probeLockGi = 0
 						probeRearms = 0
-						probeTag = fmt.Sprintf("probing top %d, waiting move confirm", len(probeGroups))
+					probeTag = fmt.Sprintf("probing top %d, waiting move confirm", len(probeGroups))
+					// 等待移动验证引导（2026-10-20 15:40，纯日志）：站桩时玩家不产生
+					// "活组"信号，程序无法确认身份（台账 #40）。这里明确告诉用户下一步做什么，
+					// 避免"不知道它在等什么"的体验落差。已验证的锁不提示（重扫场景）。
+					lock.mu.RLock()
+					wasVerified := lock.verified
+					lock.mu.RUnlock()
+					if !wasVerified {
+						fmt.Printf("  [hint] 站桩时无法确认身份，请小幅走动 2~3 步完成移动验证（别直接跑）\n")
 					}
+				}
 					fmt.Printf("  [sm] eden -> lock 0x%X copies=%d [%s]\n", res.Addr, res.Copies, probeTag)
 					continue
 				}
@@ -668,6 +683,7 @@ func stateMachine() {
 					probeRearms = 0
 					fmt.Printf("  [sm] scan -> lock 0x%X copies=%d [probing top %d, waiting move confirm]\n",
 						addr, best.Copies, len(shortlist))
+					fmt.Printf("  [hint] 站桩时无法确认身份，请小幅走动 2~3 步完成移动验证（别直接跑）\n")
 				} else {
 					fmt.Println("  [sm] structural scan found nothing - retrying")
 				}
