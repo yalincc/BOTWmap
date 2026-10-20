@@ -268,14 +268,17 @@
   }
 
   function getBadgeEl() {
-    var el = (typeof document !== 'undefined') && (document.getElementById('worldTierBadge') || document.getElementById('tierBadge'));
+    var el = (typeof document !== 'undefined') && document.getElementById('worldTierBadge');
     if (!el && typeof document !== 'undefined') {
-      var parent = document.querySelector('.save-upload');
+      /* V1.7.1：徽标挂在「探索度」折叠行右端（index.html 静态节点）。
+         兜底创建也落在那里；极端时序下才退回报存档区。 */
+      var wrap = document.querySelector('.stats-head-wrap');
+      var parent = wrap || document.querySelector('.save-upload');
       if (parent) {
-        el = document.createElement('div');
+        el = document.createElement('span');
         el.id = 'worldTierBadge';
-        el.className = 'su-tier-badge hidden';
-        parent.insertBefore(el, parent.querySelector('.su-tip') || null);
+        el.className = 'tier-badge hidden';
+        parent.appendChild(el);
       }
     }
     return el;
@@ -297,10 +300,11 @@
     var pts = (cur.points != null) ? cur.points : 0;
     var isEn = global.I18N && global.I18N.getLang() === 'en';
     if (isEn) {
-      badge.textContent = 'World Tier: Lv' + lvl + ' (' + pts + ' pts)';
+      badge.textContent = 'World Lv' + lvl + ' (' + pts + ' pts)';
       badge.title = 'World tier estimated from save file kill scores (official scaling algorithm)\nLv1: 0~285 pts\nLv2: 286~941 pts\nLv3: 942~1555 pts\nLv4: 1556+ pts';
     } else {
-      badge.textContent = '世界档位: Lv' + lvl + ' (' + pts + '分)';
+      /* V1.7.1：老大定稿格式 世界等级N（M分）——悬停 title 维持原内容不变 */
+      badge.textContent = '世界等级' + lvl + '（' + pts + '分）';
       badge.title = '世界档位根据存档击杀积分推算（官方缩放算法）\nLv1: 0~285分\nLv2: 286~941分\nLv3: 942~1555分\nLv4: 1556+分';
     }
     badge.classList.remove('hidden');

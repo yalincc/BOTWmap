@@ -187,6 +187,17 @@ const SAVE_UPLOAD = (() => {
       UI.toast('请选择 Ryujinx / Cemu 的 game_data.sav 存档文件');
       return;
     }
+    /* F-019：caption.sav / option.sav 与 game_data.sav 同文件夹，且头 4 字节同为
+       版本 0x471E + marker FFFFFFFF，能骗过版本白名单；caption.sav 还有 189 个条目，
+       连条目数检查一起过——但它不含 PlayTime，旧版会静默"加载成功"只差时间
+       （大师档用户高发：分享包解压一排 .sav 容易抓错）。按文件名直接拦死，
+       重命名过的 game_data.sav 不受影响（只拦已知坏名，兜底靠下面的条目阈值）。 */
+    if (/^(caption|option)\.sav$/i.test(file.name)) {
+      UI.toast((window.I18N && window.I18N.t)
+        ? window.I18N.t('save.wrongFile', '这是 caption.sav / option.sav（存档预览或设置文件），不是进度存档；请选择同文件夹下的 game_data.sav')
+        : '这是 caption.sav / option.sav（存档预览或设置文件），不是进度存档；请选择同文件夹下的 game_data.sav', 6000);
+      return;
+    }
     if (file.size < 1024) {
       UI.toast('文件太小，可能不是有效的存档');
       return;
@@ -366,7 +377,14 @@ const SAVE_UPLOAD = (() => {
       else if (v !== 0 && ksHash[h]) ksCnt[ksHash[h].flag] = v;
       else if (v !== 0 && flags[h]) done.set(h, flags[h]);
     }
-    if (entries < 100) { UI.toast('存档结构异常（条目过少），请确认是 game_data.sav'); return; }
+    /* F-019：阈值 100 → 10000。合法 game_data.sav 最小的 v1.0 也有约 11.2 万条，
+       而 caption.sav(189) / option.sav(41) 等非主存档都在千条以下——双保险。 */
+    if (entries < 10000) {
+      UI.toast((window.I18N && window.I18N.t)
+        ? window.I18N.t('save.entriesTooFew', '存档条目数不足，请确认上传的是 game_data.sav（主存档文件，不是 caption.sav / option.sav）')
+        : '存档条目数不足，请确认上传的是 game_data.sav（主存档文件，不是 caption.sav / option.sav）');
+      return;
+    }
 
     /* P3：世界档位计算（官方缩放算法）与徽标展示 */
     let tierInfo = { points: 0, tier: 0, worldTier: 0, level: 1, chainTier: {} };
@@ -519,7 +537,13 @@ const SAVE_UPLOAD = (() => {
       parts.push('回忆 ' + (mp.length ? mp.join('/') : byT.memory));
     }
     const hrs = (playtime / 3600).toFixed(1);
-    UI.toast('已从 ' + srcName + ' 存档加载 ✓ ' + parts.join(' · ') + (playtime ? '（游玩 ' + hrs + ' 小时）' : ''));
+    /* F-019：PlayTime=0/缺失时明示"未记录"，不再静默省略（旧表现被用户当成"不显示时间"） */
+    const timeSuffix = playtime
+      ? '（游玩 ' + hrs + ' 小时）'
+      : ((window.I18N && window.I18N.t)
+        ? window.I18N.t('save.noPlaytime', '（游玩时间未记录）')
+        : '（游玩时间未记录）');
+    UI.toast('已从 ' + srcName + ' 存档加载 ✓ ' + parts.join(' · ') + timeSuffix);
   }
 
   return { init, isLoaded: () => loaded };
