@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func f32(v float32) []byte {
@@ -210,6 +211,133 @@ func TestParseSaveReal(t *testing.T) {
 }
 
 // ---- 进度 ----
+
+// ---- 存档空档过滤（台账 #25）+ 传送目的地匹配（#28）+ 动态参考中心 ----
+
+// makeSaveWith 构造最小有效 game_data.sav：头版本 + PLAYER_POSITION 三连块
+// + PlayTime + 若干额外条目（如神庙完成哈希）。
+func makeSaveWith(t *testing.T, pos [3]float32, playtime uint32, extra map[uint32]uint32) []byte {
+	t.Helper()
+	n := 6 + len(extra) // 3 组坐标 + PlayTime + extra
+	buf := make([]byte, 0x0C+n*8)
+	put := func(o int, v uint32) { binary.LittleEndian.PutUint32(buf[o:], v) }
+	put(0, 0x471E)
+	put(0x0C, playerPositionHash)
+	put(0x10, math.Float32bits(pos[0]))
+	put(0x14, playerPositionHash)
+	put(0x18, math.Float32bits(pos[1]))
+	put(0x1C, playerPositionHash)
+	put(0x20, math.Float32bits(pos[2]))
+	put(0x24, playtimeHash)
+	put(0x28, playtime)
+	o := 0x2C
+	for h, v := range extra {
+		put(o, h)
+		put(o+4, v)
+		o += 8
+	}
+	return buf
+}
+
+func TestSaveAnchorsSkipsEmptySlot(t *testing.T) {
+	hashes := shrineDoneHashes()
+	if len(hashes) == 0 {
+		t.Fatal("embedded progress table missing shrine hashes")
+	}
+	root := t.TempDir()
+	write := func(slot string, data []byte, mod time.Time) {
+		dir := filepath.Join(root, botwTitleID, "0000000000000008", slot)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(dir, "game_data.sav")
+		if err := os.WriteFile(p, data, 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(p, mod, mod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now()
+	// slot 6：空档（Playtime=0），mtime 最新 —— 旧实现会取到它（初始台地锚点）
+	write("6", makeSaveWith(t, [3]float32{-1026.5, 252.3, 1803.2}, 0, nil), now)
+	// slot 1：正常档（有进度 + 神庙完成 1），mtime 更旧
+	write("1", makeSaveWith(t, [3]float32{4286.6, 236.5, -2717.3}, 223696,
+		map[uint32]uint32{hashes[0]: 1}), now.Add(-2*time.Hour))
+
+	setEdenSaveDirOverride(root)
+	defer setEdenSaveDirOverride("")
+	got := currentGame.SaveAnchors(&edenPlatform{})
+	if len(got) == 0 {
+		t.Fatal("expected an anchor")
+	}
+	if math.Abs(float64(got[0].Pos[0]-4286.6)) > 0.01 {
+		t.Fatalf("picked empty slot, pos=%v playtime=%d", got[0].Pos, got[0].Playtime)
+	}
+	if got[0].Playtime != 223696 {
+		t.Fatalf("playtime mismatch: %d", got[0].Playtime)
+	}
+
+	// 全部是空档 → 仍须返回一个（不改变老行为下限，只是排优先级）
+	root2 := t.TempDir()
+	dir := filepath.Join(root2, botwTitleID, "0000000000000008", "7")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "game_data.sav"),
+		makeSaveWith(t, [3]float32{-1026.5, 252.3, 1803.2}, 0, nil), 0644); err != nil {
+		t.Fatal(err)
+	}
+	setEdenSaveDirOverride(root2)
+	if got := currentGame.SaveAnchors(&edenPlatform{}); len(got) != 1 {
+		t.Fatalf("empty-only fallback should still return the newest slot, got %d", len(got))
+	}
+}
+
+func TestMatchShrineTowerAndGate(t *testing.T) {
+	// 塔/神庙参考点存的是地图像素：mx=2*gx+12000, my=2*gz+10000
+	tower := ProgressPoint{T: "tower", Cn: "森林之塔", X: 2*4000.0 + 12000, Y: 2*(-3000.0) + 10000}
+	gate := ProgressPoint{T: "shrine", Cn: "兹纳·卡伊神庙", X: 2*4500.0 + 12000, Y: 2*(-3100.0) + 10000}
+	prev := progress
+	progress = &progressWatcher{ok: true, refs: []ProgressPoint{tower, gate}}
+	defer func() { progress = prev }()
+
+	if p := matchShrine(4000, 200, -3000); p == nil || p.T != "tower" || p.Cn != "森林之塔" {
+		t.Fatalf("tower match failed: %+v", p)
+	}
+	if p := matchShrine(4500, 200, -3100); p == nil || p.T != "shrine" || p.Cn != "兹纳·卡伊神庙" {
+		t.Fatalf("shrine gate match failed: %+v", p)
+	}
+	// 半径外（>40m 像素半径）不应命中
+	if p := matchShrine(4000+200, 200, -3000+200); p != nil {
+		t.Fatalf("out-of-radius should not match: %+v", p)
+	}
+}
+
+func TestEdenRefCenter(t *testing.T) {
+	EdenClearRefCenter()
+	defer EdenClearRefCenter()
+	if _, ok := edenRefCenter(); ok {
+		t.Fatal("should start empty")
+	}
+	// 非法坐标（伪槽 Y=2000 会被 gameValidTriple 拒？这里用原点簇）不得写入
+	edenSetRefCenter([3]float32{0, 0, 0})
+	if _, ok := edenRefCenter(); ok {
+		t.Fatal("invalid coord must be rejected")
+	}
+	edenSetRefCenter([3]float32{4286.6, 236.5, -2717.3})
+	if pos, ok := edenRefCenter(); !ok || math.Abs(float64(pos[0]-4286.6)) > 0.01 {
+		t.Fatalf("set/read failed: %v %v", pos, ok)
+	}
+	// IfEmpty 在已有中心时不得覆盖（首次锁定语义）
+	if edenSetRefCenterIfEmpty([3]float32{100, 200, 300}) {
+		t.Fatal("IfEmpty must not overwrite existing center")
+	}
+	EdenClearRefCenter()
+	if edenSetRefCenterIfEmpty([3]float32{100, 200, 300}) != true {
+		t.Fatal("IfEmpty should set when empty")
+	}
+}
 
 func TestProgress(t *testing.T) {
 	setPlatform(&ryujinxPlatform{})

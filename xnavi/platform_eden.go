@@ -143,7 +143,7 @@ func (p *edenPlatform) SaveRoots() []string {
 	}
 	if sd := edenSaveDirOverride; sd != "" {
 		// GUI 设置"Eden 存档路径"（直接存档根，BOTW 为 nand/user/save 下含 01007EF00011E000 的目录）
-		roots = append(roots, sd)
+		return []string{sd}
 	}
 	if p.h != 0 {
 		if exe := edenProcessPath(p.h); exe != "" {
@@ -437,8 +437,7 @@ func edenJunkGroup(g *Group) bool {
 	return false
 }
 
-// edenGroupAndRank 分组打分：先扩 top80 检查 struct，丢弃 junk 组，再截断 top30。
-// 排序唯一规则（engine 与 xnavi 双端已验证）：struct>0 门槛 → copies 降序 → dist 升序。
+// edenGroupAndRank 分组打分：直接对所有候选组计算 struct，struct>0 优先，再截断 top30。
 func edenGroupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 	groups := map[[3]int32]*Group{}
 	for _, hit := range hits {
@@ -457,57 +456,33 @@ func edenGroupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 			g.Dist, g.Ri = hit.Dist, hit.Ri
 		}
 	}
-	var byCopies []*Group
+	var all []*Group
 	for _, g := range groups {
 		g.Copies = len(g.Addrs)
-		byCopies = append(byCopies, g)
-	}
-	// 截断（Eden 特有，与 Cemu/Ryujinx 相反）：
-	//   玩家/NPC 槽 copies 小（dump 实证玩家 copies=1），静态物体组 copies 大
-	//   （81~301 草/树/装饰多实例）。copies 降序截断会把玩家组（copies=1）
-	//   挤出 top80——copies=1 的组在 1.6 万命中里有几千个。
-	//   改为 copies 升序截断：活动槽优先保留，静态大组自然排后。
-	sort.Slice(byCopies, func(i, j int) bool { return byCopies[i].Copies < byCopies[j].Copies })
-	top := byCopies
-	if len(top) > 80 {
-		top = top[:80]
-	}
-	for _, g := range top {
-		// 检查组内全部地址（并发扫描 hits 顺序不确定，截断采样会漏矩阵槽 → struct=0）。
 		for _, a := range g.Addrs {
 			if rotOK(h, a) {
 				g.Struct++
 			}
 		}
-	}
-	kept := top[:0]
-	for _, g := range top {
 		if edenJunkGroup(g) {
 			continue
 		}
-		kept = append(kept, g)
+		all = append(all, g)
 	}
-	if len(kept) > 30 {
-		kept = kept[:30]
-	}
-	// 排序（Eden 与 Cemu/Ryujinx 相反的关键差异）：
-	//   Cemu/Ryujinx copies 降序——固定偏移场景 copies 多=活跃槽；
-	//   Eden copies 升序——玩家槽 copies=1（2026-10-07 dump 实证），静态物体
-	//   组 copies=81~301（草/树/装饰多实例）降序时霸榜把玩家挤出 top80。
-	//   唯一规则：struct>0 门槛 → copies 升序 → dist 升序。
-	sort.Slice(kept, func(i, j int) bool {
-		a, b := kept[i], kept[j]
+	// 排序规则：struct>0 组无条件排最前；同级按与参考锚点距离由近到远排序
+	sort.Slice(all, func(i, j int) bool {
+		a, b := all[i], all[j]
 		aLive, bLive := a.Struct > 0, b.Struct > 0
 		if aLive != bLive {
 			return aLive
 		}
-		if a.Copies != b.Copies {
-			return a.Copies > b.Copies
-		}
 		return a.Dist < b.Dist
 	})
-	shortlist := make([]ShortlistEntry, 0, len(kept))
-	for _, g := range kept {
+	if len(all) > 30 {
+		all = all[:30]
+	}
+	shortlist := make([]ShortlistEntry, 0, len(all))
+	for _, g := range all {
 		shortlist = append(shortlist, ShortlistEntry{
 			Hud:    [3]float32{g.X, g.Y, g.Z},
 			Copies: g.Copies,
@@ -517,7 +492,7 @@ func edenGroupAndRank(h uintptr, hits []Hit) ([]*Group, []ShortlistEntry) {
 			Addrs:  g.Addrs[:min(len(g.Addrs), 24)],
 		})
 	}
-	return kept, shortlist
+	return all, shortlist
 }
 
 // edenGroupHasValid 检查组内前 8 个地址是否存在合法坐标（锁定前校验）。
@@ -554,6 +529,9 @@ func edenLiveGroups(h uintptr, ranked []*Group) []*Group {
 	first := make([]sample, nGroups)
 	for i := 0; i < nGroups; i++ {
 		g := ranked[i]
+		if g.Struct <= 0 {
+			continue
+		}
 		if len(g.Addrs) > 0 {
 			first[i].addr = g.Addrs[0]
 			if d := currentGame.DecodeAt(h, g.Addrs[0]); d != nil {
@@ -593,8 +571,8 @@ func pickEdenGroup(h uintptr, ranked []*Group, refs [][3]float32) *Group {
 			if d == nil {
 				continue
 			}
-			// 宽容差 40m：确保组内地址与组代表基本一致，防止严重错位
-			if dist3([3]float32{d[0], d[1], d[2]}, [3]float32{g.X, g.Y, g.Z}) < 40.0 {
+			// 宽容差 40m：确保组内地址与组代表基本一致，且具有结构签名
+			if dist3([3]float32{d[0], d[1], d[2]}, [3]float32{g.X, g.Y, g.Z}) < 40.0 && rotOK(h, g.Addrs[i]) {
 				g.Addrs[0], g.Addrs[i] = g.Addrs[i], g.Addrs[0]
 				return g
 			}
@@ -631,6 +609,58 @@ func edenFilterHits(hits []Hit) []Hit {
 	return out
 }
 
+// ---- 进程内动态参考中心 edenRefPos（手册 §2.3 / 台账 §附）----
+//
+// 取代落盘 last_pos 与"每次重扫都重读存档锚点"：
+//   - **不落盘** → 锁错一次不会跨进程复现（重启即清空，#8 不成立）；
+//   - 写入时机：首次锁定 / 每次传送跳变（把中心钉在目的地）/ 每次移动确认；
+//   - EdenLocate 优先用它当扫描中心，存档锚点降为冷启动兜底
+//     （否则每 12s 重扫都重读存档，锚点随"最新写入槽"漂移 → #25 / #30）。
+var (
+	edenRefMu    sync.Mutex
+	edenRefPos   [3]float32
+	edenRefValid bool
+)
+
+// edenSetRefCenter 写入动态参考中心（非法坐标直接忽略，防伪坐标污染）。
+func edenSetRefCenter(pos [3]float32) {
+	if !gameValidTriple(pos[0], pos[1], pos[2]) {
+		return
+	}
+	edenRefMu.Lock()
+	edenRefPos, edenRefValid = pos, true
+	edenRefMu.Unlock()
+}
+
+// edenSetRefCenterIfEmpty 仅在还没有参考中心时写入（首次锁定用）。
+// 返回是否真的写入，调用方据此打日志。
+func edenSetRefCenterIfEmpty(pos [3]float32) bool {
+	if !gameValidTriple(pos[0], pos[1], pos[2]) {
+		return false
+	}
+	edenRefMu.Lock()
+	defer edenRefMu.Unlock()
+	if edenRefValid {
+		return false
+	}
+	edenRefPos, edenRefValid = pos, true
+	return true
+}
+
+// edenRefCenter 读当前动态参考中心（进程内）。
+func edenRefCenter() ([3]float32, bool) {
+	edenRefMu.Lock()
+	defer edenRefMu.Unlock()
+	return edenRefPos, edenRefValid
+}
+
+// EdenClearRefCenter 清空动态参考中心（平台切换 / 模拟器重启时调用）。
+func EdenClearRefCenter() {
+	edenRefMu.Lock()
+	edenRefPos, edenRefValid = [3]float32{}, false
+	edenRefMu.Unlock()
+}
+
 // EdenLocate 实现 edenLocator 接口（Eden 阶梯式极速定位路径）。
 // Tier 0: known 绝对地址秒锁（bypassKnown=false 时，读 valid 且非神庙槽即锁，耗时 0ms）；
 // Tier 1 & 2: Switch 虚拟机 User Heap 空间定向窄窗初筛（仅 2.65GB 真实堆，±120m → ±400m，耗时 0.2~0.5s）；
@@ -653,18 +683,30 @@ func (p *edenPlatform) EdenLocate(bypassKnown bool) *LocateResult {
 			if edenShrinePos([3]float32{d[0], d[1], d[2]}) {
 				continue
 			}
-			return &LocateResult{Addr: a, Copies: 0, Hud: [3]float32{d[0], d[1], d[2]}}
+			if !rotOK(h, a) {
+				continue
+			}
+			edenSetRefCenterIfEmpty([3]float32{d[0], d[1], d[2]})
+			return &LocateResult{Addr: a, Copies: 0, Struct: 1, Hud: [3]float32{d[0], d[1], d[2]}}
 		}
 	}
 
-	// 存档锚点读取
-	anchors := currentGame.SaveAnchors(p)
-	if len(anchors) == 0 {
-		fmt.Println("  [eden] no usable save anchor found - retrying")
-		return nil
+	// 扫描中心（手册 §2.3 两级）：内存动态参考 > 磁盘存档锚点。
+	// 动态参考是进程内变量，传送后已被钉到目的地、移动确认后跟上玩家，
+	// 因此重扫中心不会随"最新写入的存档槽"漂移（#30 的土壤）。
+	var refs [][3]float32
+	if pos, ok := edenRefCenter(); ok {
+		refs = [][3]float32{pos}
+		fmt.Printf("  [eden] dynamic scan center: mem=(%.1f, %.1f, %.1f)\n", pos[0], pos[1], pos[2])
+	} else {
+		anchors := currentGame.SaveAnchors(p)
+		if len(anchors) == 0 {
+			fmt.Println("  [eden] no usable save anchor found - retrying")
+			return nil
+		}
+		refs = [][3]float32{anchors[0].Pos}
+		fmt.Printf("  [eden] save anchor: mem=(%.1f, %.1f, %.1f)\n", anchors[0].Pos[0], anchors[0].Pos[1], anchors[0].Pos[2])
 	}
-	refs := [][3]float32{anchors[0].Pos}
-	fmt.Printf("  [eden] save anchor: mem=(%.1f, %.1f, %.1f)\n", anchors[0].Pos[0], anchors[0].Pos[1], anchors[0].Pos[2])
 
 	t0 := time.Now()
 	const edenScanMinMB = 0.0625 // 64KB 下限：Eden 内存碎片化，必须扫 64KB 以上全部微型块
@@ -787,6 +829,12 @@ func (p *edenPlatform) EdenLocate(bypassKnown bool) *LocateResult {
 	fmt.Printf("  [eden] locked 0x%012X copies=%d struct=%d total %.1fs\n",
 		addr, best.Copies, best.Struct, time.Since(t0).Seconds())
 
+	// 首次锁定 → 建立进程内参考中心：此后重扫不再重读存档锚点，
+	// 锚点不会随"最新写入的存档槽"漂移（#25 空档陷阱 / #30 锚点漂移的共同土壤）。
+	if hud != ([3]float32{}) && edenSetRefCenterIfEmpty(hud) {
+		fmt.Printf("  [eden] dynamic scan center set mem=(%.1f, %.1f, %.1f)\n", hud[0], hud[1], hud[2])
+	}
+
 	return &LocateResult{
 		Addr:      addr,
 		Copies:    best.Copies,
@@ -806,6 +854,9 @@ func (p *edenPlatform) EdenSaveKnown(addr uintptr) {
 		return
 	}
 	if edenShrinePos([3]float32{d[0], d[1], d[2]}) {
+		return
+	}
+	if !rotOK(p.h, addr) {
 		return
 	}
 	edenKnownAdd(addr)
@@ -926,4 +977,42 @@ func edenKnownFail(addr uintptr) {
 	buf, _ := json.MarshalIndent(d, "", "  ")
 	os.WriteFile(edenKnownPath(), buf, 0644)
 	fmt.Printf("  [eden-known] addr %s fail=%d (evict>=%d)\n", hex8(addr), d.Fails[hex8(addr)], edenKnownEvictFail)
+}
+
+// edenDropKnown 毒地址硬淘汰（乒乓专用，v3.1.3 逻辑）：一次即剔出 known 缓存，
+// 并把失败计数直接打到淘汰阈值，防止 edenKnownAdd 立刻把它写回来。
+//
+// 与 edenKnownFail 的分工：edenKnownFail 是"读失败"的三振出局（可能是页保护瞬变）；
+// 乒乓是**确定性的毒地址**（同一地址在两个固定位置轮流写，玩家跑动每拍只有 ~1.2m），
+// 留着它下次启动还会再锁同一毒槽（台账 §〇.5 第 2 行）。
+func edenDropKnown(addr uintptr) {
+	if addr == 0 {
+		return
+	}
+	var d edenKnownData
+	if data, err := os.ReadFile(edenKnownPath()); err == nil {
+		json.Unmarshal(data, &d)
+	}
+	if d.Fails == nil {
+		d.Fails = map[string]int{}
+	}
+	key := hex8(addr)
+	d.Fails[key] = edenKnownEvictFail
+	var list []string
+	removed := false
+	for _, v := range d.Addrs {
+		if v == key {
+			removed = true
+			continue
+		}
+		if d.Fails[v] >= edenKnownEvictFail {
+			continue
+		}
+		list = append(list, v)
+	}
+	d.Addrs = list
+	d.Updated = time.Now().Format("2006-01-02 15:04:05")
+	buf, _ := json.MarshalIndent(d, "", "  ")
+	os.WriteFile(edenKnownPath(), buf, 0644)
+	fmt.Printf("  [eden-known] drop %s poison slot (removed=%v, known=%d)\n", key, removed, len(list))
 }

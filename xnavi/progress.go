@@ -263,6 +263,59 @@ func (w *progressWatcher) loop() {
 	}
 }
 
+// ---- 存档"空档"判定用的轻量查询（SaveAnchors 调用；不依赖 progress watcher 实例）----
+//
+// 台账 #25 空档陷阱：Eden 6 个轮转槽按 mtime 取"最新"会取到**空档/新档**
+// （日志 `save=…\6\game_data.sav` + `done: shrines 0/136`）。空档坐标是初始位置
+// （实测锚点 (-1026.5, 252.3, 1803.2)，而玩家在阿卡莱 5000 米外），整轮扫描围着
+// 废弃锚点转，最后只能在全堆里锁到伪坐标簇。
+// 这里只按"参考表里的神庙完成哈希"数一下，供 SaveAnchors 排除空档。
+var (
+	shrineDoneOnce sync.Once
+	shrineDoneKeys []uint32
+)
+
+// shrineDoneHashes 参考表里所有神庙的完成哈希（done_hash 优先，与 refresh 同口径）。
+func shrineDoneHashes() []uint32 {
+	shrineDoneOnce.Do(func() {
+		buf, err := progressRefsFS.ReadFile("data/progress_points.json")
+		if err != nil {
+			return
+		}
+		var obj struct {
+			Points []ProgressPoint `json:"points"`
+		}
+		if json.Unmarshal(buf, &obj) != nil {
+			return
+		}
+		for _, p := range obj.Points {
+			if p.T != "shrine" {
+				continue
+			}
+			key := p.Hash
+			if p.DoneHash != 0 {
+				key = p.DoneHash
+			}
+			shrineDoneKeys = append(shrineDoneKeys, key)
+		}
+	})
+	return shrineDoneKeys
+}
+
+// shrineDoneCount 存档里已完成的神庙数（0 = 空档/新档）。
+func shrineDoneCount(entries map[uint32]uint32) int {
+	if len(entries) == 0 {
+		return 0
+	}
+	n := 0
+	for _, h := range shrineDoneHashes() {
+		if entries[h] != 0 {
+			n++
+		}
+	}
+	return n
+}
+
 // snapshot 返回 (可用, 最新 JSON body, 进度代次)。
 func (w *progressWatcher) snapshot() (bool, []byte, string) {
 	w.mu.RLock()

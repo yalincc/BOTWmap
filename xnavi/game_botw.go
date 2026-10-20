@@ -20,6 +20,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -138,7 +139,13 @@ func gameDist3(a1, a2, a3, b1, b2, b3 float32) float32 {
 	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 }
 
-// matchShrine 跳变目标（展示序 gx, alt, gz）是否落在某神庙入口附近（像素坐标）。
+// matchShrine 跳变目标（展示序 gx, alt, gz）是否落在某**固定传送点**
+// （神庙入口 / 希卡塔）的像素半径内（手册 §4.5.1 传送目的地锚定）。
+//
+// 用途边界（别再混用）：
+//   - 这里只服务"传送目的地是否可信 + 打印目的地名"；
+//   - **进庙判定不看它**（庙内是本地尺度坐标，换算成地图像素会落在海拉鲁中心，
+//     几乎不可能命中图标 —— v3.1.3 教训 / 台账 #24）。进庙只看坐标尺度，见 watch.go。
 func matchShrine(gx, alt, gz float32) *ProgressPoint {
 	if progress == nil {
 		return nil
@@ -146,17 +153,20 @@ func matchShrine(gx, alt, gz float32) *ProgressPoint {
 	px, py := gameToMap(gx, alt, gz)
 	progress.mu.RLock()
 	defer progress.mu.RUnlock()
+	var best *ProgressPoint
+	bestD := float32(1e18)
 	for i := range progress.refs {
 		p := &progress.refs[i]
-		if p.T != "shrine" {
+		if p.T != "shrine" && p.T != "tower" {
 			continue
 		}
 		dx, dy := px-float32(p.X), py-float32(p.Y)
-		if dx*dx+dy*dy < gameMatchShrineRadius*gameMatchShrineRadius {
-			return p
+		d := dx*dx + dy*dy
+		if d < gameMatchShrineRadius*gameMatchShrineRadius && d < bestD {
+			best, bestD = p, d
 		}
 	}
-	return nil
+	return best
 }
 
 // ---- Game 接口实现（BOTW）----
@@ -289,27 +299,79 @@ func (g *gameBotw) ShrineReturn() (time.Duration, float32) {
 	return gameShrineReturnWindow * time.Millisecond, gameShrineReturnDist
 }
 
+// anchorSkipLogged 空档过滤日志去重：SaveAnchors 会被 EdenLocate / edenShrinePos /
+// EdenSaveKnown 多次调用，同一个空档只报一次，避免日志刷屏。
+var anchorSkipLogged sync.Map
+
+// logAnchorSkip 报告被排除的空档/新档（#25 判读入口：一眼看出锚点为什么是废的）。
+func logAnchorSkip(path string, playtime uint32, dones int) {
+	if _, seen := anchorSkipLogged.LoadOrStore(path, true); seen {
+		return
+	}
+	fmt.Printf("  [anchor] skip empty/new save slot: %s (playtime=%ds, shrines=%d)\n",
+		path, playtime, dones)
+}
+
 // SaveAnchors = 原 savefile.go readSaveAnchors 逻辑原样平移。
 // 主档策略：Cemu/Eden=最新 mtime 槽（BotW 轮转写 6 槽，槽号固定不可靠，
 // 按 mtime 取最新，live-cemu 与 live-eden 双端实测）；Ryujinx=最高 playtime。
+// Cemu/Eden 选档时额外排除空档/新档（#25），见下方注释。
 func (g *gameBotw) SaveAnchors(p Platform) []*SaveAnchor {
 	files := allSaveFiles(p)
 	switch p.Name() {
 	case "Cemu", "Eden":
-		best, bestT := "", time.Time{}
+		// #25 空档陷阱（2026-10-20 05:19 实测）：不能只按 mtime 取"最新"——
+		// 6 个轮转槽里可能混着空档/新档（日志 `done: shrines 0/136`），其坐标是
+		// 初始位置（实测锚点 (-1026.5, 252.3, 1803.2)，玩家在 5000 米外的阿卡莱），
+		// 拿它当扫描中心会让整轮定位全废（±120m 只命中 391 条 → 全堆兜底锁伪坐标）。
+		// 选档策略（按 mtime 降序遍历，命中即停，只解析到答案为止）：
+		//   ① 最新档里 Playtime>0 且神庙完成数>0 的第一个 —— 正常在玩的档；
+		//   ② 兜底：最新档里 Playtime>0 的第一个（刚出初始台地、还没通关神庙）；
+		//   ③ 极端兜底：全部是空档 → 沿用旧行为（按 mtime 最新），不降低老下限。
+		type saveCand struct {
+			path string
+			mod  time.Time
+		}
+		var cands []saveCand
 		for _, f := range files {
-			if fi, err := os.Stat(f); err == nil && fi.ModTime().After(bestT) {
-				best, bestT = f, fi.ModTime()
+			if fi, err := os.Stat(f); err == nil {
+				cands = append(cands, saveCand{f, fi.ModTime()})
 			}
 		}
-		if best == "" {
-			return nil
+		sort.Slice(cands, func(i, j int) bool { return cands[i].mod.After(cands[j].mod) })
+		var strong, played *SaveAnchor
+		for _, c := range cands {
+			entries, a := parseGameData(c.path)
+			if a == nil {
+				continue
+			}
+			dones := shrineDoneCount(entries)
+			if a.Playtime == 0 || dones == 0 {
+				logAnchorSkip(c.path, a.Playtime, dones)
+			}
+			if a.Playtime == 0 {
+				continue
+			}
+			if played == nil {
+				played = a
+			}
+			if dones > 0 {
+				strong = a
+				break
+			}
 		}
-		_, a := parseGameData(best)
-		if a == nil {
-			return nil
+		if strong != nil {
+			return []*SaveAnchor{strong}
 		}
-		return []*SaveAnchor{a}
+		if played != nil {
+			return []*SaveAnchor{played}
+		}
+		for _, c := range cands {
+			if _, a := parseGameData(c.path); a != nil {
+				return []*SaveAnchor{a}
+			}
+		}
+		return nil
 	default: // Ryujinx / 兜底
 			var out []*SaveAnchor
 			seen := map[[3]int32]int{}

@@ -277,6 +277,78 @@ func dist3(a, b [3]float32) float32 {
 	return float32(math.Sqrt(float64(dx*dx + dy*dy + dz*dz)))
 }
 
+// verifyLock 强力真身认证（手册 §4.5.1）：传送跳变命中希卡塔 / 神庙固定坐标时，
+// 直接把 verified 置 true —— "目的地是固定点"比"这个槽在动"强得多。
+func verifyLock(a uintptr, why string) {
+	lock.mu.Lock()
+	changed := !lock.verified
+	lock.verified = true
+	lock.mu.Unlock()
+	if changed {
+		fmt.Printf("  [sm] lock 0x%X verified by %s\n", a, why)
+	}
+}
+
+// mountSearchBlocks 骑乘实体搜索的内存块集合（#27 的关键约束）。
+// Eden 的 sessionBlocks 返回全宿主 RW 区（64KB 下限，实测 4000+ 区 / 12.9GB），
+// findMountActor 逐块 32MB 全读 —— 会把 200ms/拍的状态机 goroutine 堵住数秒，
+// 这才是"骑马卡 5 秒"的真实来源（日志：entered riding → 5s 后才 dismounted）。
+// 因此 Eden 只搜 Switch User Heap（约 2.65GB）；其余平台沿用会话块（零改动）。
+func mountSearchBlocks(p Platform, h uintptr) []MemBlock {
+	if ep, ok := p.(*edenPlatform); ok && ep != nil {
+		if blks := edenGuestBlocksWithOptions(h, 0.0625, true, ep.pid); len(blks) > 0 {
+			return blks
+		}
+	}
+	return sessionBlocks(h)
+}
+
+// mountFallbackPos 骑乘 / 盾滑期间的主槽读数兜底（台账 #27，手册 §4.4 / §4.12）。
+//
+// 骑乘（以及盾滑）时坐标槽前 8 字节被 IsRiding 标志复用（X=0, Y=1），
+// DecodeAt 恒返回 nil；旧实现在这里 `cur = prev; continue` → 红点冻死约 5 秒。
+// 兜底顺序：
+//  1. 主槽二次采样——骑乘期是高频交替写（与 Q19 撕裂读同源），几十毫秒后
+//     常能读到合法三元组；
+//  2. 探针池里的镜像副本（同一玩家坐标的其它副本，未被标志位污染），取距上一拍最近的。
+//
+// 都取不到返回 nil，由调用方原地保持**一拍**（绝不跳过状态机）。
+func mountFallbackPos(h uintptr, a uintptr, prev [3]float32, hasPrev bool, groups []ShortlistEntry) ([]float32, string) {
+	for i := 0; i < 3; i++ {
+		if i > 0 {
+			time.Sleep(15 * time.Millisecond)
+		}
+		if d := currentGame.DecodeAt(h, a); d != nil {
+			return d, "player slot"
+		}
+	}
+	if !hasPrev {
+		return nil, ""
+	}
+	var best []float32
+	bestD := float32(probeNearDist)
+	for gi := range groups {
+		g := &groups[gi]
+		n := len(g.Addrs)
+		if n > 8 {
+			n = 8
+		}
+		for i := 0; i < n; i++ {
+			d := currentGame.DecodeAt(h, g.Addrs[i])
+			if d == nil {
+				continue
+			}
+			if dd := dist3([3]float32{d[0], d[1], d[2]}, prev); dd < bestD {
+				bestD, best = dd, d
+			}
+		}
+	}
+	if best != nil {
+		return best, "mirror copy"
+	}
+	return nil, ""
+}
+
 func stateMachine() {
 	rescanCh = make(chan struct{}, 1)
 
@@ -293,6 +365,7 @@ func stateMachine() {
 	shrineMode := false
 	var preJump [3]float32
 	var lastJumpAt time.Time
+	var lastWarpRefAt time.Time // 传送锚定自限：#23 伪槽会在同一秒内连发多条 warped to
 
 	probing := false
 	var probeGroups []ShortlistEntry
@@ -332,15 +405,17 @@ func stateMachine() {
 	// Q16 乒乓拉黑：锁到的地址若在两个固定位置间来回跳（玩家镜像被多数据源
 	// 轮流写），拉黑后探针跳过它找下一个候选；10 分钟后自动解禁
 	probeBlacklist := map[uintptr]time.Time{}
-	// 乒乓检测用：>100m 瞬跳时记录跳前位置（cap 4），cur 若与历史值重合 = A→B→A
+	// 乒乓检测用：>20m 瞬跳时记录跳前位置（cap 4），cur 若与历史值重合 = A→B→A
 	ppHist := [][3]float32{}
-	ppReprobe := false
+	// 本拍已执行"拉黑 + 淘汰毒地址 + 解锁"→ 跳过后续跟随逻辑，等重扫
+	ppUnlocked := false
 
 	// 骑乘追踪状态（BOTW 专属：马 / 大师摩托车）
 	mountActive := false
 	var mountAddr uintptr
 	var mountLastScan time.Time
 	var mountLinkPosBefore [3]float32 // 上马前林克最后的有效坐标
+	mountSrc := ""                   // 骑乘期读数来源（player slot / mirror copy），仅变化时打日志
 
 	resetFollow := func() {
 		prev, hasPrev = [3]float32{}, false
@@ -350,6 +425,7 @@ func stateMachine() {
 		mountActive = false
 		mountAddr = 0
 		mountLastScan = time.Time{}
+		mountSrc = ""
 	}
 
 	tick := time.NewTicker(smTick)
@@ -370,6 +446,7 @@ func stateMachine() {
 				state.source = "waiting for emulator"
 				state.mu.Unlock()
 			}
+			EdenClearRefCenter() // 模拟器进程没了：进程内参考中心必然失效
 			continue
 		}
 		p := currentPlatform()
@@ -400,6 +477,7 @@ func stateMachine() {
 						currentSessionBase = 0
 						knownBlocks = nil
 						zeroBlockN = 0
+						EdenClearRefCenter() // 换平台：旧进程的参考中心无意义
 						goUnlocked("platform auto-switched")
 						p = alt
 						h = alt.Handle()
@@ -757,7 +835,7 @@ func stateMachine() {
 				bgCooldown = 12 * time.Second
 			}
 		}
-		if bgScan && time.Since(lastBgScanAt) >= bgCooldown {
+		if bgScan && !shrineMode && time.Since(lastBgScanAt) >= bgCooldown {
 			bgScan = false
 			lastBgScanAt = time.Now()
 			if loc, ok := p.(edenLocator); ok {
@@ -823,7 +901,11 @@ func stateMachine() {
 			}
 		}
 
-		// ---- BOTW 骑乘（马/大师摩托车）动态伴生代理 ----
+		// ---- BOTW 骑乘（马 / 大师摩托车 / 盾滑）动态伴生代理 ----
+		// 铁律（台账 #27 / 手册 §4.4 / §4.12）：拿到骑乘信号后**先继续用玩家槽**，
+		// 只有玩家槽确实无效时才去找坐骑实体；坐骑找不到**绝不冻结画面**。
+		// 取数优先级：① 林克主槽（二次采样）→ ② 探针池镜像副本
+		//              → ③ 已捕获的坐骑实体（单地址读）→ ④ 内存扫描抓坐骑实体（最贵，最后才用）
 		if mountActive {
 			// 正在骑乘跟随中：检测林克是否已按 X 下马
 			if v != nil {
@@ -831,9 +913,19 @@ func stateMachine() {
 				fmt.Printf("  [mount] link dismounted -> restored player tracking mem=(%.1f, %.1f, %.1f)\n", v[0], v[1], v[2])
 				mountActive = false
 				mountAddr = 0
+				mountSrc = ""
 			} else if isMount, targetZ := checkMountState(h, a); isMount {
-				// 持续骑乘状态：直接跟随已捕获的坐骑实体
-				if mountAddr != 0 {
+				// ①② 主槽 + 镜像副本：每拍都试，不阻塞（这就是 #27 的正解）
+				if d, src := mountFallbackPos(h, a, prev, hasPrev, probeGroups); d != nil {
+					v = d
+					if src != mountSrc {
+						mountSrc = src
+						fmt.Printf("  [mount] riding without mount entity -> following %s mem=(%.1f, %.1f, %.1f)\n",
+							src, d[0], d[1], d[2])
+					}
+				}
+				// ③ 已捕获的坐骑实体：单地址读，便宜；主槽有读数时不再用（避免两源互相拉扯）
+				if v == nil && mountAddr != 0 {
 					dMount := currentGame.DecodeAt(h, mountAddr)
 					if dMount == nil {
 						for i := 0; i < 3; i++ {
@@ -856,10 +948,11 @@ func stateMachine() {
 						mountAddr = 0
 					}
 				}
-				// 若未捕获或坐骑槽丢失，且距离上次扫描 >= 1s，快速重捕获
-				if mountAddr == 0 && time.Since(mountLastScan) >= 1*time.Second {
+				// ④ 主槽与镜像副本全废、且没有已捕获实体 → 才去内存里抓坐骑实体
+				//    （Eden 只搜 User Heap：全宿主扫会把状态机堵死，见 mountSearchBlocks）
+				if v == nil && mountAddr == 0 && time.Since(mountLastScan) >= 1*time.Second {
 					mountLastScan = time.Now()
-					blks := sessionBlocks(h)
+					blks := mountSearchBlocks(p, h)
 					anchorPos := mountLinkPosBefore
 					if anchorPos == ([3]float32{}) && hasPrev {
 						anchorPos = prev
@@ -878,17 +971,26 @@ func stateMachine() {
 				// 既无正常坐标也不是骑乘标志
 				mountActive = false
 				mountAddr = 0
+				mountSrc = ""
 			}
-		} else {
+		} else if v == nil {
 			// 步行状态下，若 v == nil，检查是否刚上马/上摩托
-			if v == nil {
-				if isMount, targetZ := checkMountState(h, a); isMount {
-					mountActive = true
-					mountLinkPosBefore = prev
-					mountLastScan = time.Now()
-					fmt.Printf("  [mount] entered riding state (targetZ=%.1f) near (%.1f, %.1f, %.1f)\n",
-						targetZ, prev[0], prev[1], prev[2])
-					blks := sessionBlocks(h)
+			if isMount, targetZ := checkMountState(h, a); isMount {
+				mountActive = true
+				mountLinkPosBefore = prev
+				mountLastScan = time.Now()
+				mountSrc = ""
+				fmt.Printf("  [mount] entered riding state (targetZ=%.1f) near (%.1f, %.1f, %.1f)\n",
+					targetZ, prev[0], prev[1], prev[2])
+				// 先主槽 / 镜像副本（#27：不许先冻住去扫内存）
+				if d, src := mountFallbackPos(h, a, prev, hasPrev, probeGroups); d != nil {
+					v = d
+					mountSrc = src
+					fmt.Printf("  [mount] riding without mount entity -> following %s mem=(%.1f, %.1f, %.1f)\n",
+						src, d[0], d[1], d[2])
+				}
+				if v == nil {
+					blks := mountSearchBlocks(p, h)
 					if mAddr, mPos, found := findMountActor(h, blks, mountLinkPosBefore, targetZ); found {
 						mountAddr = mAddr
 						v = []float32{mPos[0], mPos[1], mPos[2]}
@@ -904,26 +1006,20 @@ func stateMachine() {
 
 		if v == nil {
 			if mountActive && hasPrev {
-				// 骑乘搜索过渡期：保持上一帧有效位置，不丢锁，不飘红点
-				cur := prev
-				gx, gy, gz := currentGame.Display(cur)
+				// 骑乘 / 盾滑兜底：主槽 + 镜像副本都读不到 → 原地保持**一拍**。
+				// 注意：这里不再 `continue`（旧实现 `cur = prev; continue` 就是
+				// "红点冻死 5 秒"的直接来源）；下一拍照样重试主槽与镜像副本。
+				v = []float32{prev[0], prev[1], prev[2]}
+			} else {
+				invalidN++
 				state.mu.Lock()
-				state.ok = true
-				state.gx, state.gy, state.gz = gx, gy, gz
-				state.mx, state.my = currentGame.ToMap(gx, gy, gz)
-				state.source = "mount (searching)"
-				state.age = float64(time.Now().UnixNano()) / 1e9
+				state.ok = false
+				state.source = "address lost (waiting for restore)"
 				state.mu.Unlock()
+				// 进神庙时地址暂时读不到，保持最后位置不飘，等游戏恢复
+				_ = invalidMax
 				continue
 			}
-			invalidN++
-			state.mu.Lock()
-			state.ok = false
-			state.source = "address lost (waiting for restore)"
-			state.mu.Unlock()
-			// 进神庙时地址暂时读不到，保持最后位置不飘，等游戏恢复
-			_ = invalidMax
-			continue
 		}
 		invalidN = 0
 		cur := [3]float32{v[0], v[1], v[2]}
@@ -975,44 +1071,113 @@ func stateMachine() {
 			}
 			for _, old := range ppHist {
 				if dist3(cur, old) < 1.0 {
+					// 乒乓硬解锁 + 毒地址淘汰（v3.1.3 已真机验收，回档丢失，台账 #32）：
+					// 旧实现只 `blacklist + re-probe` = 空转——探针重装后同一地址
+					// 仍会被重新选中（06:10 实测 1 分钟 7 次 ping-pong，红点抖 1 分钟）。
 					probeBlacklist[a] = time.Now()
-					fmt.Printf("  [sm] lock 0x%X ping-pong (%.0fm jump back to recent pos) -> blacklist + re-probe\n", a, delta)
+					fmt.Printf("  [sm] lock 0x%X ping-pong (%.0fm jump back to recent pos) -> blacklist + drop known + unlock\n", a, delta)
+					if _, isEden := p.(edenLocator); isEden {
+						edenKnownFail(a) // 常规三振出局通道（记一次读失败）
+						edenDropKnown(a) // 乒乓是确定性毒地址：一次即硬剔除，防止下次启动再锁同一毒槽
+					}
 					ppHist = ppHist[:0]
-					probing = true
-					probeMoved = make([]int, len(probeGroups))
+					probing = false
+					probeGroups = nil
+					probeMoved = nil
 					probeBase = map[uintptr][3]float32{}
 					probeAddrMoves = map[uintptr]int{}
-					probeStart = time.Now()
-					probeLast = time.Now()
 					probeLockGi = -1
 					probeRearms = 0
-					ppReprobe = true
+					inLocked = false
+					goUnlocked("ping-pong -> unlock")
+					ppUnlocked = true
 					break
 				}
 			}
-			if ppReprobe {
-				ppReprobe = false
+			if ppUnlocked {
+				ppUnlocked = false
 				continue
 			}
 		}
 
+		// ---- 传送（手册 §4.5）：单拍 >300m 跳变 ----
+		// 判定顺序（04:16 / 05:11 代已真机验收，#28）：
+		//   命中希卡塔 → warped to tower: 名字
+		//   命中神庙且坐标已是本地尺度 → 进庙（红点钉门口）
+		//   命中神庙但仍是世界尺度 → warped to shrine gate: 名字
+		//   没命中任何固定点 → warped to (x, y, z)
+		//   未验证且没命中 → 解锁重扫（防野指针）
 		if hasPrev && delta > teleportDist {
 			lock.mu.RLock()
 			ver := lock.verified
 			lock.mu.RUnlock()
-			if ver {
-				incCounter("jumps")
-				frozenN = 0
-				lastBgScanAt = time.Time{}
-				preJump = prev
-				lastJumpAt = time.Now()
-				if pnt := currentGame.MatchShrine(cur[0], cur[1], cur[2]); pnt != nil {
-					shrineMode = true
-					fmt.Printf("  [shrine] entered %s\n", pnt.Cn)
-				}
-			} else {
+			pnt := currentGame.MatchShrine(cur[0], cur[1], cur[2])
+			// 进庙尺度（手册 §4.6）：当前拍是本地尺度 **且上一拍是世界尺度**
+			// （防海拉鲁中心原点带的合法世界坐标被误判成庙内坐标）
+			enteredLocal := abs32(cur[0]) < currentGame.ShrineExit() && abs32(cur[2]) < currentGame.ShrineExit() &&
+				(abs32(prev[0]) >= currentGame.ShrineExit() || abs32(prev[2]) >= currentGame.ShrineExit())
+			if pnt == nil && !ver {
 				inLocked = false
 				goUnlocked(fmt.Sprintf("teleport jump %.0fm on unverified -> rescan", delta))
+				continue
+			}
+			incCounter("jumps")
+			frozenN = 0
+			lastBgScanAt = time.Time{}
+			preJump = prev
+			lastJumpAt = time.Now()
+			// 传送目的地锚定：进程内动态参考中心钉在目的地（不落盘，重启清零）。
+			// 自限（台账 #23 连带后果）：1.5s 内第二次"传送"基本不可能是真人操作 →
+			// 不写参考中心，避免伪坐标槽把扫描中心灌脏（伪槽指纹见手册 §4.5.3）。
+			if time.Since(lastWarpRefAt) >= 1500*time.Millisecond {
+				edenSetRefCenter(cur)
+				lastWarpRefAt = time.Now()
+			} else {
+				fmt.Printf("  [teleport] repeated jump within 1.5s - scan center not updated (suspect pseudo slot)\n")
+			}
+			switch {
+			case pnt != nil && pnt.T == "tower":
+				fmt.Printf("  [teleport] warped to tower: %s\n", pnt.Cn)
+				verifyLock(a, "teleport tower")
+			case pnt != nil && enteredLocal:
+				// 直接传送进庙：坐标已切本地尺度 → 进庙模式，红点钉在入口
+				shrineMode = true
+				fmt.Printf("  [shrine] entered %s (local scale) -> holding entry (%.1f, %.1f, %.1f)\n",
+					pnt.Cn, prev[0], prev[1], prev[2])
+				verifyLock(a, "teleport shrine")
+			case pnt != nil:
+				fmt.Printf("  [teleport] warped to shrine gate: %s\n", pnt.Cn)
+				verifyLock(a, "teleport shrine gate")
+			default:
+				fmt.Printf("  [teleport] warped to (%.1f, %.1f, %.1f)\n", cur[0], cur[1], cur[2])
+			}
+			if shrineMode {
+				// 庙内是本地尺度坐标：不跟随、不写 known、不触发重扫（手册 §4.6）
+				state.mu.Lock()
+				state.ok = true
+				state.source = "shrine"
+				state.age = float64(time.Now().UnixNano()) / 1e9
+				state.mu.Unlock()
+				continue
+			}
+		}
+
+		// ---- 进庙判定（手册 §4.6 尺度法，禁止挂像素匹配 / #24）----
+		// 判据：坐标切到本地尺度（|X|<300 且 |Z|<300）**且上一拍是世界尺度**。
+		// delta>100 是防"海拉鲁中心原点带"误判的闸门：正常跑动每拍 ~1.2m，
+		// 只有场景切换才可能在 200ms 内推进 100m。
+		if !shrineMode && hasPrev && delta > 100 {
+			localNow := abs32(cur[0]) < currentGame.ShrineExit() && abs32(cur[2]) < currentGame.ShrineExit()
+			worldPrev := abs32(prev[0]) >= currentGame.ShrineExit() || abs32(prev[2]) >= currentGame.ShrineExit()
+			if localNow && worldPrev {
+				shrineMode = true
+				fmt.Printf("  [shrine] entered (local scale %.0f, %.0f) -> holding entry (%.1f, %.1f, %.1f)\n",
+					cur[0], cur[2], prev[0], prev[1], prev[2])
+				state.mu.Lock()
+				state.ok = true
+				state.source = "shrine"
+				state.age = float64(time.Now().UnixNano()) / 1e9
+				state.mu.Unlock()
 				continue
 			}
 		}
@@ -1036,6 +1201,10 @@ func stateMachine() {
 				}
 				lock.mu.Unlock()
 				probing = false
+				if _, isEden := currentPlatform().(edenLocator); isEden {
+					// 移动确认 → 进程内动态参考中心跟上玩家（手册 §2.3 写入时机之一）
+					edenSetRefCenter(cur)
+				}
 				if !savedKnown {
 					savedKnown = true
 					if loc, ok := currentPlatform().(edenLocator); ok {
