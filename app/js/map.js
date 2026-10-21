@@ -60,7 +60,11 @@ const CAT_GROUP = {
 const K_SETTINGS = 'botwmap.settings.v1';
 const DEFAULT_SETTINGS = {
   doneMode: 'dim',   // 'dim' 默认（已完成的点变灰仍显示） | 'hide' 隐藏
-  hideCats: { shrine: 1, seed: 1, memory: 1, chest: 1, tower: 0, beast: 0, equip: 0, quest: 0, boss: 0 },
+  // 2026-10-22（老大定）：各类目默认**全不勾**——切到「隐藏」只隐藏「已完成的点」，
+  // 该不该连整类一起隐藏由用户自己勾选。原默认勾了 shrine/seed/memory/chest 四类，
+  // 导致用户只想藏已完成的点，却连带把四类点位整体藏掉（违反直觉）。
+  // 存量用户不受影响：load() 里已存的 hideCats 覆盖默认值。
+  hideCats: { shrine: 0, seed: 0, memory: 0, chest: 0, tower: 0, beast: 0, equip: 0, quest: 0, boss: 0 },
   dragonPath: true,
   regionShow: true,
 };
