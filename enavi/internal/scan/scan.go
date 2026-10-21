@@ -110,15 +110,60 @@ type Hit struct {
 	Addr   uintptr
 	P      Vec3
 	Copies int     // 坐标相同（0.1m 内）的地址数，仅作参考，不作身份判据
-	Rot    bool    // 邻近是否有 3x3 旋转矩阵（Actor 结构特征）
+	Rot    bool    // 邻近是否有 3x3 正交旋转矩阵（Actor 结构特征，已排除轴矩阵）
 	Quat   bool    // pos+0x0C 处是否是单位模长四元数（位置历史记录特征）
+	Run    int     // 连续有效位置记录数（0x40 步长）—— 活的玩家帧是一整条 run
 	Dist   float64 // 与锚点的 3D 距离（锚点为 nil 时为 0）
 }
 
 // ---------- ★ 身份判据（2026-10-21 实测重新确立） ----------
 
+// RecStride 位置历史记录的步长（实测 0x40 = 64 字节）。
+const RecStride = 0x40
+
 // QuatWindowBytes 容纳「pos + 四元数(16B)」所需的最小长度。
 const QuatWindowBytes = 0x0C + 16
+
+// IsValidRec 判断 buf[off:] 处是不是一条合法的位置记录
+// （坐标合法 + 四元数单位模长）。
+func IsValidRec(buf []byte, off int) bool {
+	if off < 0 || off+QuatWindowBytes > len(buf) {
+		return false
+	}
+	p := Vec3{f32b(buf, off), f32b(buf, off+4), f32b(buf, off+8)}
+	if !p.WorldCoordOK() {
+		return false
+	}
+	return IsQuatUnit(buf, off+0x0C)
+}
+
+// RunLength 数 buf[off:] 处在 0x40 步长上连续延伸的合法记录数。
+//
+// ★ 为什么这个判据最准（2026-10-21 16:0x 实测）：
+//
+//	玩家当前帧在内存里是**一整条连续的 run**（实测 run=5~17，连续 0x40 步长）；
+//	而冻结的历史副本是**孤立的**（前后 ±0x40 都不是合法记录，run=1）。
+//	另外玩家当前帧的 run 位于**两个独立拷贝**中（实测相距 145MB），
+//	其中只有一个是活的 —— run 长度 + 是否在变，两者合起来才能锁定玩家。
+func RunLength(buf []byte, off int) int {
+	if !IsValidRec(buf, off) {
+		return 0
+	}
+	n := 1
+	for k := 1; k <= 16; k++ {
+		if !IsValidRec(buf, off+k*RecStride) {
+			break
+		}
+		n++
+	}
+	for k := 1; k <= 16; k++ {
+		if off-k*RecStride < 0 || !IsValidRec(buf, off-k*RecStride) {
+			break
+		}
+		n++
+	}
+	return n
+}
 
 // IsQuatUnit 判断 buf[off:off+16] 是否是单位模长四元数。
 //
@@ -141,7 +186,6 @@ func IsQuatUnit(buf []byte, off int) bool {
 }
 
 // IsAxisMatrix 判断 buf[off:off+36] 是不是「单位轴矩阵」。
-//
 // ★ 为什么必须排除它：
 //   轴矩阵（9 个元素里正好 3 个非零、且都是 ±1，如 0,1,0 / -1,0,0 / 0,0,1）
 //   **完全满足** Rot3OK 的全部判据（三列单位长、两两正交），
@@ -202,6 +246,10 @@ func FindTriples(buf []byte, base uintptr, opt Options) []Hit {
 		// Quat：pos + 单位模长四元数（位置历史记录特征）。
 		//   这是**当前实机最可靠的身份判据**（见 ENAVI-HANDBOOK §6）。
 		h.Quat = IsQuatUnit(buf, off+0x0C)
+		// Run：连续有效记录数（活的玩家帧是一整条 run，冻结副本是孤立的）
+		if h.Quat {
+			h.Run = RunLength(buf, off)
+		}
 		hits = append(hits, h)
 	}
 	return hits
@@ -292,6 +340,9 @@ func Group(hits []Hit) []Hit {
 			out[i].Copies++
 			out[i].Rot = out[i].Rot || h.Rot
 			out[i].Quat = out[i].Quat || h.Quat
+			if h.Run > out[i].Run {
+				out[i].Run = h.Run
+			}
 			continue
 		}
 		h.Copies = 1
@@ -299,12 +350,22 @@ func Group(hits []Hit) []Hit {
 		out = append(out, h)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
+		// ① 连续 run 越长越像玩家当前帧（活的玩家帧是一整条 run）
+		if (out[i].Run > 0) != (out[j].Run > 0) {
+			return out[i].Run > 0
+		}
+		if out[i].Run != out[j].Run {
+			return out[i].Run > out[j].Run
+		}
+		// ② 有四元数指纹的（位置历史记录）
 		if out[i].Quat != out[j].Quat {
 			return out[i].Quat
 		}
+		// ③ 有 3x3 矩阵的（Actor 结构，已排除轴矩阵）
 		if out[i].Rot != out[j].Rot {
 			return out[i].Rot
 		}
+		// ④ 距锚点近
 		return out[i].Dist < out[j].Dist
 	})
 	return out

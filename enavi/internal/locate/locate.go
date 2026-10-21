@@ -61,6 +61,10 @@ const (
 	shrineXY    = 100.0 // 神庙本地坐标的 X/Z 绝对值上限（米）
 	shrineMaxY  = 50.0  // 神庙本地坐标的海拔上限（米）
 	saveFreshS  = 120   // 磁盘存档"新鲜"判定：mtime 距今秒数（自动存档落地后约 1~2 秒写入）
+	// winWide 宽窗半径：存档锚点可能严重过期（实测玩家走了 800+ 米而存档没更新），
+	//   窄窗（120m）根本扫不到人 → 必须有宽窗兜底。
+	//   宽窗下靠「连续 run 长度 + 是否在变」来识别玩家，不靠距离。
+	winWide = 3000.0
 )
 
 // isShrineScale 是否为「神庙试炼场本地尺度」坐标。
@@ -289,10 +293,39 @@ func New(p *winmem.Process) (*Tracker, error) {
 			found = true
 		}
 	}
+	// ★★★ 宽窗兜底（2026-10-21 16:0x 实测）：
+	//
+	//	实测玩家从 (98.1, 121.7, 1657.0) 走到了 (-705, 177, 1706) —— 800+ 米，
+	//	而磁盘存档还停在老位置（mtime 15:25，游戏没自动存档）。
+	//	这时候**以存档为中心的任何窄窗都扫不到人**。
+	//
+	//	但窄窗有时会"成功"——锁到一个 run 很长但**位置是旧的**的记录
+	//	（实测窄窗命中过 run=33 但坐标是 69.8/1612.7，离玩家 800 米）。
+	//	所以判断标准不是"扫到没"，而是"扫到的**位置**合不合理"。
+	if !found || !t.anchorFresh() {
+		logf("[locate] 存档锚点附近没找到玩家（锚点可能已过期），改用 %0.0fm 宽窗重扫\n", winWide)
+		if t.rescan(t.anchor, winWide) {
+			found = true
+		}
+	}
 	if !found {
 		return nil, fmt.Errorf("存档锚点 (%.1f, %.1f, %.1f) 窗口内未找到活跃玩家 Actor（请确认已载入游戏世界，若仍在加载画面请稍候）", t.anchor.X, t.anchor.Y, t.anchor.Z)
 	}
 	return t, nil
+}
+
+// anchorFresh 判断当前锁定的位置是否还"新鲜"（相对存档锚点没跑太远）。
+//
+// 用途：存档锚点可能严重过期（玩家走了 800+ 米而游戏没自动存档），
+// 此时窄窗扫到的"最近记录"其实是老位置 → 必须改用宽窗全图找。
+func (t *Tracker) anchorFresh() bool {
+	t.mu.RLock()
+	cur, anchor := t.cur, t.anchor
+	t.mu.RUnlock()
+	if !anchor.Valid() {
+		return true // 没有锚点可比 → 信任当前结果
+	}
+	return cur.Dist2D(anchor) < 400
 }
 
 // Anchor 存档锚点（日志用）。
@@ -689,26 +722,30 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	// ★★ 再加一道：坐标必须通过 WorldCoordOK（严于 Valid）——
 	//   实测踩到过参数表里的退化坐标 (107.7, 1.0, 0.0)：
 	//   Valid() 对它返回 true，但它离玩家 2485m，锁上去红点直接飞到天边。
-	// ★ 身份判据（2026-10-21 实测重订）：
+	// ★ 身份判据（2026-10-21 16:0x 实测重订）：
 	//   「pos + 单位模长四元数」= 位置历史记录 = 当前实机最可靠的目标。
 	//   3x3 正交矩阵降级为辅助（h.Rot，已排除轴矩阵假阳性）。
 	//
 	//   为什么不要「只要有 3x3 矩阵」：实测某些场景里**一个真 Actor 矩阵都没有**，
 	//   命中的 6 个全是轴矩阵（骨骼基向量/方向轴）→ 锁到的就是死数据。
+	//
+	// ★★ 硬门槛：必须有**连续 run**（Run >= 2）。
+	//   玩家的当前帧在内存里是一整条连续的 0x40 步长 run（实测 run=5~17），
+	//   而冻结的历史副本是**孤立的**（前后 ±0x40 都不是合法记录，run=1）。
+	//   只要 run>=2 就能把「冻结副本」全排除掉。
 	identHits := make([]scan.Hit, 0, len(allHits))
 	for _, h := range allHits {
 		if !h.P.WorldCoordOK() {
 			continue
 		}
-		if !h.Quat && !h.Rot {
-			continue // 既没有四元数指纹也没有矩阵 → 不是目标
+		if h.Run < 2 {
+			continue // 孤立的记录 = 冻结副本，不是玩家当前帧
 		}
 		identHits = append(identHits, h)
 	}
 	if len(identHits) == 0 {
 		return false
 	}
-
 	// 坐标分组去重（有四元数优先 + 有矩阵次之 + 距中心近）。
 	groups := scan.Group(identHits)
 	if len(groups) == 0 {
@@ -780,35 +817,99 @@ type scanJob struct {
 //   上千个候选逐个读要 1 秒以上；而块读（8MB）只要几百次，总计 ~1 秒，
 //   而且是**同一批地址**的重读，能直接对比。
 func (t *Tracker) pickLiveCandidate(groups []scan.Hit, jobs []scanJob, chunk int, overlap int) (scan.Hit, bool) {
-	const liveProbeWait = 700 * time.Millisecond
-	const liveMoveDist = 0.001 // 1mm 以上的变化算"在动"（玩家站着也有微小浮动）
+	const liveProbeWait = 500 * time.Millisecond
+	const liveMoveDist = 0.001 // 1mm 以上的变化算"在动"
+	const maxSaneJump = 30.0   // 超过 30m 算"环形缓冲回绕"，不是真实移动
 
 	if len(groups) == 0 {
 		return scan.Hit{}, false
 	}
-	// 只探测前 N 个候选（按优先级已排好），避免全量对比
 	const maxProbe = 400
 	probes := groups
 	if len(probes) > maxProbe {
 		probes = probes[:maxProbe]
 	}
-	// 记下探测前的坐标
 	before := make(map[uintptr]scan.Vec3, len(probes))
 	for _, h := range probes {
 		before[h.Addr] = h.P
 	}
 
-	time.Sleep(liveProbeWait)
+	// 第一轮采样：筛出"在动"的
+	moved1 := t.probeMovers(probes, jobs, before, liveMoveDist, maxSaneJump)
+	if len(moved1) == 0 {
+		best := probes[0]
+		for _, h := range probes[1:] {
+			if h.Dist < best.Dist {
+				best = h
+			}
+		}
+		return best, false
+	}
 
-	// 重读包含候选的块（并发），对比变化
-	var mu sync.Mutex
-	movers := map[uintptr]float64{}
+	// ★ 第二轮采样：确认是**连续移动**，不是环形缓冲回绕。
+	//
+	// 实测（2026-10-21 15:58）：位置历史记录是**环形缓冲**，
+	// 写到头会绕回，某个槽的内容会**突然变成几公里外的旧位置**（实测跳了 1648m）。
+	// 只看一次变化会把这个槽当成"在动"→ 锁上去 → 下一拍坐标突变 → 判失效 → 无限重扫。
+	//
+	// 连续移动的特征：**两次采样都是小幅变化，且方向一致**。
+	time.Sleep(liveProbeWait)
+	after1 := make(map[uintptr]scan.Vec3, len(moved1))
+	for addr := range moved1 {
+		if p, alive, ok := t.readActor(addr); ok && alive {
+			after1[addr] = p
+		}
+	}
+	moved2 := t.probeMovers(probes, jobs, after1, liveMoveDist, maxSaneJump)
+
+	// 两轮都在动的 = 连续跟踪 = 玩家当前帧
+	live := map[uintptr]bool{}
+	for addr := range moved1 {
+		if moved2[addr] {
+			live[addr] = true
+		}
+	}
+	if len(live) == 0 {
+		logf("[locate] 活体探测：无连续移动的候选（玩家可能静止）\n")
+		best := probes[0]
+		for _, h := range probes[1:] {
+			if h.Dist < best.Dist {
+				best = h
+			}
+		}
+		return best, false
+	}
+
+	// 在连续移动的候选里，取离存档锚点最近的（玩家最可能在那附近）
+	best, bestD := probes[0], 1e18
+	n := 0
+	for _, h := range probes {
+		if !live[h.Addr] {
+			continue
+		}
+		n++
+		if h.Dist < bestD {
+			best, bestD = h, h.Dist
+		}
+	}
+	logf("[locate] 活体探测：%d/%d 个候选连续移动，选中 %#x (%.1f, %.1f, %.1f) 距锚点=%.1fm\n",
+		n, len(probes), best.Addr, best.P.X, best.P.Y, best.P.Z, best.Dist)
+	return best, true
+}
+
+// probeMovers 把含候选的内存块重读一遍，返回"位置变了且变化合理"的候选地址集合。
+func (t *Tracker) probeMovers(probes []scan.Hit, jobs []scanJob, before map[uintptr]scan.Vec3, minMove, maxJump float64) map[uintptr]bool {
+	movers := map[uintptr]bool{}
 	for _, j := range jobs {
 		buf, err := t.proc.Read(j.addr, j.n)
 		if err != nil || len(buf) < 12 {
 			continue
 		}
 		for _, h := range probes {
+			prev, ok := before[h.Addr]
+			if !ok {
+				continue
+			}
 			rel := int64(h.Addr) - int64(j.addr)
 			if rel < 0 || rel+12 > int64(len(buf)) {
 				continue
@@ -819,39 +920,12 @@ func (t *Tracker) pickLiveCandidate(groups []scan.Hit, jobs []scanJob, chunk int
 				Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[off+4:])),
 				Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[off+8:])),
 			}
-			d := now.Dist3D(before[h.Addr])
-			if d <= liveMoveDist {
+			d := now.Dist3D(prev)
+			if d < minMove || d > maxJump {
 				continue
 			}
-			mu.Lock()
-			if d > movers[h.Addr] {
-				movers[h.Addr] = d
-			}
-			mu.Unlock()
+			movers[h.Addr] = true
 		}
 	}
-	if len(movers) == 0 {
-		// 都没动：取离锚点最近的那个（玩家站着不动时的合理退路）
-		best := probes[0]
-		for _, h := range probes[1:] {
-			if h.Dist < best.Dist {
-				best = h
-			}
-		}
-		return best, false
-	}
-	// 动了的里，取位移最大的（真玩家跑动幅度最大），同值时取离锚点近的
-	best, bestD := probes[0], -1.0
-	for _, h := range probes {
-		d, ok := movers[h.Addr]
-		if !ok {
-			continue
-		}
-		if d > bestD || (d == bestD && h.Dist < best.Dist) {
-			best, bestD = h, d
-		}
-	}
-	logf("[locate] 活体探测：%d/%d 个候选在变，选中 %#x (%.1f, %.1f, %.1f) 位移=%.4fm\n",
-		len(movers), len(probes), best.Addr, best.P.X, best.P.Y, best.P.Z, bestD)
-	return best, true
+	return movers
 }
