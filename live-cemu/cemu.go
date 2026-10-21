@@ -37,6 +37,7 @@ var (
 	procCreateToolhelpSnap = kernel32.NewProc("CreateToolhelp32Snapshot")
 	procProcess32FirstW    = kernel32.NewProc("Process32FirstW")
 	procProcess32NextW     = kernel32.NewProc("Process32NextW")
+	procQueryFullImageName = kernel32.NewProc("QueryFullProcessImageNameW")
 )
 
 type ProcessEntry32W struct {
@@ -92,6 +93,23 @@ func utf16Decode(u []uint16) []rune {
 		out = append(out, r)
 	}
 	return out
+}
+
+// processPath 取进程 exe 完整路径（自动扫描"运行中的 Cemu.exe 目录"用）。
+// 权限：openProc 已带 PROCESS_QUERY_INFORMATION（0x0400），QueryFullProcessImageNameW 可直接用。
+func processPath(pid uint32) string {
+	h := openProc(pid)
+	if h == 0 {
+		return ""
+	}
+	defer procCloseHandle.Call(h)
+	buf := make([]uint16, 1024)
+	n := uint32(len(buf))
+	r, _, _ := procQueryFullImageName.Call(h, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&n)))
+	if r == 0 || n == 0 {
+		return ""
+	}
+	return string(utf16Decode(buf[:n]))
 }
 
 func openProc(pid uint32) uintptr {

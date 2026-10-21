@@ -309,6 +309,18 @@ func main() {
 	fmt.Printf("  CemuNavi %s - Breath of the Wild (Cemu) live tracker\n", buildVer)
 	fmt.Println("==================================================")
 
+	// 参数解析必须先于 trackLoop/startProgress，否则手动存档路径在首次进度读取时不生效。
+	certDir := "certs"
+	for _, a := range os.Args[1:] {
+		if strings.HasPrefix(a, "--tls-cert-dir=") {
+			certDir = strings.TrimPrefix(a, "--tls-cert-dir=")
+		}
+		if strings.HasPrefix(a, "--cemu-save-dir=") {
+			cemuSaveDirOverride = strings.TrimPrefix(a, "--cemu-save-dir=")
+			fmt.Printf("  [save] manual save dir: %s (top priority, isolated from auto-scan)\n", cemuSaveDirOverride)
+		}
+	}
+
 	go trackLoop()
 	startProgress()
 
@@ -322,12 +334,6 @@ func main() {
 	// v1.3.2：exe 旁 certs/ 有证书（server.pem + server.key）→ 自动启用 https 双协议，
 	// 手机镜像页获得 secure context（wakeLock 防息屏生效）；缺证书降级 http，定位照常。
 	tlsMode := false
-	certDir := "certs"
-	for _, a := range os.Args[1:] {
-		if strings.HasPrefix(a, "--tls-cert-dir=") {
-			certDir = strings.TrimPrefix(a, "--tls-cert-dir=")
-		}
-	}
 	if abs, err := filepath.Abs(certDir); err == nil {
 		certDir = abs
 	}

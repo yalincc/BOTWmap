@@ -61,7 +61,18 @@ var progress = &progressWatcher{}
 
 /* ---------- 存档定位 ---------- */
 
+// cemuSaveDirOverride 由 --cemu-save-dir= 指定（手动指定存档根）。
+// 手动指定 = 唯一存档根：最优先、隔离自动探测、完全信任（进度按 mtime 最新读）。
+var cemuSaveDirOverride string
+
+// saveRoots 存档根候选：
+//   - 手动指定（--cemu-save-dir=）：唯一根（不再叠加自动探测，读不到就是没有）
+//   - 自动：%APPDATA%\Cemu（mlc01 层 + 直连层）+ 运行中的 Cemu.exe 所在目录（两种布局）
+//     便携版 Cemu 常把 mlc 数据放 exe 同目录（无 mlc01 中间层），运行中目录探测可直接命中。
 func saveRoots() []string {
+	if cemuSaveDirOverride != "" {
+		return []string{cemuSaveDirOverride}
+	}
 	var roots []string
 	add := func(p string) {
 		if p != "" {
@@ -72,19 +83,14 @@ func saveRoots() []string {
 		add(v)
 	}
 	if app := os.Getenv("APPDATA"); app != "" {
-		add(filepath.Join(app, "Cemu", "mlc01", "usr", "save", "00050000"))
+		add(filepath.Join(app, "Cemu", "mlc01", "usr", "save", "00050000")) // 安装版（mlc01 层）
+		add(filepath.Join(app, "Cemu", "usr", "save", "00050000"))          // mlc 根直连
 	}
-	if exe, err := os.Executable(); err == nil {
-		add(filepath.Join(filepath.Dir(exe), "mlc01", "usr", "save", "00050000"))
-	}
-	for _, base := range []string{
-		filepath.Join(os.Getenv("USERPROFILE"), "Documents", "Cemu"),
-		`C:\Cemu`, `D:\Cemu`, `E:\Cemu`, `H:\Cemu`, `H:\Cemu\Cemu_2.6`,
-	} {
-		if base != "" && base != filepath.Join(os.Getenv("USERPROFILE"), "Documents", "Cemu") {
-			add(filepath.Join(base, "mlc01", "usr", "save", "00050000"))
-		} else if base != "" {
-			add(filepath.Join(base, "mlc01", "usr", "save", "00050000"))
+	for _, pid := range findAllPid("Cemu") {
+		if p := processPath(pid); p != "" {
+			dir := filepath.Dir(p)
+			add(filepath.Join(dir, "mlc01", "usr", "save", "00050000"))
+			add(filepath.Join(dir, "usr", "save", "00050000"))
 		}
 	}
 	return roots
@@ -200,6 +206,9 @@ func (w *progressWatcher) refresh() {
 	if best == "" {
 		if !w.init {
 			fmt.Println("  [progress] no Cemu save found yet - watching")
+			fmt.Printf("  [progress] searched: %v\n", saveRoots())
+			fmt.Println("  [progress] tip: portable Cemu often keeps saves at <CemuDir>\\usr\\save\\00050000\\101c9300")
+			fmt.Println("  [progress]      if not found, run with --cemu-save-dir=<dir> to specify (manual takes priority)")
 		}
 		w.ok = false
 		w.init = true
