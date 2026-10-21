@@ -116,30 +116,22 @@ func isShrineScale(v scan.Vec3) bool {
 //   记录 = pos(12) + 四元数(16) → 至少 28 字节；
 //   若还要看 3x3 矩阵（最远 +0x2C）→ 需 80 字节。
 //   旧代码读 64 字节 → 矩阵在 +0x20 时够不到 → 误判「Actor 已死」→ 无限重扫。
-const actorReadLen = 128
-
-func (t *Tracker) readActor(addr uintptr) (pos scan.Vec3, alive bool, ok bool) {
-	buf, err := t.proc.ReadTimeout(addr, actorReadLen, 500*time.Millisecond)
+// readActor 读一个位置记录。
+// 只要能读出 12 字节并且通过 WorldCoordOK，即视为有效坐标。
+func (t *Tracker) readActor(addr uintptr) (pos scan.Vec3, ok bool) {
+	buf, err := t.proc.ReadTimeout(addr, 12, 500*time.Millisecond)
 	if err != nil || len(buf) < 12 {
-		return scan.Vec3{}, false, false
+		return scan.Vec3{}, false
 	}
 	p := scan.Vec3{
 		X: math.Float32frombits(binary.LittleEndian.Uint32(buf[0:])),
 		Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[4:])),
 		Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[8:])),
 	}
-	// 闸①：坐标必须合法（NaN / Inf / 越界 / 近零 / 轴上退化 全挡掉）
 	if !p.WorldCoordOK() {
-		return p, false, true
+		return p, false
 	}
-	// 闸②：四元数仍是单位模长 → 这条记录还活着
-	//     （读不够长度时**不能**判死 —— 那是"没读到"而不是"没有"）
-	if len(buf) >= scan.QuatWindowBytes {
-		if !scan.IsQuatUnit(buf, 0x0C) {
-			return p, false, true
-		}
-	}
-	return p, true, true
+	return p, true
 }
 
 // Logger 定位核心的日志出口（由 cmd/enavi 注入，落到 enavi.log）。
@@ -228,40 +220,27 @@ func New(p *winmem.Process) (*Tracker, error) {
 		t.anchor = scan.Vec3{X: best.Pos[0], Y: best.Pos[1], Z: best.Pos[2]}
 	}
 
-	// ① known 缓存：同一 Eden 会话内，直接读，不进扫描
-	//
-	// ★ 门禁比旧版严得多（2026-10-21 实测事故修复）：
-	//   旧版只看「坐标合法 + 附近有 3x3 矩阵 + 距存档 <800m」，
-	//   结果 known 里存了一条**死地址**（玩家进神庙后那个 Actor 被释放），
-	//   而那块内存被引擎复用成了别的东西 → 秒锁到一个假坐标 → 之后再也定位不上。
-	//   现在必须同时满足：
-	//     ① 坐标通过 WorldCoordOK（挡 NaN/退化坐标/参数表）
-	//     ② 四元数仍是单位模长（= 这条记录还活着；3x3 矩阵只作辅助）
-	//     ③ 距存档锚点 < 800m
-	//   任一不过 → 立即作废，走全堆扫描。
+	// ① known 缓存：同一 Eden 会话内，直接读，不进扫描。
+	// 只要地址依然可读且坐标通过 WorldCoordOK，直接 0ms 秒锁。
 	if e, ok := known.Load().Pick(t.pid, t.started); ok && e.Verified {
-		// 读 128 字节：矩阵最远在 +0x2C，读 64 字节会看不到它 → 误判失效。
-		if buf, err := p.Read(e.Addr, actorReadLen); err == nil && len(buf) >= scan.QuatWindowBytes {
+		buf, err := p.Read(e.Addr, 12)
+		if err == nil && len(buf) >= 12 {
 			pos := scan.Vec3{
 				X: math.Float32frombits(binary.LittleEndian.Uint32(buf[0:])),
 				Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[4:])),
 				Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[8:])),
 			}
-			alive := pos.WorldCoordOK() && scan.IsQuatUnit(buf, 0x0C)
-			if alive {
-				anchorOK := !t.anchor.Valid() || pos.Dist2D(t.anchor) < 800
-				if anchorOK {
-					t.addr = e.Addr
-					t.cur = pos
-					t.ok = true
-					t.verified = true
-					logf("[locate] known 缓存命中（秒锁）：%#x pos=(%.1f, %.1f, %.1f)\n",
-						e.Addr, pos.X, pos.Y, pos.Z)
-					return t, nil
-				}
+			if pos.WorldCoordOK() {
+				t.addr = e.Addr
+				t.cur = pos
+				t.ok = true
+				t.verified = true
+				logf("[locate] known 缓存命中（秒锁）：%#x pos=(%.1f, %.1f, %.1f)\n",
+					e.Addr, pos.X, pos.Y, pos.Z)
+				return t, nil
 			}
 		}
-		logf("[locate] known 缓存已失效（地址死了或坐标非法），改走扫描\n")
+		logf("[locate] known 缓存已失效（地址不可读或坐标非法），改走扫描\n")
 	}
 
 	// ② 存档锚点窗口扫描（以存档为中心，在近场找带 Actor 旋转矩阵的真实玩家坐标槽）
@@ -293,17 +272,8 @@ func New(p *winmem.Process) (*Tracker, error) {
 			found = true
 		}
 	}
-	// ★★★ 宽窗兜底（2026-10-21 16:0x 实测）：
-	//
-	//	实测玩家从 (98.1, 121.7, 1657.0) 走到了 (-705, 177, 1706) —— 800+ 米，
-	//	而磁盘存档还停在老位置（mtime 15:25，游戏没自动存档）。
-	//	这时候**以存档为中心的任何窄窗都扫不到人**。
-	//
-	//	但窄窗有时会"成功"——锁到一个 run 很长但**位置是旧的**的记录
-	//	（实测窄窗命中过 run=33 但坐标是 69.8/1612.7，离玩家 800 米）。
-	//	所以判断标准不是"扫到没"，而是"扫到的**位置**合不合理"。
-	if !found || !t.anchorFresh() {
-		logf("[locate] 存档锚点附近没找到玩家（锚点可能已过期），改用 %0.0fm 宽窗重扫\n", winWide)
+	if !found {
+		logf("[locate] 存档窄窗/中窗未找到玩家，改用 %0.0fm 宽窗重扫\n", winWide)
 		if t.rescan(t.anchor, winWide) {
 			found = true
 		}
@@ -312,20 +282,6 @@ func New(p *winmem.Process) (*Tracker, error) {
 		return nil, fmt.Errorf("存档锚点 (%.1f, %.1f, %.1f) 窗口内未找到活跃玩家 Actor（请确认已载入游戏世界，若仍在加载画面请稍候）", t.anchor.X, t.anchor.Y, t.anchor.Z)
 	}
 	return t, nil
-}
-
-// anchorFresh 判断当前锁定的位置是否还"新鲜"（相对存档锚点没跑太远）。
-//
-// 用途：存档锚点可能严重过期（玩家走了 800+ 米而游戏没自动存档），
-// 此时窄窗扫到的"最近记录"其实是老位置 → 必须改用宽窗全图找。
-func (t *Tracker) anchorFresh() bool {
-	t.mu.RLock()
-	cur, anchor := t.cur, t.anchor
-	t.mu.RUnlock()
-	if !anchor.Valid() {
-		return true // 没有锚点可比 → 信任当前结果
-	}
-	return cur.Dist2D(anchor) < 400
 }
 
 // Anchor 存档锚点（日志用）。
@@ -349,47 +305,30 @@ func (t *Tracker) Tick() Update {
 		return Update{OK: false, Source: "lost"}
 	}
 
-	// ★ 读 Actor（坐标 + 存活校验）—— 不再裸读 12 字节。
-	//   Actor 死了（进神庙/传送/场景切换）时内存仍然可读，会读出 NaN 或清零，
-	//   旧代码把它当合法坐标 → 红点乱飞、甚至锁到 2 公里外的假槽。
-	v, alive, readOK := t.readActor(addr)
-	if !readOK {
-		// 真正的读失败（进程死了/页不可读）
+	// ★ 死读当前锁定地址：只要能读出合法的海拉鲁世界坐标（WorldCoordOK），就死读它
+	v, ok := t.readActor(addr)
+	if !ok {
+		// 真正的读失败（进程退出/内存页未就绪/坐标非法）
 		t.mu.Lock()
 		t.fails++
 		f := t.fails
 		if f >= readFailMax {
 			t.ok = false
-			t.addr = 0 // 明确失效 → 允许重扫
+			t.addr = 0 // 连续读失败达上限 → 允许重扫
 		}
 		t.mu.Unlock()
 		if f >= readFailMax {
-			// ★ 用「最后已知位置」当重扫中心，不要传空坐标。
-			//   传空坐标 → 扫描退化成"扫世界原点周围"（实测 3057 万命中，
-			//   排最前的全是原点附近的退化坐标）→ 精确地锁到垃圾槽。
 			t.rescanAsync(cur, winFar)
 			return Update{OK: false, Source: "lost", Note: "连续读失败，重扫中"}
 		}
-		// 单次失败多半是瞬态（加载中页保护切换），保持上一位置
+		// 单次失败多半是瞬态（如传送加载中），保持上一已知位置
 		return Update{OK: okCur, Verified: verified, Pos: cur, Addr: addr, Source: "hold"}
 	}
-	if !alive {
-		// ★ Actor 已死（坐标非法 或 3x3 旋转矩阵消失）→ 立刻失效重扫。
-		//   不能像以前那样继续用这个地址 —— 那会一路 NaN 下去，
-		//   甚至重扫时锁到 2 公里外的假槽。
-		t.mu.Lock()
-		t.fails = readFailMax // 直接判定失效，不再等 5 拍
-		t.ok = false
-		t.addr = 0
-		t.verified = false
-		t.cands = nil
-		oldPos := t.cur
-		t.mu.Unlock()
-		logf("[locate] Actor 已失效（坐标非法或旋转矩阵消失）：旧位置 (%.1f, %.1f, %.1f) → 重扫中\n",
-			oldPos.X, oldPos.Y, oldPos.Z)
-		t.rescanAsync(oldPos, winNear) // 围着最后已知位置重扫
-		return Update{OK: false, Pos: oldPos, Addr: addr, Source: "lost", Note: "Actor 已失效，重新定位中"}
-	}
+
+	// 读成功，重置失败计数
+	t.mu.Lock()
+	t.fails = 0
+	t.mu.Unlock()
 
 	// 多候选走动仲裁（防驿站等多 NPC 场景误锁静止 NPC）
 	t.mu.RLock()
@@ -413,6 +352,7 @@ func (t *Tracker) Tick() Update {
 					t.cands = nil
 					t.persist(cPos, true)
 					t.mu.Unlock()
+					logf("[locate] 走动仲裁识别真玩家：addr=%#x pos=(%.1f, %.1f, %.1f)\n", c.addr, cPos.X, cPos.Y, cPos.Z)
 					return Update{OK: true, Verified: true, Pos: cPos, Addr: c.addr, Source: "player", Note: "走动仲裁识别为真玩家"}
 				}
 			}
@@ -424,47 +364,42 @@ func (t *Tracker) Tick() Update {
 	isShrineLocal := isShrineScale(v)
 	if shrine {
 		if !isShrineLocal {
-			// 出庙（or 传送出庙）：解除神庙挂起。
-			// ★ 关键：出庙这一拍坐标从「庙内本地尺度」跳回「世界尺度」，
-			//   跳变幅度天然超过 teleportDist —— 但它不是传送，是正常出庙。
-			//   所以这里直接接受新坐标并就地更新 t.cur，**不再走传送重扫分支**，
-			//   否则每出一次庙就要白白全堆扫 2~3 秒。
+			// 出庙（or 传送出庙）：解除神庙挂起，就地恢复跟随，绝不走传送重扫
 			t.mu.Lock()
 			t.shrine = false
 			t.cur = v
 			t.ok = true
 			t.fails = 0
 			t.mu.Unlock()
+			logf("[locate] 离开神庙，恢复跟随：addr=%#x pos=(%.1f, %.1f, %.1f)\n", addr, v.X, v.Y, v.Z)
 			return Update{OK: true, Verified: verified, Pos: v, Addr: addr, Source: "player", Note: "已离开神庙，恢复跟随"}
 		}
-		// 还在庙里：红点钉在入口（cur 保持进入庙前的世界坐标，天然就是门口）。
-		// ★ ok 必须为 true —— 前端 live.js 用 `p.ok` 判「服务在线」，
-		//   ok=false 会被判成离线 → 连续 3 次后停止轮询 → 红点直接消失（2026-10-21 实测事故）。
-		//   对照兄弟项目 live-cemu：神庙模式下同样是 OK=true / Verified=true。
+		// 还在庙里：红点钉在入口（cur 保持进入庙前的世界坐标，天然就是门口）
 		return Update{OK: true, Verified: true, Pos: cur, Addr: addr, Source: "shrine", Shrine: true, Note: "神庙内试炼场（本地坐标），红点钉在门口"}
 	} else if isShrineLocal && !isShrineScale(cur) && v.Dist3D(cur) > 100 {
-		// 进庙：世界尺度 → 神庙本地尺度。位置钉在进入前的 cur（= 门口）。
+		// 进庙：挂起
 		t.mu.Lock()
 		t.shrine = true
 		t.ok = true
 		t.mu.Unlock()
+		logf("[locate] 进入神庙，红点钉在入口：pos=(%.1f, %.1f, %.1f)\n", cur.X, cur.Y, cur.Z)
 		return Update{OK: true, Verified: true, Pos: cur, Addr: addr, Source: "shrine", Shrine: true, Note: "神庙内试炼场（本地坐标），红点钉在门口"}
 	}
 
 	d := v.Dist3D(cur)
 
-	// 传送：单拍 >300m
+	// ★ 传送：单拍 >300m。
+	// 老大实测确认：传送后 addr 不变，坐标直接更新！因此直接更新坐标，绝不重扫换 addr！
 	if d > teleportDist {
 		t.mu.Lock()
 		t.cur = v
-		t.verified = false
-		t.moveN = 0
 		t.fails = 0
 		t.shrine = false // 传送必定解除神庙状态
-		t.cands = nil   // ★ 旧候选池跨传送残留 → 仲裁可能选到千里外的旧 Actor
+		t.cands = nil   // 清空旧候选池
 		t.mu.Unlock()
-		t.rescanAsync(v, winNear) // 围着落点重扫
-		return Update{OK: true, Pos: v, Addr: addr, Source: "scan", Note: "传送跳变，重扫中"}
+		logf("[locate] 传送跳变（位移 %.1fm）：addr=%#x 保持锁定，新坐标=(%.1f, %.1f, %.1f)\n",
+			d, addr, v.X, v.Y, v.Z)
+		return Update{OK: true, Verified: verified, Pos: v, Addr: addr, Source: "player", Note: "传送落地"}
 	}
 
 	// 单拍位移异常大（野指针/锁错）
@@ -733,42 +668,39 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	//   玩家的当前帧在内存里是一整条连续的 0x40 步长 run（实测 run=5~17），
 	//   而冻结的历史副本是**孤立的**（前后 ±0x40 都不是合法记录，run=1）。
 	//   只要 run>=2 就能把「冻结副本」全排除掉。
+	// 过滤候选：
+	// ① 坐标必须通过 WorldCoordOK
+	// ② 优先收连续 run（Run >= 2）的槽（排除孤立冻结副本）
 	identHits := make([]scan.Hit, 0, len(allHits))
 	for _, h := range allHits {
 		if !h.P.WorldCoordOK() {
 			continue
 		}
-		if h.Run < 2 {
-			continue // 孤立的记录 = 冻结副本，不是玩家当前帧
+		if h.Run >= 2 {
+			identHits = append(identHits, h)
 		}
-		identHits = append(identHits, h)
+	}
+	// 若无 Run >= 2 的候选，退而放过所有合法命中
+	if len(identHits) == 0 {
+		for _, h := range allHits {
+			if h.P.WorldCoordOK() {
+				identHits = append(identHits, h)
+			}
+		}
 	}
 	if len(identHits) == 0 {
 		return false
 	}
-	// 坐标分组去重（有四元数优先 + 有矩阵次之 + 距中心近）。
+
+	// 坐标分组去重并排序（Run 长度越长越优先 + 有四元数优先 + 距中心近优先）
 	groups := scan.Group(identHits)
 	if len(groups) == 0 {
 		return false
 	}
 
-	// ★★ 活体探测：候选里既有「正在更新的记录」，也有「冻结的历史副本」。
-	//
-	// 实测（2026-10-21 15:5x）：同一场景里，
-	//   · 冻结副本 (99.885, 123.037, 1660.139) —— 多次采样纹丝不动
-	//   · 活记录 (107.16, 125.98, 1669.42)   —— 逐帧跟随玩家
-	//   两者结构完全一样（pos + 单位四元数），**只有"会不会变"能区分**。
-	//   而它们相距 145MB —— 是引擎里的两份独立拷贝，只有一份是活的。
-	//
-	// 做法：等一小段时间，把**含候选的那些内存块**重读一遍，
-	//       对比同一地址的坐标变没变。变了的才是玩家当前帧。
-	//       （不能用"逐个读地址"做：单次 12 字节读实测 689µs，
-	//        上千个候选要 1 秒以上；而块读只要 757 次 8MB 读，~1 秒内完成。）
-	best, moved := t.pickLiveCandidate(groups, jobs, chunk, overlap)
-	if !moved {
-		logf("[locate] 候选均无变化（玩家可能静止），取距锚点最近的一个：%#x (%.1f, %.1f, %.1f)\n",
-			best.Addr, best.P.X, best.P.Y, best.P.Z)
-	}
+	best := groups[0]
+	logf("[locate] 扫描锁定最佳候选：%#x pos=(%.1f, %.1f, %.1f) run=%d dist=%.1fm\n",
+		best.Addr, best.P.X, best.P.Y, best.P.Z, best.Run, best.Dist)
 
 	var slots []candSlot
 	for i := 0; i < len(groups) && i < 5; i++ {
@@ -787,11 +719,7 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	t.cands = slots
 	t.mu.Unlock()
 
-	// ★ 锁定即写盘（verified=false）。
-	//   玩家站着不动就永远等不到"走动 3 拍"，若只在 verified 时写盘，
-	//   「站着不动」这个最常见的场景每次启动都要重扫 3~8 秒。
-	//   这条 verified=false 的记录只作参考（known.Pick 不接受它秒锁），
-	//   但能让下次启动知道"这个地址上次还在"。
+	// 锁定即写盘（verified=false），供下次启动参考
 	t.persist(best.P, false)
 	return true
 }
@@ -800,132 +728,4 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 type scanJob struct {
 	addr uintptr
 	n    int
-}
-
-// pickLiveCandidate 从候选里挑出「正在更新」的那一个。
-//
-// ★ 这是 2026-10-21 15:5x 实测确立的关键判据：
-//   位置历史记录里，玩家当前帧和历史帧**结构完全一样**（pos + 单位四元数），
-//   唯一的区别是**会不会变**。只按"离存档近"排序会锁到冻结的历史帧
-//   （实测锁到 99.885,1660.139，而玩家实际在 107.16,1669.42 —— 差 11 米；
-//     两者相距 145MB，是引擎里的两份独立拷贝，只有一份是活的）。
-//
-// 做法：等一会儿 → 把**含候选的内存块**重读一遍 → 对比同一地址的坐标变没变。
-//
-// 为什么用块读而不是逐个读地址：
-//   单次 12 字节 ReadProcessMemory 实测 **689µs**（Eden 进程被占时更慢），
-//   上千个候选逐个读要 1 秒以上；而块读（8MB）只要几百次，总计 ~1 秒，
-//   而且是**同一批地址**的重读，能直接对比。
-func (t *Tracker) pickLiveCandidate(groups []scan.Hit, jobs []scanJob, chunk int, overlap int) (scan.Hit, bool) {
-	const liveProbeWait = 500 * time.Millisecond
-	const liveMoveDist = 0.001 // 1mm 以上的变化算"在动"
-	const maxSaneJump = 30.0   // 超过 30m 算"环形缓冲回绕"，不是真实移动
-
-	if len(groups) == 0 {
-		return scan.Hit{}, false
-	}
-	const maxProbe = 400
-	probes := groups
-	if len(probes) > maxProbe {
-		probes = probes[:maxProbe]
-	}
-	before := make(map[uintptr]scan.Vec3, len(probes))
-	for _, h := range probes {
-		before[h.Addr] = h.P
-	}
-
-	// 第一轮采样：筛出"在动"的
-	moved1 := t.probeMovers(probes, jobs, before, liveMoveDist, maxSaneJump)
-	if len(moved1) == 0 {
-		best := probes[0]
-		for _, h := range probes[1:] {
-			if h.Dist < best.Dist {
-				best = h
-			}
-		}
-		return best, false
-	}
-
-	// ★ 第二轮采样：确认是**连续移动**，不是环形缓冲回绕。
-	//
-	// 实测（2026-10-21 15:58）：位置历史记录是**环形缓冲**，
-	// 写到头会绕回，某个槽的内容会**突然变成几公里外的旧位置**（实测跳了 1648m）。
-	// 只看一次变化会把这个槽当成"在动"→ 锁上去 → 下一拍坐标突变 → 判失效 → 无限重扫。
-	//
-	// 连续移动的特征：**两次采样都是小幅变化，且方向一致**。
-	time.Sleep(liveProbeWait)
-	after1 := make(map[uintptr]scan.Vec3, len(moved1))
-	for addr := range moved1 {
-		if p, alive, ok := t.readActor(addr); ok && alive {
-			after1[addr] = p
-		}
-	}
-	moved2 := t.probeMovers(probes, jobs, after1, liveMoveDist, maxSaneJump)
-
-	// 两轮都在动的 = 连续跟踪 = 玩家当前帧
-	live := map[uintptr]bool{}
-	for addr := range moved1 {
-		if moved2[addr] {
-			live[addr] = true
-		}
-	}
-	if len(live) == 0 {
-		logf("[locate] 活体探测：无连续移动的候选（玩家可能静止）\n")
-		best := probes[0]
-		for _, h := range probes[1:] {
-			if h.Dist < best.Dist {
-				best = h
-			}
-		}
-		return best, false
-	}
-
-	// 在连续移动的候选里，取离存档锚点最近的（玩家最可能在那附近）
-	best, bestD := probes[0], 1e18
-	n := 0
-	for _, h := range probes {
-		if !live[h.Addr] {
-			continue
-		}
-		n++
-		if h.Dist < bestD {
-			best, bestD = h, h.Dist
-		}
-	}
-	logf("[locate] 活体探测：%d/%d 个候选连续移动，选中 %#x (%.1f, %.1f, %.1f) 距锚点=%.1fm\n",
-		n, len(probes), best.Addr, best.P.X, best.P.Y, best.P.Z, best.Dist)
-	return best, true
-}
-
-// probeMovers 把含候选的内存块重读一遍，返回"位置变了且变化合理"的候选地址集合。
-func (t *Tracker) probeMovers(probes []scan.Hit, jobs []scanJob, before map[uintptr]scan.Vec3, minMove, maxJump float64) map[uintptr]bool {
-	movers := map[uintptr]bool{}
-	for _, j := range jobs {
-		buf, err := t.proc.Read(j.addr, j.n)
-		if err != nil || len(buf) < 12 {
-			continue
-		}
-		for _, h := range probes {
-			prev, ok := before[h.Addr]
-			if !ok {
-				continue
-			}
-			rel := int64(h.Addr) - int64(j.addr)
-			if rel < 0 || rel+12 > int64(len(buf)) {
-				continue
-			}
-			off := int(rel)
-			now := scan.Vec3{
-				X: math.Float32frombits(binary.LittleEndian.Uint32(buf[off:])),
-				Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[off+4:])),
-				Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[off+8:])),
-			}
-			d := now.Dist3D(prev)
-			if d < minMove || d > maxJump {
-				continue
-			}
-			movers[h.Addr] = true
-		}
-	}
-	return movers
 }
