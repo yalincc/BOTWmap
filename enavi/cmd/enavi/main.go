@@ -209,6 +209,8 @@ func main() {
 	}
 
 	logPrintln(version.Banner())
+	// 把定位核心的日志接到统一出口（enavi.log + stdout）。
+	locate.Logger = func(format string, a ...any) { logPrint(format, a...) }
 	cfg, used := loadConfig(*cfgPath)
 	if *port > 0 {
 		cfg.Port = *port

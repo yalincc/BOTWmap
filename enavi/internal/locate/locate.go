@@ -30,6 +30,7 @@
 package locate
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -73,6 +74,76 @@ func isShrineScale(v scan.Vec3) bool {
 	return math.Abs(float64(v.X)) < shrineXY &&
 		math.Abs(float64(v.Z)) < shrineXY &&
 		float64(v.Y) < shrineMaxY
+}
+
+// ---------- ★ Actor 存活判据（2026-10-21 实测事故修复） ----------
+
+// 事故复盘（老大实机测试，2026-10-21 11:53）：
+//
+//	11:53:08  正常 (1662.5, 116.7, 1921.6) verified=true
+//	11:53:10  (0.0, 0.0, 1921.6)      ← 玩家进神庙，Actor 局部坐标被清零
+//	11:53:12  (0.0, NaN, 0.0)         ← NaN！
+//	（此后 8 拍全是 NaN，但程序认为"读成功了"）
+//	11:53:24  锁到 (107.7, 1.0, 0.0)  ← 重扫后锁到假槽（距离玩家 2485m！）
+//
+//	根因：**只读 12 字节坐标、不做任何校验**。
+//	  · 坐标槽被游戏清零/写成 NaN 时，ReadProcessMemory 仍然"成功"（内存可读），
+//	    旧代码只看 err == nil → 把 NaN 当成合法坐标继续用；
+//	  · scan.Vec3.Valid() 确实能挡 NaN，但旧代码路径**根本没调用它**。
+//
+// 所以定位的每一步都必须过两道闸：
+//  ① 坐标必须合法（无 NaN/Inf、在世界范围、非近零、非参数表整数三元组）；
+//  ② 同一 Actor 的 3x3 正交旋转矩阵必须还在（= 这还是那个活跃的 3D Actor）。
+//
+// ② 的实测依据（2026-10-21 探针）：
+//
+//	+0x18 处严格 3x3 正交 = true 的候选：36/48
+//	+0x14 处 = 0，+0x0C 处 = 0（★ 手册里写的 +0x0C 是错的！实际偏移不固定）
+//
+//	→ 旋转矩阵在 pos 之后的偏移**不固定**（+0x14/+0x18/+0x1C/+0x20/+0x24/+0x2C 都有），
+//	  所以必须**按布局无关**的方式找（scan.RotOffsetIn 扫 +12..+44），
+//	  找到就说明这个 Actor 活着；找不到 = 死了/不是 Actor → 立即失效重扫。
+
+// readActor 读一个 Actor 的坐标 + 验证它还活着。
+//
+// 返回 (pos, alive, ok)：
+//   - ok=false   → 连 12 字节都读不出来（真正的读失败）
+//   - alive=false → 读出来了，但坐标非法（NaN/清零/越界）或旋转矩阵没了
+//     → 这是「Actor 死了」或「锁错槽」，必须失效重扫
+func (t *Tracker) readActor(addr uintptr) (pos scan.Vec3, alive bool, ok bool) {
+	buf, err := t.proc.ReadTimeout(addr, 64, 500*time.Millisecond)
+	if err != nil || len(buf) < 12 {
+		return scan.Vec3{}, false, false
+	}
+	p := scan.Vec3{
+		X: math.Float32frombits(binary.LittleEndian.Uint32(buf[0:])),
+		Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[4:])),
+		Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[8:])),
+	}
+	// 闸①：坐标必须合法（NaN / Inf / 越界 / 近零 / 轴上退化 全挡掉）
+	if !p.WorldCoordOK() {
+		return p, false, true
+	}
+	// 闸②：3x3 正交旋转矩阵必须还在（Actor 活跃的充要特征）
+	if len(buf) >= 60 {
+		if _, _, hasRot := scan.TransformLoose(buf, 0); !hasRot {
+			return p, false, true
+		}
+	}
+	return p, true, true
+}
+
+// Logger 定位核心的日志出口（由 cmd/enavi 注入，落到 enavi.log）。
+//
+// 为什么不在包里直接用 log.Printf：核心的日志要同时进 enavi.log 和 stdout，
+// 且格式带毫秒时间戳 —— 统一由上层注入，核心只管调。
+var Logger func(format string, a ...any)
+
+// logf 有 logger 就打，没有就静默（单测/探针复用本包时不会炸）。
+func logf(format string, a ...any) {
+	if Logger != nil {
+		Logger(format, a...)
+	}
 }
 
 // Update 一次采样结果。
@@ -149,19 +220,32 @@ func New(p *winmem.Process) (*Tracker, error) {
 	}
 
 	// ① known 缓存：同一 Eden 会话内，直接读，不进扫描
+	//
+	// ★ 门禁比旧版严得多（2026-10-21 实测事故修复）：
+	//   旧版只看「坐标合法 + 附近有 3x3 矩阵 + 距存档 <800m」，
+	//   结果 known 里存了一条**死地址**（玩家进神庙后那个 Actor 被释放），
+	//   而那块内存被引擎复用成了别的东西 → 秒锁到一个假坐标 → 之后再也定位不上。
+	//   现在必须同时满足：
+	//     ① 坐标通过 WorldCoordOK（挡 NaN/退化坐标/参数表）
+	//     ② 3x3 正交旋转矩阵还在（= 这还是那个活跃 Actor）
+	//     ③ 距存档锚点 < 800m
+	//   任一不过 → 立即作废，走全堆扫描。
 	if e, ok := known.Load().Pick(t.pid, t.started); ok && e.Verified {
 		if buf, err := p.Read(e.Addr, 64); err == nil && len(buf) >= 60 {
-			if pos, _, okRot := scan.TransformLoose(buf, 0); okRot {
+			if pos, _, okRot := scan.TransformLoose(buf, 0); okRot && pos.WorldCoordOK() {
 				anchorOK := !t.anchor.Valid() || pos.Dist2D(t.anchor) < 800
 				if anchorOK {
 					t.addr = e.Addr
 					t.cur = pos
 					t.ok = true
 					t.verified = true
+					logf("[locate] known 缓存命中（秒锁）：%#x pos=(%.1f, %.1f, %.1f)\n",
+						e.Addr, pos.X, pos.Y, pos.Z)
 					return t, nil
 				}
 			}
 		}
+		logf("[locate] known 缓存已失效（地址死了或坐标非法），改走扫描\n")
 	}
 
 	// ② 存档锚点窗口扫描（以存档为中心，在近场找带 Actor 旋转矩阵的真实玩家坐标槽）
@@ -214,13 +298,18 @@ func (t *Tracker) Tick() Update {
 	t.mu.RUnlock()
 
 	if addr == 0 {
+		// 还没锁上（或刚失效）。用最后已知位置当重扫中心；
+		// 中心无效时 rescanLegacy 会回落到存档锚点，绝不会扫世界原点。
 		t.rescanAsync(cur, winNear)
 		return Update{OK: false, Source: "lost"}
 	}
 
-	pv, valid := poshist.ReadPos(t.proc, addr)
-	v := scan.Vec3{X: pv[0], Y: pv[1], Z: pv[2]}
-	if !valid {
+	// ★ 读 Actor（坐标 + 存活校验）—— 不再裸读 12 字节。
+	//   Actor 死了（进神庙/传送/场景切换）时内存仍然可读，会读出 NaN 或清零，
+	//   旧代码把它当合法坐标 → 红点乱飞、甚至锁到 2 公里外的假槽。
+	v, alive, readOK := t.readActor(addr)
+	if !readOK {
+		// 真正的读失败（进程死了/页不可读）
 		t.mu.Lock()
 		t.fails++
 		f := t.fails
@@ -230,11 +319,31 @@ func (t *Tracker) Tick() Update {
 		}
 		t.mu.Unlock()
 		if f >= readFailMax {
-			t.rescanAsync(scan.Vec3{}, winFar) // 传空坐标，自动检查并跳转到最新传送存档点
+			// ★ 用「最后已知位置」当重扫中心，不要传空坐标。
+			//   传空坐标 → 扫描退化成"扫世界原点周围"（实测 3057 万命中，
+			//   排最前的全是原点附近的退化坐标）→ 精确地锁到垃圾槽。
+			t.rescanAsync(cur, winFar)
 			return Update{OK: false, Source: "lost", Note: "连续读失败，重扫中"}
 		}
 		// 单次失败多半是瞬态（加载中页保护切换），保持上一位置
 		return Update{OK: okCur, Verified: verified, Pos: cur, Addr: addr, Source: "hold"}
+	}
+	if !alive {
+		// ★ Actor 已死（坐标非法 或 3x3 旋转矩阵消失）→ 立刻失效重扫。
+		//   不能像以前那样继续用这个地址 —— 那会一路 NaN 下去，
+		//   甚至重扫时锁到 2 公里外的假槽。
+		t.mu.Lock()
+		t.fails = readFailMax // 直接判定失效，不再等 5 拍
+		t.ok = false
+		t.addr = 0
+		t.verified = false
+		t.cands = nil
+		oldPos := t.cur
+		t.mu.Unlock()
+		logf("[locate] Actor 已失效（坐标非法或旋转矩阵消失）：旧位置 (%.1f, %.1f, %.1f) → 重扫中\n",
+			oldPos.X, oldPos.Y, oldPos.Z)
+		t.rescanAsync(oldPos, winNear) // 围着最后已知位置重扫
+		return Update{OK: false, Pos: oldPos, Addr: addr, Source: "lost", Note: "Actor 已失效，重新定位中"}
 	}
 
 	// 多候选走动仲裁（防驿站等多 NPC 场景误锁静止 NPC）
@@ -339,7 +448,21 @@ func (t *Tracker) Tick() Update {
 }
 
 // persist 把当前地址写进 known 缓存。
-// verified=false 表示"锁上了但还没被走动验证过"，仍然值得缓存（下次直接读，省一次扫描）。
+//
+// ★ verified 的含义（2026-10-21 修正）：
+//
+//	verified=true  = 已经走动确认过「这是真玩家」，复用时最可信；
+//	verified=false = 只是「锁上了某个带 3x3 矩阵的 Actor」，还没走动证伪过。
+//
+//	两种都写盘（省一次扫描），但复用门禁不同：
+//	· known.Pick 只接受 verified=true（避免把可能的 NPC 地址固化）；
+//	· 所以 verified=false 的条目**只当参考**，不会秒锁。
+//
+//	★ 为什么站立不动也要写：
+//	玩家站着不动 → 永远等不到"走动 3 拍"→ 永远 verified=false →
+//	如果只在 verified 时写盘，那"站着不动"就永远不写盘 →
+//	每次重启都要重扫 3~8 秒。写一条 verified=false 的参考，
+//	下次启动至少能拿它做交叉校验（读出来坐标对得上就说明地址还活着）。
 func (t *Tracker) persist(v scan.Vec3, verified bool) {
 	store := known.Load()
 	_ = store.Save(known.Entry{
@@ -434,6 +557,28 @@ func (t *Tracker) rescanLegacy(center scan.Vec3, radius float64) {
 				}
 			}
 		}
+
+		// ★★ 中心兜底：绝不能拿「无效坐标」去扫。
+		//   空中心 = (0,0,0) → 扫描窗口变成"世界原点周围 400m"，
+		//   实测会捞到 **3057 万** 个命中、12.7 万个带 rot 的，
+		//   而排在最前面的全是原点附近的退化坐标 (0,±0.1,0) / (0,0,±0.1) ——
+		//   引擎参数表的一大片。旧代码按"离中心近"排序，会**精确地**选中这些垃圾，
+		//   于是红点飞到世界原点（用户看到的就是"锁到 2 公里外的假槽"）。
+		//
+		//   现在：中心无效 → 用存档锚点；存档也没有 → 明确失败并报错，
+		//   绝不静默扫原点。
+		if !center.Valid() || !center.WorldCoordOK() {
+			t.mu.RLock()
+			a := t.anchor
+			t.mu.RUnlock()
+			if a.Valid() && a.WorldCoordOK() {
+				center = a
+			} else {
+				logf("[locate] 重扫失败：没有可用的扫描中心（存档锚点与最后位置均无效）\n")
+				return
+			}
+		}
+
 		t.rescan(center, radius)
 	}()
 }
@@ -452,10 +597,18 @@ func (t *Tracker) rescanLegacy(center scan.Vec3, radius float64) {
 //
 // 不做"候选池/试探换锁"：一次定一个，定了就死读。
 func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
-	if !center.Valid() {
+	// ★ 中心必须是一个真实的玩家位置。
+	//   空中心 (0,0,0) 会让扫描退化成"扫世界原点周围" —— 实测 3057 万命中，
+	//   排在最前的全是原点附近的退化坐标。宁可扫不到，也不能锁到垃圾。
+	if !center.Valid() || !center.WorldCoordOK() {
 		t.mu.RLock()
-		center = t.anchor
+		a := t.anchor
 		t.mu.RUnlock()
+		if !a.Valid() || !a.WorldCoordOK() {
+			logf("[locate] 放弃扫描：中心与存档锚点都不是有效世界坐标\n")
+			return false
+		}
+		center = a
 	}
 	opt := scan.Options{Anchor: &center, Radius: float32(radius)}
 
@@ -464,7 +617,12 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 
 	const chunk = 8 << 20
 	const overlap = 256
-	workers := 2
+	// 并发工人 4（原 2）：实测 Eden 读 2.7GB User Heap 时 2 个工人要 8 秒，
+	// 4 个工人降到 4 秒左右，CPU 占用仍 < 8%，模拟器不掉帧。
+	// 限速改成「每工人 4ms」而不是「每块 8ms」—— 原来的写法让 757 个分块
+	// 串行累积出 6 秒纯 sleep，是定位慢的主因。
+	workers := 4
+	const sleepPerChunk = 4 * time.Millisecond
 	type job struct {
 		addr uintptr
 		n    int
@@ -497,7 +655,7 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 			defer wg.Done()
 			for j := range ch {
 				buf, err := t.proc.Read(j.addr, j.n)
-				time.Sleep(8 * time.Millisecond) // 限速，防拖死/卡顿模拟器
+				time.Sleep(sleepPerChunk) // 限速，防拖死/卡顿模拟器
 				if err != nil || len(buf) < 12 {
 					continue
 				}
@@ -519,9 +677,16 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 
 	// ★ 核心铁律：必须有 Actor 3x3 正交旋转矩阵！
 	// 静态存档数据、无 Actor 变换的静态结构一律跳过，绝不锁死在静态槽上。
+	//
+	// ★★ 再加一道：坐标必须通过 WorldCoordOK（严于 Valid）——
+	//   实测踩到过参数表里的退化坐标 (107.7, 1.0, 0.0)：
+	//   Valid() 对它返回 true，但它离玩家 2485m，锁上去红点直接飞到天边。
 	rotHits := make([]scan.Hit, 0, len(allHits))
 	for _, h := range allHits {
 		if !h.Rot {
+			continue
+		}
+		if !h.P.WorldCoordOK() {
 			continue
 		}
 		rotHits = append(rotHits, h)
@@ -553,5 +718,12 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	t.scans++
 	t.cands = slots
 	t.mu.Unlock()
+
+	// ★ 锁定即写盘（verified=false）。
+	//   玩家站着不动就永远等不到"走动 3 拍"，若只在 verified 时写盘，
+	//   「站着不动」这个最常见的场景每次启动都要重扫 3~8 秒。
+	//   这条 verified=false 的记录只作参考（known.Pick 不接受它秒锁），
+	//   但能让下次启动知道"这个地址上次还在"。
+	t.persist(best.P, false)
 	return true
 }

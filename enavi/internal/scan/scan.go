@@ -59,6 +59,47 @@ func (v Vec3) Valid() bool {
 	return true
 }
 
+// WorldCoordOK 更严格的「像不像海拉鲁世界坐标」判据。
+//
+// ★ 为什么要比 Valid() 严（2026-10-21 实测事故）：
+//   Valid() 只挡 NaN/越界/近零，但**挡不住参数表里的退化坐标**。
+//   实测踩到的坑：Actor 死了之后重扫，锁到了 (107.7, 1.0, 0.0) ——
+//   X 和 Z 都在轴上、alt 恰好 = 1，这是引擎参数表的典型形态，不是玩家位置。
+//   Valid() 对它返回 true（→ 以为锁上了真玩家，其实离玩家 2485m）。
+//
+// 三条补充判据（与 poshist 包的 worldCoordOK 同口径，统一到一处）：
+//  1. X 与 Z 不能同时为 0（世界坐标不会正好落在坐标轴上）；
+//  2. 排除世界原点附近（|X|<10 且 |Z|<10）—— 原点在海外，玩家不可能在那儿；
+//  3. 排除「轴上退化坐标」：X 或 Z 恰好为 0 时要求 alt 不为 1
+//     （参数表特征是 X≈0 / alt≈1）。
+//
+// 注意：**不排除整数三元组** —— 实测真实玩家坐标就在 (-717, 618) 这种整数格上，
+// 早期版本按「X 与 Z 同时为整数」排除，把真玩家误杀了。
+func (v Vec3) WorldCoordOK() bool {
+	if !v.Valid() {
+		return false
+	}
+	dx, dy, dz := float64(v.X), float64(v.Y), float64(v.Z)
+	// ① X 与 Z 不能同时为 0
+	if v.X == 0 && v.Z == 0 {
+		return false
+	}
+	// ② 排除世界原点附近的**退化**坐标。
+	//   神庙试炼场的坐标是合法的小数值（|X|<100, |Z|<100, Y<50），
+	//   可能落在原点附近 —— 那是**合法**的（神庙在地下，世界原点不在那）。
+	//   区分办法：退化坐标是「几乎为零」的噪声（±0.1 量级、alt 也是 0 附近），
+	//   真神庙坐标是「像样的小数值」（Y 明显是海拔值，如 12m）。
+	//   所以：原点附近 且 alt 也在 0 附近 → 退化垃圾；否则放过。
+	if math.Abs(dx) < 10 && math.Abs(dz) < 10 && math.Abs(dy) < 5 {
+		return false
+	}
+	// ③ 轴上退化坐标（参数表特征：X≈0 / alt≈1）
+	if (v.X == 0 || v.Z == 0) && math.Abs(dy-1.0) < 0.01 {
+		return false
+	}
+	return true
+}
+
 // InShrine 是否落在神庙内本地尺度。
 func (v Vec3) InShrine() bool {
 	return math.Abs(float64(v.X)) < ShrineXY && math.Abs(float64(v.Z)) < ShrineXY
