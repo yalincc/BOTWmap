@@ -1,17 +1,20 @@
-// HTTP 层：定位 API + 自带地图页静态托管 + BOTWmap 资产代理。
+// HTTP 层：定位 API + BOTWmap 本地地图托管（手机镜像）+ 缺图引导页。
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
-// BOTWmap 资产候选位置（存在即自动接管，缺失不影响核心导航）
+// BOTWmap 资产候选位置（开发机回退路径；终端用户优先 exe 同目录 app/，见 exeDirApp）
 var botwRoots = []string{
 	`E:\WorkSpace\BOTWmap\app`,
 	`..\BOTWmap\app`,
@@ -20,6 +23,97 @@ var botwRoots = []string{
 
 // lanURL 移动端局域网镜像 URL（main 启动时计算；/pos 返回，网页二维码面板读取）
 var lanURL string
+
+//go:embed mirror_fallback.html
+var mirrorFallbackHTML string
+
+// 内置手机镜像引导页：找不到 app/ 地图时 / 与 /botw/ 返回此页（v1.3.2，对齐 xnavi v3.1.0），
+// 手机扫码后至少知道缺什么、怎么补，替代白屏/黑 JSON。
+func writeMirrorFallback(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	cors(w)
+	_, _ = w.Write([]byte(mirrorFallbackHTML))
+}
+
+// exeDirApp 返回 exe 所在目录下的 app/ 路径（引导页承诺的位置）。
+func exeDirApp() string {
+	if exe, err := os.Executable(); err == nil {
+		if real, err2 := filepath.EvalSymlinks(exe); err2 == nil {
+			exe = real
+		}
+		return filepath.Join(filepath.Dir(exe), "app")
+	}
+	return ""
+}
+
+var (
+	botwFS   http.Handler
+	botwFSMu sync.Mutex
+)
+
+// resolveBotwFS 返回本地地图静态处理器；没有就返回 nil（调用方回落到引导页）。
+// 惰性解析 + mutex：用户按引导页提示补齐 app/ 后，刷新页面即可生效，不必重启。
+// 已挂载成功后不再重复 stat（botwFS != nil 直接返回）。
+func resolveBotwFS() http.Handler {
+	botwFSMu.Lock()
+	defer botwFSMu.Unlock()
+	if botwFS != nil {
+		return botwFS
+	}
+	cands := make([]string, 0, len(botwRoots)+1)
+	if p := exeDirApp(); p != "" {
+		cands = append(cands, p) // 最高优先：exe 同目录
+	}
+	cands = append(cands, botwRoots...)
+	for _, c := range cands {
+		if c == "" {
+			continue // v1.3.2 加固：空路径经 filepath.Abs 会变成 cwd，误把当前目录挂成地图根
+		}
+		if abs, err := filepath.Abs(c); err == nil {
+			c = abs
+		}
+		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
+			botwFS = http.StripPrefix("/botw", http.FileServer(http.Dir(c)))
+			fmt.Printf("  [asset] BOTWmap assets mounted: %s\n", c)
+			return botwFS
+		}
+	}
+	return nil
+}
+
+// legacyWebDir 自带地图页目录（历史遗留 web/），启动时解析一次；仅作无 app/ 时的兜底。
+var legacyWebDir string
+
+// rootHandler v1.3.2：根路径与 /botw/ 统一入口。
+//   - 有 app/ 地图：/ 302 跳镜像入口 /botw/?follow=1&game=botw（手机只输 IP:端口 即可达）；
+//     /botw/... 直接服务地图静态文件（手机跟随红点 + 导航 + 进度，与电脑同一套页面）。
+//   - 无 app/：返回内置引导页（告诉用户缺什么、怎么补）；/ 优先回落历史 web/ 页。
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	isBotw := path == "/botw" || strings.HasPrefix(path, "/botw/")
+	if path == "/" || isBotw {
+		fs := resolveBotwFS()
+		if fs == nil {
+			if path == "/" && legacyWebDir != "" {
+				http.FileServer(http.Dir(legacyWebDir)).ServeHTTP(w, r)
+				return
+			}
+			writeMirrorFallback(w)
+			return
+		}
+		if path == "/" {
+			http.Redirect(w, r, "/botw/?follow=1&game=botw", http.StatusFound)
+			return
+		}
+		fs.ServeHTTP(w, r)
+		return
+	}
+	if legacyWebDir != "" {
+		http.FileServer(http.Dir(legacyWebDir)).ServeHTTP(w, r)
+		return
+	}
+	http.NotFound(w, r)
+}
 
 func cors(w http.ResponseWriter) {
 	h := w.Header()
@@ -157,43 +251,13 @@ func newMux() *http.ServeMux {
 		jsonOutRaw(w, body)
 	})
 
-	// BOTWmap 资产代理（存在才注册）
-	var root string
-	for _, c := range botwRoots {
-		if abs, err := filepath.Abs(c); err == nil {
-			c = abs
-		}
-		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
-			root = c
-			break
-		}
+	// v1.3.2：地图资产 + 根路径统一入口（有 app/ → 302 跳镜像；无 → 引导页）
+	legacyWebDir = locateWebDir()
+	if legacyWebDir != "" {
+		fmt.Printf("  [web]   legacy map page dir: %s\n", legacyWebDir)
 	}
-	if root != "" {
-		fs := http.FileServer(http.Dir(root))
-		mux.Handle("/botw/", http.StripPrefix("/botw/", fs))
-		fmt.Printf("  [asset] BOTWmap assets mounted: %s\n", root)
-	} else {
-		mux.HandleFunc("/botw/", func(w http.ResponseWriter, r *http.Request) {
-			cors(w)
-			w.WriteHeader(404)
-		})
-		fmt.Println("  [asset] BOTWmap not found - using grid basemap (navigation unaffected)")
-	}
-
-	// 自研地图页
-	webDir := locateWebDir()
-	if webDir != "" {
-		mux.Handle("/", http.FileServer(http.Dir(webDir)))
-		fmt.Printf("  [web]   map page dir: %s\n", webDir)
-	} else {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			cors(w)
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = w.Write([]byte(`<meta charset="utf-8"><h3>CemuNavi 运行中</h3>
-<p>未找到地图页目录（web/）。请保证 CemuNavi.exe 与 web/ 同级。</p>
-<p>API 可用：<a href="/pos">/pos</a> · <a href="/status">/status</a></p>`))
-		})
-	}
+	resolveBotwFS() // 预热：启动即挂载则打印日志；未挂载每次请求都会重试
+	mux.HandleFunc("/", rootHandler)
 	return mux
 }
 

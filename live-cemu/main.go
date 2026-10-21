@@ -4,22 +4,33 @@
 // 去掉旧版 poll/verify/watchdog 三 goroutine 竞态，固定偏移多块试读，
 // 读 5 次失败才重找，站定不重定位。
 //
+// v1.3.2 应急复用版：对齐 xnavi v3.1.0 手机镜像能力 ——
+// certs/ 有证书自动启用 https 双协议（手机防息屏）、根路径 302 跳镜像、
+// 缺 app/ 地图时返回内置引导页。
+//
 // 用法：先开 Cemu 进游戏，再运行 navicemu.exe（默认 :8766，自动开在线地图）。
 
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/tls"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-const buildVer = "v1.3.1"
+const buildVer = "v1.3.2"
 
 const onlineMapURL = "https://botw.yalin.site/"
 
@@ -264,8 +275,9 @@ func defaultRouteIPv4() string {
 	return ""
 }
 
-// makeLanURL 构造移动端镜像 URL：http://<IP>:<port>/botw/?follow=1&game=<game>
-func makeLanURL(port int, game string) string {
+// makeLanURL 构造移动端镜像 URL：http(s)://<IP>:<port>/botw/?follow=1&game=<game>
+// v1.3.2：tlsMode 时输出 https（手机镜像页 secure context，wakeLock 防息屏生效）。
+func makeLanURL(port int, game string, tlsMode bool) string {
 	ip := defaultRouteIPv4()
 	if ip == "" {
 		if ips := lanIPv4s(); len(ips) > 0 {
@@ -275,7 +287,11 @@ func makeLanURL(port int, game string) string {
 	if ip == "" {
 		return ""
 	}
-	return fmt.Sprintf("http://%s:%d/botw/?follow=1&game=%s", ip, port, game)
+	scheme := "http"
+	if tlsMode {
+		scheme = "https"
+	}
+	return fmt.Sprintf("%s://%s:%d/botw/?follow=1&game=%s", scheme, ip, port, game)
 }
 
 func pickPort(start int) (net.Listener, int) {
@@ -302,23 +318,60 @@ func main() {
 		time.Sleep(4 * time.Second)
 		os.Exit(1)
 	}
+
+	// v1.3.2：exe 旁 certs/ 有证书（server.pem + server.key）→ 自动启用 https 双协议，
+	// 手机镜像页获得 secure context（wakeLock 防息屏生效）；缺证书降级 http，定位照常。
+	tlsMode := false
+	certDir := "certs"
+	for _, a := range os.Args[1:] {
+		if strings.HasPrefix(a, "--tls-cert-dir=") {
+			certDir = strings.TrimPrefix(a, "--tls-cert-dir=")
+		}
+	}
+	if abs, err := filepath.Abs(certDir); err == nil {
+		certDir = abs
+	}
+	cert, certErr := tls.LoadX509KeyPair(filepath.Join(certDir, "server.pem"), filepath.Join(certDir, "server.key"))
+
 	url := fmt.Sprintf("http://127.0.0.1:%d", port)
-	lanURL = makeLanURL(port, "botw") // 手机镜像 URL（/pos.lanUrl 供网页二维码面板读取）
 
 	fmt.Printf("  API: %s/pos\n", url)
 	if port != 8766 {
 		fmt.Println("  note: 8766 taken, using spare port (online map expects 8766)")
 	}
-	// v1.3.1 移动端镜像入口：手机/iPad 同一 WiFi 打开下列任一地址即可跟随红点+导航
+	// v1.3.2 移动端镜像入口：手机/iPad 同一 WiFi 打开下列任一地址即可跟随红点+导航
+	// 证书齐全时输出 https（与 /pos.lanUrl 一致，避免误导）
+	scheme := "http"
+	if certErr == nil {
+		scheme = "https"
+	}
 	for _, ip := range lanIPv4s() {
-		fmt.Printf("  LAN: http://%s:%d/botw/?follow=1&game=botw\n", ip, port)
+		fmt.Printf("  LAN: %s://%s:%d/botw/?follow=1&game=botw\n", scheme, ip, port)
+	}
+	if certErr != nil {
+		fmt.Println("  hint: certs not found - phone mirror runs http (screen wake lock off).")
+		fmt.Println("        run certs\\gen-cert.ps1 once to enable https wake lock.")
 	}
 	fmt.Println("  Close this window to stop")
 	fmt.Println("--------------------------------------------------")
 
 	mux := newMux()
-	srv := &http.Server{Handler: mux}
-	go func() { _ = srv.Serve(l) }()
+	if certErr == nil {
+		// v1.3.2 双协议共存：同端口 http + https（按首字节 0x16 分派，对齐 xnavi v3.1.0）
+		tlsMode = true
+		tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+		dl := newDualListener(l, tlsCfg)
+		go dl.run()
+		plainSrv := &http.Server{Handler: mux, ErrorLog: log.New(&errFilter{w: os.Stderr}, "", log.LstdFlags)}
+		secureSrv := &http.Server{Handler: mux, ErrorLog: log.New(io.Discard, "", 0)}
+		go func() { _ = plainSrv.Serve(dl.plain) }()
+		go func() { _ = secureSrv.Serve(dl.secure) }()
+		fmt.Printf("  [tls] certs loaded -> http + https dual mode on :%d (phone wake lock ON)\n", port)
+	} else {
+		srv := &http.Server{Handler: mux}
+		go func() { _ = srv.Serve(l) }()
+	}
+	lanURL = makeLanURL(port, "botw", tlsMode) // 手机镜像 URL（/pos.lanUrl 供网页二维码面板读取）
 
 	time.Sleep(800 * time.Millisecond)
 	if port == 8766 {
@@ -329,4 +382,102 @@ func main() {
 	}
 
 	select {}
+}
+
+// ---- 双协议监听（v1.3.2，对齐 xnavi v3.1.0）：同端口 http + https 共存 ----
+// 原理：Accept 后预读首字节；0x16（TLS ClientHello 首字节）→ TLS 通道，否则明文 HTTP 通道。
+// 连接被立即关闭（如端口探测）→ 首字节读取失败 → 静默丢弃，不产生 TLS 握手错误刷屏日志。
+
+// bufConn 保存预读缓冲的 bufio.Reader，首字节已在其中。
+type bufConn struct {
+	net.Conn
+	r *bufio.Reader
+}
+
+func (c *bufConn) Read(p []byte) (int, error) { return c.r.Read(p) }
+
+// chanListener 从 channel 接收连接（http.Server.Serve 的 listener 接口）。
+type chanListener struct {
+	addr net.Addr
+	ch   chan net.Conn
+	done chan struct{}
+}
+
+func (l *chanListener) Accept() (net.Conn, error) {
+	select {
+	case c := <-l.ch:
+		return c, nil
+	case <-l.done:
+		return nil, net.ErrClosed
+	}
+}
+func (l *chanListener) Close() error {
+	select {
+	case <-l.done:
+	default:
+		close(l.done)
+	}
+	return nil
+}
+func (l *chanListener) Addr() net.Addr { return l.addr }
+
+// dualListener 分派器：底层 tcp 监听 → 按首字节分派到明文/TLS 通道。
+type dualListener struct {
+	ln     net.Listener
+	tlsCfg *tls.Config
+	plain  *chanListener
+	secure *chanListener
+}
+
+func newDualListener(ln net.Listener, tlsCfg *tls.Config) *dualListener {
+	return &dualListener{
+		ln:     ln,
+		tlsCfg: tlsCfg,
+		plain:  &chanListener{addr: ln.Addr(), ch: make(chan net.Conn, 16), done: make(chan struct{})},
+		secure: &chanListener{addr: ln.Addr(), ch: make(chan net.Conn, 16), done: make(chan struct{})},
+	}
+}
+
+func (d *dualListener) run() {
+	for {
+		c, err := d.ln.Accept()
+		if err != nil {
+			d.plain.Close()
+			d.secure.Close()
+			return
+		}
+		go d.dispatch(c)
+	}
+}
+
+func (d *dualListener) dispatch(c net.Conn) {
+	br := bufio.NewReader(c)
+	first, err := br.Peek(1)
+	if err != nil {
+		c.Close() // 连接立即关闭（探测类）→ 静默丢弃
+		return
+	}
+	if first[0] == 0x16 { // TLS ClientHello 首字节
+		select {
+		case d.secure.ch <- tls.Server(&bufConn{Conn: c, r: br}, d.tlsCfg):
+		default:
+			c.Close()
+		}
+		return
+	}
+	select {
+	case d.plain.ch <- &bufConn{Conn: c, r: br}:
+	default:
+		c.Close()
+	}
+}
+
+// errFilter 过滤预期内的 TLS 握手错误日志，其余原样输出。
+type errFilter struct{ w io.Writer }
+
+func (f *errFilter) Write(p []byte) (int, error) {
+	if bytes.Contains(p, []byte("TLS handshake error")) {
+		return len(p), nil
+	}
+	return f.w.Write(p)
 }

@@ -5,6 +5,28 @@
 > ★ **本仓库含多个程序、版本号各自独立**（在线地图 `BOTWmap` / 导航程序 `xnavi`、`navicemu`、`botwnavi-eden`），
 > 因此**每条版本标题一律带程序名**，格式固定 `## [程序名 VX.Y.Z] - YYYY-MM-DD 摘要`——网页版写 `BOTWmap`，导航程序写自己的名字，**禁止只写一个版本号**（规则见 `docs/spec/DEV-HANDBOOK.md` §3.1 命名表）。
 
+## [navicemu v1.3.2] - 2026-10-21 应急复用版 · 手机镜像导航对齐 xnavi v3.1.0
+
+> **批次说明**：navicemu 自 2026-10-07 并入 xnavi 后停止常规维护；本版为**应急复用**——
+> 有用户反馈 xnavi 无法定位，需要发老版 navicemu 应急，遂把它缺的手机镜像导航能力一次补齐。
+> 定位逻辑零改动，全部改动在 HTTP 服务层。
+
+### 新增：手机镜像导航对齐 xnavi v3.1.0
+- **根路径直达镜像**：手机浏览器只输 `http://<电脑IP>:8766` 即 302 跳转 `/botw/?follow=1&game=botw` 导航页（旧版输根路径只见错误页）；
+- **HTTPS 双协议（可选）**：exe 旁 `certs/` 存在 `server.pem`+`server.key` 时**自动启用**（无需参数/设置），同端口 http+https 共存（Accept 预读首字节 `0x16` 走 TLS 通道）；手机镜像页走 https 后 **Screen Wake Lock 防息屏生效**；证书缺失自动降级 http，日志明示跑 `certs\gen-cert.ps1`；
+- **缺图内置引导页**：`mirror_fallback.html` 编译进 exe——exe 旁无 `app/` 地图时手机打开看到分步引导（缺什么、怎么补、一键跳下载），替代白屏/黑 JSON；
+- **exe 同目录 `app/` 优先挂载**：对齐 xnavi 的 `exeDirApp` 最高优先 + 惰性解析（用户后补地图刷新即生效，无需重启）；另加固：空路径候选跳过（`filepath.Abs("")` 会解析成 cwd，误把当前目录挂成地图根）。
+
+### 发布包
+- `navicemu-v1.3.2-BOTWmap-package.zip`：主程序 + `start.bat` + 内置离线地图 `app/`（V1.7.1）+ `certs/` 证书脚本与说明（不含私钥）；包 README 面向终端用户（快速开始 / 手机防息屏步骤 / 常见问题）。
+
+### 质量保障
+- 本机实测：/pos、根路径 302、/botw/ 镜像页 200（V1.7.1 地图 30KB）、/botw/js/live.js 200；
+- HTTPS 实测（gen-cert.ps1 生成本机证书）：`https://<LAN-IP>:8766/pos` 200 且 `lanUrl` 输出 `https://`、https 根路径 302、同端口 http 照常 200；
+- 缺图引导页实测（overlay 构建清空地图路径变体）：`/` 与 `/botw/` 均返回内置引导页，/pos 照常。
+
+---
+
 ## [BOTWmap v1.7.1] - 2026-10-21 存档上传防误传加固 · 世界等级徽标移位
 
 > **批次说明**：本批共三件独立改动同批发布 —— ① 存档上传防误传 ② 世界等级徽标移位 ③ Lynel23 大师限定门禁。

@@ -18,3 +18,8 @@ live-cemu V1.1.0开发计划-全自动进度同步.md
 # 编译产物不入库（2026-09-29 已从仓库移除跟踪）
 navicemu.exe
 navicemu.exe~
+
+# 证书：只入库生成脚本，生成的密钥/证书不入库（v1.3.2）
+certs/*
+!certs/gen-cert.ps1
+!certs/serve-cert.ps1
