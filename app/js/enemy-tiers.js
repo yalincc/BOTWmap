@@ -148,6 +148,20 @@
     return { hot: hot, all: all };
   }
 
+  /* 大师限定基础标记（data.js hard:1）：首次 apply 时收集，之后随大师开关摘放。
+     V1.7.1 背景：Lynel23 是大师模式限定生成的人马（camp.js LYNEL_OVERRIDES 有实测掉落），
+     普通模式无此布点，却常显在基础层 → 用户报「大师档才有的马出现在普通地图」。
+     刻意不做成大师层小怪注入：会丢图标 / #N 编号 / Boss 卡片掉落信息，且 SMALL_CATS 本就不收 boss 类。 */
+  var hardMarkers = null;
+  function gateHardMarkers(arr, hardOn) {
+    if (!hardMarkers) hardMarkers = arr.filter(function (m) { return m.hard; });
+    hardMarkers.forEach(function (m) {
+      var i = arr.indexOf(m);
+      if (hardOn && i < 0) arr.push(m);
+      else if (!hardOn && i >= 0) arr.splice(i, 1);
+    });
+  }
+
   /* 应用：swap BOTW_DATA.markers 的小怪层条目 + 重建营地层视图 + 重绘 */
   var _applying = false;
   function apply(chainTierArg, dlcStateArg) {
@@ -178,6 +192,10 @@
 
     var markers = composeMarkers(global.__chainTier, st);
     global.BOTW_DATA.markers.push.apply(global.BOTW_DATA.markers, markers);
+
+    // V1.7.1：大师限定标记摘放——开关关着从基础标记摘掉（普通地图不显示），开着放回。
+    // 摘放与大师层注入同在 apply 单点，绘制/命中/计数/搜索随全链路重算自动一致。
+    gateHardMarkers(global.BOTW_DATA.markers, !!(st && (st.hardmode || st.master)));
 
     // P5：营地层换源与武器联动
     var camps = composeCamps(global.__chainTier);
@@ -268,14 +286,17 @@
   }
 
   function getBadgeEl() {
-    var el = (typeof document !== 'undefined') && (document.getElementById('worldTierBadge') || document.getElementById('tierBadge'));
+    var el = (typeof document !== 'undefined') && document.getElementById('worldTierBadge');
     if (!el && typeof document !== 'undefined') {
-      var parent = document.querySelector('.save-upload');
+      /* V1.7.1：徽标挂在「探索度」折叠行右端（index.html 静态节点）。
+         兜底创建也落在那里；极端时序下才退回报存档区。 */
+      var wrap = document.querySelector('.stats-head-wrap');
+      var parent = wrap || document.querySelector('.save-upload');
       if (parent) {
-        el = document.createElement('div');
+        el = document.createElement('span');
         el.id = 'worldTierBadge';
-        el.className = 'su-tier-badge hidden';
-        parent.insertBefore(el, parent.querySelector('.su-tip') || null);
+        el.className = 'tier-badge hidden';
+        parent.appendChild(el);
       }
     }
     return el;
@@ -297,10 +318,11 @@
     var pts = (cur.points != null) ? cur.points : 0;
     var isEn = global.I18N && global.I18N.getLang() === 'en';
     if (isEn) {
-      badge.textContent = 'World Tier: Lv' + lvl + ' (' + pts + ' pts)';
+      badge.textContent = 'World Lv' + lvl + ' (' + pts + ' pts)';
       badge.title = 'World tier estimated from save file kill scores (official scaling algorithm)\nLv1: 0~285 pts\nLv2: 286~941 pts\nLv3: 942~1555 pts\nLv4: 1556+ pts';
     } else {
-      badge.textContent = '世界档位: Lv' + lvl + ' (' + pts + '分)';
+      /* V1.7.1：老大定稿格式 世界等级N（M分）——悬停 title 维持原内容不变 */
+      badge.textContent = '世界等级' + lvl + '（' + pts + '分）';
       badge.title = '世界档位根据存档击杀积分推算（官方缩放算法）\nLv1: 0~285分\nLv2: 286~941分\nLv3: 942~1555分\nLv4: 1556+分';
     }
     badge.classList.remove('hidden');

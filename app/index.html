@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=62&b=1641016">
+<link rel="stylesheet" href="css/style.css?v=64&b=1641016">
 <style>
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
@@ -78,7 +78,12 @@
 
     <!-- 探索度（v1.2.1 内嵌折叠面板：展开完整统计，面板自身滚动不截断） -->
     <div id="statsCollapse">
-      <button type="button" class="collapsible-head" id="statsToggle">▤ 探索度</button>
+      <div class="stats-head-wrap">
+        <button type="button" class="collapsible-head" id="statsToggle">▤ 探索度</button>
+        <!-- V1.7.1：世界等级徽标挂「探索度」行右端（老大二次指示：敌人大类不协调且英文截断）。
+             与按钮平级 + 绝对定位：点徽标不触发折叠，也不受 toggle.textContent 重绘影响 -->
+        <span id="worldTierBadge" class="tier-badge hidden" title="世界档位根据存档击杀积分推算（官方缩放算法）" data-i18n-title="tier.badgeTitle"></span>
+      </div>
       <div id="statsPanel" class="stats-body hidden"></div>
     </div>
 
@@ -91,7 +96,6 @@
           <span class="su-clear-tip hidden" id="suClearTip" data-i18n="save.clearTip">清空旧存档数据</span>
         </span>
       </div>
-      <div id="worldTierBadge" class="su-tier-badge hidden" title="世界档位根据存档击杀积分推算（官方缩放算法）" data-i18n-title="tier.badgeTitle"></div>
       <div class="su-tip hidden" id="suTip">
         <b data-i18n-html="save.tip.file">存档文件：game_data.sav（Switch 与 Wii U·Cemu 同名，上传自动识别端序）</b>
         <div data-i18n-html="save.tip.ryu">Ryujinx（Switch 模拟器）：<br><code>%APPDATA%\Ryujinx\bis\user\save\0000000000000008\0\1\game_data.sav</code></div>
@@ -103,7 +107,7 @@
     </div>
 
     <footer class="side-foot">
-      <p class="foot-version">BOTWMAP 1.7.0 © 2026 yalincc</p>
+      <p class="foot-version">BOTWMAP 1.7.1 © 2026 yalincc</p>
       <p>GitHub <a href="https://github.com/yalincc/BOTWmap" target="_blank" rel="noopener">https://github.com/yalincc/BOTWmap</a></p>
     </footer>
   </aside>
@@ -404,7 +408,7 @@
 <script src="data/i18n/en.js?v=6&b=1641016"></script>
 <script src="data/i18n/quests_en.js?v=1&b=1641016"></script>
 <script src="js/i18n.js?v=4&b=1641016"></script>
-<script src="js/data.js?v=5&b=1641016"></script>
+<script src="js/data.js?v=6&b=1641016"></script>
 <script src="js/enemies.js?v=3&b=1641016"></script>
 <!-- 官方缩放链 tier 视图数据件与混装模块（§12 官方缩放） -->
 <script src="data/enemy-tiers/scaling.js?v=1&b=1641016"></script>
@@ -414,7 +418,7 @@
 <script src="data/enemy-tiers/tier-3.js?v=1&b=1641016"></script>
 <script src="data/enemy-tiers/quest.js?v=1&b=1641016"></script>
 <script src="data/enemy-tiers/hardmode.js?v=1&b=1641016"></script>
-<script src="js/enemy-tiers.js?v=5&b=1641016"></script>
+<script src="js/enemy-tiers.js?v=8&b=1641016"></script>
 <script src="js/dragon_paths.js?v=3&b=1641016"></script>
 <script src="js/koroks.js?v=1&b=1641016"></script>
 <script src="js/korok_paths.js?v=1&b=1641016"></script>
@@ -434,7 +438,7 @@
 <script src="data/enemy_save.js?v=1&b=1641016"></script>
 <script src="data/pb_lists.js?v=1&b=1641016"></script>
 <script src="data/weapon_collect_save.js?v=2&b=1641016"></script>
-<script src="js/save_upload.js?v=30&b=1641016"></script>
+<script src="js/save_upload.js?v=31&b=1641016"></script>
 <script src="data/quests.js?v=8&b=1641016"></script>
 <!-- V1.6.2 · M3：任务板块拆 5 模块（data → done → canvas → flow → panel → card），quest.js 只做装配 + 门面 -->
 <script src="js/quest/quest-data.js?v=2&b=1641016"></script>
