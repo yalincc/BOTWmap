@@ -250,7 +250,7 @@ func New(p *winmem.Process) (*Tracker, error) {
 		}
 	}
 	if !found {
-		return nil, fmt.Errorf("未在游戏世界中找到林克实体（若游戏在主菜单或加载画面，请载入大世界后开始定位）")
+		return nil, fmt.Errorf("未在存档附近找到林克（请在游戏内按【+】手动存个档，或点击【手工校准】输入大致位置后重新定位）")
 	}
 	return t, nil
 }
