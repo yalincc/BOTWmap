@@ -111,7 +111,57 @@ type Hit struct {
 	P      Vec3
 	Copies int     // 坐标相同（0.1m 内）的地址数，仅作参考，不作身份判据
 	Rot    bool    // 邻近是否有 3x3 旋转矩阵（Actor 结构特征）
+	Quat   bool    // pos+0x0C 处是否是单位模长四元数（位置历史记录特征）
 	Dist   float64 // 与锚点的 3D 距离（锚点为 nil 时为 0）
+}
+
+// ---------- ★ 身份判据（2026-10-21 实测重新确立） ----------
+
+// QuatWindowBytes 容纳「pos + 四元数(16B)」所需的最小长度。
+const QuatWindowBytes = 0x0C + 16
+
+// IsQuatUnit 判断 buf[off:off+16] 是否是单位模长四元数。
+//
+// ★ 为什么用「单位模长」而不是「w∈(0.9,1.0]」：
+//   w = cos(θ/2)，玩家一转身 w 就离开 (0.9,1.0]（实测 w=-0.311）——
+//   那个判据只在面朝特定方向时成立，方向无关的判据是 w²+x²+y²+z² ≈ 1。
+func IsQuatUnit(buf []byte, off int) bool {
+	if off < 0 || off+16 > len(buf) {
+		return false
+	}
+	n := 0.0
+	for i := 0; i < 4; i++ {
+		v := float64(f32b(buf, off+i*4))
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return false
+		}
+		n += v * v
+	}
+	return math.Abs(n-1.0) < 0.02
+}
+
+// IsAxisMatrix 判断 buf[off:off+36] 是不是「单位轴矩阵」。
+//
+// ★ 为什么必须排除它：
+//   轴矩阵（9 个元素里正好 3 个非零、且都是 ±1，如 0,1,0 / -1,0,0 / 0,0,1）
+//   **完全满足** Rot3OK 的全部判据（三列单位长、两两正交），
+//   但它在引擎里到处都是（骨骼基向量、方向轴、欧拉角编码），
+//   不是「活跃 3D Actor」的证据。实测它就是误锁的元凶之一。
+func IsAxisMatrix(buf []byte, off int) bool {
+	if off < 0 || off+36 > len(buf) {
+		return false
+	}
+	nz, ones := 0, 0
+	for i := 0; i < 9; i++ {
+		v := math.Abs(float64(f32b(buf, off+i*4)))
+		if v > 1e-6 {
+			nz++
+			if math.Abs(v-1.0) < 1e-4 {
+				ones++
+			}
+		}
+	}
+	return nz == 3 && ones == 3
 }
 
 // Options 扫描参数。
@@ -144,7 +194,14 @@ func FindTriples(buf []byte, base uintptr, opt Options) []Hit {
 		if opt.Anchor != nil {
 			h.Dist = v.Dist3D(*opt.Anchor)
 		}
-		h.Rot = RotOffset(buf, off) >= 0
+		// Rot：3x3 正交旋转矩阵（Actor 特征）—— 但**排除轴矩阵**。
+		//   轴矩阵满足全部正交判据却不是 Actor（骨骼基向量、方向轴到处都是）。
+		if ro := RotOffset(buf, off); ro >= 0 && !IsAxisMatrix(buf, off+ro) {
+			h.Rot = true
+		}
+		// Quat：pos + 单位模长四元数（位置历史记录特征）。
+		//   这是**当前实机最可靠的身份判据**（见 ENAVI-HANDBOOK §6）。
+		h.Quat = IsQuatUnit(buf, off+0x0C)
 		hits = append(hits, h)
 	}
 	return hits
@@ -214,8 +271,9 @@ func YawFromQuat(qx, qy, qz, qw float32) float64 {
 
 // Group 按坐标（0.1m 取整）分组，回填 Copies 并排序。
 // 排序口径（Enavi 与 xnavi 的关键差异）：
-//   1) 有旋转矩阵的结构优先（Actor 特征）；
-//   2) 距锚点近优先；
+//   1) 有「pos+单位四元数」的记录优先（位置历史记录 = 当前实机最可靠的身份判据）；
+//   2) 其次有 3x3 正交旋转矩阵的结构优先（Actor 特征，轴矩阵已排除）；
+//   3) 最后按「距锚点近」优先。
 //   copies 仅写进结果供人看，不参与排序 —— 2026-10-20 实测已证伪它当身份判据。
 func Group(hits []Hit) []Hit {
 	if len(hits) == 0 {
@@ -233,6 +291,7 @@ func Group(hits []Hit) []Hit {
 		if i, ok := idx[k]; ok {
 			out[i].Copies++
 			out[i].Rot = out[i].Rot || h.Rot
+			out[i].Quat = out[i].Quat || h.Quat
 			continue
 		}
 		h.Copies = 1
@@ -240,6 +299,9 @@ func Group(hits []Hit) []Hit {
 		out = append(out, h)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Quat != out[j].Quat {
+			return out[i].Quat
+		}
 		if out[i].Rot != out[j].Rot {
 			return out[i].Rot
 		}
@@ -361,7 +423,7 @@ func f32b(buf []byte, off int) float32 {
 // (0,0,1) 单位变换、世界尺度 0 个 —— 说明真实 Actor 的排布不是那个固定形状。
 // 这里改成布局无关：从 +12 起按 4 字节步长最多试 9 个窗口。
 func RotOffset(buf []byte, off int) int {
-	return RotOffsetIn(buf, off, 12, 44)
+	return RotOffsetIn(buf, off, RotSearchLo, RotSearchHi)
 }
 
 // RotOffsetIn 在相对 posOff 的 [lo, hi] 字节区间（4 字节步长）内找正交 3x3。
@@ -383,10 +445,26 @@ func RotOffsetIn(buf []byte, posOff, lo, hi int) int {
 	return -1
 }
 
+// RotSearchHi 旋转矩阵相对 pos 的搜索上界（字节）。
+//
+// 实测（2026-10-21）：矩阵出现在 +0x14 / +0x18 / +0x1C / +0x20 / +0x24 / +0x2C。
+// 上界取 44（= 0x2C）留 4 字节余量。
+const (
+	RotSearchLo = 12
+	RotSearchHi = 44
+	// RotWindowBytes 完整容纳「最远偏移 + 3x3 矩阵(36字节)」所需的最小缓冲长度
+	// = 44 + 36 = 80。读不够这个长度就**不能**断言「没有矩阵」。
+	RotWindowBytes = RotSearchHi + 36
+)
+
 // TransformLoose pos 三个 float 合法 + 其后邻域存在正交 3x3（布局无关，实测口径）。
 // 返回 pos、旋转矩阵相对偏移 rotOff。
+//
+// ★ 缓冲长度要求 = RotWindowBytes(80)，不是 60 ——
+//   矩阵最远在 +0x2C，要读完 3x3 需要 +0x2C+36 = 80 字节。
+//   读 60 字节时 +0x2C 处的矩阵根本看不到 → 会把「活着的 Actor」误判成死的。
 func TransformLoose(buf []byte, off int) (pos Vec3, rotOff int, ok bool) {
-	if off < 0 || off+60 > len(buf) {
+	if off < 0 || off+RotWindowBytes > len(buf) {
 		return pos, -1, false
 	}
 	pos = Vec3{f32b(buf, off), f32b(buf, off+4), f32b(buf, off+8)}

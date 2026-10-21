@@ -76,42 +76,46 @@ func isShrineScale(v scan.Vec3) bool {
 		float64(v.Y) < shrineMaxY
 }
 
-// ---------- ★ Actor 存活判据（2026-10-21 实测事故修复） ----------
+// ---------- ★ 身份判据与存活判据（2026-10-21 两次事故后重订） ----------
+//
+// 事故 1（11:53）：读坐标不做校验 → 进神庙后 Actor 坐标被清零/写成 NaN，
+// 旧代码把 NaN 当合法坐标一路用下去。
+//
+// 事故 2（15:2x）：加了「3x3 旋转矩阵」判据后仍然无限重扫，
+// 因为 **readActor 只读 64 字节**，而矩阵在 +0x20 处 → 要读到 68 字节才看得见
+// → 每拍都误判「Actor 已死」→ 无限重扫 → 表现为「坐标固定、一直失败」。
+//
+// 事故 3（15:4x，实测确认）：在某些场景里 **根本不存在真正的 Actor 3x3 矩阵**。
+//   600m 宽窗实测：带 rot 的命中 60 个，其中
+//     · 真 Actor 矩阵（非轴排列）= **0**
+//     · 轴矩阵（骨骼基向量/方向轴，误判）= 32
+//     · 位置历史记录（pos+单位四元数）= 8
+//   而 120m 窄窗：带四元数指纹的命中 **1213** 个，带矩阵的只有 6 个（全是轴矩阵）。
+//
+// ⇒ 结论：**当前实机唯一可靠的身份判据是「pos + 单位模长四元数」**，
+//   也就是 BOTW 自己的「位置历史记录」（0x28 步长，pos + 四元数 + 角度）。
+//   它实时更新（实测玩家跑动时逐帧变），比 3x3 矩阵判据**更准**。
+//   3x3 矩阵判据降级为辅助（存在时加分），并排除轴矩阵这种假阳性。
+//
+// 存活判据（三道闸）：
+//  ① 坐标必须合法（WorldCoordOK：NaN/Inf/越界/近零/退化/参数表全挡）
+//  ② 四元数仍是单位模长（说明这条记录还活着）
+//  ③ 缓冲读够了长度（不够 = "没读到"，不是"没有"，绝不能据此判死）
 
-// 事故复盘（老大实机测试，2026-10-21 11:53）：
-//
-//	11:53:08  正常 (1662.5, 116.7, 1921.6) verified=true
-//	11:53:10  (0.0, 0.0, 1921.6)      ← 玩家进神庙，Actor 局部坐标被清零
-//	11:53:12  (0.0, NaN, 0.0)         ← NaN！
-//	（此后 8 拍全是 NaN，但程序认为"读成功了"）
-//	11:53:24  锁到 (107.7, 1.0, 0.0)  ← 重扫后锁到假槽（距离玩家 2485m！）
-//
-//	根因：**只读 12 字节坐标、不做任何校验**。
-//	  · 坐标槽被游戏清零/写成 NaN 时，ReadProcessMemory 仍然"成功"（内存可读），
-//	    旧代码只看 err == nil → 把 NaN 当成合法坐标继续用；
-//	  · scan.Vec3.Valid() 确实能挡 NaN，但旧代码路径**根本没调用它**。
-//
-// 所以定位的每一步都必须过两道闸：
-//  ① 坐标必须合法（无 NaN/Inf、在世界范围、非近零、非参数表整数三元组）；
-//  ② 同一 Actor 的 3x3 正交旋转矩阵必须还在（= 这还是那个活跃的 3D Actor）。
-//
-// ② 的实测依据（2026-10-21 探针）：
-//
-//	+0x18 处严格 3x3 正交 = true 的候选：36/48
-//	+0x14 处 = 0，+0x0C 处 = 0（★ 手册里写的 +0x0C 是错的！实际偏移不固定）
-//
-//	→ 旋转矩阵在 pos 之后的偏移**不固定**（+0x14/+0x18/+0x1C/+0x20/+0x24/+0x2C 都有），
-//	  所以必须**按布局无关**的方式找（scan.RotOffsetIn 扫 +12..+44），
-//	  找到就说明这个 Actor 活着；找不到 = 死了/不是 Actor → 立即失效重扫。
-
-// readActor 读一个 Actor 的坐标 + 验证它还活着。
+// readActor 读一个位置记录 + 验证它还活着。
 //
 // 返回 (pos, alive, ok)：
 //   - ok=false   → 连 12 字节都读不出来（真正的读失败）
-//   - alive=false → 读出来了，但坐标非法（NaN/清零/越界）或旋转矩阵没了
-//     → 这是「Actor 死了」或「锁错槽」，必须失效重扫
+//   - alive=false → 读出来了，但坐标非法 或 四元数已失效 → 记录死了，必须重扫
+//
+// ★★★ 读取长度必须够（2026-10-21 实测事故）：
+//   记录 = pos(12) + 四元数(16) → 至少 28 字节；
+//   若还要看 3x3 矩阵（最远 +0x2C）→ 需 80 字节。
+//   旧代码读 64 字节 → 矩阵在 +0x20 时够不到 → 误判「Actor 已死」→ 无限重扫。
+const actorReadLen = 128
+
 func (t *Tracker) readActor(addr uintptr) (pos scan.Vec3, alive bool, ok bool) {
-	buf, err := t.proc.ReadTimeout(addr, 64, 500*time.Millisecond)
+	buf, err := t.proc.ReadTimeout(addr, actorReadLen, 500*time.Millisecond)
 	if err != nil || len(buf) < 12 {
 		return scan.Vec3{}, false, false
 	}
@@ -124,9 +128,10 @@ func (t *Tracker) readActor(addr uintptr) (pos scan.Vec3, alive bool, ok bool) {
 	if !p.WorldCoordOK() {
 		return p, false, true
 	}
-	// 闸②：3x3 正交旋转矩阵必须还在（Actor 活跃的充要特征）
-	if len(buf) >= 60 {
-		if _, _, hasRot := scan.TransformLoose(buf, 0); !hasRot {
+	// 闸②：四元数仍是单位模长 → 这条记录还活着
+	//     （读不够长度时**不能**判死 —— 那是"没读到"而不是"没有"）
+	if len(buf) >= scan.QuatWindowBytes {
+		if !scan.IsQuatUnit(buf, 0x0C) {
 			return p, false, true
 		}
 	}
@@ -227,12 +232,19 @@ func New(p *winmem.Process) (*Tracker, error) {
 	//   而那块内存被引擎复用成了别的东西 → 秒锁到一个假坐标 → 之后再也定位不上。
 	//   现在必须同时满足：
 	//     ① 坐标通过 WorldCoordOK（挡 NaN/退化坐标/参数表）
-	//     ② 3x3 正交旋转矩阵还在（= 这还是那个活跃 Actor）
+	//     ② 四元数仍是单位模长（= 这条记录还活着；3x3 矩阵只作辅助）
 	//     ③ 距存档锚点 < 800m
 	//   任一不过 → 立即作废，走全堆扫描。
 	if e, ok := known.Load().Pick(t.pid, t.started); ok && e.Verified {
-		if buf, err := p.Read(e.Addr, 64); err == nil && len(buf) >= 60 {
-			if pos, _, okRot := scan.TransformLoose(buf, 0); okRot && pos.WorldCoordOK() {
+		// 读 128 字节：矩阵最远在 +0x2C，读 64 字节会看不到它 → 误判失效。
+		if buf, err := p.Read(e.Addr, actorReadLen); err == nil && len(buf) >= scan.QuatWindowBytes {
+			pos := scan.Vec3{
+				X: math.Float32frombits(binary.LittleEndian.Uint32(buf[0:])),
+				Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[4:])),
+				Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[8:])),
+			}
+			alive := pos.WorldCoordOK() && scan.IsQuatUnit(buf, 0x0C)
+			if alive {
 				anchorOK := !t.anchor.Valid() || pos.Dist2D(t.anchor) < 800
 				if anchorOK {
 					t.addr = e.Addr
@@ -623,11 +635,7 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	// 串行累积出 6 秒纯 sleep，是定位慢的主因。
 	workers := 4
 	const sleepPerChunk = 4 * time.Millisecond
-	type job struct {
-		addr uintptr
-		n    int
-	}
-	var jobs []job
+	var jobs []scanJob
 	for _, r := range t.regions {
 		if !r.Readable() || r.Size == 0 {
 			continue
@@ -640,14 +648,14 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 			if uintptr(n) < r.Size-off {
 				n += overlap
 			}
-			jobs = append(jobs, job{r.Base + off, n})
+			jobs = append(jobs, scanJob{r.Base + off, n})
 		}
 	}
 	if len(jobs) == 0 {
 		return false
 	}
 
-	ch := make(chan job, workers*2)
+	ch := make(chan scanJob, workers*2)
 	var wg sync.WaitGroup
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
@@ -681,26 +689,49 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	// ★★ 再加一道：坐标必须通过 WorldCoordOK（严于 Valid）——
 	//   实测踩到过参数表里的退化坐标 (107.7, 1.0, 0.0)：
 	//   Valid() 对它返回 true，但它离玩家 2485m，锁上去红点直接飞到天边。
-	rotHits := make([]scan.Hit, 0, len(allHits))
+	// ★ 身份判据（2026-10-21 实测重订）：
+	//   「pos + 单位模长四元数」= 位置历史记录 = 当前实机最可靠的目标。
+	//   3x3 正交矩阵降级为辅助（h.Rot，已排除轴矩阵假阳性）。
+	//
+	//   为什么不要「只要有 3x3 矩阵」：实测某些场景里**一个真 Actor 矩阵都没有**，
+	//   命中的 6 个全是轴矩阵（骨骼基向量/方向轴）→ 锁到的就是死数据。
+	identHits := make([]scan.Hit, 0, len(allHits))
 	for _, h := range allHits {
-		if !h.Rot {
-			continue
-		}
 		if !h.P.WorldCoordOK() {
 			continue
 		}
-		rotHits = append(rotHits, h)
+		if !h.Quat && !h.Rot {
+			continue // 既没有四元数指纹也没有矩阵 → 不是目标
+		}
+		identHits = append(identHits, h)
 	}
-	if len(rotHits) == 0 {
+	if len(identHits) == 0 {
 		return false
 	}
 
-	// 坐标分组去重（有旋转矩阵优先 + 距中心近）。
-	groups := scan.Group(rotHits)
+	// 坐标分组去重（有四元数优先 + 有矩阵次之 + 距中心近）。
+	groups := scan.Group(identHits)
 	if len(groups) == 0 {
 		return false
 	}
-	best := groups[0]
+
+	// ★★ 活体探测：候选里既有「正在更新的记录」，也有「冻结的历史副本」。
+	//
+	// 实测（2026-10-21 15:5x）：同一场景里，
+	//   · 冻结副本 (99.885, 123.037, 1660.139) —— 多次采样纹丝不动
+	//   · 活记录 (107.16, 125.98, 1669.42)   —— 逐帧跟随玩家
+	//   两者结构完全一样（pos + 单位四元数），**只有"会不会变"能区分**。
+	//   而它们相距 145MB —— 是引擎里的两份独立拷贝，只有一份是活的。
+	//
+	// 做法：等一小段时间，把**含候选的那些内存块**重读一遍，
+	//       对比同一地址的坐标变没变。变了的才是玩家当前帧。
+	//       （不能用"逐个读地址"做：单次 12 字节读实测 689µs，
+	//        上千个候选要 1 秒以上；而块读只要 757 次 8MB 读，~1 秒内完成。）
+	best, moved := t.pickLiveCandidate(groups, jobs, chunk, overlap)
+	if !moved {
+		logf("[locate] 候选均无变化（玩家可能静止），取距锚点最近的一个：%#x (%.1f, %.1f, %.1f)\n",
+			best.Addr, best.P.X, best.P.Y, best.P.Z)
+	}
 
 	var slots []candSlot
 	for i := 0; i < len(groups) && i < 5; i++ {
@@ -726,4 +757,101 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	//   但能让下次启动知道"这个地址上次还在"。
 	t.persist(best.P, false)
 	return true
+}
+
+// scanJob 一次分块读取任务。
+type scanJob struct {
+	addr uintptr
+	n    int
+}
+
+// pickLiveCandidate 从候选里挑出「正在更新」的那一个。
+//
+// ★ 这是 2026-10-21 15:5x 实测确立的关键判据：
+//   位置历史记录里，玩家当前帧和历史帧**结构完全一样**（pos + 单位四元数），
+//   唯一的区别是**会不会变**。只按"离存档近"排序会锁到冻结的历史帧
+//   （实测锁到 99.885,1660.139，而玩家实际在 107.16,1669.42 —— 差 11 米；
+//     两者相距 145MB，是引擎里的两份独立拷贝，只有一份是活的）。
+//
+// 做法：等一会儿 → 把**含候选的内存块**重读一遍 → 对比同一地址的坐标变没变。
+//
+// 为什么用块读而不是逐个读地址：
+//   单次 12 字节 ReadProcessMemory 实测 **689µs**（Eden 进程被占时更慢），
+//   上千个候选逐个读要 1 秒以上；而块读（8MB）只要几百次，总计 ~1 秒，
+//   而且是**同一批地址**的重读，能直接对比。
+func (t *Tracker) pickLiveCandidate(groups []scan.Hit, jobs []scanJob, chunk int, overlap int) (scan.Hit, bool) {
+	const liveProbeWait = 700 * time.Millisecond
+	const liveMoveDist = 0.001 // 1mm 以上的变化算"在动"（玩家站着也有微小浮动）
+
+	if len(groups) == 0 {
+		return scan.Hit{}, false
+	}
+	// 只探测前 N 个候选（按优先级已排好），避免全量对比
+	const maxProbe = 400
+	probes := groups
+	if len(probes) > maxProbe {
+		probes = probes[:maxProbe]
+	}
+	// 记下探测前的坐标
+	before := make(map[uintptr]scan.Vec3, len(probes))
+	for _, h := range probes {
+		before[h.Addr] = h.P
+	}
+
+	time.Sleep(liveProbeWait)
+
+	// 重读包含候选的块（并发），对比变化
+	var mu sync.Mutex
+	movers := map[uintptr]float64{}
+	for _, j := range jobs {
+		buf, err := t.proc.Read(j.addr, j.n)
+		if err != nil || len(buf) < 12 {
+			continue
+		}
+		for _, h := range probes {
+			rel := int64(h.Addr) - int64(j.addr)
+			if rel < 0 || rel+12 > int64(len(buf)) {
+				continue
+			}
+			off := int(rel)
+			now := scan.Vec3{
+				X: math.Float32frombits(binary.LittleEndian.Uint32(buf[off:])),
+				Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[off+4:])),
+				Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[off+8:])),
+			}
+			d := now.Dist3D(before[h.Addr])
+			if d <= liveMoveDist {
+				continue
+			}
+			mu.Lock()
+			if d > movers[h.Addr] {
+				movers[h.Addr] = d
+			}
+			mu.Unlock()
+		}
+	}
+	if len(movers) == 0 {
+		// 都没动：取离锚点最近的那个（玩家站着不动时的合理退路）
+		best := probes[0]
+		for _, h := range probes[1:] {
+			if h.Dist < best.Dist {
+				best = h
+			}
+		}
+		return best, false
+	}
+	// 动了的里，取位移最大的（真玩家跑动幅度最大），同值时取离锚点近的
+	best, bestD := probes[0], -1.0
+	for _, h := range probes {
+		d, ok := movers[h.Addr]
+		if !ok {
+			continue
+		}
+		if d > bestD || (d == bestD && h.Dist < best.Dist) {
+			best, bestD = h, d
+		}
+	}
+	logf("[locate] 活体探测：%d/%d 个候选在变，选中 %#x (%.1f, %.1f, %.1f) 位移=%.4fm\n",
+		len(movers), len(probes), best.Addr, best.P.X, best.P.Y, best.P.Z, bestD)
+	return best, true
 }

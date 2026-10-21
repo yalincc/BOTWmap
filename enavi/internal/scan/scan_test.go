@@ -54,3 +54,78 @@ func TestValidStillLoose(t *testing.T) {
 
 func nan() float64    { return math.NaN() }
 func posInf() float64 { return math.Inf(1) }
+
+// TestIsQuatUnit 固化「单位模长四元数」判据。
+//
+// ★ 为什么不用「w ∈ (0.9, 1.0]」：
+//   w = cos(θ/2)，玩家一转身 w 就离开 (0.9,1.0]（实测 w = -0.311）。
+//   方向无关的判据是 w²+x²+y²+z² ≈ 1。
+func TestIsQuatUnit(t *testing.T) {
+	mk := func(w, x, y, z float32) []byte {
+		b := make([]byte, 16)
+		v := [4]float32{w, x, y, z}
+		for i, f := range v {
+			bits := math.Float32bits(f)
+			b[i*4] = byte(bits)
+			b[i*4+1] = byte(bits >> 8)
+			b[i*4+2] = byte(bits >> 16)
+			b[i*4+3] = byte(bits >> 24)
+		}
+		return b
+	}
+	// 玩家实测朝向（w=0, x=-0.0516, y=-0.9986, z=-0.0080）→ 模长 1
+	if !IsQuatUnit(mk(0, -0.0516, -0.9986, -0.0080), 0) {
+		t.Error("玩家实测四元数应判为单位模长")
+	}
+	// w=-0.311 的转身姿态：模长仍应为 1
+	if !IsQuatUnit(mk(-0.311, 0.5487, 0.5487, 0.5487), 0) {
+		t.Error("w=-0.311 的转身姿态模长仍≈1，应判为单位模长")
+	}
+	// 明显不是四元数
+	if IsQuatUnit(mk(0, 0, 0, 0), 0) {
+		t.Error("全零不应判为单位模长")
+	}
+}
+
+// TestIsAxisMatrix 固化「轴矩阵要排除」这条判据。
+//
+// 实测踩过：引擎里的方向轴/骨骼基向量是 0,1,0 / -1,0,0 / 0,0,1 这种整齐排列，
+// **完全满足** Rot3OK 的全部正交判据，但把它当「Actor 旋转矩阵」会锁到死数据。
+func TestIsAxisMatrix(t *testing.T) {
+	mk := func(v [9]float32) []byte {
+		b := make([]byte, 36)
+		for i, f := range v {
+			bits := math.Float32bits(f)
+			b[i*4] = byte(bits)
+			b[i*4+1] = byte(bits >> 8)
+			b[i*4+2] = byte(bits >> 16)
+			b[i*4+3] = byte(bits >> 24)
+		}
+		return b
+	}
+	// 实测误判的那个轴矩阵
+	axis := [9]float32{0, 1, 0, -1, 0, 0, 0, 0, 1}
+	if !IsAxisMatrix(mk(axis), 0) {
+		t.Error("0,1,0 / -1,0,0 / 0,0,1 应判为轴矩阵")
+	}
+	// 真实 Actor 的任意旋转矩阵：元素是"乱"的
+	real := [9]float32{-0.25, -0.50, -1.00, 0.99, 0.00, 0.06, 0.00, 0.98, -0.20}
+	if IsAxisMatrix(mk(real), 0) {
+		t.Error("任意旋转矩阵不应判为轴矩阵")
+	}
+}
+
+// TestRotWindowBytes 固化「读够 80 字节才能断言有没有矩阵」。
+//
+// 矩阵最远在 +0x2C，要读完 3x3 需要 +0x2C+36 = 80 字节。
+// 读 64 字节时会漏看 +0x20 处的矩阵 → 把活着的 Actor 误判成死的。
+func TestRotWindowBytes(t *testing.T) {
+	if RotWindowBytes != 80 {
+		t.Errorf("RotWindowBytes = %d, want 80", RotWindowBytes)
+	}
+	// TransformLoose 在 64 字节缓冲上必须拒绝（而不是"找不到矩阵"）
+	small := make([]byte, 64)
+	if _, _, ok := TransformLoose(small, 0); ok {
+		t.Error("64 字节缓冲不足以判定矩阵，TransformLoose 不应返回 ok")
+	}
+}
