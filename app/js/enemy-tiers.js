@@ -148,6 +148,20 @@
     return { hot: hot, all: all };
   }
 
+  /* 大师限定基础标记（data.js hard:1）：首次 apply 时收集，之后随大师开关摘放。
+     V1.7.1 背景：Lynel23 是大师模式限定生成的人马（camp.js LYNEL_OVERRIDES 有实测掉落），
+     普通模式无此布点，却常显在基础层 → 用户报「大师档才有的马出现在普通地图」。
+     刻意不做成大师层小怪注入：会丢图标 / #N 编号 / Boss 卡片掉落信息，且 SMALL_CATS 本就不收 boss 类。 */
+  var hardMarkers = null;
+  function gateHardMarkers(arr, hardOn) {
+    if (!hardMarkers) hardMarkers = arr.filter(function (m) { return m.hard; });
+    hardMarkers.forEach(function (m) {
+      var i = arr.indexOf(m);
+      if (hardOn && i < 0) arr.push(m);
+      else if (!hardOn && i >= 0) arr.splice(i, 1);
+    });
+  }
+
   /* 应用：swap BOTW_DATA.markers 的小怪层条目 + 重建营地层视图 + 重绘 */
   var _applying = false;
   function apply(chainTierArg, dlcStateArg) {
@@ -178,6 +192,10 @@
 
     var markers = composeMarkers(global.__chainTier, st);
     global.BOTW_DATA.markers.push.apply(global.BOTW_DATA.markers, markers);
+
+    // V1.7.1：大师限定标记摘放——开关关着从基础标记摘掉（普通地图不显示），开着放回。
+    // 摘放与大师层注入同在 apply 单点，绘制/命中/计数/搜索随全链路重算自动一致。
+    gateHardMarkers(global.BOTW_DATA.markers, !!(st && (st.hardmode || st.master)));
 
     // P5：营地层换源与武器联动
     var camps = composeCamps(global.__chainTier);
