@@ -106,6 +106,9 @@ func (s Store) Pick(pid uint32, procStarted int64) (Entry, bool) {
 		if procStarted != 0 && e.ProcStarted != 0 && e.ProcStarted != procStarted {
 			continue // 不同会话（进程重启过），地址不可信
 		}
+		if !e.Verified {
+			continue // 未经验证（走动确认）的地址不予复用，防止错误地址被秒锁固化
+		}
 		if time.Since(time.Unix(e.SavedAt, 0)) > softTTL {
 			continue
 		}

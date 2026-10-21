@@ -58,7 +58,7 @@ func loadConfig(path string) (Config, string) {
 		return cfg, path
 	}
 	if err := json.Unmarshal(b, &cfg); err != nil {
-		fmt.Printf("[config] 解析 %s 失败，用默认值: %v\n", path, err)
+		logPrint("[config] 解析 %s 失败，用默认值: %v\n", path, err)
 		return defaultConfig(), path
 	}
 	if cfg.Port == 0 {
@@ -68,6 +68,35 @@ func loadConfig(path string) (Config, string) {
 		cfg.ProcName = "eden"
 	}
 	return cfg, path
+}
+
+// ---------- 本地持久运行日志 (enavi.log) ----------
+
+var (
+	logMu   sync.Mutex
+	logFile *os.File
+)
+
+func logPrint(format string, a ...any) {
+	msg := fmt.Sprintf(format, a...)
+	os.Stdout.WriteString(msg)
+	if logFile != nil {
+		logMu.Lock()
+		ts := time.Now().Format("2006/01/02 15:04:05.000 ")
+		logFile.WriteString(ts + msg)
+		logMu.Unlock()
+	}
+}
+
+func logPrintln(a ...any) {
+	msg := fmt.Sprintln(a...)
+	os.Stdout.WriteString(msg)
+	if logFile != nil {
+		logMu.Lock()
+		ts := time.Now().Format("2006/01/02 15:04:05.000 ")
+		logFile.WriteString(ts + msg)
+		logMu.Unlock()
+	}
 }
 
 // ---------- 共享状态 ----------
@@ -101,19 +130,30 @@ func main() {
 	port := flag.Int("port", 0, "覆盖端口")
 	flag.Parse()
 
-	fmt.Println(version.Banner())
+	// 开启持久化运行日志，便于复盘操作与排查
+	if f, err := os.OpenFile("enavi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+		// 若文件 > 5MB 则滚动截断
+		if fi, err2 := f.Stat(); err2 == nil && fi.Size() > 5<<20 {
+			f.Close()
+			f, _ = os.OpenFile("enavi.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+		}
+		logFile = f
+		defer f.Close()
+	}
+
+	logPrintln(version.Banner())
 	cfg, used := loadConfig(*cfgPath)
 	if *port > 0 {
 		cfg.Port = *port
 	}
 	const sampleHz = 10 // 采样频率写死：10Hz 对网页 600ms 轮询足够，且不吃 CPU
-	fmt.Printf("[config] %s → port=%d proc=%s（采样 %dHz 固定）\n", used, cfg.Port, cfg.ProcName, sampleHz)
+	logPrint("[config] %s → port=%d proc=%s（采样 %dHz 固定）\n", used, cfg.Port, cfg.ProcName, sampleHz)
 
 	st := &shared{cfg: map[string]any{}}
 
 	// 单实例锁：孤儿进程占 8766 会让前端连到死服务
 	if !acquireSingleInstance("Global\\EnaviM1") {
-		fmt.Println("[fatal] 已有一个 Enavi 在运行（或端口被占）。先关掉旧窗口。")
+		logPrintln("[fatal] 已有一个 Enavi 在运行（或端口被占）。先关掉旧窗口。")
 		os.Exit(1)
 	}
 
@@ -138,7 +178,7 @@ func main() {
 				}
 				t, err := locate.New(p)
 				if err != nil {
-					fmt.Printf("[locate] 锁定失败：%v（3 秒后重试）\n", err)
+					logPrint("[locate] 锁定失败：%v（3 秒后重试）\n", err)
 					p.Close()
 					time.Sleep(3 * time.Second)
 					continue
@@ -152,12 +192,12 @@ func main() {
 				st.rescan = func() { tt.Rescan() }
 				st.mu.Unlock()
 				a := t.Anchor()
-				fmt.Printf("[locate] ✓ 已锁定：锚点=(%.1f, %.1f, %.1f)\n", a.X, a.Y, a.Z)
+				logPrint("[locate] ✓ 已锁定：锚点=(%.1f, %.1f, %.1f)\n", a.X, a.Y, a.Z)
 			}
 
 			<-ticker.C
 			if !proc.Alive() {
-				fmt.Println("[locate] Eden 已退出，重新探测…")
+				logPrintln("[locate] Eden 已退出，重新探测…")
 				mux.Lock()
 				proc.Close()
 				proc, tr = nil, nil
@@ -174,21 +214,21 @@ func main() {
 			if time.Since(lastPrint) >= 2*time.Second {
 				lastPrint = time.Now()
 				if u.OK {
-					fmt.Printf("[pos] (%.1f, %.1f, %.1f) verified=%v src=%s addr=0x%X scans=%d\n",
+					logPrint("[pos] (%.1f, %.1f, %.1f) verified=%v src=%s addr=0x%X scans=%d\n",
 						u.Pos.X, u.Pos.Y, u.Pos.Z, u.Verified, u.Source, sb.Addr, sb.Scans)
 				} else {
 					note := u.Source
 					if u.Note != "" {
 						note += ": " + u.Note
 					}
-					fmt.Printf("[pos] -- 定位中（%s）\n", note)
+					logPrint("[pos] -- 定位中（%s）\n", note)
 				}
 			}
 		}
 	}()
 
 	waitSignal()
-	fmt.Println("\n[exit] 收到退出信号")
+	logPrintln("\n[exit] 收到退出信号")
 }
 
 func attach(procName string) *winmem.Process {
@@ -198,10 +238,10 @@ func attach(procName string) *winmem.Process {
 	}
 	p, err := winmem.Open(pids[0])
 	if err != nil {
-		fmt.Printf("[attach] 打开 %s(pid=%d) 失败：%v\n", procName, pids[0], err)
+		logPrint("[attach] 打开 %s(pid=%d) 失败：%v\n", procName, pids[0], err)
 		return nil
 	}
-	fmt.Printf("[attach] pid=%d %s\n", pids[0], p.ExePath())
+	logPrint("[attach] pid=%d %s\n", pids[0], p.ExePath())
 	return p
 }
 
@@ -312,7 +352,7 @@ func serve(cfg Config, st *shared) {
 	})
 
 	addr := fmt.Sprintf("127.0.0.1:%d", cfg.Port)
-	fmt.Printf("[http] 监听 http://%s/pos   （地图里会自动连这个地址）\n", addr)
+	logPrint("[http] 监听 http://%s/pos   （地图里会自动连这个地址）\n", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		fmt.Printf("[fatal] HTTP 启动失败：%v（端口被占？）\n", err)
 		os.Exit(1)

@@ -29,6 +29,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -62,6 +63,11 @@ type Update struct {
 }
 
 // Tracker 玩家位置跟踪器。
+type candSlot struct {
+	addr uintptr
+	init scan.Vec3
+}
+
 type Tracker struct {
 	proc    *winmem.Process
 	regions []winmem.Region
@@ -77,6 +83,7 @@ type Tracker struct {
 	moveN    int
 	fails    int
 	shrine   bool // 是否在神庙内（挂起跟随）
+	cands    []candSlot // 待验证备选槽（用于驿站等多 NPC 场景走动仲裁）
 
 	scanBusy int32
 	scans    int
@@ -115,51 +122,43 @@ func New(p *winmem.Process) (*Tracker, error) {
 	}
 
 	// ① known 缓存：同一 Eden 会话内，直接读，不进扫描
-	if e, ok := known.Load().Pick(t.pid, t.started); ok {
-		if pv, valid := poshist.ReadPos(p, e.Addr); valid {
-			v := scan.Vec3{X: pv[0], Y: pv[1], Z: pv[2]}
-			// 校验：必须是合法世界坐标（防读到已失效的地址）
-			if v.Valid() {
-				t.addr = e.Addr
-				t.cur = v
-				t.ok = true
-				t.verified = e.Verified
-				t.persist(v, e.Verified) // 刷新 SavedAt，延长软 TTL
-				return t, nil
+	if e, ok := known.Load().Pick(t.pid, t.started); ok && e.Verified {
+		if buf, err := p.Read(e.Addr, 64); err == nil && len(buf) >= 60 {
+			if pos, _, okRot := scan.TransformLoose(buf, 0); okRot {
+				anchorOK := !t.anchor.Valid() || pos.Dist2D(t.anchor) < 800
+				if anchorOK {
+					t.addr = e.Addr
+					t.cur = pos
+					t.ok = true
+					t.verified = true
+					return t, nil
+				}
 			}
 		}
 	}
 
-	// ② 位置历史缓冲定位（★ 主路径）
-	var anchor [3]float32
-	anchorValid := t.anchor.Valid()
-	if anchorValid {
-		anchor = [3]float32{t.anchor.X, t.anchor.Y, t.anchor.Z}
+	// ② 存档锚点窗口扫描（以存档为中心，在近场找带 Actor 旋转矩阵的真实玩家坐标槽）
+	anchors, _ := saveanchor.Find(p.ExePath())
+	if len(anchors) == 0 {
+		return nil, errors.New("未找到可用存档锚点，请在游戏内按 + 存个档（或等待自动存档）")
 	}
-	addr, err := poshist.ScanWithAnchor(p, anchor, anchorValid)
-	if err != nil {
-		// 定位失败 → 回落到旧的存档锚点扫描（兜底，但不该走到这）
-		if !t.anchor.Valid() {
-			return nil, fmt.Errorf("位置历史缓冲定位失败（%v）；也没有可用存档锚点", err)
+	found := false
+	for i := 0; i < len(anchors) && i < 3; i++ {
+		anc := scan.Vec3{X: anchors[i].Pos[0], Y: anchors[i].Pos[1], Z: anchors[i].Pos[2]}
+		if t.rescan(anc, winNear) {
+			t.anchor = anc
+			found = true
+			break
 		}
-		if !t.rescan(t.anchor, winNear) && !t.rescan(t.anchor, winFar) {
-			return nil, fmt.Errorf("位置历史缓冲定位失败（%v），且锚点窗口内没有坐标槽", err)
-		}
-	} else {
-		v, ok := poshist.ReadPos(p, addr)
-		if !ok {
-			return nil, errors.New("位置历史缓冲已定位但读不出坐标")
-		}
-		t.addr = addr
-		t.cur = scan.Vec3{X: v[0], Y: v[1], Z: v[2]}
-		t.ok = true
-		t.verified = true // 位置历史缓冲的元素本身就是玩家当前帧，无需走动验证
-		t.scans++
 	}
-	// 首次锁定就写盘（verified=false）：即使玩家一直站着不动，下次也能秒锁。
-	t.mu.RLock()
-	t.persist(t.cur, t.verified)
-	t.mu.RUnlock()
+	if !found {
+		if t.rescan(t.anchor, winFar) {
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("存档锚点 (%.1f, %.1f, %.1f) 窗口内未找到活跃玩家 Actor（请确认已载入游戏世界，若仍在加载画面请稍候）", t.anchor.X, t.anchor.Y, t.anchor.Z)
+	}
 	return t, nil
 }
 
@@ -190,20 +189,59 @@ func (t *Tracker) Tick() Update {
 		}
 		t.mu.Unlock()
 		if f >= readFailMax {
-			t.rescanAsync(cur, winFar)
-			return Update{OK: false, Source: "lost", Note: "连续读失败"}
+			t.rescanAsync(scan.Vec3{}, winFar) // 传空坐标，自动检查并跳转到最新传送存档点
+			return Update{OK: false, Source: "lost", Note: "连续读失败，重扫中"}
 		}
 		// 单次失败多半是瞬态（加载中页保护切换），保持上一位置
 		return Update{OK: okCur, Verified: verified, Pos: cur, Addr: addr, Source: "hold"}
 	}
 
-	// 神庙内：坐标是本地尺度，钉住入口，不跟随、不重扫
-	if shrine || (v.InShrine() && !cur.InShrine()) {
+	// 多候选走动仲裁（防驿站等多 NPC 场景误锁静止 NPC）
+	t.mu.RLock()
+	cands := t.cands
+	t.mu.RUnlock()
+	if !verified && len(cands) > 1 {
+		for _, c := range cands {
+			if c.addr == addr {
+				continue
+			}
+			pCand, okCand := poshist.ReadPos(t.proc, c.addr)
+			if okCand {
+				cPos := scan.Vec3{X: pCand[0], Y: pCand[1], Z: pCand[2]}
+				dCand := cPos.Dist3D(c.init)
+				if dCand >= moveDist && dCand < maxTickJump {
+					t.mu.Lock()
+					t.addr = c.addr
+					t.cur = cPos
+					t.verified = true
+					t.moveN = moveConfirmN
+					t.cands = nil
+					t.persist(cPos, true)
+					t.mu.Unlock()
+					return Update{OK: true, Verified: true, Pos: cPos, Addr: c.addr, Source: "player", Note: "走动仲裁识别为真玩家"}
+				}
+			}
+		}
+	}
+
+	// 神庙内部试炼场本地尺度判定（必须 |X|<100, |Z|<100 且高度 Y < 50）
+	// 注意：中央平原之塔等大世界坐标也在原点附近（但高度 Y > 100m），不可误判为神庙！
+	isShrineLocal := math.Abs(float64(v.X)) < 100 && math.Abs(float64(v.Z)) < 100 && v.Y < 50
+	if shrine {
+		if !isShrineLocal {
+			// 出庙或传送：立即解除神庙挂起状态
+			t.mu.Lock()
+			t.shrine = false
+			t.mu.Unlock()
+		} else {
+			return Update{OK: false, Pos: cur, Addr: addr, Source: "shrine", Note: "神庙内试炼场（本地坐标），红点钉在门口"}
+		}
+	} else if isShrineLocal && !cur.InShrine() && v.Dist3D(cur) > 100 {
 		t.mu.Lock()
 		t.shrine = true
 		t.ok = false
 		t.mu.Unlock()
-		return Update{OK: false, Pos: cur, Addr: addr, Source: "shrine", Note: "神庙内（本地坐标），红点钉在门口"}
+		return Update{OK: false, Pos: cur, Addr: addr, Source: "shrine", Note: "神庙内试炼场（本地坐标），红点钉在门口"}
 	}
 
 	d := v.Dist3D(cur)
@@ -215,6 +253,7 @@ func (t *Tracker) Tick() Update {
 		t.verified = false
 		t.moveN = 0
 		t.fails = 0
+		t.shrine = false // 传送必定解除神庙状态
 		t.mu.Unlock()
 		t.rescanAsync(v, winNear) // 围着落点重扫
 		return Update{OK: true, Pos: v, Addr: addr, Source: "scan", Note: "传送跳变，重扫中"}
@@ -261,10 +300,13 @@ func (t *Tracker) persist(v scan.Vec3, verified bool) {
 
 // Rescan 手动重扫。
 func (t *Tracker) Rescan() {
-	t.mu.RLock()
-	cur := t.cur
-	t.mu.RUnlock()
-	t.rescanAsync(cur, winFar)
+	t.mu.Lock()
+	t.shrine = false
+	if anchors, _ := saveanchor.Find(t.proc.ExePath()); len(anchors) > 0 {
+		t.anchor = scan.Vec3{X: anchors[0].Pos[0], Y: anchors[0].Pos[1], Z: anchors[0].Pos[2]}
+	}
+	t.mu.Unlock()
+	t.rescanAsync(scan.Vec3{}, winFar)
 }
 
 // LeaveShrine 离开神庙（外部可调；出庙时清挂起标记）。
@@ -288,10 +330,7 @@ func (t *Tracker) Stats() Stats {
 }
 
 func (t *Tracker) rescanAsync(center scan.Vec3, radius float64) {
-	// ★ 新主路径：重扫 = 重新定位位置历史缓冲
-	_ = center
-	_ = radius
-	t.rescanPosHist()
+	t.rescanLegacy(center, radius)
 }
 
 // rescanPosHist 重新定位位置历史缓冲。
@@ -333,6 +372,16 @@ func (t *Tracker) rescanLegacy(center scan.Vec3, radius float64) {
 	}
 	go func() {
 		defer atomic.StoreInt32(&t.scanBusy, 0)
+		// 检查磁盘是否有最新的传送存档（BOTW 传送落地必自动存档）
+		if anchors, _ := saveanchor.Find(t.proc.ExePath()); len(anchors) > 0 {
+			latest := scan.Vec3{X: anchors[0].Pos[0], Y: anchors[0].Pos[1], Z: anchors[0].Pos[2]}
+			if !center.Valid() || latest.Dist2D(center) > 200 {
+				center = latest
+				t.mu.Lock()
+				t.anchor = latest
+				t.mu.Unlock()
+			}
+		}
 		t.rescan(center, radius)
 	}()
 }
@@ -352,11 +401,12 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	}
 	var best cand
 	found := false
+	var allCands []cand
 	var mu sync.Mutex
 
 	const chunk = 8 << 20
 	const overlap = 256
-	workers := 8
+	workers := 2
 	type job struct {
 		addr uintptr
 		n    int
@@ -389,6 +439,7 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 			defer wg.Done()
 			for j := range ch {
 				buf, err := t.proc.Read(j.addr, j.n)
+				time.Sleep(8 * time.Millisecond) // 限速，防拖死/卡顿模拟器
 				if err != nil || len(buf) < 12 {
 					continue
 				}
@@ -398,14 +449,13 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 				}
 				mu.Lock()
 				for _, h := range hits {
-					score := -h.Dist
-					if h.Rot {
-						score += 1000 // 有 Actor 旋转矩阵 → 优先
-					} else if scan.HistoryCopyAt(t.proc, h.Addr, h.P) {
-						score -= 200 // 位置历史副本 → 降级
-					} else {
-						score += 100
+					// ★ 核心铁律：必须有 Actor 3x3 正交旋转矩阵！
+					// 静态存档数据、无 Actor 变换的静态结构一律跳过，绝不锁死在静态槽上
+					if !h.Rot {
+						continue
 					}
+					score := 1000.0 - h.Dist
+					allCands = append(allCands, cand{addr: h.Addr, p: h.P, score: score})
 					if !found || score > best.score {
 						best = cand{addr: h.Addr, p: h.P, score: score}
 						found = true
@@ -424,6 +474,14 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	if !found {
 		return false
 	}
+	sort.Slice(allCands, func(i, j int) bool {
+		return allCands[i].score > allCands[j].score
+	})
+	var slots []candSlot
+	for i := 0; i < len(allCands) && i < 5; i++ {
+		slots = append(slots, candSlot{addr: allCands[i].addr, init: allCands[i].p})
+	}
+
 	t.mu.Lock()
 	t.addr = best.addr
 	t.cur = best.p
@@ -433,11 +491,8 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	t.fails = 0
 	t.shrine = false
 	t.scans++
-	savedAddr, savedPos := t.addr, t.cur
+	t.cands = slots
 	t.mu.Unlock()
-	// 重扫结果也落盘：下次启动直接读这个地址
-	t.addr = savedAddr
-	t.persist(savedPos, false)
 	return true
 }
 
