@@ -232,6 +232,16 @@ func (a *App) Rescan() string {
 	return "已提交重新扫描"
 }
 
+// RescanManual 手动输入 XZ 坐标定向快速扫描。
+func (a *App) RescanManual(x, z float64) string {
+	path := filepath.Join(a.workDir, "rescan.req")
+	data, _ := json.Marshal(map[string]float64{"x": x, "z": z})
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "提交失败: " + err.Error()
+	}
+	return fmt.Sprintf("已提交以坐标 (%.1f, %.1f) 定向校准扫描", x, z)
+}
+
 // statusPath 核心每 2 秒写的状态快照。
 func (a *App) statusPath() string { return filepath.Join(a.workDir, "status.json") }
 
@@ -271,7 +281,7 @@ func (a *App) CoreStatus() map[string]any {
 		obj["gx"], obj["gy"], obj["gz"] = 0, 0, 0
 		obj["mx"], obj["my"] = 0, 0
 		obj["addr"] = 0
-		obj["scans"], obj["saves"] = 0, 0
+		obj["scans"] = 0
 		obj["shrine"] = false
 		obj["pid"] = 0
 	}
@@ -427,7 +437,7 @@ func (a *App) ExportDiagnostics() string {
 		bw.Write([]byte(info))
 	}
 
-	for _, name := range []string{"status.json", "enavi.log", "known_player.json"} {
+	for _, name := range []string{"status.json", "enavi.log"} {
 		buf, err := os.ReadFile(filepath.Join(a.workDir, name))
 		if err != nil {
 			continue

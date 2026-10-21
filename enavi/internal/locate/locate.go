@@ -38,7 +38,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"botwmap/enavi/internal/known"
 	"botwmap/enavi/internal/poshist"
 	"botwmap/enavi/internal/saveanchor"
 	"botwmap/enavi/internal/scan"
@@ -51,7 +50,7 @@ const (
 	maxTickJump  = 150.0 // 单拍位移上限（防野指针）
 	winNear      = 120.0 // 窄窗半径（米）
 	winFar       = 400.0 // 兜底窗口
-	readFailMax  = 5     // 连续读失败几次判定失效
+	readFailMax  = 25    // 连续读失败几次判定失效（2.5 秒，足够黑屏加载过渡）
 	moveDist     = 0.5   // 视为"动了"的门槛
 	moveConfirmN = 3     // 连续几拍动 → 已验证
 	// 神庙本地尺度判据（§3.5 物理特征鉴别表）：
@@ -61,10 +60,7 @@ const (
 	shrineXY    = 100.0 // 神庙本地坐标的 X/Z 绝对值上限（米）
 	shrineMaxY  = 50.0  // 神庙本地坐标的海拔上限（米）
 	saveFreshS  = 120   // 磁盘存档"新鲜"判定：mtime 距今秒数（自动存档落地后约 1~2 秒写入）
-	// winWide 宽窗半径：存档锚点可能严重过期（实测玩家走了 800+ 米而存档没更新），
-	//   窄窗（120m）根本扫不到人 → 必须有宽窗兜底。
-	//   宽窗下靠「连续 run 长度 + 是否在变」来识别玩家，不靠距离。
-	winWide = 3000.0
+	winWide     = 3000.0
 )
 
 // isShrineScale 是否为「神庙试炼场本地尺度」坐标。
@@ -183,19 +179,17 @@ type Tracker struct {
 
 	scanBusy int32
 	scans    int
-	saves    int
 }
 
 // Stats 诊断信息。
 type Stats struct {
 	Addr   uintptr
 	Scans  int
-	Saves  int
 	Busy   bool
 	Anchor scan.Vec3
 }
 
-// New 建立跟踪器。顺序：known 缓存 → 存档锚点窄窗扫描。
+// New 建立跟踪器。以最新存档锚点开窗扫描定位真林克。
 func New(p *winmem.Process) (*Tracker, error) {
 	d, _, err := p.FindDram()
 	if err != nil {
@@ -212,7 +206,7 @@ func New(p *winmem.Process) (*Tracker, error) {
 		started: p.StartedAt(),
 	}
 
-	// 锚点（存档）——冷启动扫描中心，也是 known 的交叉校验。
+	// 锚点（存档）——冷启动扫描中心。
 	// ★ 用 saveanchor.Best 挑「有进度且最新」的那一档，排除空档/新档。
 	anchors, _ := saveanchor.Find(p.ExePath())
 	best := saveanchor.Best(anchors)
@@ -220,30 +214,7 @@ func New(p *winmem.Process) (*Tracker, error) {
 		t.anchor = scan.Vec3{X: best.Pos[0], Y: best.Pos[1], Z: best.Pos[2]}
 	}
 
-	// ① known 缓存：同一 Eden 会话内，直接读，不进扫描。
-	// 只要地址依然可读且坐标通过 WorldCoordOK，直接 0ms 秒锁。
-	if e, ok := known.Load().Pick(t.pid, t.started); ok && e.Verified {
-		buf, err := p.Read(e.Addr, 12)
-		if err == nil && len(buf) >= 12 {
-			pos := scan.Vec3{
-				X: math.Float32frombits(binary.LittleEndian.Uint32(buf[0:])),
-				Y: math.Float32frombits(binary.LittleEndian.Uint32(buf[4:])),
-				Z: math.Float32frombits(binary.LittleEndian.Uint32(buf[8:])),
-			}
-			if pos.WorldCoordOK() {
-				t.addr = e.Addr
-				t.cur = pos
-				t.ok = true
-				t.verified = true
-				logf("[locate] known 缓存命中（秒锁）：%#x pos=(%.1f, %.1f, %.1f)\n",
-					e.Addr, pos.X, pos.Y, pos.Z)
-				return t, nil
-			}
-		}
-		logf("[locate] known 缓存已失效（地址不可读或坐标非法），改走扫描\n")
-	}
-
-	// ② 存档锚点窗口扫描（以存档为中心，在近场找带 Actor 旋转矩阵的真实玩家坐标槽）
+	// 存档锚点窗口扫描（以存档为中心，在近场找真实玩家坐标槽）
 	if len(anchors) == 0 {
 		return nil, errors.New("未找到可用存档锚点，请在游戏内按 + 存个档（或等待自动存档）")
 	}
@@ -273,13 +244,13 @@ func New(p *winmem.Process) (*Tracker, error) {
 		}
 	}
 	if !found {
-		logf("[locate] 存档窄窗/中窗未找到玩家，改用 %0.0fm 宽窗重扫\n", winWide)
+		logf("[locate] 存档窄窗/中窗未找到活跃玩家，改用 %0.0fm 宽窗重扫\n", winWide)
 		if t.rescan(t.anchor, winWide) {
 			found = true
 		}
 	}
 	if !found {
-		return nil, fmt.Errorf("存档锚点 (%.1f, %.1f, %.1f) 窗口内未找到活跃玩家 Actor（请确认已载入游戏世界，若仍在加载画面请稍候）", t.anchor.X, t.anchor.Y, t.anchor.Z)
+		return nil, fmt.Errorf("未在游戏世界中找到林克实体（若游戏在主菜单或加载画面，请载入大世界后开始定位）")
 	}
 	return t, nil
 }
@@ -307,6 +278,36 @@ func (t *Tracker) Tick() Update {
 
 	// ★ 死读当前锁定地址：只要能读出合法的海拉鲁世界坐标（WorldCoordOK），就死读它
 	v, ok := t.readActor(addr)
+	isShrineLocal := ok && isShrineScale(v)
+
+	// 神庙内部试炼场本地尺度判定（必须 |X|<100, |Z|<100 且高度 Y < 50）
+	// 注意：中央平原之塔等大世界坐标也在原点附近（但高度 Y > 100m），不可误判为神庙！
+	if shrine {
+		if ok && !isShrineLocal {
+			// 出庙（脱离神庙本地尺度，恢复大世界尺度）：解除神庙挂起，恢复实时跟随
+			t.mu.Lock()
+			t.shrine = false
+			t.cur = v
+			t.ok = true
+			t.fails = 0
+			t.mu.Unlock()
+			logf("[locate] 离开神庙，恢复跟随：addr=%#x pos=(%.1f, %.1f, %.1f)\n", addr, v.X, v.Y, v.Z)
+			return Update{OK: true, Verified: verified, Pos: v, Addr: addr, Source: "player", Note: "已离开神庙，恢复跟随"}
+		}
+		// 还在神庙内（无论是读出神庙本地坐标，还是黑屏瞬态读不到）：
+		// ★ 死锁保护：绝不把 addr 置 0，绝不在神庙内部发起重扫，红点死死钉在神庙门口！
+		return Update{OK: true, Verified: true, Pos: cur, Addr: addr, Source: "shrine", Shrine: true, Note: "神庙内试炼场（本地坐标），红点钉在门口"}
+	} else if ok && isShrineLocal && !isShrineScale(cur) && v.Dist3D(cur) > 100 {
+		// 进庙：世界尺度 → 神庙本地尺度。位置钉在进入前的门口（cur）
+		t.mu.Lock()
+		t.shrine = true
+		t.ok = true
+		t.fails = 0
+		t.mu.Unlock()
+		logf("[locate] 进入神庙，红点钉在入口：pos=(%.1f, %.1f, %.1f)\n", cur.X, cur.Y, cur.Z)
+		return Update{OK: true, Verified: true, Pos: cur, Addr: addr, Source: "shrine", Shrine: true, Note: "神庙内试炼场（本地坐标），红点钉在门口"}
+	}
+
 	if !ok {
 		// 真正的读失败（进程退出/内存页未就绪/坐标非法）
 		t.mu.Lock()
@@ -321,7 +322,7 @@ func (t *Tracker) Tick() Update {
 			t.rescanAsync(cur, winFar)
 			return Update{OK: false, Source: "lost", Note: "连续读失败，重扫中"}
 		}
-		// 单次失败多半是瞬态（如传送加载中），保持上一已知位置
+		// 单次失败多半是瞬态（如传送加载中、过图黑屏），保持上一已知位置
 		return Update{OK: okCur, Verified: verified, Pos: cur, Addr: addr, Source: "hold"}
 	}
 
@@ -350,40 +351,12 @@ func (t *Tracker) Tick() Update {
 					t.verified = true
 					t.moveN = moveConfirmN
 					t.cands = nil
-					t.persist(cPos, true)
 					t.mu.Unlock()
 					logf("[locate] 走动仲裁识别真玩家：addr=%#x pos=(%.1f, %.1f, %.1f)\n", c.addr, cPos.X, cPos.Y, cPos.Z)
 					return Update{OK: true, Verified: true, Pos: cPos, Addr: c.addr, Source: "player", Note: "走动仲裁识别为真玩家"}
 				}
 			}
 		}
-	}
-
-	// 神庙内部试炼场本地尺度判定（必须 |X|<100, |Z|<100 且高度 Y < 50）
-	// 注意：中央平原之塔等大世界坐标也在原点附近（但高度 Y > 100m），不可误判为神庙！
-	isShrineLocal := isShrineScale(v)
-	if shrine {
-		if !isShrineLocal {
-			// 出庙（or 传送出庙）：解除神庙挂起，就地恢复跟随，绝不走传送重扫
-			t.mu.Lock()
-			t.shrine = false
-			t.cur = v
-			t.ok = true
-			t.fails = 0
-			t.mu.Unlock()
-			logf("[locate] 离开神庙，恢复跟随：addr=%#x pos=(%.1f, %.1f, %.1f)\n", addr, v.X, v.Y, v.Z)
-			return Update{OK: true, Verified: verified, Pos: v, Addr: addr, Source: "player", Note: "已离开神庙，恢复跟随"}
-		}
-		// 还在庙里：红点钉在入口（cur 保持进入庙前的世界坐标，天然就是门口）
-		return Update{OK: true, Verified: true, Pos: cur, Addr: addr, Source: "shrine", Shrine: true, Note: "神庙内试炼场（本地坐标），红点钉在门口"}
-	} else if isShrineLocal && !isShrineScale(cur) && v.Dist3D(cur) > 100 {
-		// 进庙：挂起
-		t.mu.Lock()
-		t.shrine = true
-		t.ok = true
-		t.mu.Unlock()
-		logf("[locate] 进入神庙，红点钉在入口：pos=(%.1f, %.1f, %.1f)\n", cur.X, cur.Y, cur.Z)
-		return Update{OK: true, Verified: true, Pos: cur, Addr: addr, Source: "shrine", Shrine: true, Note: "神庙内试炼场（本地坐标），红点钉在门口"}
 	}
 
 	d := v.Dist3D(cur)
@@ -419,7 +392,8 @@ func (t *Tracker) Tick() Update {
 		t.moveN++
 		if t.moveN >= moveConfirmN && !t.verified {
 			t.verified = true
-			t.persist(v, true) // 升级为已验证（不每拍写盘）
+			t.cands = nil
+			logf("[locate] 移动确认为真玩家：addr=%#x 已锁定\n", addr)
 		}
 	}
 	upd := Update{OK: true, Verified: t.verified, Pos: v, Addr: addr, Source: "player"}
@@ -427,45 +401,24 @@ func (t *Tracker) Tick() Update {
 	return upd
 }
 
-// persist 把当前地址写进 known 缓存。
-//
-// ★ verified 的含义（2026-10-21 修正）：
-//
-//	verified=true  = 已经走动确认过「这是真玩家」，复用时最可信；
-//	verified=false = 只是「锁上了某个带 3x3 矩阵的 Actor」，还没走动证伪过。
-//
-//	两种都写盘（省一次扫描），但复用门禁不同：
-//	· known.Pick 只接受 verified=true（避免把可能的 NPC 地址固化）；
-//	· 所以 verified=false 的条目**只当参考**，不会秒锁。
-//
-//	★ 为什么站立不动也要写：
-//	玩家站着不动 → 永远等不到"走动 3 拍"→ 永远 verified=false →
-//	如果只在 verified 时写盘，那"站着不动"就永远不写盘 →
-//	每次重启都要重扫 3~8 秒。写一条 verified=false 的参考，
-//	下次启动至少能拿它做交叉校验（读出来坐标对得上就说明地址还活着）。
-func (t *Tracker) persist(v scan.Vec3, verified bool) {
-	store := known.Load()
-	_ = store.Save(known.Entry{
-		Addr:        t.addr,
-		PID:         t.pid,
-		ProcStarted: t.started,
-		Pos:         [3]float32{v.X, v.Y, v.Z},
-		Verified:    verified,
-	})
-	t.saves++
-}
-
 // Rescan 手动重扫。
-//
-// ★ 保留当前中心（t.cur），**不**把 anchor 重置为存档点：
-//   玩家可能已经传送了几公里，存档点还在老地方 —— 用它当扫描中心会扫不到人。
-//   存档锚点只在「冷启动、还不知道玩家在哪」时才有意义。
 func (t *Tracker) Rescan() {
 	t.mu.Lock()
 	t.shrine = false
 	center := t.cur
 	t.mu.Unlock()
 	t.rescanAsync(center, winFar)
+}
+
+// RescanManual 手工指定坐标重扫（输入大致 XZ 坐标定向扫描，150m 窄窗秒搜）。
+func (t *Tracker) RescanManual(center scan.Vec3) {
+	t.mu.Lock()
+	t.shrine = false
+	t.cur = center
+	t.addr = 0
+	t.mu.Unlock()
+	logf("[locate] 收到手工校准坐标：(%.1f, %.1f)，开启定向快速找人\n", center.X, center.Z)
+	t.rescanAsync(center, 150.0)
 }
 
 // LeaveShrine 离开神庙（外部可调；出庙时清挂起标记）。
@@ -482,7 +435,6 @@ func (t *Tracker) Stats() Stats {
 	return Stats{
 		Addr:   t.addr,
 		Scans:  t.scans,
-		Saves:  t.saves,
 		Busy:   atomic.LoadInt32(&t.scanBusy) == 1,
 		Anchor: t.anchor,
 	}
@@ -577,6 +529,13 @@ func (t *Tracker) rescanLegacy(center scan.Vec3, radius float64) {
 //
 // 不做"候选池/试探换锁"：一次定一个，定了就死读。
 func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
+	// ★ 刷新 User Heap 区域：模拟器若在游戏内重启过，User Heap 会重新分配映射
+	if d, _, err := t.proc.FindDram(); err == nil {
+		if regs := scan.HeapRegions(t.proc, d, 64<<10); len(regs) > 0 {
+			t.regions = regs
+		}
+	}
+
 	// ★ 中心必须是一个真实的玩家位置。
 	//   空中心 (0,0,0) 会让扫描退化成"扫世界原点周围" —— 实测 3057 万命中，
 	//   排在最前的全是原点附近的退化坐标。宁可扫不到，也不能锁到垃圾。
@@ -597,10 +556,6 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 
 	const chunk = 8 << 20
 	const overlap = 256
-	// 并发工人 4（原 2）：实测 Eden 读 2.7GB User Heap 时 2 个工人要 8 秒，
-	// 4 个工人降到 4 秒左右，CPU 占用仍 < 8%，模拟器不掉帧。
-	// 限速改成「每工人 4ms」而不是「每块 8ms」—— 原来的写法让 757 个分块
-	// 串行累积出 6 秒纯 sleep，是定位慢的主因。
 	workers := 4
 	const sleepPerChunk = 4 * time.Millisecond
 	var jobs []scanJob
@@ -651,26 +606,12 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	close(ch)
 	wg.Wait()
 
-	// ★ 核心铁律：必须有 Actor 3x3 正交旋转矩阵！
-	// 静态存档数据、无 Actor 变换的静态结构一律跳过，绝不锁死在静态槽上。
-	//
-	// ★★ 再加一道：坐标必须通过 WorldCoordOK（严于 Valid）——
-	//   实测踩到过参数表里的退化坐标 (107.7, 1.0, 0.0)：
-	//   Valid() 对它返回 true，但它离玩家 2485m，锁上去红点直接飞到天边。
-	// ★ 身份判据（2026-10-21 16:0x 实测重订）：
-	//   「pos + 单位模长四元数」= 位置历史记录 = 当前实机最可靠的目标。
-	//   3x3 正交矩阵降级为辅助（h.Rot，已排除轴矩阵假阳性）。
-	//
-	//   为什么不要「只要有 3x3 矩阵」：实测某些场景里**一个真 Actor 矩阵都没有**，
-	//   命中的 6 个全是轴矩阵（骨骼基向量/方向轴）→ 锁到的就是死数据。
-	//
-	// ★★ 硬门槛：必须有**连续 run**（Run >= 2）。
-	//   玩家的当前帧在内存里是一整条连续的 0x40 步长 run（实测 run=5~17），
-	//   而冻结的历史副本是**孤立的**（前后 ±0x40 都不是合法记录，run=1）。
-	//   只要 run>=2 就能把「冻结副本」全排除掉。
 	// 过滤候选：
 	// ① 坐标必须通过 WorldCoordOK
-	// ② 优先收连续 run（Run >= 2）的槽（排除孤立冻结副本）
+	// ② ★★★ 硬门槛：必须有连续 run（Run >= 2）！
+	//    真林克在 3D 世界生成后拥有完整的 RingBuffer（实测 run=33）。
+	//    而在游戏主菜单、黑屏加载期，内存里只有参数表等静态数据（run=0）。
+	//    ★ 绝对不收 Run < 2 的死数据！宁可报未命中返回 false，也绝不误锁死数据！
 	identHits := make([]scan.Hit, 0, len(allHits))
 	for _, h := range allHits {
 		if !h.P.WorldCoordOK() {
@@ -678,14 +619,6 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 		}
 		if h.Run >= 2 {
 			identHits = append(identHits, h)
-		}
-	}
-	// 若无 Run >= 2 的候选，退而放过所有合法命中
-	if len(identHits) == 0 {
-		for _, h := range allHits {
-			if h.P.WorldCoordOK() {
-				identHits = append(identHits, h)
-			}
 		}
 	}
 	if len(identHits) == 0 {
@@ -719,8 +652,6 @@ func (t *Tracker) rescan(center scan.Vec3, radius float64) bool {
 	t.cands = slots
 	t.mu.Unlock()
 
-	// 锁定即写盘（verified=false），供下次启动参考
-	t.persist(best.P, false)
 	return true
 }
 

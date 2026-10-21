@@ -155,7 +155,6 @@ type statusPayload struct {
 	MY       float32  `json:"my"`
 	Addr     uintptr  `json:"addr"`
 	Scans    int      `json:"scans"`
-	Saves    int      `json:"saves"`
 	Shrine   bool     `json:"shrine"`
 	Anchor   scan.Vec3 `json:"anchor"`
 	PID      uint32   `json:"pid"`
@@ -327,7 +326,6 @@ func main() {
 				MY:       2*float32(u.Pos.Z) + 10000,
 				Addr:     addr,
 				Scans:    sb.Scans,
-				Saves:    sb.Saves,
 				Shrine:   u.Shrine,
 				Anchor:   anchor,
 				PID:      uint32(os.Getpid()),

@@ -67,7 +67,7 @@
             <div class="text-slate-400">Z <span class="text-white font-bold">{{ fmt(st.gz) }}</span></div>
             <div class="text-slate-400">地图像素 <span class="text-white font-bold">{{ fmtInt(st.mx) }}, {{ fmtInt(st.my) }}</span></div>
             <div class="text-slate-400">地址 <span class="text-white font-bold">{{ hexAddr }}</span></div>
-            <div class="text-slate-400">扫描 <span class="text-white font-bold">{{ st.scans }}</span> · 写入 <span class="text-white font-bold">{{ st.saves }}</span></div>
+            <div class="text-slate-400">扫描次数 <span class="text-white font-bold">{{ st.scans }}</span></div>
           </div>
           <div class="text-[11px] font-mono mt-1.5 text-slate-400">
             锚点 <span class="text-slate-300">{{ anchorText }}</span>
@@ -101,6 +101,7 @@
             <button class="hover:text-slate-200" @click="clearLogs">清屏</button>
             <button class="hover:text-slate-200" @click="exportDiag">导出诊断包</button>
             <button class="hover:text-slate-200" @click="openLogDir">打开目录</button>
+            <button class="hover:text-blue-300 text-blue-400" @click="showManualCalib = true">手工校准</button>
             <button class="hover:text-slate-200" @click="rescan">重新扫描</button>
           </div>
         </div>
@@ -139,6 +140,40 @@
       </div>
     </div>
 
+    <!-- 手工校准弹窗 -->
+    <div v-if="showManualCalib" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showManualCalib = false">
+      <div class="bg-[#161b22] border border-blue-500/40 rounded-lg p-5 w-96 shadow-2xl">
+        <div class="text-sm font-bold text-white mb-2 flex items-center justify-between">
+          <span>手工坐标校准（快速找人）</span>
+          <span class="text-[11px] text-blue-400 font-normal">BOTW 仅需 XZ</span>
+        </div>
+        <div class="text-xs text-slate-400 mb-3 leading-relaxed">
+          若长时间未存档或自动定位偏差，建议在游戏里<span class="text-white">传送到神庙或高塔</span>，输入该地标大概坐标（或点下方快捷预设）定向秒搜：
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <label class="block text-slate-400 text-[11px] mb-1">X 坐标：</label>
+            <input v-model="calibX" type="number" step="0.1" placeholder="例如 -215.0" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-xs focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-slate-400 text-[11px] mb-1">Z 坐标：</label>
+            <input v-model="calibZ" type="number" step="0.1" placeholder="例如 250.0" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-xs focus:border-blue-500 focus:outline-none" />
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap mb-4 text-[11px]">
+          <span class="text-slate-500">快捷预设:</span>
+          <button @click="fillPreset(-215, 250)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">平原之塔</button>
+          <button @click="fillPreset(-1071, 1913)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">复苏神庙</button>
+          <button @click="fillPreset(3435, 1968)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">哈特诺塔</button>
+          <button @click="fillPreset(3780, 2111)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">哈特诺所</button>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs text-slate-300" @click="showManualCalib = false">取消</button>
+          <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white font-medium" @click="submitManualCalib">以此坐标定向找人</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 关于弹窗 -->
     <div v-if="showAbout" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showAbout = false">
       <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-96 text-xs space-y-2">
@@ -163,8 +198,28 @@ import { api, rt } from './bridge.js'
 const ver = ref('v0.1.0')
 const showSettings = ref(false)
 const showAbout = ref(false)
+const showManualCalib = ref(false)
+const calibX = ref('')
+const calibZ = ref('')
 const toast = ref('')
 let toastTimer = null
+
+function fillPreset(x, z) {
+  calibX.value = String(x)
+  calibZ.value = String(z)
+}
+
+async function submitManualCalib() {
+  const x = Number(calibX.value)
+  const z = Number(calibZ.value)
+  if (isNaN(x) || isNaN(z)) {
+    notify('请输入合法的 X 与 Z 数值')
+    return
+  }
+  showManualCalib.value = false
+  const msg = await api.RescanManual(x, z)
+  notify(msg || '已提交手工校准定向找人')
+}
 
 const mapUrl = 'https://botw.yalin.site'
 

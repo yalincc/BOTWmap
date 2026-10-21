@@ -118,6 +118,7 @@ function createMockApi() {
       return '已停止'
     },
     Rescan: async () => { push('已提交重新扫描'); emit('status:update', advance()); return '已提交重新扫描' },
+    RescanManual: async (x, z) => { push(`已提交手工校准重扫 (${x}, ${z})`); emit('status:update', advance()); return `已提交以坐标 (${x}, ${z}) 定向找人` },
     PickDir: async (title) => { console.log('[mock] PickDir', title); return 'D:\\Eden\\games\\botw\\save' },
     OpenMap: async () => { browserOpen('https://botw.yalin.site/?follow=1&game=botw'); return 'ok' },
     OpenLogDir: async () => { push('打开日志目录'); return 'ok' },
