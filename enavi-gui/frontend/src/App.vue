@@ -361,6 +361,12 @@ async function toggleLocating() {
     const msg = await api.StartCore()
     notify(msg || '已提交启动')
   }
+  // 立刻拉一次真实状态（不等 800ms 的事件轮询）→ 按钮和状态条立刻跟着变。
+  // ★ 状态必须以服务端返回的 running 为准，不能靠本地猜测，
+  //   否则「停止后界面还显示停止」这类 stale 状态会一直误导用户。
+  try {
+    applyStatus(await api.CoreStatus())
+  } catch (e) { /* 忽略：下一轮事件会补上 */ }
 }
 
 async function pickDir() {

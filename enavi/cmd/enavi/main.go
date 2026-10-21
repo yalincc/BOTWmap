@@ -184,6 +184,7 @@ func main() {
 	port := flag.Int("port", 0, "覆盖端口")
 	statusFile := flag.String("status-file", "status.json", "状态快照输出文件（GUI 读；传空串则不写）")
 	rescanReq := flag.String("rescan-req", "rescan.req", "手动重扫请求文件（GUI 写这个文件触发重扫；传空串则禁用）")
+	logPathFlag := flag.String("log-file", "enavi.log", "运行日志文件（GUI 读；传空串则只输出到 stdout）")
 	saveDir := flag.String("eden-save-dir", "", "Eden 的 BOTW 存档目录（留空自动探测；GUI 设置里可指定）")
 	flag.Parse()
 
@@ -193,12 +194,15 @@ func main() {
 		logPrint("[config] Eden 存档目录（手动指定）: %s\n", *saveDir)
 	}
 
-	// 开启持久化运行日志，便于复盘操作与排查
-	if f, err := os.OpenFile("enavi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
+	// 开启持久化运行日志，便于复盘操作与排查。
+	// ★ 日志路径用显式参数（--log-file），不依赖进程工作目录 ——
+	//   GUI 启动核心时工作目录可能与日志所在目录不一致，绑 cwd 会读不到。
+	logPath := *logPathFlag
+	if f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
 		// 若文件 > 5MB 则滚动截断
 		if fi, err2 := f.Stat(); err2 == nil && fi.Size() > 5<<20 {
 			f.Close()
-			f, _ = os.OpenFile("enavi.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			f, _ = os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 		}
 		logFile = f
 		defer f.Close()

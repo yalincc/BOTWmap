@@ -89,14 +89,22 @@ func (a *App) startup(ctx context.Context) {
 	a.cfg = a.loadConfig()
 	// 清理孤儿核心进程（GUI 崩溃/被杀后其子进程可能残留并独占 8766 端口）。
 	exec.Command("taskkill", "/IM", "enavi.exe", "/F").Run()
-	// 上一次的日志不带到这一轮（面板从干净状态开始，便于复现问题）。
-	_ = os.WriteFile(filepath.Join(a.workDir, "enavi.log"), nil, 0o644)
+	// ★ 不清空 enavi.log —— 保留上一轮的日志，出问题时能翻查。
+	//   核心自己是追加写，且超过 5MB 会自行截断。
+	//   但 status.json 必须清掉：它是上一轮的残留，里面的 running/坐标全是 stale 的，
+	//   不清会被误读成"核心还活着且已锁定"（2026-10-21 实测事故的另一半）。
+	_ = os.Remove(a.statusPath())
+	_ = os.Remove(filepath.Join(a.workDir, "rescan.req"))
 	a.tailInit()
 	go a.eventBridge(ctx)
 }
 
 func (a *App) onShutdown(ctx context.Context) {
+	// ★ 必须加锁：stopCoreLocked 会写 a.cmd，而 cmd.Wait() 的收尾 goroutine
+	//   也在写 a.cmd —— 不加锁就是 data race（go build 检测不出来，运行期偶发）。
+	a.mu.Lock()
 	a.stopCoreLocked()
+	a.mu.Unlock()
 }
 
 // eventBridge 每 800ms 推一次状态与日志增量。
@@ -134,7 +142,11 @@ func (a *App) StartCore() string {
 	if _, err := os.Stat(exe); err != nil {
 		return "找不到核心程序 enavi.exe（应放在本程序同目录）"
 	}
-	args := []string{"--status-file", "status.json", "--rescan-req", "rescan.req"}
+	args := []string{
+		"--status-file", filepath.Join(a.workDir, "status.json"),
+		"--rescan-req", filepath.Join(a.workDir, "rescan.req"),
+		"--log-file", filepath.Join(a.workDir, "enavi.log"),
+	}
 	if a.cfg != nil && a.cfg.EdenSaveDir != "" {
 		args = append(args, "--eden-save-dir="+a.cfg.EdenSaveDir)
 	}
@@ -175,11 +187,33 @@ func (a *App) StopCore() string {
 	return "已停止"
 }
 
+// stopCoreLocked 杀掉核心子进程（调用方必须已持锁）。
+//
+// ★ 必须等进程真的退出再返回：
+//   否则「点停止 → 立刻点开始定位」会出现新核心抢不到 8766 端口
+//   （旧进程还没退，HTTP 绑定失败 → 新核心只剩定位、网页端全废）。
+//   核心是只读程序，Kill 不会有副作用。
 func (a *App) stopCoreLocked() {
-	if a.cmd != nil && a.cmd.Process != nil {
-		a.cmd.Process.Kill()
+	if a.cmd == nil || a.cmd.Process == nil {
 		a.cmd = nil
+		return
 	}
+	cmd := a.cmd
+	a.cmd = nil
+	_ = cmd.Process.Kill()
+	// 等它真的退出（最多 3 秒）。cmd.Wait() 由启动时的 goroutine 负责，
+	// 这里只等进程句柄失效即可。
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if cmd.ProcessState != nil {
+			break
+		}
+		time.Sleep(30 * time.Millisecond)
+	}
+	// status.json 是核心写的"我还活着"快照 —— 核心死了它就是 stale 的，
+	// 不删会被下次启动读成"已锁定 + 旧坐标"。
+	_ = os.Remove(a.statusPath())
+	_ = os.Remove(filepath.Join(a.workDir, "rescan.req"))
 }
 
 // CoreRunning 核心子进程是否在运行。
@@ -203,12 +237,20 @@ func (a *App) statusPath() string { return filepath.Join(a.workDir, "status.json
 
 // CoreStatus 读 status.json 并附加 GUI 侧状态（running / webOK / webNote）。
 //
-// 注意：status.json 里的 anchor 是 {X,Y,Z} 对象（核心写的是 scan.Vec3 结构体）。
+// ★★ 铁律：**`running` 只能来自 GUI 自己的进程状态，绝不能让 status.json 覆盖**。
+//
+//	status.json 里的 "running" 是核心进程写的"我还活着"，但核心被杀后
+//	status.json 还躺在磁盘上（没人删）→ 下次读它会拿到 stale 的 running=true
+//	→ GUI 界面永远显示「■ 停止」按钮 → 再点「开始定位」反而成了「停止」→ 死锁。
+//	（2026-10-21 实测事故：停止后关掉重开仍是停止状态，无法定位。）
+//
+//	所以：先 unmarshal 核心的状态，再**无条件**用 GUI 侧的真实进程状态覆盖 running。
 func (a *App) CoreStatus() map[string]any {
 	a.mu.Lock()
-	running := a.cmd != nil && a.cmd.Process != nil
+	running := a.cmd != nil && a.cmd.Process != nil && a.cmd.ProcessState == nil
 	a.mu.Unlock()
-	obj := map[string]any{"running": running}
+
+	obj := map[string]any{}
 	buf, err := os.ReadFile(a.statusPath())
 	if err == nil && json.Unmarshal(buf, &obj) == nil {
 		// 核心写的 anchor 是对象，前端按 {X,Y,Z} 读。
@@ -216,6 +258,24 @@ func (a *App) CoreStatus() map[string]any {
 		obj["ok"] = false
 		obj["note"] = "核心未写入状态（未运行或启动中）"
 	}
+	// ★ 无条件覆盖：GUI 的进程状态是唯一真相。
+	obj["running"] = running
+
+	if !running {
+		// 核心已停 → status.json 是上一轮的残留，坐标/扫描数全部作废，
+		// 否则界面会继续显示"已锁定 + 旧坐标"，让人以为还在定位。
+		obj["ok"] = false
+		obj["verified"] = false
+		obj["source"] = ""
+		obj["note"] = "核心已停止"
+		obj["gx"], obj["gy"], obj["gz"] = 0, 0, 0
+		obj["mx"], obj["my"] = 0, 0
+		obj["addr"] = 0
+		obj["scans"], obj["saves"] = 0, 0
+		obj["shrine"] = false
+		obj["pid"] = 0
+	}
+
 	// 网页端可用性：核心自己起 8766（协议 v1 给 live.js 读）。
 	// 端口被别的程序占了 → 核心会打 "[fatal] HTTP 启动失败" → 网页端不可用，
 	// 但 GUI 定位不受影响（双入口独立）。
