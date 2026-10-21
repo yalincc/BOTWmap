@@ -287,14 +287,12 @@ func (w *progressWatcher) refresh() {
 	w.body, w.gen, w.save, w.modT = buf, gen, best, mtime
 	w.ok = true
 	if !w.init {
-		rel := best
-		for _, r := range saveRoots() {
-			if r != "" && strings.HasPrefix(best, r) {
-				rel = strings.TrimPrefix(best, r+string(filepath.Separator))
-				break
-			}
+		src := "auto"
+		if cemuSaveDirOverride != "" {
+			src = "manual(--cemu-save-dir)"
 		}
-		fmt.Printf("  [progress] save=%s\n", rel)
+		fmt.Printf("  [progress] save: %s\n", best)
+		fmt.Printf("  [progress] source: %s, slot: %s\n", src, filepath.Base(filepath.Dir(best)))
 		fmt.Printf("  [progress] done: shrines %d/%d, towers %d/%d, koroks %d/%d, memories %d/%d, beasts %d/%d\n",
 			doneN["shrine"], totalN["shrine"], doneN["tower"], totalN["tower"], doneN["korok"], totalN["korok"],
 			doneN["memory"], totalN["memory"], doneN["beast"], totalN["beast"])

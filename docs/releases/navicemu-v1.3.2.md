@@ -15,6 +15,12 @@ navicemu 自 2026-10-07 并入 xnavi 后停止常规维护（v1.3.1 收尾）。
 - 变更：exe 同目录 `app/` 优先挂载 + 惰性解析（后补地图刷新即生效）
 - 加固：resolveBotwFS 跳过空路径候选（空路径经 `filepath.Abs` 变 cwd，会误挂当前目录）
 - 发布包：主程序 + start.bat + 离线地图 app/（V1.7.1，11184 文件）+ certs/ 脚本与说明（不含私钥）
+- 轻量单独版：`RELEASE/navicemu-v1.3.2/`（exe + certs + start.bat + README，zip 约 3MB，
+  不含离线地图 app/；无 app/ 时自动返回内置引导页，需离线地图请用 BOTWmap-package 版）
+- 存档读取加固（10-21 晚）：`--cemu-save-dir=<存档根>` 手动指定唯一根最优先（隔离自动探测、无档即提示）；
+  自动扫描收敛为 `%APPDATA%\Cemu` + 运行中 Cemu.exe 所在目录（兼容 mlc01/usr 两种布局），便携版免配自动命中；进度纯 mtime 最新
+- 存档可读性（10-22 凌晨）：启动日志升级为 `[progress] save: <完整路径>` + `source: auto/manual(--cemu-save-dir)` + `slot: <槽号>`；
+  README 新增"存档（可选：手动指定）"小节，写明参数用法与目录格式
 
 ## 3. 技术方案
 

@@ -43,6 +43,22 @@
 地图地址：https://botw.yalin.site/
 本地 API：http://127.0.0.1:8766/pos ・ /progress
 
+### 存档（可选：手动指定，最优先）
+
+不指定时自动扫描 `%APPDATA%\Cemu` 与运行中的 Cemu.exe 所在目录（含便携版 `usr/save` 布局），
+启动日志 `[progress] save: <完整路径>` + `source/slot` 行会显示实际读取的存档。
+
+需要强制指定时，给 `start.bat` 里的启动命令加参数（示例，真实路径）：
+
+```bat
+navicemu.exe --cemu-save-dir="H:\Cemu\cemu_1.26.2\usr\save\00050000\101c9300\user\80000001"
+```
+
+- 存档根目录形如 `<Cemu目录>\usr\save\00050000\<游戏ID>\user\80000001`（`101c9300` 为日版游戏 ID；
+  上例为 Cemu 1.26.2 便携版的实际路径，安装版通常在 `%APPDATA%\Cemu\mlc01\usr\save\00050000\...`）
+- 手动指定的目录是**唯一存档根**，不会被自动扫描覆盖；读不到会打印 searched 列表并提示
+- 同目录多槽时按修改时间（mtime）最新取
+
 ## 兼容性
 
 - 模拟器：Cemu 1.26 及以上（Windows）
