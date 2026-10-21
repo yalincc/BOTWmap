@@ -1,7 +1,7 @@
 # V1.6.6 重做交接文档（怪物层重建 · 官方缩放链）
 
 > **读者**：接手 V1.6.6 重做的 AI/开发者。
-> **前置阅读**：`docs/releases/UNPUBLISHED-v1.6.6.md`（版本报告，含回档原因与 9 坑表）、`E:\WorkSpace\BOTWroms\raw\romfs\DATA-README.md` §12（数据口径权威）。
+> **前置阅读**：`docs/releases/UNPUBLISHED-BOTWmap-V1.6.6.md`（版本报告，含回档原因与 9 坑表）、`E:\WorkSpace\BOTWroms\raw\romfs\DATA-README.md` §12（数据口径权威）。
 > **状态**：数据管线与算法已验证可复用；待重做 = 前端接线（约 1 天）。废弃实现可 `git show f4f158a` 全量参考（未丢失）。
 
 ---
@@ -67,14 +67,14 @@ source/build_botwmap_tiers.py   # venv python 直跑（纯标准库）
 ### 4.5 ui.js
 - 敌人组标题旁【LvN】徽标（`Lv = worldTier+1`，hover title 含积分与档位说明）+ DLC2/大师模式 toggle（dlcState localStorage `botwmap.dlc.v1`）
 - `window.UI = UI` 显式挂载（顶层 const 不自动挂 window）
-- buildLayerList 的敌人组分支：含 DLC2/大师 toggle + 徽标（重做时按 docs/releases/UNPUBLISHED-v1.6.6.md 的设计）
+- buildLayerList 的敌人组分支：含 DLC2/大师 toggle + 徽标（重做时按 docs/releases/UNPUBLISHED-BOTWmap-V1.6.6.md 的设计）
 
 ## 5. 已验证的算法快照（2026-10-15 实测）
 
 - 老大槽 5 存档：43/50 计分怪命中、**积分 10065**、链档 Bokoblin=3/Moriblin=3(cap)/Lynel=3/Lizalfos=3/Assassin=1、worldTier=3（Lv4 白银世界）——与游戏内白鬃/白银实测吻合
 - 数据件量级：markers 3847/档、camps 1416/档（hot 96~105）、quest 92、hardmode 765
 
-## 6. 九坑速查（详见 docs/releases/UNPUBLISHED-v1.6.6.md §4）
+## 6. 九坑速查（详见 docs/releases/UNPUBLISHED-BOTWmap-V1.6.6.md §4）
 
 1. loc 嵌套口径（根因级）2. cat 拼写 Moriblin/Octarock 3. killScores 在 enemy-scaling.json 4. camps.weapons 是 {item,count} 数组 5. index 对齐非 id 6. camp hit 坐标口径=地图像素 7. 小怪标记与营地刷点同源重合（click 被抢→测试用 openCard 编程路径）8. 初始化时序（camp boot 兜底）9. apply 异常被 save_upload 恢复段 try 吞（pageerror 空 ≠ 没跑）
 
