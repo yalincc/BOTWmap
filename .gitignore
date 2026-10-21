@@ -88,7 +88,10 @@ RELEASE/
 xnavi/xnavi-core-new.exe
 
 # v3.1.0 TLS 证书体系（机器相关 + 含私钥，不入库；rootCA/脚本随发布包走）
-certs/
+# v1.3.2：live-cemu/certs 的两个生成脚本需入库（包内只带脚本+README，私钥/证书不入库）
+certs/*
+!certs/gen-cert.ps1
+!certs/serve-cert.ps1
 
 # 诊断导出与临时报告目录（不入库）
 report/
