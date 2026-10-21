@@ -2,9 +2,9 @@
 
 > 每个版本（含已回档的）一份报告。
 > **落点与命名（2026-10-21 老大定，必须照抄）**：
-> - 在线地图（网页版）→ `docs/releases/BOTWmap-V{X.Y.Z}.md`，标题行 `# BOTWmap V{X.Y.Z} 版本报告（{YYYY-MM-DD}）`
+> - 在线地图（网页版）→ `docs/releases/BOTWmap-v{X.Y.Z}.md`，标题行 `# BOTWmap v{X.Y.Z} 版本报告（{YYYY-MM-DD}）`
 > - 导航程序 → `docs/releases/xnavi-v{X.Y.Z}.md` / `docs/releases/navicemu-v{X.Y.Z}.md`，标题行同理换成对应程序名
-> - 未发布即回档 → `docs/releases/UNPUBLISHED-BOTWmap-V{X.Y.Z}.md`
+> - 未发布即回档 → `docs/releases/UNPUBLISHED-BOTWmap-v{X.Y.Z}.md`
 > - 理由：本项目在线地图与导航程序版本号各自独立，文件名/标题不带程序名就分不清、搜不准。
 > 结构固定为以下 7 节，写完才算版本关闭；回档的版本同样要写（结论改为"已回档"并说明原因）。
 > 配套：变更明细写 CHANGELOG.md，用户反馈台账写 tools/FEEDBACK.md（本地）。
@@ -12,7 +12,7 @@
 ## 模板结构
 
 ```markdown
-# BOTWmap V{X.Y.Z} 版本报告（{YYYY-MM-DD}）
+# BOTWmap v{X.Y.Z} 版本报告（{YYYY-MM-DD}）
 
 ## 1. 版本概述
 一句话目标 + 最终结论（已发布 / 已回档 + 原因）。
