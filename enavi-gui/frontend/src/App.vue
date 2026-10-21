@@ -195,7 +195,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { api, rt } from './bridge.js'
 
-const ver = ref('v0.1.0')
+const ver = ref('v0.1.1')
 const showSettings = ref(false)
 const showAbout = ref(false)
 const showManualCalib = ref(false)

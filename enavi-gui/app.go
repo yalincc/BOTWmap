@@ -28,7 +28,7 @@ import (
 )
 
 // guiVersion GUI 版本号（导航程序版本独立，不跟网页版）。
-const guiVersion = "v0.1.0"
+const guiVersion = "v0.1.1"
 
 // corePort 核心的 HTTP 端口（与网页端共用）。
 const corePort = 8766
