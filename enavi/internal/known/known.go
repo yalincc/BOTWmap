@@ -46,13 +46,7 @@ func path() string {
 	// `go run` 时 exe 在临时目录里，缓存写到那里就丢了；
 	// 而生产是 build/enavi.exe 从 enavi/ 目录启动，工作目录才是稳定位置。
 	if wd, err := os.Getwd(); err == nil {
-		p := filepath.Join(wd, fileName)
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-		// 还没建过 → 记下工作目录，等会儿写的时候用同一个
-		wdPath = p
-		return p
+		return filepath.Join(wd, fileName)
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -60,9 +54,6 @@ func path() string {
 	}
 	return filepath.Join(filepath.Dir(exe), fileName)
 }
-
-// wdPath 工作目录下的缓存路径（首次调用 path() 时确定）。
-var wdPath string
 
 // Load 读缓存（文件不存在返回空 Store，不报错）。
 func Load() Store {

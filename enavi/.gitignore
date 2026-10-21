@@ -1,3 +1,10 @@
 build/
 report/
 *.exe
+*.exe~
+
+# 运行期产物（不入库：含机器相关的 pid / 宿主地址）
+enavi.log
+known_player.json
+status.json
+status.json.tmp

@@ -4,22 +4,50 @@
   "gameVersion": "1.6.0",
   "platform": "eden",
   "edenVersionsTested": [],
-  "updatedAt": "2026-10-20",
-
+  "updatedAt": "2026-10-21",
   "coordinates": {
-    "axisOrder": ["X", "alt", "Z"],
+    "axisOrder": [
+      "X",
+      "alt",
+      "Z"
+    ],
     "elevBias": 0.0,
     "note": "2026-10-07 xnavi 实测：与 game_data.sav 锚点 d=0.0 完全一致，无 TOTK 式 +105 bias"
   },
-
   "anchorLadder": [
-    { "level": "L0", "kind": "knownAddress", "costMs": 200, "status": "proven" },
-    { "level": "L1", "kind": "guestModuleAnchor", "costMs": 100, "status": "todo", "detail": "在 DRAM 大块内定位主模块 rodata 特征 → 反推模块基址 → 指针链 base+delta；M0 验证" },
-    { "level": "L2", "kind": "saveAnchor", "costMs": 400, "status": "proven" },
-    { "level": "L3", "kind": "userHeapWindowScan", "costMs": 1200, "status": "proven" },
-    { "level": "L4", "kind": "fullHostScan", "costMs": 20000, "status": "fallbackOnly", "detail": "仅 L3 连续 3 次失败后允许；常规路径禁用（19GB 全读会堵死状态机）" }
+    {
+      "level": "L0",
+      "kind": "knownAddress",
+      "costMs": 200,
+      "status": "proven"
+    },
+    {
+      "level": "L1",
+      "kind": "guestModuleAnchor",
+      "costMs": 100,
+      "status": "todo",
+      "detail": "在 DRAM 大块内定位主模块 rodata 特征 → 反推模块基址 → 指针链 base+delta；M0 验证"
+    },
+    {
+      "level": "L2",
+      "kind": "saveAnchor",
+      "costMs": 400,
+      "status": "proven"
+    },
+    {
+      "level": "L3",
+      "kind": "userHeapWindowScan",
+      "costMs": 1200,
+      "status": "proven"
+    },
+    {
+      "level": "L4",
+      "kind": "fullHostScan",
+      "costMs": 20000,
+      "status": "fallbackOnly",
+      "detail": "仅 L3 连续 3 次失败后允许；常规路径禁用（19GB 全读会堵死状态机）"
+    }
   ],
-
   "identity": {
     "hard": [
       "actorNamePointer: 槽位邻近指针指向 'Player' / 'GameROMPlayer' ASCII 串（M0 验证）",
@@ -34,7 +62,6 @@
       "copies: 已证伪（真身 18~91，内部数组假组 108~2986，方向还相反）"
     ]
   },
-
   "thresholds": {
     "tickMs": 100,
     "moveDistM": 0.5,
@@ -42,15 +69,23 @@
     "teleportDistM": 300,
     "teleportConfirmTicks": 2,
     "frozenRescanMs": 12000,
-    "windowStepM": [120, 400],
-    "shrineLocalScale": 300,
-    "altRange": [-600, 5000],
-    "maxTickJumpM": 100,
+    "windowStepM": [
+      120,
+      400
+    ],
+    "shrineLocalScale": 100,
+    "altRange": [
+      -600,
+      5000
+    ],
+    "maxTickJumpM": 150,
     "failAddrTTLSec": 90,
     "poiRadiusM": 300,
-    "poiTopN": 10
+    "poiTopN": 10,
+    "shrineMaxAltitudeM": 50,
+    "readFailMax": 5,
+    "saveFreshSec": 120
   },
-
   "m0Findings": {
     "edenVersion": "0.2.1",
     "edenExe": "G:\\YUZU\\eden\\eden.exe",
@@ -58,7 +93,10 @@
       "blockBase": "0x28184AE0000",
       "blockSize": 4294967296,
       "protect": "0x04",
-      "extra4GPrivate": ["0x303CCD20000", "0x30537CF0000"],
+      "extra4GPrivate": [
+        "0x303CCD20000",
+        "0x30537CF0000"
+      ],
       "state": "idle-no-game",
       "note": "空载快照：13.91GB/8909 区/WS 4.9GB；记忆里游戏内为 24.4GB/25082 区"
     },
@@ -71,9 +109,14 @@
       "note": "绝大多数是 TipsPlayer.msbt / GameROMPlayer.sbactorpack 等 romfs 路径，不能当身份锚点；裸串集中在 phys +0x5D2~+0x60C，待游戏内确认"
     },
     "moduleAnchorDelta": null,
-    "versionString160": { "hits": 1, "physOffset": "0xAB65D684", "note": "L1 首选锚点候选，唯一性最好" },
+    "versionString160": {
+      "hits": 1,
+      "physOffset": "0xAB65D684",
+      "note": "L1 首选锚点候选，唯一性最好"
+    },
     "quatOffsetFromPos": null,
     "gdbStubRoundTripMs": null,
     "gdbStubHaltsCpu": null
-  }
+  },
+  "_note_thresholds": "★ 代码常量口径以 internal/locate/locate.go 顶部 const 块为真源；此处是登记副本，2026-10-21 已同步（maxTickJump 100→150、shrineLocalScale 300→100 并新增 shrineMaxAltitudeM=50）。神庙判定用「|X|<100 && |Z|<100 && Y<50」，300 那套只是「是否世界尺度」的粗判据。"
 }

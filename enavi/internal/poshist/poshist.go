@@ -78,7 +78,6 @@ func Scan(p *winmem.Process) (uintptr, error) {
 
 // ScanWithAnchor 定位位置历史缓冲；anchor 是存档坐标（可选，用于玩家静止时的兜底判定）。
 func ScanWithAnchor(p *winmem.Process, anchor [3]float32, anchorValid bool) (uintptr, error) {
-	staticCandidates = nil
 	d, _, err := p.FindDram()
 	if err != nil {
 		return 0, err
@@ -277,17 +276,15 @@ func anchorDist(v, anchor [3]float32) float64 {
 // MoveProbeWait 判断「槽会不会变」时的等待间隔。
 var MoveProbeWait = 1500 * time.Millisecond
 
-// staticCandidates 静态候选（坐标合法但不变）。
-var staticCandidates []uintptr
-
-// nearAnchor 是否离存档锚点足够近。
-func nearAnchor(v [3]float32, anchor [3]float32) bool {
-	dx := float64(v[0] - anchor[0])
-	dz := float64(v[2] - anchor[2])
-	return math.Hypot(dx, dz) < 3000
-}
-
 // ReadPos 读一个位置（宿主地址处的 12 字节）。
+//
+// ★ 注意：本包在**生产路径**上只被当作「读 12 字节坐标」的工具用
+//   （locate.Tick 读锁定地址、仲裁时读候选地址）。
+//   指纹扫描 ScanWithAnchor 已不是定位主路径 —— 2026-10-21 实测证伪：
+//   +0x28/+0x50 是「60~90 秒推进一次的历史采样循环展示缓冲」，
+//   与玩家当前动作解耦，不能当实时位置源。
+//   保留本包是因为它是那份实测结论的载体（别再走回头路），
+//   且 enavi-probe 的 climb 等探针还在用它做交叉验证。
 func ReadPos(p *winmem.Process, addr uintptr) ([3]float32, bool) {
 	buf, err := p.ReadTimeout(addr, PosSize, 500*time.Millisecond)
 	if err != nil || len(buf) < PosSize {

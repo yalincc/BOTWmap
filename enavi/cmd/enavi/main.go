@@ -110,6 +110,7 @@ type shared struct {
 	cfg     map[string]any
 	anchor  scan.Vec3
 	addr    uintptr
+	stats   locate.Stats
 }
 
 func (s *shared) set(u locate.Update) {
@@ -119,16 +120,78 @@ func (s *shared) set(u locate.Update) {
 	s.mu.Unlock()
 }
 
+// setStats 记录定位器统计（扫描次数 / 缓存写入次数）。
+func (s *shared) setStats(sb locate.Stats) {
+	s.mu.Lock()
+	s.stats = sb
+	s.mu.Unlock()
+}
+
 func (s *shared) snapshot() (locate.Update, time.Time, any, map[string]any, scan.Vec3, uintptr) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.upd, s.updated, s.target, s.cfg, s.anchor, s.addr
 }
 
+// ---------- status.json（给 GUI 读的文件契约） ----------
+//
+// ★ 为什么走文件而不是 HTTP：
+//   enavi-gui 与网页端是**两个独立入口**。GUI 要能看状态，
+//   但不能依赖 8766 —— 8766 被别的程序占了，网页端不可用，
+//   GUI 也必须照常能定位、能看日志、能手动重扫。
+//   （沿用 xnavi-gui 的同一套契约：status.json + core.log。）
+
+// statusPayload 写进 status.json 的内容。
+type statusPayload struct {
+	Running  bool     `json:"running"`
+	OK       bool     `json:"ok"`
+	Verified bool     `json:"verified"`
+	Source   string   `json:"source"`
+	Note     string   `json:"note"`
+	GX       float32  `json:"gx"`
+	GY       float32  `json:"gy"`
+	GZ       float32  `json:"gz"`
+	MX       float32  `json:"mx"`
+	MY       float32  `json:"my"`
+	Addr     uintptr  `json:"addr"`
+	Scans    int      `json:"scans"`
+	Saves    int      `json:"saves"`
+	Shrine   bool     `json:"shrine"`
+	Anchor   scan.Vec3 `json:"anchor"`
+	PID      uint32   `json:"pid"`
+	Updated  string   `json:"updated"`
+	Version  string   `json:"version"`
+}
+
+// writeStatus 原子写 status.json（先写临时文件再改名，避免 GUI 读到半截 JSON）。
+func writeStatus(path string, p statusPayload) {
+	if path == "" {
+		return
+	}
+	b, err := json.MarshalIndent(p, "", "  ")
+	if err != nil {
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return
+	}
+	_ = os.Rename(tmp, path)
+}
+
 func main() {
 	cfgPath := flag.String("config", "", "配置文件（默认 exe 同目录 enavi.json）")
 	port := flag.Int("port", 0, "覆盖端口")
+	statusFile := flag.String("status-file", "status.json", "状态快照输出文件（GUI 读；传空串则不写）")
+	rescanReq := flag.String("rescan-req", "rescan.req", "手动重扫请求文件（GUI 写这个文件触发重扫；传空串则禁用）")
+	saveDir := flag.String("eden-save-dir", "", "Eden 的 BOTW 存档目录（留空自动探测；GUI 设置里可指定）")
 	flag.Parse()
+
+	// 存档目录覆盖：GUI 里手动指定时走这条路（自动探测不到时的兜底）。
+	if *saveDir != "" {
+		_ = os.Setenv("BOTW_SAVE_DIR", *saveDir)
+		logPrint("[config] Eden 存档目录（手动指定）: %s\n", *saveDir)
+	}
 
 	// 开启持久化运行日志，便于复盘操作与排查
 	if f, err := os.OpenFile("enavi.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); err == nil {
@@ -161,6 +224,7 @@ func main() {
 	go serve(cfg, st)
 
 	// 后台定位循环：Eden 没开/没进游戏就每 3 秒重试
+	reqPath := *rescanReq
 	go func() {
 		mux := &sync.Mutex{}
 		var tr *locate.Tracker
@@ -205,11 +269,21 @@ func main() {
 				st.set(locate.Update{OK: false, Source: "lost"})
 				continue
 			}
+			// GUI 的「重新扫描」请求（文件契约，不依赖 HTTP）。
+			// GUI 写 rescan.req 文件 → 核心每拍检查一次并删除。
+			if reqPath != "" {
+				if _, err := os.Stat(reqPath); err == nil {
+					_ = os.Remove(reqPath)
+					logPrint("[locate] 收到手动重扫请求（GUI）\n")
+					tr.Rescan()
+				}
+			}
 			u := tr.Tick()
 			sb := tr.Stats()
 			st.mu.Lock()
 			st.upd, st.updated, st.addr = u, time.Now(), sb.Addr
 			st.mu.Unlock()
+			st.setStats(sb)
 			// 每 2 秒打一行（不打 \r：重定向到文件时会连成一条巨行）
 			if time.Since(lastPrint) >= 2*time.Second {
 				lastPrint = time.Now()
@@ -224,6 +298,36 @@ func main() {
 					logPrint("[pos] -- 定位中（%s）\n", note)
 				}
 			}
+		}
+	}()
+
+	// status.json 输出：每 2 秒写一次，供 GUI 壳读取状态（文件通信，不依赖 HTTP）
+	go func() {
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+		for range t.C {
+			u, _, _, _, anchor, addr := st.snapshot()
+			sb := st.stats
+			writeStatus(*statusFile, statusPayload{
+				Running:  true,
+				OK:       u.OK,
+				Verified: u.Verified,
+				Source:   u.Source,
+				Note:     u.Note,
+				GX:       u.Pos.X,
+				GY:       u.Pos.Y,
+				GZ:       u.Pos.Z,
+				MX:       2*float32(u.Pos.X) + 12000, // BOTWmap 地图像素坐标
+				MY:       2*float32(u.Pos.Z) + 10000,
+				Addr:     addr,
+				Scans:    sb.Scans,
+				Saves:    sb.Saves,
+				Shrine:   u.Shrine,
+				Anchor:   anchor,
+				PID:      uint32(os.Getpid()),
+				Updated:  time.Now().Format("15:04:05"),
+				Version:  version.Version,
+			})
 		}
 	}()
 

@@ -167,6 +167,52 @@ func Find(exePath string) ([]Anchor, []string) {
 	return anchors, scanned
 }
 
+// Best 从候选存档里挑出「最可能是玩家当前在玩的那一档」。
+//
+// ★ 为什么需要（2026-10-21 修正）：
+//   Eden 的 BOTW 存档有 6 个槽（轮转写），其中可能混着：
+//     · 空档 / 新档（刚开的新游戏，PlayTime=0、克洛格=0）—— 坐标是初始位置，
+//       拿它当扫描锚点会扫到出厂点位，锁不到玩家；
+//     · 玩家早已不玩的旧档 —— 坐标在几公里外。
+//   旧逻辑（locate 直接取 anchors[0]）只按 (Playtime>0, mtime) 排，
+//   遇到「新档 PlayTime 恰好>0 但进度为空」就会选错。
+//
+// 判据（从严到宽）：
+//  1. 有进度（克洛格数 > 0 或 游玩时长 > 0）→ 合格档；
+//  2. 合格档里取 mtime 最新的（BOTW 轮转写，最近写过的最接近当前状态）；
+//  3. 一个合格档都没有 → 退回 mtime 最新的（总比没有强，但坐标可能不准）。
+//
+// 返回 nil 表示没有可用存档。
+func Best(anchors []Anchor) *Anchor {
+	if len(anchors) == 0 {
+		return nil
+	}
+	// 合格档：有进度
+	var qualified []Anchor
+	for _, a := range anchors {
+		if a.Koroks > 0 || a.Playtime > 0 {
+			qualified = append(qualified, a)
+		}
+	}
+	if len(qualified) == 0 {
+		// 全是空档/新档 → 取最新的，并标记出来（调用方可据此降级）
+		best := anchors[0]
+		for _, a := range anchors[1:] {
+			if a.MTime.After(best.MTime) {
+				best = a
+			}
+		}
+		return &best
+	}
+	best := qualified[0]
+	for _, a := range qualified[1:] {
+		if a.MTime.After(best.MTime) {
+			best = a
+		}
+	}
+	return &best
+}
+
 // Parse 解析单个 game_data.sav。
 func Parse(path string) (*Anchor, error) {
 	data, err := os.ReadFile(path)
