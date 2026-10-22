@@ -5,6 +5,33 @@
 > ★ **本仓库含多个程序、版本号各自独立**（在线地图 `BOTWmap` / 导航程序 `xnavi`、`navicemu`、`botwnavi-eden`），
 > 因此**每条版本标题一律带程序名**，格式固定 `## [程序名 VX.Y.Z] - YYYY-MM-DD 摘要`——网页版写 `BOTWmap`，导航程序写自己的名字，**禁止只写一个版本号**（规则见 `docs/spec/DEV-HANDBOOK.md` §3.1 命名表）。
 
+## [xnavi v3.2.1] - 2026-10-23 状态快照会话签名 · 发布包纯净与文档同步
+
+> **批次说明**：v3.2.0 交付后追问出的三处收尾问题一次收口。核心是把「启动时删除 status.json」这个掩盖症状的做法，换成「给快照签上会话身份」的根源治理；同时清掉混进发布包的运行时垃圾与一段死代码，并把文档里与实现相反的描述改正。
+
+### 修复：状态快照会话签名（根治旧坐标误开图）
+- **问题**：`status.json` 是核心每 2 秒覆盖写的运行快照，程序退出后残留在磁盘上。下次启动时，界面在核心写出首份新快照之前（最长 2 秒）会先读到上次会话的残留，其中带着旧坐标与 `verified=true`，于是地图会按旧位置自动弹出。
+- **核心侧**：`monitor.go` 的快照新增 `corePid`（核心自身进程号），与既有的 `pid`（所附加的模拟器进程号）区分开。
+- **界面侧**：`CoreStatus()` 新增签名门禁——快照的 `corePid` 必须等于本次拉起的子进程号，否则整条丢弃并强制 `ok=false / verified=false`，状态显示为「核心启动中，等待本次会话首份状态」；核心未运行时一律不改用磁盘快照。
+- **为何不用时间戳**：时间判据依赖系统时钟，用户改时间、切时区、休眠唤醒都可能误判；进程身份不随时钟变化，且实现成本相同。
+
+### 修复：相对时间不再残留上次会话
+- 未取得本次签名快照时，界面清空「最新存档」相对时间，避免继续显示上次会话的「X 小时前」。
+
+### 清理：发布包纯净与死代码
+- **删除 `diagnostic.go`**：该文件内 `dumpDiagnostic()` 在 v3.2.0 已无任何调用点（死代码），`--dump` 调试模式走的是另一个函数；此前发布包里 11 个 `diagnostics/diag_*.json` 均为 3.1.x 时期残留。
+- **发布包不再包含 `diagnostics/`**：运行时诊断产物不再是交付内容。
+- **`.gitignore` 补齐**：`xnavi-gui/xnavi-core.exe`（7.9MB 核心副本）、`xnavi-gui/diagnostics/`、`status.json`、日志与 `xnavi-gui-config.json` 不再出现在待提交列表。
+
+### 文档
+- **修正 `CHANGELOG` v3.2.0 条目里 Ryujinx 的错误描述**：原文写成「固定偏移秒读、零扫描」，与实现相反；实际自 v3.2.0 起已改为动力学根运动缓冲扫描（结构特征 + Run>=2），固定偏移 `0xA77FCBBC` 已废除。
+- `docs/releases/xnavi-v3.2.1.md` 新增版本报告；`RELEASE/README.md` 新增发布包目录规范（必带 / 禁带清单）。
+
+### 发布包
+- `RELEASE/xnavi-v3.2.1.zip`：`xnavi.exe`（GUI 桌面端）+ `xnavi-core.exe`（定位核心）+ `certs/` + `data/` + `README.md` + `TROUBLESHOOTING.md` + `xnavi-icon.ico`。**不含** `diagnostics/`、`status.json`、`*.log`、`xnavi-gui-config.json`、`known_botw_cemu.json`。
+
+---
+
 ## [xnavi v3.2.0] - 2026-10-22 管道化架构重构 · 极简核心收敛与全端日志标准化
 
 > **批次说明**：彻底终结多模拟器定位器分散与代码踩脚现状。将 xnavi 重构为「分发调度器 + 垂直独立追踪管道」架构，物理拆分 Cemu、Ryujinx、Eden 专属管道；全盘践行 Enavi「做减法、做简单高效」的核心哲学：原汁原味并入 enavi 在 Eden 上攻克的全部稳定性成果（Run>=2 门禁、传送零重扫、神庙挂起、彻底废除 known 缓存）；彻底消灭 Ryujinx 与 Cemu 管道中导致骑马、盾滑误掉锁的加法补丁，死守锁定地址；全端日志全量标准化（`[attach]`, `[lock]`, `[track]`, `[warp]`, `[shrine]`, `[hold]`, `[lost]`），完全对齐排查手册。
@@ -13,7 +40,7 @@
 - **调度分发解耦**：`watch.go` 代码行数从 1323 行精简至 250 行，仅负责活跃模拟器探测与生命周期调度分发；
 - **专属物理管道**：
   - `watch_cemu.go`：专属 Wii U 大端固定偏移秒读（`0x1055300C` / `0xC1F8BF4`），零扫描，死守锁定的 addr；
-  - `watch_ryujinx.go`：专属 Switch 小端固定偏移秒读（`0xA77FCBBC`），零扫描，死守锁定的 addr；
+  - `watch_ryujinx.go`：专属 Switch 小端**动力学根运动缓冲扫描**（`FindEdenTriples` + 单位四元数结构特征 + Run>=2 门禁），与 Eden 同一套找法；**彻底废除原固定偏移 `0xA77FCBBC`**（该地址指向外观骨骼 Transform 槽，骑乘/盾滑时被复用成标志位读出假坐标），锁定后死守 addr；
   - `watch_eden.go`：专属 Switch User Heap（2.65GB）并发扫描与死读，物理隔离；
 - **统一契约插槽**：定义标准 `Tracker` 接口，为后续《王国之泪》（TOTK）无缝并入预留整齐管道插槽。
 

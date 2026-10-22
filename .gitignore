@@ -79,6 +79,12 @@ xnavi/xnavi-core.exe
 xnavi/diagnostics/
 xnavi-gui/_*.py
 xnavi-gui/xnavi-gui.exe
+# v3.2.1：GUI 目录下的核心副本与实践产物（7.9MB 二进制曾被误判为待提交）
+xnavi-gui/xnavi-core.exe
+xnavi-gui/diagnostics/
+xnavi-gui/status.json
+xnavi-gui/*.log
+xnavi-gui/xnavi-gui-config.json
 xnavi-v2.1.0.zip
 _changelog.py
 

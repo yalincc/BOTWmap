@@ -8,15 +8,23 @@
 - GUI 壳（wails）`xnavi.exe` 启动时 exec 拉起核心 `xnavi-core.exe`
   （TOTK 侧同一套壳在 `TOTKmap\live-gui\`，复用文件通信，未重编译）
 
-## 交接必读
+## 文档指针（按需读，别猜）
 
-**当前开发状态、遗留问题清单、架构说明见（最新）：**
-`..\归档\开发计划\docs-过程文档-20261003\xnavi V2.3.0 TOTK剥离收尾与知识点总结-20261003.md`
+| 要做什么 | 读 |
+|---|---|
+| 改定位逻辑 / 判断定位是否正常 | `docs/spec/LOCATE-RULES.md`（游戏行为 ↔ 定位逻辑对照 + 阈值表 + 日志词典） |
+| 排查调试、查日志词典、发版回归清单 | `docs/spec/DEBUG-HANDBOOK.md` |
+| 用户报问题的速查 | `docs/spec/TROUBLESHOOTING.md` |
+| 当前架构与历次踩坑台账 | `docs/releases/xnavi-v3.2.0.md`、`docs/releases/xnavi-v3.2.1.md` |
+| **发布包里该放什么 / 不该放什么** | `RELEASE/README.md` §「发布包目录规范」+ `docs/spec/DEV-HANDBOOK.md` §7.1 |
+| 同步定位规则的"宪法" | `docs/spec/LOCATE-RULES.md`（改代码前先看 §禁区） |
 
-历史：
-`..\归档\开发计划\docs-过程文档-20261002\Xnavi交接文档-20261002-BOTW与TOTK分离及TOTK定位稳定性.md`
-`..\归档\开发计划\docs-过程文档-20260929\Xnavi V2.2.1交接文档-指针扫描与TOTK定位稳定性.md`
-`..\归档\开发计划\docs-过程文档-20260929\Xnavi V2.2.0交接文档-开发进度与遗留问题.md`
+> 历史交接（v2.2.x ~ v2.3.0，已归档，路径为历史快照）：
+> `..\归档\开发计划\docs-过程文档-20261003\xnavi V2.3.0 TOTK剥离收尾与知识点总结-20261003.md`
+> `..\归档\开发计划\docs-过程文档-20261002\Xnavi交接文档-20261002-BOTW与TOTK分离及TOTK定位稳定性.md`
+> `..\归档\开发计划\docs-过程文档-20260929\Xnavi V2.2.1交接文档-指针扫描与TOTK定位稳定性.md`
+> `..\归档\开发计划\docs-过程文档-20260929\Xnavi V2.2.0交接文档-开发进度与遗留问题.md`
+> v3.1.0 调试上下文已于 2026-10-23 移至 `..\归档\弃用\xnavi-debug上下文-v3.1.0.md`（v3.2.0 架构已重写，看 DEBUG-HANDBOOK）。
 
 ## 快速命令（PowerShell）
 

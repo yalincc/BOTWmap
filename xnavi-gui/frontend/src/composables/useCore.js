@@ -248,6 +248,9 @@ export async function initCore() {
       saveMtime.value = st.saveMtime
     } else if (st.progress && st.progress.saveMtime) {
       saveMtime.value = st.progress.saveMtime
+    } else if (!st.ok) {
+      // v3.2.1：未取得本次会话的签名快照时清空，避免继续显示上次会话的相对时间
+      saveMtime.value = 0
     }
 
     if (st.progress && st.progress.counts) {

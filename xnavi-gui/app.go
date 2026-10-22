@@ -32,6 +32,7 @@ type App struct {
 	ctx       context.Context
 	mu        sync.Mutex
 	cmd       *exec.Cmd
+	corePid   int // v3.2.1：本次拉起的 core 子进程号，用于状态快照会话签名
 	workDir   string
 	logBuf    []string
 	logMarker string
@@ -368,7 +369,16 @@ func (a *App) StartCore(emu string) string {
 		return "启动失败: " + err.Error()
 	}
 	a.cmd = cmd
-	go func() { cmd.Wait(); a.mu.Lock(); if a.cmd == cmd { a.cmd = nil }; a.mu.Unlock() }()
+	a.corePid = cmd.Process.Pid
+	go func() {
+		cmd.Wait()
+		a.mu.Lock()
+		if a.cmd == cmd {
+			a.cmd = nil
+			a.corePid = 0
+		}
+		a.mu.Unlock()
+	}()
 	msg := "核心已启动（" + emu + "）"
 	if game != "" && game != "auto" {
 		msg += " · 游戏 " + game
@@ -389,6 +399,7 @@ func (a *App) stopCoreLocked() {
 		a.cmd.Process.Kill()
 		a.cmd = nil
 	}
+	a.corePid = 0
 }
 
 // CoreRunning 核心子进程是否在运行。
@@ -401,10 +412,22 @@ func (a *App) CoreRunning() bool {
 // statusPath 核心每 2s 写的会话快照。
 func (a *App) statusPath() string { return filepath.Join(a.workDir, "status.json") }
 
+// snapshotSignedBy 校验快照里的 corePid 是否就是本次拉起的子进程号。
+// v3.2.1：status.json 会残留在磁盘上，若不做会话签名校验，上次会话的旧坐标
+// 与 verified=true 会被当成本次状态，导致地图带着旧位置自动弹出。
+func snapshotSignedBy(obj map[string]any, corePid int) bool {
+	if corePid <= 0 {
+		return false
+	}
+	v, ok := obj["corePid"].(float64)
+	return ok && int(v) == corePid
+}
+
 // CoreStatus 读 status.json 并附加 GUI 侧状态（running / webOK / webNote）。
 func (a *App) CoreStatus() map[string]any {
 	a.mu.Lock()
 	running := a.cmd != nil && a.cmd.Process != nil
+	corePid := a.corePid
 	a.mu.Unlock()
 	obj := map[string]any{"running": running}
 	buf, err := os.ReadFile(a.statusPath())
@@ -412,6 +435,15 @@ func (a *App) CoreStatus() map[string]any {
 	} else {
 		obj["ok"] = false
 		obj["note"] = "核心未写入状态（未运行或启动中）"
+	}
+	// 会话签名门禁：快照必须由本次启动的 core 写出，否则整条丢弃。
+	if !running || !snapshotSignedBy(obj, corePid) {
+		obj = map[string]any{"running": running, "ok": false, "verified": false}
+		if running {
+			obj["note"] = "核心启动中，等待本次会话首份状态"
+		} else {
+			obj["note"] = "核心未运行"
+		}
 	}
 	// 网页端可用性：核心运行且 8766 未被外部占用 → 可用。
 	// 核心日志里出现 "HTTP 端口被占用" 说明核心启动时 listen 失败。
