@@ -20,6 +20,8 @@ export function ManualCalibrate(arg1:number,arg2:number):Promise<string>;
 
 export function OpenLogDir():Promise<string>;
 
+export function OpenMapURL():Promise<string>;
+
 export function OpenSaveDir():Promise<string>;
 
 export function PickDir(arg1:string):Promise<string>;

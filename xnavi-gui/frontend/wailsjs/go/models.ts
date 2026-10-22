@@ -7,6 +7,9 @@ export namespace main {
 	    emulator: string;
 	    game: string;
 	    tls: boolean;
+	    autoOpenMap?: boolean;
+	    customMapURL: string;
+	    autoDetectSave?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -20,6 +23,9 @@ export namespace main {
 	        this.emulator = source["emulator"];
 	        this.game = source["game"];
 	        this.tls = source["tls"];
+	        this.autoOpenMap = source["autoOpenMap"];
+	        this.customMapURL = source["customMapURL"];
+	        this.autoDetectSave = source["autoDetectSave"];
 	    }
 	}
 

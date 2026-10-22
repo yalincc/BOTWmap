@@ -358,6 +358,7 @@ func (w *progressWatcher) summarize() (bool, map[string]any) {
 	return true, map[string]any{
 		"save":       w.save,
 		"saveSource": w.saveSource,
+		"saveMtime":  w.modT.Unix(),
 		"playtime":   w.playtime,
 		"koroks":     w.koroks,
 		"counts":     c,

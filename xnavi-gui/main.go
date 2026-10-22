@@ -18,9 +18,9 @@ func main() {
 		Title:     "Xnavi 游戏定位导航",
 		Width:     920,
 		Height:    680,
-		MinWidth:  720,
-		MinHeight: 560,
-		Frameless: false, // 无边框：前端自绘标题栏（去壳化，拖拽区 --wails-draggable）
+		MinWidth:  880,
+		MinHeight: 600,
+		Frameless: true, // 无边框：前端自绘标题栏（去壳化，拖拽区 --wails-draggable）
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

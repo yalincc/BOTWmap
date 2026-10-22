@@ -47,6 +47,9 @@ type Config struct {
 	Emulator       string `json:"emulator"`       // auto | cemu | ryujinx | eden
 	Game           string `json:"game"`           // auto | botw | totk
 	TLS            bool   `json:"tls"`             // v3.1.0：--tls 双协议，手机镜像页防息屏
+	AutoOpenMap    *bool  `json:"autoOpenMap"`    // 定位成功后自动打开地图网页（默认 true）
+	CustomMapURL   string `json:"customMapURL"`   // 自定义地图地址（留空=localhost:8766）
+	AutoDetectSave *bool  `json:"autoDetectSave"` // 自动检测存档（默认 true）
 }
 
 func (a *App) configPath() string { return filepath.Join(a.workDir, "xnavi-gui-config.json") }
@@ -57,6 +60,10 @@ func (a *App) loadConfig() *Config {
 	if err == nil {
 		json.Unmarshal(buf, cfg)
 	}
+	// 为指针类型设默认值（JSON 未写字段时保持 nil，这里补全）
+	defaultTrue := true
+	if cfg.AutoOpenMap == nil    { cfg.AutoOpenMap = &defaultTrue }
+	if cfg.AutoDetectSave == nil { cfg.AutoDetectSave = &defaultTrue }
 	return cfg
 }
 
@@ -502,6 +509,18 @@ func (a *App) lastNLines(lines []string) []string {
 		}
 	}
 	return out
+}
+
+// OpenMapURL 在默认浏览器打开地图网页（支持 http/https/file:/// 自定义地址）。
+func (a *App) OpenMapURL() string {
+	url := "http://127.0.0.1:8766"
+	if a.cfg != nil && a.cfg.CustomMapURL != "" {
+		url = a.cfg.CustomMapURL
+	}
+	if err := exec.Command("cmd", "/c", "start", "", url).Start(); err != nil {
+		return "打开失败: " + err.Error()
+	}
+	return "已打开: " + url
 }
 
 // OpenLogDir 打开日志/数据目录（方便用户反馈时复制日志）。

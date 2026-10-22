@@ -155,6 +155,9 @@ func statusLoop() {
 				if src, ok := psum["saveSource"]; ok {
 					obj["saveSource"] = src
 				}
+				if mt, ok := psum["saveMtime"]; ok {
+					obj["saveMtime"] = mt
+				}
 			}
 		}
 		buf, err := json.MarshalIndent(obj, "", " ")
