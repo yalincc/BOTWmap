@@ -40,6 +40,7 @@ export default {
     openMap: 'Open Map',
     start: 'Start Locating',
     locating: 'Locating...',
+    locateOk: 'Located',
     browse: 'Browse',
     openDir: 'Open Dir',
     save: 'Save',
@@ -106,8 +107,6 @@ export default {
   settings: {
     title: 'Settings & Save Management',
     autoOpenMap: 'Auto open web map upon lock',
-    customMapUrl: 'Custom Map Web URL',
-    customMapUrlPlaceholder: 'Default official map (supports file:/// or local web)',
     cemuPath: 'Cemu BOTW save path (leave empty for auto):',
     ryuPath: 'Ryujinx BOTW save path (leave empty for auto):',
     edenPath: 'Eden BOTW save path (leave empty for auto):',

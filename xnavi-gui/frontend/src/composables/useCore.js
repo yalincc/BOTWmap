@@ -23,11 +23,10 @@ export const progressData = ref({})
 export const cfg = reactive({
   cemuSaveDir: '', ryujinxSaveDir: '', edenSaveDir: '',
   emulator: 'auto', game: 'auto', tls: false,
-  autoOpenMap: true, customMapURL: '', autoDetectSave: true
+  autoOpenMap: true, autoDetectSave: true
 })
 
 export const envDetect = reactive({ cemu: false, ryujinx: false, eden: false })
-export const statusMapUrl = ref('')
 export const detectedGame = ref('')
 
 export const syncText = computed(() => {
@@ -63,27 +62,13 @@ function setStepState() {
   }
 }
 
-export const defaultMapUrl = computed(() => {
-  if (statusMapUrl.value) return statusMapUrl.value
-  const g = detectedGame.value || 'botw'
-  return g === 'totk' ? 'https://totk.yalin.site/' : 'https://botw.yalin.site/'
-})
+// v3.2.1：在线地图地址写死（xnavi 只服务 BOTW）。
+// follow=1 由网页端 app/js/live.js 消费 → 打开即激活右下角「跟随玩家位置」并持久化。
+export const MAP_URL = 'https://botw.yalin.site/?follow=1&game=botw'
 
-export function buildMapUrl() {
-  const base = cfg.customMapURL && cfg.customMapURL.trim() ? cfg.customMapURL.trim() : defaultMapUrl.value
-  let g = detectedGame.value
-  if (!g || g === 'auto') g = (cfg.game && cfg.game !== 'auto') ? cfg.game : 'botw'
-  const sep = base.includes('?') ? '&' : '?'
-  return `${base}${sep}follow=1&game=${g}`
-}
-
-export async function openMap() {
-  const url = buildMapUrl()
-  if (api.OpenMapURL) {
-    await api.OpenMapURL(url)
-  } else {
-    rt.BrowserOpenURL(url)
-  }
+// 用 Wails 自带的浏览器打开能力：走系统 ShellExecute，URL 里的 & 不会被 shell 截断。
+export function openMap() {
+  rt.BrowserOpenURL(MAP_URL)
 }
 
 export const logs = ref([])
@@ -142,7 +127,6 @@ export async function saveSettings() {
     game: cfg.game,
     tls: cfg.tls,
     autoOpenMap: cfg.autoOpenMap,
-    customMapURL: cfg.customMapURL,
     autoDetectSave: cfg.autoDetectSave
   })
   const det = await api.EnvDetect()
@@ -161,7 +145,6 @@ export async function loadConfig() {
   cfg.game = c.game || 'auto'
   cfg.tls = !!c.tls
   cfg.autoOpenMap = c.autoOpenMap !== undefined ? !!c.autoOpenMap : true
-  cfg.customMapURL = c.customMapURL || ''
   cfg.autoDetectSave = c.autoDetectSave !== undefined ? !!c.autoDetectSave : true
   const det = await api.EnvDetect()
   envDetect.cemu = det.cemu
@@ -242,7 +225,6 @@ export async function initCore() {
     pos.lockAddr = st.lockAddr || ''
     pos.ageSec = st.ageSec || 0
     if (st.game) detectedGame.value = st.game
-    if (st.map_url) statusMapUrl.value = st.map_url
 
     if (st.saveMtime) {
       saveMtime.value = st.saveMtime

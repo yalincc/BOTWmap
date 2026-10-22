@@ -40,6 +40,7 @@ export default {
     openMap: '打开网页地图',
     start: '开始定位',
     locating: '正在定位中',
+    locateOk: '定位成功',
     browse: '浏览',
     openDir: '打开目录',
     save: '保存',
@@ -106,8 +107,6 @@ export default {
   settings: {
     title: '设置与存档管理',
     autoOpenMap: '锁定后自动打开网页地图',
-    customMapUrl: '自定义地图网页地址',
-    customMapUrlPlaceholder: '默认官方地图 (支持 file:/// 或 本地网页)',
     cemuPath: 'Cemu 的 BOTW 存档路径（留空自动探测）：',
     ryuPath: 'Ryujinx 的 BOTW 存档路径（留空自动探测）：',
     edenPath: 'Eden 的 BOTW 存档路径（留空自动探测）：',

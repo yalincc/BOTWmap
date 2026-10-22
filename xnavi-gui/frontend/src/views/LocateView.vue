@@ -49,12 +49,14 @@
           🧭 {{ t('buttons.openMap') }}
         </button>
         <button @click="toggleLocating"
-          :class="isLocating
-            ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-950/50'
-            : 'bg-blue-600 hover:bg-blue-500 shadow-blue-950/50'"
+          :class="{
+            'bg-blue-600 hover:bg-blue-500 shadow-blue-950/50': locateState === 'idle',
+            'bg-amber-600 hover:bg-amber-500 shadow-amber-950/50': locateState === 'working',
+            'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50': locateState === 'ok'
+          }"
           class="w-[128px] py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-lg active:scale-95">
-          <span>{{ isLocating ? '■' : '▶' }}</span>
-          <span>{{ isLocating ? t('buttons.locating') : t('buttons.start') }}</span>
+          <span>{{ locateState === 'ok' ? '✔' : (locateState === 'working' ? '■' : '▶') }}</span>
+          <span>{{ t('buttons.' + (locateState === 'ok' ? 'locateOk' : (locateState === 'working' ? 'locating' : 'start'))) }}</span>
         </button>
       </div>
     </section>
@@ -130,8 +132,8 @@
 
       <!-- 右 6 列：本地解析进度与存档 -->
       <div class="col-span-6 flex flex-col min-h-0">
-        <section class="bg-[#161b22] border border-slate-800 rounded-xl p-3 flex-1 flex flex-col justify-between">
-          <div>
+        <section class="bg-[#161b22] border border-slate-800 rounded-xl p-3 flex flex-col flex-1 w-full">
+          <div class="shrink-0">
             <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-800/80 mb-2.5">
               <div class="flex items-center gap-2">
                 <span class="font-bold text-emerald-400">{{ t('locate.localProgress') }}</span>
@@ -140,34 +142,20 @@
               <span class="text-[11px] font-mono text-slate-400">{{ t('locate.playtime') }}: <span class="text-white font-bold">{{ playtimeText }}</span></span>
             </div>
 
-            <!-- 18 项探索度（4 组，与网页口径一致；数据全部来自存档） -->
-            <div class="space-y-1">
-              <div v-for="g in STAT_GROUPS" :key="g.title">
-                <div class="flex items-center gap-1.5 mb-0.5">
-                  <span class="text-[10px] font-semibold text-slate-500">{{ t('locate.' + g.title) }}</span>
-                  <span class="flex-1 h-px bg-slate-800"></span>
-                </div>
-                <div class="grid grid-cols-3 gap-1">
-                  <div v-for="it in g.items" :key="it.k"
-                       class="bg-[#0d1117] px-1.5 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
-                    <span class="text-slate-400 text-[10px] truncate">{{ t('locate.' + it.t) }}</span>
-                    <span class="font-mono text-white font-bold text-[10px] shrink-0">{{ countText(it.k) }}</span>
-                  </div>
-                </div>
+            <!-- 18 项探索度：平铺，不分组（按 探索→任务→收集→讨伐 顺序） -->
+            <div class="grid grid-cols-3 gap-1.5">
+              <div v-for="it in STAT_ITEMS" :key="it.k"
+                   class="bg-[#0d1117] px-2 py-1 rounded-lg border border-slate-800 flex items-center justify-between gap-1"
+                   :title="t('locate.saveOnlyHint')">
+                <span class="text-slate-400 text-xs truncate">{{ t('locate.' + it.t) }}</span>
+                <span class="font-mono text-white font-bold text-xs shrink-0">{{ countText(it.k) }}</span>
               </div>
-              <div class="text-[9px] text-slate-600 pt-0.5">{{ t('locate.saveOnlyHint') }}</div>
             </div>
           </div>
 
-          <!-- 生效存档管理条 -->
-          <div class="mt-2 pt-2 border-t border-slate-800/80 text-xs">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-[11px] text-slate-400 font-medium shrink-0">{{ t('locate.saveInfo') }}:</span>
-              <span class="text-[10px] font-mono text-slate-300 truncate flex-1 text-right" :title="progressData.save || '未检测到存档'">
-                {{ progressData.save || '未检测到存档（启动后自动探测）' }}
-              </span>
-            </div>
-            <div class="flex items-center justify-between gap-2 mt-2 flex-wrap">
+          <!-- 生效存档管理条：按钮在上，存档路径在下 -->
+          <div class="mt-3 pt-2.5 border-t border-slate-800/80 text-xs">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
               <!-- 四个动作按钮 -->
               <div class="flex items-center gap-1.5">
                 <button @click="pickSaveFile" class="bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded text-[11px] font-medium transition active:scale-95">
@@ -190,10 +178,16 @@
                   <input v-model="cfg.autoDetectSave" @change="saveSettings" type="checkbox" class="accent-blue-600 w-3.5 h-3.5 rounded" />
                   <span>{{ t('locate.autoDetectSave') }}</span>
                 </label>
-                <div v-if="saveTimeAgoText" class="font-mono text-[11px]" :class="saveTimeAgoClass">
+                <div v-if="saveTimeAgoText" class="font-mono text-[11px] shrink-0" :class="saveTimeAgoClass">
                   {{ t('locate.latestSaveTime') }}: {{ saveTimeAgoText }}
                 </div>
               </div>
+            </div>
+            <div class="flex items-center gap-2 mt-2">
+              <span class="text-[11px] text-slate-400 font-medium shrink-0">{{ t('locate.saveInfo') }}:</span>
+              <span class="text-[10px] font-mono text-slate-300 truncate flex-1" :title="progressData.save || '未检测到存档'">
+                {{ progressData.save || '未检测到存档（启动后自动探测）' }}
+              </span>
             </div>
           </div>
         </section>
@@ -214,7 +208,7 @@ import SettingsPop from '../components/SettingsPop.vue'
 import AboutPop from '../components/AboutPop.vue'
 import {
   pos, steps, stepClass, stepDot, isLocating, toggleLocating, progressData,
-  openMap, buildMapUrl, cfg, saveSettings, ver, syncText, syncClass, syncDot,
+  openMap, cfg, saveSettings, ver, syncText, syncClass, syncDot,
   rt, manualCalibrate, openSave, pickSaveFile, pickSaveDir, detectSave,
   saveTimeAgoText, saveTimeAgoClass
 } from '../composables/useCore'
@@ -242,16 +236,12 @@ const emuShortLabel = computed(() => {
   return { auto: '自动探测', cemu: 'Cemu', ryujinx: 'Ryujinx', eden: 'Eden' }[e] || e
 })
 
-const headerMapHost = computed(() => {
-  if (cfg.customMapURL && cfg.customMapURL.trim()) {
-    try {
-      const u = new URL(cfg.customMapURL.trim())
-      return u.host || '自定义网页'
-    } catch {
-      return '本地网页'
-    }
-  }
-  return 'botw.yalin.site'
+const headerMapHost = 'botw.yalin.site'
+
+// 定位按钮三态：未开始 / 定位中 / 定位成功（真身已确认）
+const locateState = computed(() => {
+  if (!isLocating.value) return 'idle'
+  return pos.verified ? 'ok' : 'working'
 })
 
 function fmt(v) { return (!pos.ok || v == null) ? '-' : Number(v).toFixed(1) }
@@ -271,24 +261,16 @@ const playtimeText = computed(() => {
 
 const saveSourceTag = computed(() => progressData.value?.saveSource || '')
 
-// 18 项探索度分组（与网页探索度面板口径一致）
+// 18 项探索度（与网页面板同口径）：平铺顺序 = 探索 6 → 任务 4 → 收集 5 → 讨伐 3
 // 探索 6 项来自核心既有 counts，其余 12 项来自 v3.2.1 新增的 stats
-const STAT_GROUPS = [
-  { title: 'grpExplore', items: [
-    { k: 'shrine', t: 'shrine' }, { k: 'tower', t: 'tower' }, { k: 'beast', t: 'beast' },
-    { k: 'korok', t: 'korok' }, { k: 'memory_photo', t: 'memoryPhoto' }, { k: 'memory_final', t: 'memoryFinal' }
-  ] },
-  { title: 'grpQuest', items: [
-    { k: 'quest_main', t: 'questMain' }, { k: 'quest_side', t: 'questSide' },
-    { k: 'quest_shrine', t: 'questShrine' }, { k: 'quest_dlc', t: 'questDlc' }
-  ] },
-  { title: 'grpCollect', items: [
-    { k: 'chest', t: 'chest' }, { k: 'weapon', t: 'weapon' }, { k: 'pb_equip', t: 'pbEquip' },
-    { k: 'pb_mat', t: 'pbMat' }, { k: 'pb_enemy', t: 'pbEnemy' }
-  ] },
-  { title: 'grpSubjugate', items: [
-    { k: 'boss_hinox', t: 'bossHinox' }, { k: 'boss_talus', t: 'bossTalus' }, { k: 'boss_molduga', t: 'bossMolduga' }
-  ] }
+const STAT_ITEMS = [
+  { k: 'shrine', t: 'shrine' }, { k: 'tower', t: 'tower' }, { k: 'beast', t: 'beast' },
+  { k: 'korok', t: 'korok' }, { k: 'memory_photo', t: 'memoryPhoto' }, { k: 'memory_final', t: 'memoryFinal' },
+  { k: 'quest_main', t: 'questMain' }, { k: 'quest_side', t: 'questSide' },
+  { k: 'quest_shrine', t: 'questShrine' }, { k: 'quest_dlc', t: 'questDlc' },
+  { k: 'chest', t: 'chest' }, { k: 'weapon', t: 'weapon' }, { k: 'pb_equip', t: 'pbEquip' },
+  { k: 'pb_mat', t: 'pbMat' }, { k: 'pb_enemy', t: 'pbEnemy' },
+  { k: 'boss_hinox', t: 'bossHinox' }, { k: 'boss_talus', t: 'bossTalus' }, { k: 'boss_molduga', t: 'bossMolduga' }
 ]
 
 function countText(k) {

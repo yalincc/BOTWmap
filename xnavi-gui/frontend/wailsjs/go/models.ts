@@ -8,7 +8,6 @@ export namespace main {
 	    game: string;
 	    tls: boolean;
 	    autoOpenMap?: boolean;
-	    customMapURL: string;
 	    autoDetectSave?: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -24,7 +23,6 @@ export namespace main {
 	        this.game = source["game"];
 	        this.tls = source["tls"];
 	        this.autoOpenMap = source["autoOpenMap"];
-	        this.customMapURL = source["customMapURL"];
 	        this.autoDetectSave = source["autoDetectSave"];
 	    }
 	}

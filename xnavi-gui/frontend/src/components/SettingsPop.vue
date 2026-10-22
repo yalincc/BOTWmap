@@ -5,17 +5,12 @@
       <button class="text-slate-500 hover:text-white" @click="$emit('close')">✕</button>
     </div>
 
-    <!-- 自动打开地图与自定义地图 URL -->
+    <!-- 自动打开地图 -->
     <div class="bg-[#0d1117] border border-slate-800 rounded-lg p-2.5 space-y-2">
       <label class="flex items-center gap-2 cursor-pointer select-none">
         <input v-model="cfg.autoOpenMap" type="checkbox" class="accent-blue-600 w-3.5 h-3.5 rounded" />
         <span class="text-white font-medium">{{ t('settings.autoOpenMap') }}</span>
       </label>
-      <div>
-        <label class="block text-[11px] text-slate-400 mb-1">{{ t('settings.customMapUrl') }}：</label>
-        <input v-model="cfg.customMapURL" :placeholder="t('settings.customMapUrlPlaceholder')"
-          class="w-full bg-[#161b22] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-[11px] focus:border-blue-500 focus:outline-none placeholder-slate-600" />
-      </div>
     </div>
 
     <!-- 模拟器存档路径 -->

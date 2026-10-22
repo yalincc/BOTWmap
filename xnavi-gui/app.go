@@ -23,7 +23,7 @@ import (
 // guiVersion 导航程序版本（三合一统一版本 v3.0.0，2026-10-07 拍板：
 // GUI 壳与导航核心 xnavi 共享同一版本号，不再各自解耦）。
 // 注意：必须与 xnavi/version.go 的 CoreVersion 保持一致。
-const guiVersion = "v3.2.0"
+const guiVersion = "v3.2.1"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -48,8 +48,7 @@ type Config struct {
 	Emulator       string `json:"emulator"`       // auto | cemu | ryujinx | eden
 	Game           string `json:"game"`           // auto | botw | totk
 	TLS            bool   `json:"tls"`             // v3.1.0：--tls 双协议，手机镜像页防息屏
-	AutoOpenMap    *bool  `json:"autoOpenMap"`    // 定位成功后自动打开地图网页（默认 true）
-	CustomMapURL   string `json:"customMapURL"`   // 自定义地图地址（留空=localhost:8766）
+	AutoOpenMap    *bool  `json:"autoOpenMap"`    // 定位成功后自动打开在线地图（默认 true）
 	AutoDetectSave *bool  `json:"autoDetectSave"` // 自动检测存档（默认 true）
 }
 
@@ -541,18 +540,6 @@ func (a *App) lastNLines(lines []string) []string {
 		}
 	}
 	return out
-}
-
-// OpenMapURL 在默认浏览器打开地图网页（支持 http/https/file:/// 自定义地址）。
-func (a *App) OpenMapURL() string {
-	url := "http://127.0.0.1:8766"
-	if a.cfg != nil && a.cfg.CustomMapURL != "" {
-		url = a.cfg.CustomMapURL
-	}
-	if err := exec.Command("cmd", "/c", "start", "", url).Start(); err != nil {
-		return "打开失败: " + err.Error()
-	}
-	return "已打开: " + url
 }
 
 // OpenLogDir 打开日志/数据目录（方便用户反馈时复制日志）。

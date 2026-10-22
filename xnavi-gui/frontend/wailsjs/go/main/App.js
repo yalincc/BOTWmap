@@ -38,10 +38,6 @@ export function OpenLogDir() {
   return window['go']['main']['App']['OpenLogDir']();
 }
 
-export function OpenMapURL() {
-  return window['go']['main']['App']['OpenMapURL']();
-}
-
 export function OpenSaveDir() {
   return window['go']['main']['App']['OpenSaveDir']();
 }

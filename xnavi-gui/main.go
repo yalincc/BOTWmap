@@ -16,9 +16,9 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "Xnavi 游戏定位导航",
-		Width:     920,
+		Width:     1010,
 		Height:    680,
-		MinWidth:  880,
+		MinWidth:  960,
 		MinHeight: 600,
 		Frameless: true, // 无边框：前端自绘标题栏（去壳化，拖拽区 --wails-draggable）
 		AssetServer: &assetserver.Options{
