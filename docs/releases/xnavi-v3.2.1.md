@@ -87,7 +87,18 @@ v3.2.0 初期采用「启动核心前第一件事：物理删除 `status.json`�
 
 ### 3.3 发布包规范落地
 
-`RELEASE/README.md` 新增「发布包目录规范」：必带 7 项（exe ×2、`data/`、`certs/`、README、TROUBLESHOOTING、icon）、禁带 6 类（`status.json`、日志、GUI 配置、`diagnostics/`、`known_botw_cemu.json`、留底文件），并固定四步出包自检（列清单 / SHA 一致 / 图标 MATCH / 空目录试跑）。
+`RELEASE/README.md` 新增「发布包目录规范」：必带 6 项（`xnavi.exe`、`xnavi-core.exe`、`data/`、`certs/`、`README.md`、`TROUBLESHOOTING.md`）、禁带 6 类（`status.json`、日志、GUI 配置、`diagnostics/`、`known_botw_cemu.json`、留底文件），并固定四步出包自检（列清单 / SHA 一致 / 图标 MATCH / 空目录试跑）。
+
+### 3.4 图标不再进发布包（本版评审定，v3.2.2 起生效）
+
+本版交付评审时发现包内的 `xnavi-icon.ico` 引起困惑：图标明明已经内嵌进 `xnavi.exe`（校验 MATCH），包内为何还单独放一份？
+
+| 结论 | 说明 |
+|---|---|
+| 该文件的性质 | **留档凭证，程序从不读取**。来源是 v3.1.0/v3.1.1 曾误发 Wails 默认 W 图标后立的规矩（`DEV-HANDBOOK.md` §7.1），用于事后比对 |
+| 为什么现在可以去掉 | `xnavi-gui/build/windows/icon.ico` 本身入库，打 tag 即可回溯当时图标，包内再放一份属重复留档，且与「发布包纯净」原则冲突 |
+| 生效范围 | **`xnavi v3.2.2` 起不再带**。v3.2.1 及以前包内的 `xnavi-icon.ico` 保持原样不动（已发布的不回改），仅作历史留档 |
+| 规范同步 | `DEV-HANDBOOK.md` §7.1 第 1 条、`RELEASE/README.md` 「必带」表均已改；图标校验改用 git 内的 `icon.ico` 作比对基准，无需包内带 ico |
 
 ---
 
