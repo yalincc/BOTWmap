@@ -72,18 +72,40 @@ var ryujinxSaveDirOverride string
 
 func setRyujinxSaveDirOverride(d string) { ryujinxSaveDirOverride = d }
 
-// SaveRoots Ryujinx 存档根（Switch 版）。
+// SaveRoots Ryujinx 存档根（Switch 版，优先级：手动指定 > 进程自省 > AppData）。
 func (p *ryujinxPlatform) SaveRoots() []string {
-	var roots []string
+	// P0: 手动指定（最高优先级）
 	if sd := ryujinxSaveDirOverride; sd != "" {
-		// GUI 设置"Ryujinx 存档路径"（直接存档根，BOTW 为 bis/user/save 下含 01007EF00011E000 的目录）
-		roots = append(roots, sd)
+		return []string{sd}
 	}
+	var roots []string
+	add := func(pp string) {
+		if pp != "" {
+			roots = append(roots, filepath.Clean(pp))
+		}
+	}
+
+	// P1: 进程自省（提取 ryuDir，检查 ryuDir/portable/bis/user/save）
+	var ryuExe string
+	if p.h != 0 {
+		ryuExe = processExePath(p.h)
+	} else if p.pid != 0 {
+		ryuExe = processExePathByPID(p.pid)
+	}
+	if ryuExe != "" {
+		ryuDir := filepath.Dir(ryuExe)
+		add(filepath.Join(ryuDir, "portable", "bis", "user", "save"))
+		add(filepath.Join(ryuDir, "bis", "user", "save"))
+	}
+
+	// P2: 检查 %APPDATA%/Ryujinx/bis/user/save
 	appdata := os.Getenv("APPDATA")
 	if appdata == "" {
 		appdata = os.Getenv("USERPROFILE") + "\\AppData\\Roaming"
 	}
-	roots = append(roots, filepath.Join(appdata, "Ryujinx", "bis", "user", "save"))
+	if appdata != "" {
+		add(filepath.Join(appdata, "Ryujinx", "bis", "user", "save"))
+	}
 	return roots
 }
 

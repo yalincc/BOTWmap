@@ -1,5 +1,16 @@
 <template>
-  <div class="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200 select-none overflow-hidden font-sans">
+  <div class="flex flex-col h-screen w-full bg-[#0d1117] text-slate-200 select-none overflow-hidden font-sans relative"
+    @dragover.prevent="isDragging = true"
+    @dragleave.prevent="isDragging = false"
+    @drop.prevent="onDrop">
+    <!-- 拖拽载入存档覆盖遮罩 -->
+    <div v-if="isDragging" class="absolute inset-0 bg-blue-950/80 border-2 border-dashed border-blue-400 z-50 flex items-center justify-center backdrop-blur-xs pointer-events-none">
+      <div class="bg-[#161b22] px-6 py-5 rounded-lg shadow-2xl border border-blue-500 text-center">
+        <div class="text-3xl mb-1">📥</div>
+        <div class="text-sm font-semibold text-white">松开鼠标载入存档</div>
+        <div class="text-xs text-slate-400 mt-1">支持拖入 game_data.sav 文件或包含它的目录</div>
+      </div>
+    </div>
     <header class="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-slate-800 shrink-0">
       <div class="flex items-center space-x-2 text-sm font-semibold tracking-wide">
         <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></span>
@@ -11,6 +22,9 @@
           <span class="w-2 h-2 rounded-full inline-block" :class="syncDot"></span>
           <span>{{ syncText }}</span>
         </div>
+        <button class="text-slate-400 hover:text-white transition flex items-center gap-1" @click="openSave">
+          <span>📁</span><span>打开存档</span>
+        </button>
         <button class="text-slate-400 hover:text-white transition" @click="showSettings = true">⚙ 设置</button>
         <button class="text-slate-400 hover:text-white transition" @click="openMap">🌐 地图</button>
         <button class="text-slate-400 hover:text-white transition" @click="showAbout = true">ℹ 关于</button>
@@ -50,17 +64,23 @@
           </button>
         </section>
         <section class="col-span-12 md:col-span-5 bg-gradient-to-r from-emerald-950/30 to-[#161b22] border border-emerald-500/30 rounded-md p-3">
-          <div class="flex items-center gap-1.5">
-            <div class="relative group">
-              <span class="text-slate-500 cursor-help text-xs select-none leading-none">?</span>
-              <div class="absolute left-0 top-full mt-1 hidden group-hover:block w-60 p-2 bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-300 z-30 shadow-xl">
-                主档自动识别：Ryujinx 取游玩时间最长的槽，Cemu 取最近修改的槽。游戏内保存后约 2 秒自动刷新。
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <div class="relative group">
+                <span class="text-slate-500 cursor-help text-xs select-none leading-none">?</span>
+                <div class="absolute left-0 top-full mt-1 hidden group-hover:block w-64 p-2 bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-300 z-30 shadow-xl">
+                  主档自动识别：Ryujinx 取游玩时间最长的槽，Cemu 取最近修改的槽。游戏内保存后约 2 秒自动刷新。支持直接拖入 .sav 文件即时生效。
+                </div>
               </div>
+              <div class="text-[11px] text-emerald-400 font-medium">存档信息</div>
+              <span v-if="saveSourceTag" class="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 border border-slate-700 text-sky-400 font-mono">{{ saveSourceTag }}</span>
             </div>
-            <div class="text-[11px] text-emerald-400 font-medium">存档信息</div>
-            <div v-if="progressData.save" class="text-[10px] text-slate-500 font-mono truncate ml-1" :title="progressData.save">{{ saveBasename }}</div>
+            <button v-if="progressData.save" class="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800/80 hover:bg-slate-700 transition" @click="openSave">
+              定位文件
+            </button>
           </div>
           <div class="text-xs text-slate-300 mt-1">{{ emuLabel }}<span v-if="emuVer"> · v{{ emuVer }}</span> · {{ gameDisplayName }}<span v-if="gameVerLabel"> {{ gameVerLabel }}</span></div>
+          <div v-if="progressData.save" class="text-[10px] text-slate-500 font-mono truncate mt-0.5" :title="progressData.save">{{ progressData.save }}</div>
           <div v-if="progressData.counts" class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 font-mono">
             <div class="text-[12px] text-slate-400">{{ gameLabels.shrine }} <span class="text-white font-bold">{{ progressData.counts.shrine[0] }}<span class="text-slate-500">/{{ progressData.counts.shrine[1] }}</span></span></div>
             <div class="text-[12px] text-slate-400">{{ gameLabels.tower }} <span class="text-white font-bold">{{ progressData.counts.tower[0] }}<span class="text-slate-500">/{{ progressData.counts.tower[1] }}</span></span></div>
@@ -101,6 +121,8 @@
             <button class="hover:text-slate-200" @click="clearLogs">清屏</button>
             <button class="hover:text-slate-200" @click="exportDiag">导出诊断包</button>
             <button class="hover:text-slate-200" @click="openLogDir">打开目录</button>
+            <button class="hover:text-blue-300 text-blue-400 font-medium" @click="showManualCalib = true">手工校准</button>
+            <button class="hover:text-slate-200" @click="doRescan">重新扫描</button>
           </div>
         </div>
         <div ref="logBox" class="flex-1 overflow-y-auto space-y-0.5 leading-relaxed text-slate-400 min-h-0 select-text">
@@ -112,31 +134,52 @@
       </section>
     </main>
     <div v-if="showSettings" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showSettings = false">
-      <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-96">
-        <div class="text-sm font-bold text-white mb-4">设置</div>
-        <div class="space-y-3 text-xs">
+      <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-[460px] max-w-[95vw] shadow-2xl">
+        <div class="text-sm font-bold text-white mb-3 flex items-center justify-between">
+          <span>设置与存档管理</span>
+          <button class="text-slate-500 hover:text-white text-xs" @click="showSettings = false">✕</button>
+        </div>
+
+        <!-- 当前生效存档状态卡片 -->
+        <div class="bg-[#0d1117] border border-slate-800 rounded p-2.5 mb-3">
+          <div class="text-[11px] text-slate-400 font-semibold mb-1 flex items-center justify-between">
+            <span>当前生效存档</span>
+            <span v-if="saveSourceTag" class="text-[10px] text-sky-400 px-1.5 py-0.2 bg-slate-800 rounded border border-slate-700 font-mono">{{ saveSourceTag }}</span>
+          </div>
+          <div class="text-[11px] text-slate-300 font-mono break-all select-text leading-relaxed">
+            {{ progressData.save || '未检测到（未启动或未找到存档）' }}
+          </div>
+          <div class="flex items-center gap-2 mt-2.5 flex-wrap">
+            <button @click="chooseSaveFile" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 rounded text-xs transition">选择存档文件</button>
+            <button @click="chooseSaveDir" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded text-xs transition">选择存档目录</button>
+            <button @click="openSave" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded text-xs transition" v-if="progressData.save">定位文件</button>
+            <button @click="resetSave" class="bg-amber-600/80 hover:bg-amber-600 text-white px-2.5 py-1 rounded text-xs ml-auto transition">恢复自动探测</button>
+          </div>
+        </div>
+
+        <div class="space-y-3 text-xs max-h-[45vh] overflow-y-auto pr-1">
           <div>
             <label class="block text-slate-400 mb-1">Cemu 的 BOTW 存档路径（留空自动探测）：</label>
             <div class="flex gap-1">
-              <input v-model="paths.cemuSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
+              <input v-model="paths.cemuSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none text-xs" />
               <button @click="pickCemuSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
             </div>
           </div>
           <div>
             <label class="block text-slate-400 mb-1">Ryujinx 的 BOTW 存档路径（留空自动探测）：</label>
             <div class="flex gap-1">
-              <input v-model="paths.ryujinxSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
+              <input v-model="paths.ryujinxSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none text-xs" />
               <button @click="pickRyujinxSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
             </div>
           </div>
           <div>
             <label class="block text-slate-400 mb-1">Eden 的 BOTW 存档路径（留空自动探测）：</label>
             <div class="flex gap-1">
-              <input v-model="paths.edenSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none" />
+              <input v-model="paths.edenSave" placeholder="自动探测" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white focus:border-blue-500 focus:outline-none text-xs" />
               <button @click="pickEdenSave" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">浏览</button>
             </div>
           </div>
-          <div class="text-slate-500">只读该平台存档做进度同步与定位锚点，填错了换个正确的即可。</div>
+          <div class="text-slate-500 text-[11px]">支持直接将 game_data.sav 拖拽入主窗口即时生效。</div>
           <div>
             <label class="flex items-center gap-2 cursor-pointer select-none py-1">
               <input v-model="paths.tls" type="checkbox" class="accent-blue-600 w-3.5 h-3.5" />
@@ -145,8 +188,9 @@
             <div class="text-[10px] text-slate-600 mt-0.5">手机镜像页走 HTTPS，防息屏用系统 Wake Lock 而非视频保亮。首次使用需先运行 certs/gen-cert.ps1 生成证书并在手机安装 rootCA.pem（certs/README.md），装一次长期有效；下次启动定位生效。</div>
           </div>
         </div>
-        <div class="flex justify-end mt-4">
-          <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white" @click="saveSettings">保存</button>
+        <div class="flex justify-end gap-2 mt-4 pt-2 border-t border-slate-800">
+          <button class="bg-slate-700 hover:bg-slate-600 px-4 py-1.5 rounded text-xs text-slate-200" @click="showSettings = false">取消</button>
+          <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white" @click="saveSettings">保存配置</button>
         </div>
       </div>
     </div>
@@ -160,6 +204,40 @@
         </div>
       </div>
     </div>
+    <!-- 手工校准弹窗 -->
+    <div v-if="showManualCalib" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showManualCalib = false">
+      <div class="bg-[#161b22] border border-blue-500/40 rounded-lg p-5 w-96 shadow-2xl">
+        <div class="text-sm font-bold text-white mb-2 flex items-center justify-between">
+          <span>手工坐标校准（快速找人）</span>
+          <span class="text-[11px] text-blue-400 font-normal">BOTW 仅需 XZ</span>
+        </div>
+        <div class="text-xs text-slate-400 mb-3 leading-relaxed">
+          若长时间未存档或自动定位偏差，建议在游戏里<span class="text-white">传送到神庙或高塔</span>，输入该地标大概坐标（或点下方快捷预设）定向秒搜：
+        </div>
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <label class="block text-slate-400 text-[11px] mb-1">X 坐标：</label>
+            <input v-model="calibX" type="number" step="0.1" placeholder="例如 -215.0" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-xs focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block text-slate-400 text-[11px] mb-1">Z 坐标：</label>
+            <input v-model="calibZ" type="number" step="0.1" placeholder="例如 250.0" class="w-full bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-xs focus:border-blue-500 focus:outline-none" />
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 flex-wrap mb-4 text-[11px]">
+          <span class="text-slate-500">快捷预设:</span>
+          <button @click="fillPreset(-215, 250)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">平原之塔</button>
+          <button @click="fillPreset(-1071, 1913)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">复苏神庙</button>
+          <button @click="fillPreset(3435, 1968)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">哈特诺塔</button>
+          <button @click="fillPreset(3780, 2111)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">哈特诺所</button>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs text-slate-300" @click="showManualCalib = false">取消</button>
+          <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white font-medium" @click="submitManualCalib">以此坐标定向找人</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="showAbout" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" @click.self="showAbout = false">
       <div class="bg-[#161b22] border border-slate-700 rounded-lg p-5 w-96 text-xs space-y-2">
         <div class="text-sm font-bold text-white mb-2">关于 xnavi</div>
@@ -187,6 +265,31 @@ const syncDot = ref('bg-slate-600')
 const syncClass = computed(() => coreRunning.value ? 'text-emerald-400' : 'text-slate-500')
 const showSettings = ref(false)
 const showAbout = ref(false)
+const showManualCalib = ref(false)
+const calibX = ref('')
+const calibZ = ref('')
+
+function fillPreset(x, z) {
+  calibX.value = String(x)
+  calibZ.value = String(z)
+}
+
+async function submitManualCalib() {
+  const x = Number(calibX.value)
+  const z = Number(calibZ.value)
+  if (isNaN(x) || isNaN(z)) {
+    alert('请输入合法的 X 与 Z 数值')
+    return
+  }
+  showManualCalib.value = false
+  const msg = await api.ManualCalibrate(x, z)
+  alert(msg || '已提交手工校准定向找人')
+}
+
+async function doRescan() {
+  const msg = await api.Rescan()
+  alert(msg || '已发送重新扫描请求')
+}
 const updateInfo = ref(null)
 let isInitLog = true
 const paths = reactive({ cemuSave: '', ryujinxSave: '', edenSave: '', tls: false })
@@ -300,6 +403,66 @@ function pushLogs(lines) {
     for (const it of items) { parseState(it.text) }
   }
 }
+const isDragging = ref(false)
+const saveSourceTag = computed(() => {
+  return progressData.value?.saveSource || ''
+})
+
+async function openSave() {
+  const msg = await api.OpenSaveDir()
+  if (msg && !msg.includes('已在资源管理器')) {
+    alert(msg)
+  }
+}
+
+async function chooseSaveFile() {
+  const f = await api.PickSaveFile()
+  if (f) {
+    await applySave(f)
+  }
+}
+
+async function chooseSaveDir() {
+  const d = await api.PickDir("选择 BOTW 存档所在目录")
+  if (d) {
+    await applySave(d)
+  }
+}
+
+async function applySave(p) {
+  const msg = await api.ApplySavePath(p)
+  alert(msg)
+  await reloadConfig()
+}
+
+async function resetSave() {
+  const msg = await api.ResetSaveDetection()
+  alert(msg)
+  await reloadConfig()
+}
+
+async function reloadConfig() {
+  const cfg = await api.LoadConfig()
+  paths.cemuSave = cfg.cemuSaveDir || ''
+  paths.ryujinxSave = cfg.ryujinxSaveDir || ''
+  paths.edenSave = cfg.edenSaveDir || ''
+  const det = await api.EnvDetect()
+  envDetect.cemu = det.cemu
+  envDetect.ryujinx = det.ryujinx
+  envDetect.eden = det.eden
+}
+
+async function onDrop(e) {
+  isDragging.value = false
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0]
+    const p = file.path || file.name
+    if (p) {
+      await applySave(p)
+    }
+  }
+}
+
 async function pickCemuSave() { const d = await api.PickDir("选择 Cemu 的 BOTW 存档目录"); if (d) paths.cemuSave = d }
 async function pickRyujinxSave() { const d = await api.PickDir("选择 Ryujinx 的 BOTW 存档目录"); if (d) paths.ryujinxSave = d }
 async function pickEdenSave() { const d = await api.PickDir("选择 Eden 的 BOTW 存档目录"); if (d) paths.edenSave = d }
@@ -370,6 +533,14 @@ onMounted(async () => {
   envDetect.cemu = det.cemu
   envDetect.ryujinx = det.ryujinx
   envDetect.eden = det.eden
+  if (rt.OnFileDrop) {
+    rt.OnFileDrop(async (x, y, droppedPaths) => {
+      isDragging.value = false
+      if (droppedPaths && droppedPaths.length > 0) {
+        await applySave(droppedPaths[0])
+      }
+    })
+  }
   const initial = await api.TailLog()
   pushLogs(initial)
   isInitLog = false
@@ -379,6 +550,14 @@ onMounted(async () => {
     coreRunning.value = st.running
     if (st.progress && st.progress.counts) {
       progressData.value = st.progress
+    }
+    if (st.save) {
+      if (!progressData.value) progressData.value = {}
+      progressData.value.save = st.save
+    }
+    if (st.saveSource) {
+      if (!progressData.value) progressData.value = {}
+      progressData.value.saveSource = st.saveSource
     }
     if (st.emuVer !== undefined) emuVer.value = st.emuVer || ''
     if (st.game) detectedGame.value = st.game

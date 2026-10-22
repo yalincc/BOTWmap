@@ -228,6 +228,19 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case "/rescan":
 		if r.Method == http.MethodGet {
+			q := r.URL.Query()
+			xs, zs := q.Get("x"), q.Get("z")
+			if xs != "" && zs != "" {
+				var x, z float64
+				if _, err1 := fmt.Sscanf(xs, "%f", &x); err1 == nil {
+					if _, err2 := fmt.Sscanf(zs, "%f", &z); err2 == nil {
+						requestRescanWithTarget(float32(x), float32(z))
+						fmt.Printf("  [server] /rescan manual target: (%.1f, %.1f)\n", x, z)
+						writeJSON(w, map[string]any{"started": true, "manual": true, "x": x, "z": z})
+						return
+					}
+				}
+			}
 			requestRescan() // 只发信号，状态机下一个 tick 处理
 			writeJSON(w, map[string]any{"started": true})
 		} else {
@@ -235,8 +248,111 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	case "/progress":
 		s.handleProgress(w, r)
+	case "/save":
+		s.handleSaveDownload(w, r)
+	case "/open-save":
+		s.handleOpenSave(w, r)
+	case "/save-override":
+		if r.Method == http.MethodPost {
+			s.handleSaveOverride(w, r)
+		} else {
+			writeJSON(w, map[string]any{"ok": false})
+		}
 	default:
 		writeJSON(w, map[string]any{"ok": false, "error": "unknown endpoint"})
+	}
+}
+
+// handleSaveDownload 将当前生效的 game_data.sav 二进制数据直传给前端进行全量探索度同步。
+func (s *server) handleSaveDownload(w http.ResponseWriter, r *http.Request) {
+	corsHeaders(w)
+	if r.Method == http.MethodOptions {
+		return
+	}
+	savePath := currentSavePath()
+	if savePath == "" {
+		http.Error(w, "no active save found", http.StatusNotFound)
+		return
+	}
+	data, err := os.ReadFile(savePath)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"game_data.sav\"")
+	w.Header().Set("X-Save-Path", savePath)
+	w.Write(data)
+}
+
+func (s *server) handleOpenSave(w http.ResponseWriter, r *http.Request) {
+	savePath := currentSavePath()
+	if savePath == "" {
+		writeJSON(w, map[string]any{"ok": false, "error": "暂无生效的存档"})
+		return
+	}
+	err := openSaveLocation(savePath)
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "path": savePath})
+}
+
+func (s *server) handleSaveOverride(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Path  string `json:"path"`
+		Clear bool   `json:"clear"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	if req.Clear || req.Path == "" {
+		setCemuSaveDirOverride("")
+		setRyujinxSaveDirOverride("")
+		setEdenSaveDirOverride("")
+		if progress != nil {
+			progress.refresh()
+		}
+		fmt.Println("  [server] /save-override: restored auto detection")
+		writeJSON(w, map[string]any{"ok": true, "cleared": true})
+		return
+	}
+	p := currentPlatform()
+	platName := ""
+	if p != nil {
+		platName = p.Name()
+	}
+	applySaveOverride(platName, req.Path)
+	if progress != nil {
+		progress.refresh()
+	}
+	fmt.Printf("  [server] /save-override: applied %s\n", req.Path)
+	writeJSON(w, map[string]any{"ok": true, "path": req.Path})
+}
+
+func applySaveOverride(platName, path string) {
+	switch platName {
+	case "Cemu":
+		setCemuSaveDirOverride(path)
+	case "Ryujinx":
+		setRyujinxSaveDirOverride(path)
+	case "Eden":
+		setEdenSaveDirOverride(path)
+	default:
+		lower := strings.ToLower(path)
+		if strings.Contains(lower, "00050000") || strings.Contains(lower, "cemu") {
+			setCemuSaveDirOverride(path)
+		} else if strings.Contains(lower, "bis") || strings.Contains(lower, "ryujinx") {
+			setRyujinxSaveDirOverride(path)
+		} else if strings.Contains(lower, "nand") || strings.Contains(lower, "eden") || strings.Contains(lower, "yuzu") {
+			setEdenSaveDirOverride(path)
+		} else {
+			setCemuSaveDirOverride(path)
+			setRyujinxSaveDirOverride(path)
+			setEdenSaveDirOverride(path)
+		}
 	}
 }
 
@@ -266,6 +382,10 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 	if progress != nil {
 		_, _, gen := progressFor().snapshot()
 		payload["progressGen"] = gen
+		if pok, psum := progressSummarize(); pok {
+			payload["save"] = psum["save"]
+			payload["saveSource"] = psum["saveSource"]
+		}
 	}
 	payload["lanUrl"] = lanURL
 	writeJSON(w, payload)

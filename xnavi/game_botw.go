@@ -216,20 +216,18 @@ func (g *gameBotw) ValidRaw(mem []float32, littleEndian bool) bool {
 // KnownOffsets BOTW 已知固定偏移（相对锚块基址），按平台：
 //   - Cemu: 0x1055300C（社区公开针位 koko-yl/BotWRamWatch，Cemu 2.6 + JP v208 实测有效）
 //           备用 0xC1F8BF4（navicemu 多块固定偏移试读的备选）
-//   - Ryujinx: 0xA77FCBBC（5 次重启样本验证，player = block_base + 偏移恒成立）
-//   - Eden: 空（无固定偏移——金手指链 0x02D1EA00 在 Eden 确认不可用，
-//     定位走 platform_eden.go 锚点窗口扫描 + 绝对地址缓存，见开发计划阶段 0）
+//   - Ryujinx / Eden: 空（统一走动力学根地址动态扫描锁定架构，不再使用外观槽固定偏移）
 func (g *gameBotw) KnownOffsets(p Platform) []uintptr {
 	if p == nil {
-		return []uintptr{0xA77FCBBC}
+		return nil
 	}
 	switch p.Name() {
 	case "Cemu":
 		return []uintptr{0x1055300C, 0xC1F8BF4}
-	case "Eden":
+	case "Eden", "Ryujinx":
 		return nil
 	default:
-		return []uintptr{0xA77FCBBC}
+		return nil
 	}
 }
 
@@ -446,40 +444,3 @@ func (g *gameBotw) SaveFileNames() []string { return []string{"game_data.sav"} }
 // currentGame 当前生效的游戏（main 解析 --game 后设置；默认 BOTW）。
 var currentGame Game = &gameBotw{}
 
-// gameIsMountState 检查原始 12 字节是否满足 BOTW 骑乘（马/大师摩托车）特征标志。
-// 实测数据（Ryujinx 实机真机验证）：
-// 林克上马/上摩托后，Transform 槽前 8 字节复用为标志位：X=0.0, Y=0x00000001 (IsRiding=1)，
-// 只有 Z 轴保留合法游戏世界坐标（与坐骑真实 Z 轴差值 < 1.0m）。
-func gameIsMountState(raw []byte, littleEndian bool) (bool, float32) {
-	if len(raw) < 12 {
-		return false, 0
-	}
-	var u0, u1, u2 uint32
-	if littleEndian {
-		u0 = uint32(raw[0]) | uint32(raw[1])<<8 | uint32(raw[2])<<16 | uint32(raw[3])<<24
-		u1 = uint32(raw[4]) | uint32(raw[5])<<8 | uint32(raw[6])<<16 | uint32(raw[7])<<24
-		u2 = uint32(raw[8]) | uint32(raw[9])<<8 | uint32(raw[10])<<16 | uint32(raw[11])<<24
-	} else {
-		u0 = uint32(raw[0])<<24 | uint32(raw[1])<<16 | uint32(raw[2])<<8 | uint32(raw[3])
-		u1 = uint32(raw[4])<<24 | uint32(raw[5])<<16 | uint32(raw[6])<<8 | uint32(raw[7])
-		u2 = uint32(raw[8])<<24 | uint32(raw[9])<<16 | uint32(raw[10])<<8 | uint32(raw[11])
-	}
-	// X 为 0 且 Y 为 1（IsRiding 标志）
-	if u0 == 0 && u1 == 1 {
-		z := math.Float32frombits(u2)
-		if math.Abs(float64(z)) > 10.0 && z > gameMinZ && z < gameMaxZ && !math.IsNaN(float64(z)) {
-			return true, z
-		}
-		return true, 0 // 骑乘标志有效，但 Z 轴未更新或为 0
-	}
-	return false, 0
-}
-
-func checkMountState(h uintptr, addr uintptr) (bool, float32) {
-	plat := currentPlatform()
-	if plat == nil {
-		return false, 0
-	}
-	raw := readMem(h, addr, 12)
-	return gameIsMountState(raw, plat.LittleEndian())
-}

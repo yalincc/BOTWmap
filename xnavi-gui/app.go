@@ -23,7 +23,7 @@ import (
 // guiVersion 导航程序版本（三合一统一版本 v3.0.0，2026-10-07 拍板：
 // GUI 壳与导航核心 xnavi 共享同一版本号，不再各自解耦）。
 // 注意：必须与 xnavi/version.go 的 CoreVersion 保持一致。
-const guiVersion = "v3.1.2"
+const guiVersion = "v3.2.0"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -151,6 +151,128 @@ func (a *App) PickDir(title string) string {
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
 	if err != nil { return "" }
 	return dir
+}
+
+// PickSaveFile 通过文件选择对话框挑选 game_data.sav 或任意 .sav 存档文件。
+func (a *App) PickSaveFile() string {
+	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择 BOTW 存档文件 (game_data.sav)",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "BOTW 存档文件 (*.sav)", Pattern: "*.sav;game_data.sav"},
+			{DisplayName: "所有文件 (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil || file == "" {
+		return ""
+	}
+	return file
+}
+
+// OpenSaveDir 在资源管理器中直接高亮当前正在生效的存档文件；若文件不存在则打开目录。
+func (a *App) OpenSaveDir() string {
+	st := a.CoreStatus()
+	savePath := ""
+	if prog, ok := st["progress"].(map[string]any); ok {
+		if s, ok := prog["save"].(string); ok {
+			savePath = s
+		}
+	}
+	if savePath == "" {
+		if s, ok := st["save"].(string); ok {
+			savePath = s
+		}
+	}
+	if savePath == "" && a.cfg != nil {
+		for _, d := range []string{a.cfg.CemuSaveDir, a.cfg.RyujinxSaveDir, a.cfg.EdenSaveDir} {
+			if d != "" && pathExists(d) {
+				savePath = d
+				break
+			}
+		}
+	}
+	if savePath == "" {
+		return "暂无正在生效的存档路径"
+	}
+	if err := openSaveLocation(savePath); err != nil {
+		return "打开失败: " + err.Error()
+	}
+	return "已在资源管理器中定位存档"
+}
+
+// ApplySavePath 手动指定存档路径（支持 .sav 文件或目录），即时生效并持久化。
+func (a *App) ApplySavePath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return a.ResetSaveDetection()
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "路径不存在: " + path
+	}
+	cleanPath := filepath.Clean(path)
+	if !fi.IsDir() {
+		base := strings.ToLower(filepath.Base(cleanPath))
+		if !strings.HasSuffix(base, ".sav") {
+			return "请选择以 .sav 结尾的存档文件（如 game_data.sav）"
+		}
+	}
+
+	if a.cfg == nil {
+		a.cfg = a.loadConfig()
+	}
+
+	lower := strings.ToLower(cleanPath)
+	emu := a.cfg.Emulator
+	if emu == "cemu" || strings.Contains(lower, "00050000") || strings.Contains(lower, "cemu") {
+		a.cfg.CemuSaveDir = cleanPath
+	} else if emu == "ryujinx" || strings.Contains(lower, "bis") || strings.Contains(lower, "ryujinx") {
+		a.cfg.RyujinxSaveDir = cleanPath
+	} else if emu == "eden" || strings.Contains(lower, "nand") || strings.Contains(lower, "eden") || strings.Contains(lower, "yuzu") {
+		a.cfg.EdenSaveDir = cleanPath
+	} else {
+		a.cfg.CemuSaveDir = cleanPath
+		a.cfg.RyujinxSaveDir = cleanPath
+		a.cfg.EdenSaveDir = cleanPath
+	}
+	a.SaveConfig(*a.cfg)
+
+	// 若 core 正在运行，通过 HTTP /save-override 实时通知生效
+	if a.CoreRunning() {
+		body, _ := json.Marshal(map[string]any{"path": cleanPath})
+		req, err := http.NewRequest("POST", "http://127.0.0.1:8766/save-override", strings.NewReader(string(body)))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+			client := http.Client{Timeout: 1 * time.Second}
+			if resp, err := client.Do(req); err == nil {
+				resp.Body.Close()
+			}
+		}
+	}
+	return "已载入存档: " + cleanPath
+}
+
+// ResetSaveDetection 清除手动指定存档路径，恢复全自动探测。
+func (a *App) ResetSaveDetection() string {
+	if a.cfg == nil {
+		a.cfg = a.loadConfig()
+	}
+	a.cfg.CemuSaveDir = ""
+	a.cfg.RyujinxSaveDir = ""
+	a.cfg.EdenSaveDir = ""
+	a.SaveConfig(*a.cfg)
+
+	if a.CoreRunning() {
+		body, _ := json.Marshal(map[string]any{"clear": true})
+		req, err := http.NewRequest("POST", "http://127.0.0.1:8766/save-override", strings.NewReader(string(body)))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+			client := http.Client{Timeout: 1 * time.Second}
+			if resp, err := client.Do(req); err == nil {
+				resp.Body.Close()
+			}
+		}
+	}
+	return "已恢复自动探测"
 }
 
 func (a *App) onShutdown(ctx context.Context) {
@@ -388,6 +510,26 @@ func (a *App) OpenLogDir() string {
 	return "已打开日志目录"
 }
 
+// ManualCalibrate 手工坐标校准（向核心发送 /rescan?x=...&z=...）
+func (a *App) ManualCalibrate(x, z float64) string {
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:8766/rescan?x=%.1f&z=%.1f", x, z))
+	if err != nil {
+		return "发送校准请求失败（核心可能未启动）"
+	}
+	defer resp.Body.Close()
+	return fmt.Sprintf("已发送手工校准坐标 (%.1f, %.1f)，开启定向快速找人", x, z)
+}
+
+// Rescan 触发一次全局重新扫描
+func (a *App) Rescan() string {
+	resp, err := http.Get("http://127.0.0.1:8766/rescan")
+	if err != nil {
+		return "发送重扫请求失败"
+	}
+	defer resp.Body.Close()
+	return "已发送重扫请求"
+}
+
 // hostname returns machine name (best effort).
 func hostname() string {
 	h, err := os.Hostname()
@@ -488,4 +630,23 @@ func (a *App) EnvDetect() map[string]any {
 func pathExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+func openSaveLocation(savePath string) error {
+	if savePath == "" {
+		return fmt.Errorf("无有效存档路径")
+	}
+	savePath = filepath.Clean(savePath)
+	fi, err := os.Stat(savePath)
+	if err == nil {
+		if !fi.IsDir() {
+			return exec.Command("explorer.exe", "/select,", savePath).Start()
+		}
+		return exec.Command("explorer.exe", savePath).Start()
+	}
+	dir := filepath.Dir(savePath)
+	if _, err := os.Stat(dir); err == nil {
+		return exec.Command("explorer.exe", dir).Start()
+	}
+	return fmt.Errorf("路径不存在: %s", savePath)
 }

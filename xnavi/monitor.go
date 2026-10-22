@@ -149,6 +149,12 @@ func statusLoop() {
 		if progress != nil {
 			if pok, psum := progressSummarize(); pok {
 				obj["progress"] = psum
+				if s, ok := psum["save"]; ok {
+					obj["save"] = s
+				}
+				if src, ok := psum["saveSource"]; ok {
+					obj["saveSource"] = src
+				}
 			}
 		}
 		buf, err := json.MarshalIndent(obj, "", " ")

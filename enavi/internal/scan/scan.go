@@ -97,6 +97,13 @@ func (v Vec3) WorldCoordOK() bool {
 	if (v.X == 0 || v.Z == 0) && math.Abs(dy-1.0) < 0.01 {
 		return false
 	}
+	// ④ 排除 (0, 0, Z) 或 (X, 0, 0) 等退化标志位向量（如骑乘/盾滑时外观槽被置为 (0, 0, Z)）
+	if (v.X == 0 || math.Abs(dx) < 0.001) && math.Abs(dy) < 0.001 {
+		return false
+	}
+	if (v.Z == 0 || math.Abs(dz) < 0.001) && math.Abs(dy) < 0.001 {
+		return false
+	}
 	return true
 }
 

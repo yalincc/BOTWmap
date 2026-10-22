@@ -37,17 +37,18 @@ type ProgressPoint struct {
 }
 
 type progressWatcher struct {
-	mu       sync.RWMutex
-	ok       bool
-	refs     []ProgressPoint
-	body     []byte
-	gen      string
-	save     string
-	modT     time.Time
-	init     bool
-	counts   map[string][2]int
-	playtime uint32
-	koroks   uint32
+	mu         sync.RWMutex
+	ok         bool
+	refs       []ProgressPoint
+	body       []byte
+	gen        string
+	save       string
+	saveSource string
+	modT       time.Time
+	init       bool
+	counts     map[string][2]int
+	playtime   uint32
+	koroks     uint32
 }
 
 var progress *progressWatcher
@@ -222,6 +223,7 @@ func (w *progressWatcher) refresh() {
 	w.body = buf
 	w.gen = gen
 	w.save = primary.Path
+	w.saveSource = saveSourceTag(plat, primary.Path)
 	w.counts = counts
 	w.playtime = primary.Playtime
 	w.koroks = primary.Koroks
@@ -323,6 +325,25 @@ func (w *progressWatcher) snapshot() (bool, []byte, string) {
 	return w.ok, w.body, w.gen
 }
 
+// currentSavePath 返回当前正在生效的存档文件绝对路径。
+func currentSavePath() string {
+	if progress != nil {
+		progress.mu.RLock()
+		s := progress.save
+		progress.mu.RUnlock()
+		if s != "" {
+			return s
+		}
+	}
+	// 兜底：若 progress watcher 尚未运行，直接从当前平台探测
+	if plat := currentPlatform(); plat != nil && currentGame != nil {
+		if anchors := currentGame.SaveAnchors(plat); len(anchors) > 0 {
+			return anchors[0].Path
+		}
+	}
+	return ""
+}
+
 // summarize 返回给 GUI 状态面板用的轻量摘要（不含 points 全表）。
 func (w *progressWatcher) summarize() (bool, map[string]any) {
 	w.mu.RLock()
@@ -335,9 +356,10 @@ func (w *progressWatcher) summarize() (bool, map[string]any) {
 		c[k] = v
 	}
 	return true, map[string]any{
-		"save":     w.save,
-		"playtime": w.playtime,
-		"koroks":   w.koroks,
-		"counts":   c,
+		"save":       w.save,
+		"saveSource": w.saveSource,
+		"playtime":   w.playtime,
+		"koroks":     w.koroks,
+		"counts":     c,
 	}
 }

@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"math"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -369,5 +371,149 @@ func TestProgress(t *testing.T) {
 		if c[0] > c[1] {
 			t.Errorf("done[%s] %d > total %d", k, c[0], c[1])
 		}
+	}
+}
+
+func TestWorldCoordOKAndRunLength(t *testing.T) {
+	// 1. 合法坐标
+	if !WorldCoordOK(1794.6, 220.3, 1046.1) {
+		t.Fatal("expected valid world coord")
+	}
+	// 2. 轴退化坐标（参数表特征：X≈0 / alt≈1）必须被拒绝
+	if WorldCoordOK(0.0, 1.0, 1500.0) {
+		t.Fatal("axis degenerate coord (X=0, alt=1) should be rejected")
+	}
+	// 2b. (0, 0, Z) 或 (X, 0, 0) 退化标志位向量（骑乘/盾滑槽特征）必须被拒绝
+	if WorldCoordOK(0.0, 0.0, 1500.0) {
+		t.Fatal("(0, 0, Z) coord should be rejected")
+	}
+	if WorldCoordOK(1500.0, 0.0, 0.0) {
+		t.Fatal("(X, 0, 0) coord should be rejected")
+	}
+	if WorldCoordOK(0.0, 1e-40, 1500.0) {
+		t.Fatal("(0, subnormal, Z) coord should be rejected")
+	}
+	// 3. 原点噪声退化必须被拒绝
+	if WorldCoordOK(0.1, 0.2, 0.1) {
+		t.Fatal("near-origin noise coord should be rejected")
+	}
+	// 4. NaN / 越界必须被拒绝
+	if WorldCoordOK(float32(math.NaN()), 100, 100) {
+		t.Fatal("NaN coord should be rejected")
+	}
+	if WorldCoordOK(8000.0, 100, 100) {
+		t.Fatal("out of bounds coord should be rejected")
+	}
+
+	// 5. RunLength 门禁自测：构造两个连续 0x40 的记录
+	buf := make([]byte, 256)
+	putRec := func(off int, x, y, z float32, qx, qy, qz, qw float32) {
+		binary.LittleEndian.PutUint32(buf[off:], math.Float32bits(x))
+		binary.LittleEndian.PutUint32(buf[off+4:], math.Float32bits(y))
+		binary.LittleEndian.PutUint32(buf[off+8:], math.Float32bits(z))
+		binary.LittleEndian.PutUint32(buf[off+12:], math.Float32bits(qx))
+		binary.LittleEndian.PutUint32(buf[off+16:], math.Float32bits(qy))
+		binary.LittleEndian.PutUint32(buf[off+20:], math.Float32bits(qz))
+		binary.LittleEndian.PutUint32(buf[off+24:], math.Float32bits(qw))
+	}
+	// 写入记录 0 与记录 1（相隔 0x40 = 64 字节）
+	putRec(0, 100.0, 200.0, 300.0, 0, 0, 0, 1.0)
+	putRec(64, 100.5, 200.0, 300.5, 0, 0, 0, 1.0)
+
+	run := RunLength(buf, 0)
+	if run < 2 {
+		t.Fatalf("expected RunLength >= 2, got %d", run)
+	}
+}
+
+func TestProcessAnchoredSaveResolution(t *testing.T) {
+	// 1. parseCemuMlcPath 测试
+	tmpDir := t.TempDir()
+	xmlPath := filepath.Join(tmpDir, "settings.xml")
+	xmlContent := `<?xml version="1.0" encoding="UTF-8"?>
+<content>
+    <mlc_path>D:\Emulators\Cemu\custom_mlc</mlc_path>
+</content>`
+	if err := os.WriteFile(xmlPath, []byte(xmlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+	mlc := parseCemuMlcPath(xmlPath)
+	if mlc != filepath.Clean(`D:\Emulators\Cemu\custom_mlc`) {
+		t.Fatalf("parseCemuMlcPath mismatch: got %q", mlc)
+	}
+
+	// 2. findSaveFiles 支持单文件直接传入
+	singleSave := filepath.Join(tmpDir, "game_data.sav")
+	if err := os.WriteFile(singleSave, makeSave(t, true), 0644); err != nil {
+		t.Fatal(err)
+	}
+	found := findSaveFiles(singleSave, []string{"game_data.sav"})
+	if len(found) != 1 || found[0] != singleSave {
+		t.Fatalf("findSaveFiles single file mismatch: got %v", found)
+	}
+
+	// 3. P0 手动覆盖优先测试
+	setCemuSaveDirOverride(tmpDir)
+	defer setCemuSaveDirOverride("")
+	cp := &cemuPlatform{}
+	roots := cp.SaveRoots()
+	if len(roots) != 1 || roots[0] != tmpDir {
+		t.Fatalf("Cemu P0 override failed: got %v", roots)
+	}
+
+	setRyujinxSaveDirOverride(tmpDir)
+	defer setRyujinxSaveDirOverride("")
+	rp := &ryujinxPlatform{}
+	rRoots := rp.SaveRoots()
+	if len(rRoots) != 1 || rRoots[0] != tmpDir {
+		t.Fatalf("Ryujinx P0 override failed: got %v", rRoots)
+	}
+
+	setEdenSaveDirOverride(tmpDir)
+	defer setEdenSaveDirOverride("")
+	ep := &edenPlatform{}
+	eRoots := ep.SaveRoots()
+	if len(eRoots) != 1 || eRoots[0] != tmpDir {
+		t.Fatalf("Eden P0 override failed: got %v", eRoots)
+	}
+
+	// 4. saveSourceTag 判定测试
+	tagOverride := saveSourceTag(cp, filepath.Join(tmpDir, "game_data.sav"))
+	if tagOverride != "手动指定" {
+		t.Fatalf("expected '手动指定', got %q", tagOverride)
+	}
+
+	setCemuSaveDirOverride("")
+	tagAppData := saveSourceTag(cp, filepath.Join(os.Getenv("APPDATA"), "Cemu", "mlc01", "usr", "save", "00050000", "game_data.sav"))
+	if tagAppData != "系统标准: AppData" {
+		t.Fatalf("expected '系统标准: AppData', got %q", tagAppData)
+	}
+}
+
+func TestSaveDownloadEndpoint(t *testing.T) {
+	tmpDir := t.TempDir()
+	saveFile := filepath.Join(tmpDir, "game_data.sav")
+	saveBytes := makeSave(t, true)
+	if err := os.WriteFile(saveFile, saveBytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	progress = &progressWatcher{save: saveFile}
+	defer func() { progress = nil }()
+
+	srv := &server{}
+	req := httptest.NewRequest("GET", "/save", nil)
+	rr := httptest.NewRecorder()
+
+	srv.handleSaveDownload(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rr.Code)
+	}
+	if ct := rr.Header().Get("Content-Type"); ct != "application/octet-stream" {
+		t.Fatalf("expected application/octet-stream, got %s", ct)
+	}
+	if len(rr.Body.Bytes()) != len(saveBytes) {
+		t.Fatalf("expected %d bytes, got %d", len(saveBytes), len(rr.Body.Bytes()))
 	}
 }

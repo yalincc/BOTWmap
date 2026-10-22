@@ -19,6 +19,7 @@ func TestIsShrineScale(t *testing.T) {
 	}{
 		{"地下神庙", scan.Vec3{X: 5, Y: 12, Z: -8}, true},
 		{"神庙深处", scan.Vec3{X: -30, Y: 2, Z: 45}, true},
+		{"DLC罗塔·奇格尔长廊神庙(Z=108.9)", scan.Vec3{X: -76.3, Y: 43.3, Z: 108.9}, true},
 		{"平原之塔（不误判）", scan.Vec3{X: -215, Y: 250, Z: 250}, false},
 		{"中央平原遗迹（不误判）", scan.Vec3{X: 120, Y: 115, Z: -200}, false},
 		{"大世界地表", scan.Vec3{X: 1662, Y: 116, Z: 1921}, false},

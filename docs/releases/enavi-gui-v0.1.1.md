@@ -49,3 +49,4 @@
 - **Git Tag**：`enavi-gui-v0.1.1`
 - **发布包**：`RELEASE/enavi-gui-v0.1.1.zip`
 - **技术手册**：`docs/spec/ENAVI-HANDBOOK.md` §10~§12
+

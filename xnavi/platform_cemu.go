@@ -20,6 +20,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type cemuPlatform struct {
@@ -109,24 +110,82 @@ func (p *cemuPlatform) LargestBlock(minMB float64) (uintptr, uintptr) {
 	return cemuLargestRWBlock(p.h)
 }
 
-// SaveRoots Cemu 存档根候选（按序探测，含便携版与常见安装目录）。
+// parseCemuMlcPath 从 Cemu 的 settings.xml 中提取 <mlc_path> 路径。
+func parseCemuMlcPath(settingsXMLPath string) string {
+	data, err := os.ReadFile(settingsXMLPath)
+	if err != nil {
+		return ""
+	}
+	s := string(data)
+	start := strings.Index(s, "<mlc_path>")
+	if start == -1 {
+		return ""
+	}
+	start += len("<mlc_path>")
+	end := strings.Index(s[start:], "</mlc_path>")
+	if end == -1 {
+		return ""
+	}
+	raw := strings.TrimSpace(s[start : start+end])
+	if raw == "" {
+		return ""
+	}
+	raw = filepath.Clean(raw)
+	if !filepath.IsAbs(raw) {
+		raw = filepath.Join(filepath.Dir(settingsXMLPath), raw)
+	}
+	return raw
+}
+
+// SaveRoots Cemu 存档根候选（按序探测，优先级：手动指定 > 进程自省 > AppData > 盘符兜底）。
 func (p *cemuPlatform) SaveRoots() []string {
+	// P0: 手动指定（最高优先级）
+	if sd := cemuSaveDirOverride; sd != "" {
+		return []string{sd}
+	}
 	var roots []string
 	add := func(pp string) {
 		if pp != "" {
-			roots = append(roots, pp)
+			roots = append(roots, filepath.Clean(pp))
 		}
 	}
 	if v := os.Getenv("CEMUNAVI_SAVE_ROOT"); v != "" {
 		add(v)
 	}
-	if sd := cemuSaveDirOverride; sd != "" {
-		// GUI 设置"Cemu 存档路径"（直接存档根，BOTW 为 mlc01/usr/save/00050000 下含 101c9300 的目录）
-		add(sd)
+
+	// P1: 进程自省（提取正在运行的 Cemu.exe 所在目录 cemuDir）
+	var cemuExe string
+	if p.h != 0 {
+		cemuExe = processExePath(p.h)
+	} else if p.pid != 0 {
+		cemuExe = processExePathByPID(p.pid)
 	}
-	if app := os.Getenv("APPDATA"); app != "" {
+	if cemuExe != "" {
+		cemuDir := filepath.Dir(cemuExe)
+		// 读取 cemuDir/settings.xml 中的 <mlc_path>
+		if mlc := parseCemuMlcPath(filepath.Join(cemuDir, "settings.xml")); mlc != "" {
+			add(filepath.Join(mlc, "usr", "save", "00050000"))
+			add(mlc)
+		}
+		// 检查便携目录 cemuDir/mlc01/usr/save/00050000
+		add(filepath.Join(cemuDir, "mlc01", "usr", "save", "00050000"))
+	}
+
+	// P2: 读取 %APPDATA%/Cemu/settings.xml 中的 <mlc_path>
+	app := os.Getenv("APPDATA")
+	if app != "" {
+		if mlc := parseCemuMlcPath(filepath.Join(app, "Cemu", "settings.xml")); mlc != "" {
+			add(filepath.Join(mlc, "usr", "save", "00050000"))
+			add(mlc)
+		}
+	}
+
+	// P3: 检查 %APPDATA%/Cemu/mlc01/usr/save/00050000
+	if app != "" {
 		add(filepath.Join(app, "Cemu", "mlc01", "usr", "save", "00050000"))
 	}
+
+	// P4: 兜底常见盘符列表
 	if exe, err := os.Executable(); err == nil {
 		add(filepath.Join(filepath.Dir(exe), "mlc01", "usr", "save", "00050000"))
 	}

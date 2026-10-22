@@ -214,13 +214,11 @@ var (
 	procQueryFullProcessImageNameW = kernel32.NewProc("QueryFullProcessImageNameW")
 )
 
-// processExePath 返回 pid 对应进程的完整 exe 路径。
-func processExePath(pid uint32) string {
-	h, err := openProcessLimited(pid)
-	if err != nil || h == 0 {
+// processExePath 返回句柄 h 对应进程的完整 exe 路径。
+func processExePath(h uintptr) string {
+	if h == 0 {
 		return ""
 	}
-	defer closeHandle(h)
 	buf := make([]uint16, 32768)
 	n := uint32(len(buf))
 	r, _, _ := procQueryFullProcessImageNameW.Call(h, 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&n)))
@@ -228,6 +226,16 @@ func processExePath(pid uint32) string {
 		return ""
 	}
 	return utf16ToString(buf[:n])
+}
+
+// processExePathByPID 返回 pid 对应进程的完整 exe 路径。
+func processExePathByPID(pid uint32) string {
+	h, err := openProcessLimited(pid)
+	if err != nil || h == 0 {
+		return ""
+	}
+	defer closeHandle(h)
+	return processExePath(h)
 }
 
 func openProcessLimited(pid uint32) (uintptr, error) {
@@ -274,5 +282,5 @@ func emulatorExeVersion() string {
 	if procPID == 0 {
 		return ""
 	}
-	return fileVersion(processExePath(procPID))
+	return fileVersion(processExePathByPID(procPID))
 }

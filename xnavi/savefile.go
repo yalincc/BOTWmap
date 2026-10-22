@@ -11,8 +11,10 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -98,8 +100,24 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 }
 
 // findSaveFiles 在根目录下递归找当前游戏存档文件（不区分大小写）。
+// 支持 root 直接指向单个 .sav 文件。
 // 文件名清单来自游戏适配层（game.SaveFileNames），BOTW 为 game_data.sav。
 func findSaveFiles(root string, names []string) []string {
+	if root == "" {
+		return nil
+	}
+	fi, err := os.Stat(root)
+	if err != nil {
+		return nil
+	}
+	if !fi.IsDir() {
+		for _, n := range names {
+			if strings.EqualFold(fi.Name(), n) {
+				return []string{root}
+			}
+		}
+		return nil
+	}
 	var out []string
 	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -118,14 +136,15 @@ func findSaveFiles(root string, names []string) []string {
 	return out
 }
 
-// allSaveFiles 遍历当前平台所有存档根候选（去重、排序）。
+// allSaveFiles 按优先级探测当前平台的存档候选根目录（首个命中优先）。
 // 平台手动路径（--<平台>-save-dir，GUI 设置）由各平台 SaveRoots 最优先返回；
-// Eden 存档根可能混入其他 Switch 游戏存档（同目录多个 title），按 BOTW 标题 ID
-// 过滤；Cemu（Wii U）/Ryujinx 存档目录本就只含 BOTW，不过滤（零影响）。
+// Eden 存档根可能混入其他 Switch 游戏存档（同目录多个 title），按 BOTW 标题 ID 过滤。
 func allSaveFiles(p Platform) []string {
 	names := currentGame.SaveFileNames()
-	var out []string
 	for _, root := range p.SaveRoots() {
+		if root == "" {
+			continue
+		}
 		files := findSaveFiles(root, names)
 		if p.Name() == "Eden" {
 			var ef []string
@@ -136,18 +155,107 @@ func allSaveFiles(p Platform) []string {
 			}
 			files = ef
 		}
-		out = append(out, files...)
-	}
-	seen := map[string]bool{}
-	var uniq []string
-	for _, f := range out {
-		if !seen[f] {
-			seen[f] = true
-			uniq = append(uniq, f)
+		if len(files) > 0 {
+			seen := map[string]bool{}
+			var uniq []string
+			for _, f := range files {
+				if !seen[f] {
+					seen[f] = true
+					uniq = append(uniq, f)
+				}
+			}
+			sort.Strings(uniq)
+			return uniq
 		}
 	}
-	sort.Strings(uniq)
-	return uniq
+	return nil
+}
+
+// saveSourceTag 根据当前平台与存档路径，识别并返回来源标签。
+func saveSourceTag(p Platform, savePath string) string {
+	if savePath == "" {
+		return ""
+	}
+	saveClean := strings.ToLower(filepath.Clean(savePath))
+
+	checkMatch := func(ov string) bool {
+		if ov == "" {
+			return false
+		}
+		ovClean := strings.ToLower(filepath.Clean(ov))
+		return strings.HasPrefix(saveClean, ovClean) || saveClean == ovClean
+	}
+
+	if checkMatch(cemuSaveDirOverride) || checkMatch(edenSaveDirOverride) || checkMatch(ryujinxSaveDirOverride) {
+		return "手动指定"
+	}
+
+	platName := ""
+	if p != nil {
+		platName = p.Name()
+	}
+
+	var procExe string
+	if p != nil {
+		if p.Handle() != 0 {
+			procExe = processExePath(p.Handle())
+		} else if p.PID() != 0 {
+			procExe = processExePathByPID(p.PID())
+		}
+	}
+	if procExe != "" {
+		exeDir := strings.ToLower(filepath.Dir(procExe))
+		switch platName {
+		case "Cemu":
+			if mlc := parseCemuMlcPath(filepath.Join(filepath.Dir(procExe), "settings.xml")); mlc != "" {
+				if strings.HasPrefix(saveClean, strings.ToLower(filepath.Clean(mlc))) {
+					return "自省命中: Cemu 便携版"
+				}
+			}
+			if strings.HasPrefix(saveClean, exeDir) {
+				return "自省命中: Cemu 便携版"
+			}
+		case "Eden":
+			parentDir := strings.ToLower(filepath.Clean(filepath.Join(filepath.Dir(procExe), "..")))
+			if strings.HasPrefix(saveClean, exeDir) || strings.HasPrefix(saveClean, parentDir) {
+				return "自省命中: Eden 便携版"
+			}
+		case "Ryujinx":
+			if strings.HasPrefix(saveClean, exeDir) {
+				return "自省命中: Ryujinx 便携版"
+			}
+		}
+	}
+
+	appdata := strings.ToLower(os.Getenv("APPDATA"))
+	if appdata != "" && strings.HasPrefix(saveClean, appdata) {
+		return "系统标准: AppData"
+	}
+	if strings.Contains(saveClean, "appdata") {
+		return "系统标准: AppData"
+	}
+
+	return "盘符扫描兜底"
+}
+
+// openSaveLocation 在资源管理器中直接高亮显示 savePath（若为文件）；若文件不存在则打开所在目录。
+func openSaveLocation(savePath string) error {
+	if savePath == "" {
+		return fmt.Errorf("无有效存档路径")
+	}
+	savePath = filepath.Clean(savePath)
+	fi, err := os.Stat(savePath)
+	if err == nil {
+		if !fi.IsDir() {
+			return exec.Command("explorer.exe", "/select,", savePath).Start()
+		}
+		return exec.Command("explorer.exe", savePath).Start()
+	}
+	dir := filepath.Dir(savePath)
+	if _, err := os.Stat(dir); err == nil {
+		return exec.Command("explorer.exe", dir).Start()
+	}
+	return fmt.Errorf("路径不存在: %s", savePath)
 }
 
 // round1 四舍五入到 1 位小数（×10 取整）。

@@ -23,6 +23,8 @@ func TestWorldCoordOK(t *testing.T) {
 		{"原点附近 负", Vec3{X: -0.0, Y: -0.0, Z: 0.0}, false},
 		{"X=Z=0 且 alt=1", Vec3{X: 0, Y: 1, Z: 0}, false},
 		{"NaN 高度", Vec3{X: 100.0, Y: float32(nan()), Z: 200.0}, false},
+		{"退化坐标 (0, 0, Z) 骑乘标志位", Vec3{X: 0.0, Y: 0.0, Z: 500.0}, false},
+		{"退化坐标 (X, 0, 0)", Vec3{X: 500.0, Y: 0.0, Z: 0.0}, false},
 		{"NaN X", Vec3{X: float32(nan()), Y: 100.0, Z: 200.0}, false},
 		{"Inf Z", Vec3{X: 100.0, Y: 100.0, Z: float32(posInf())}, false},
 		{"X 越界", Vec3{X: 8000.0, Y: 100.0, Z: 200.0}, false},
