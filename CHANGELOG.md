@@ -5,9 +5,18 @@
 > ★ **本仓库含多个程序、版本号各自独立**（在线地图 `BOTWmap` / 导航程序 `xnavi`、`navicemu`、`botwnavi-eden`），
 > 因此**每条版本标题一律带程序名**，格式固定 `## [程序名 VX.Y.Z] - YYYY-MM-DD 摘要`——网页版写 `BOTWmap`，导航程序写自己的名字，**禁止只写一个版本号**（规则见 `docs/spec/DEV-HANDBOOK.md` §3.1 命名表）。
 
-## [xnavi v3.2.1] - 2026-10-23 状态快照会话签名 · 发布包纯净与文档同步
+## [xnavi v3.2.1] - 2026-10-23 存档统计 18 项 · 状态快照会话签名 · 发布包纯净
 
-> **批次说明**：v3.2.0 交付后追问出的三处收尾问题一次收口。核心是把「启动时删除 status.json」这个掩盖症状的做法，换成「给快照签上会话身份」的根源治理；同时清掉混进发布包的运行时垃圾与一段死代码，并把文档里与实现相反的描述改正。
+> **批次说明**：v3.2.0 交付后追问出的三处收尾问题一次收口，外加 GUI 存档统计与网页面板对齐。核心两件事：把「启动时删除 status.json」这个掩盖症状的做法换成「给快照签会话身份」；把核心的存档统计从 5 项补到 18 项（全部自己读存档，不依赖网页）。
+
+### 新增：存档统计补齐 18 项（与网页探索度同口径）
+- **背景**：GUI 原本只显示 5 项（神庙/塔/克洛格/回忆/神兽），缺口 12 项一直靠网页 `/save` 管道解析。本次让核心自己补齐。
+- **18 项构成**：探索 6（神庙/塔/神兽/克洛格/照片记忆/最终回忆）+ 任务 4（主线/支线/神庙挑战/DLC）+ 收集 5（宝箱/武器/图鉴×3）+ 讨伐 3（西诺克斯/岩石巨人/莫尔德拉吉克）。
+- **数据表**：新增 `source/build_save_stats.py`，从现有网页字典派生 `xnavi/data/save_stats.json`（23KB，只含 hash 集合与分类、不含坐标，`go:embed` 内嵌）。字典由脚本生成、禁止手改，网页字典变更须重跑。
+- **讨伐免坐标**：92 条 `IsDefeat_Enemy_*` 的 flag 名自带种族（`_Giant_`/`_Golem_`/`_Sandworm_`），按前缀归族，无需点位就近匹配；生成时与 `enemy_save.js` 交叉验证 92/92 完全一致。
+- **口径**：探索/收集/讨伐 14 项网页统计面板本就「存档优先」，两边完全一致；任务 4 项网页会把手动勾选算进去，界面注明「仅统计存档数据」。
+- **验证**：用真实 Ryujinx 存档对拍，Go 实现与 Python 参考实现 **12 项逐项完全一致**（`xnavi/save_stats_test.go` 可复跑）。
+- **界面**：`LocateView.vue` 由 6 宫格扩为四组 18 项，中英双语同步。
 
 ### 修复：状态快照会话签名（根治旧坐标误开图）
 - **问题**：`status.json` 是核心每 2 秒覆盖写的运行快照，程序退出后残留在磁盘上。下次启动时，界面在核心写出首份新快照之前（最长 2 秒）会先读到上次会话的残留，其中带着旧坐标与 `verified=true`，于是地图会按旧位置自动弹出。
@@ -28,7 +37,8 @@
 - `docs/releases/xnavi-v3.2.1.md` 新增版本报告；`RELEASE/README.md` 新增发布包目录规范（必带 / 禁带清单）。
 
 ### 发布包
-- `RELEASE/xnavi-v3.2.1.zip`：`xnavi.exe`（GUI 桌面端）+ `xnavi-core.exe`（定位核心）+ `certs/` + `data/` + `README.md` + `TROUBLESHOOTING.md` + `xnavi-icon.ico`。**不含** `diagnostics/`、`status.json`、`*.log`、`xnavi-gui-config.json`、`known_botw_cemu.json`。
+- `RELEASE/xnavi-v3.2.1.zip`（7.93MB / 13 项）：`xnavi.exe`（GUI 桌面端）+ `xnavi-core.exe`（定位核心）+ `data/` + `certs/` + `README.md` + `TROUBLESHOOTING.md`。**不含** `diagnostics/`、`status.json`、`*.log`、`xnavi-gui-config.json`、`known_botw_cemu.json`、`xnavi-icon.ico`（图标已内嵌，留档交给 git）。
+- 自检：包内 exe SHA 与构建产物一致、图标 MATCH、禁带清单全无。
 
 ---
 

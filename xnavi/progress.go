@@ -47,6 +47,7 @@ type progressWatcher struct {
 	modT       time.Time
 	init       bool
 	counts     map[string][2]int
+	stats      map[string][2]int // v3.2.1：任务/收集/讨伐 12 项扩展统计（见 save_stats.go）
 	playtime   uint32
 	koroks     uint32
 }
@@ -225,6 +226,8 @@ func (w *progressWatcher) refresh() {
 	w.save = primary.Path
 	w.saveSource = saveSourceTag(plat, primary.Path)
 	w.counts = counts
+	// v3.2.1：扩展 12 项（任务 4 / 收集 5 / 讨伐 3），与网页 18 项口径对齐
+	w.stats = countSaveStats(entries)
 	w.playtime = primary.Playtime
 	w.koroks = primary.Koroks
 	if fi, err := os.Stat(primary.Path); err == nil {
@@ -362,5 +365,6 @@ func (w *progressWatcher) summarize() (bool, map[string]any) {
 		"playtime":   w.playtime,
 		"koroks":     w.koroks,
 		"counts":     c,
+		"stats":      w.stats,
 	}
 }

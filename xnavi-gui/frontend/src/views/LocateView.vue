@@ -140,35 +140,22 @@
               <span class="text-[11px] font-mono text-slate-400">{{ t('locate.playtime') }}: <span class="text-white font-bold">{{ playtimeText }}</span></span>
             </div>
 
-            <!-- BOTW 6 宫格 -->
-            <div class="grid grid-cols-3 gap-2">
-              <div class="bg-[#0d1117] p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-slate-400 text-xs">{{ t('locate.shrine') }}</span>
-                <span class="font-mono text-white font-bold text-xs">{{ countText('shrine') }}</span>
+            <!-- 18 项探索度（4 组，与网页口径一致；数据全部来自存档） -->
+            <div class="space-y-1">
+              <div v-for="g in STAT_GROUPS" :key="g.title">
+                <div class="flex items-center gap-1.5 mb-0.5">
+                  <span class="text-[10px] font-semibold text-slate-500">{{ t('locate.' + g.title) }}</span>
+                  <span class="flex-1 h-px bg-slate-800"></span>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                  <div v-for="it in g.items" :key="it.k"
+                       class="bg-[#0d1117] px-1.5 py-1 rounded border border-slate-800 flex items-center justify-between gap-1">
+                    <span class="text-slate-400 text-[10px] truncate">{{ t('locate.' + it.t) }}</span>
+                    <span class="font-mono text-white font-bold text-[10px] shrink-0">{{ countText(it.k) }}</span>
+                  </div>
+                </div>
               </div>
-              <div class="bg-[#0d1117] p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-slate-400 text-xs">{{ t('locate.tower') }}</span>
-                <span class="font-mono text-white font-bold text-xs">{{ countText('tower') }}</span>
-              </div>
-              <div class="bg-[#0d1117] p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-slate-400 text-xs">{{ t('locate.korok') }}</span>
-                <span class="font-mono text-white font-bold text-xs">{{ countText('korok') }}</span>
-              </div>
-              <div class="bg-[#0d1117] p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-slate-400 text-xs">{{ t('locate.memory') }}</span>
-                <span class="font-mono text-white font-bold text-xs">{{ countText('memory') }}</span>
-              </div>
-              <div class="bg-[#0d1117] p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-slate-400 text-xs">{{ t('locate.beast') }}</span>
-                <span class="font-mono text-white font-bold text-xs">{{ countText('beast') }}</span>
-              </div>
-              <div class="bg-[#0d1117] p-2 rounded-lg border border-slate-800 flex items-center justify-between">
-                <span class="text-slate-400 text-xs">{{ t('locate.saveSync') }}</span>
-                <span class="font-mono text-emerald-400 font-semibold text-[11px] flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  {{ t('locate.saveSyncOk') }}
-                </span>
-              </div>
+              <div class="text-[9px] text-slate-600 pt-0.5">{{ t('locate.saveOnlyHint') }}</div>
             </div>
           </div>
 
@@ -284,8 +271,28 @@ const playtimeText = computed(() => {
 
 const saveSourceTag = computed(() => progressData.value?.saveSource || '')
 
+// 18 项探索度分组（与网页探索度面板口径一致）
+// 探索 6 项来自核心既有 counts，其余 12 项来自 v3.2.1 新增的 stats
+const STAT_GROUPS = [
+  { title: 'grpExplore', items: [
+    { k: 'shrine', t: 'shrine' }, { k: 'tower', t: 'tower' }, { k: 'beast', t: 'beast' },
+    { k: 'korok', t: 'korok' }, { k: 'memory_photo', t: 'memoryPhoto' }, { k: 'memory_final', t: 'memoryFinal' }
+  ] },
+  { title: 'grpQuest', items: [
+    { k: 'quest_main', t: 'questMain' }, { k: 'quest_side', t: 'questSide' },
+    { k: 'quest_shrine', t: 'questShrine' }, { k: 'quest_dlc', t: 'questDlc' }
+  ] },
+  { title: 'grpCollect', items: [
+    { k: 'chest', t: 'chest' }, { k: 'weapon', t: 'weapon' }, { k: 'pb_equip', t: 'pbEquip' },
+    { k: 'pb_mat', t: 'pbMat' }, { k: 'pb_enemy', t: 'pbEnemy' }
+  ] },
+  { title: 'grpSubjugate', items: [
+    { k: 'boss_hinox', t: 'bossHinox' }, { k: 'boss_talus', t: 'bossTalus' }, { k: 'boss_molduga', t: 'bossMolduga' }
+  ] }
+]
+
 function countText(k) {
-  const c = progressData.value?.counts?.[k]
+  const c = progressData.value?.stats?.[k] || progressData.value?.counts?.[k]
   if (!c) return '-'
   return `${c[0]}/${c[1]}`
 }

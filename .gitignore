@@ -73,6 +73,8 @@ xnavi/status.json
 xnavi/known_*.json
 xnavi/data/*
 !xnavi/data/progress_points.json
+# v3.2.1：18 项统计精简字典（go:embed 必需，缺失则核心无法编译；由 source/build_save_stats.py 生成）
+!xnavi/data/save_stats.json
 # xnavi / xnavi-gui 一次性脚本与编译产物（不入库；2026-09-29 清理时补）
 xnavi/_*.py
 xnavi/xnavi-core.exe
