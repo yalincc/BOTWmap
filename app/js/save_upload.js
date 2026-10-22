@@ -332,7 +332,7 @@ const SAVE_UPLOAD = (() => {
     });
   }
 
-  function applySave(buf, fileName) {
+  function applySave(buf, fileName, silent) {
     if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
     const littleEndian = detectEndian(dv, fileName);
@@ -543,10 +543,10 @@ const SAVE_UPLOAD = (() => {
       : ((window.I18N && window.I18N.t)
         ? window.I18N.t('save.noPlaytime', '（游玩时间未记录）')
         : '（游玩时间未记录）');
-    UI.toast('已从 ' + srcName + ' 存档加载 ✓ ' + parts.join(' · ') + timeSuffix);
+    if (!silent) UI.toast('已从 ' + srcName + ' 存档加载 ✓ ' + parts.join(' · ') + timeSuffix);
   }
 
-  return { init, isLoaded: () => loaded };
+  return { init, isLoaded: () => loaded, applySave };
 })();
 
 (function () {

@@ -236,7 +236,7 @@ const LIVE = (() => {
   /* ---------- 存档进度加载（标点就近匹配 + 计数） ---------- */
   // 优先从本地追踪服务 /progress 实时拉取（游戏内保存后自动更新）；
   // 服务不可用时降级到静态文件（旧 Python 版/本地构建产物）。
-  async function loadProgress() {
+  async function loadProgress(manual) {
     if (progLoading) return;
     progLoading = true;
     try {
@@ -245,6 +245,16 @@ const LIVE = (() => {
       else {
         const r2 = await fetch('../data/progress_points.json?t=' + Date.now(), { cache: 'no-store' });
         if (r2.ok) applyProgress(await r2.json());
+      }
+      // V3.2.0: 全量探索度同步 (自动拉取最新 game_data.sav 同步任务、宝箱、讨伐、莱尼尔等)
+      if (typeof SAVE_UPLOAD !== 'undefined' && SAVE_UPLOAD.applySave) {
+        try {
+          const rSave = await fetch(LIVE_API + '/save?t=' + Date.now(), { cache: 'no-store' });
+          if (rSave.ok) {
+            const buf = await rSave.arrayBuffer();
+            SAVE_UPLOAD.applySave(buf, 'game_data.sav', !manual);
+          }
+        } catch (eSave) { /* 离线或无可用存档时静默 */ }
       }
     } catch (e) { /* 离线时静默 */ } finally { progLoading = false; }
   }
@@ -680,7 +690,7 @@ const LIVE = (() => {
     BotwMap.prototype._drawLive = drawLive;
   }
 
-  return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive, clearTrail };
+  return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive, clearTrail, loadProgress };
 })();
 
 (function () {
