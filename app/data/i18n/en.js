@@ -106,6 +106,8 @@ window.BOTW_I18N.en = {
   "settings.doneMode.hide": "Hide",
   "settings.doneCats": "Completed Marker Types",
   "settings.dragonPath": "Dragon Paths",
+  "settings.liveTrail": "Movement Trail",
+  "settings.liveTrail.clear": "Clear",
   "settings.show": "Show",
   "settings.hide": "Hide",
   "settings.dlcQuest": "DLC2 Quest Enemies (One-Hit)",
@@ -196,6 +198,7 @@ window.BOTW_I18N.en = {
 
   // Toasts
   "toast.copied": "Copied: ",
+  "toast.trailCleared": "Trail cleared",
   "toast.shareCopied": "Share link copied to clipboard",
   "toast.marked": "Marked done: ",
   "toast.unmarked": "Cancelled done: ",

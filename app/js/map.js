@@ -66,6 +66,9 @@ const DEFAULT_SETTINGS = {
   // 存量用户不受影响：load() 里已存的 hideCats 覆盖默认值。
   hideCats: { shrine: 0, seed: 0, memory: 0, chest: 0, tower: 0, beast: 0, equip: 0, quest: 0, boss: 0 },
   dragonPath: true,
+  // 2026-10-22：玩家移动轨迹（定位时记录的虚线淡红线）开关，默认显示 = 保持原行为
+  // （老用户 localStorage 里没有这个键，走默认值；设成隐藏会让老用户轨迹突然消失）
+  liveTrail: true,
   regionShow: true,
 };
 window.BOTW_SETTINGS = {

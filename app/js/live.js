@@ -572,6 +572,15 @@ const LIVE = (() => {
     UI.toast(ok ? '链接已复制 · 手机需与电脑在同一 WiFi' : '复制失败，请长按选择复制');
   }
 
+  /* ---------- 清除移动轨迹（V1.7.2 设置面板「清除」按钮） ---------- */
+  function clearTrail() {
+    if (!map || !map.live || !Array.isArray(map.live.trail)) return 0;
+    const n = map.live.trail.length;
+    map.live.trail.length = 0;
+    if (map.draw) map.draw();
+    return n;
+  }
+
   /* ---------- 画布绘制（挂到 BotwMap.prototype._drawLive） ---------- */
   function drawLive(ctx) {
     const L = this.live;
@@ -579,7 +588,10 @@ const LIVE = (() => {
     const w = this.w, h = this.h;
 
     // 移动轨迹（虚线淡红）
-    if (L.trail.length > 1) {
+    // V1.7.2：设置面板新增「移动轨迹 显示/隐藏/清除」。用 !== false 判定而非 === true，
+    // 这样即使老缓存里没有 liveTrail 字段也照常显示（不会因缓存缺键而突然不画）。
+    const trailOn = !window.BOTW_SETTINGS || window.BOTW_SETTINGS.s.liveTrail !== false;
+    if (trailOn && L.trail.length > 1) {
       ctx.save();
       ctx.lineWidth = 2;
       ctx.strokeStyle = 'rgba(255,90,90,.5)';
@@ -668,7 +680,7 @@ const LIVE = (() => {
     BotwMap.prototype._drawLive = drawLive;
   }
 
-  return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive };
+  return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive, clearTrail };
 })();
 
 (function () {

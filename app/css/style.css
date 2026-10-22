@@ -230,8 +230,11 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   position: absolute; z-index: 26; width: 360px; max-width: calc(100vw - 24px); right: 12px; top: 66px;
   background: var(--panel-solid); border: 1px solid var(--gold-dim);
   border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px;
-  /* 手机端：内容变长后必须可滚动，否则顶出屏幕外 */
-  max-height: calc(100vh - 90px); overflow-y: auto; overscroll-behavior: contain;
+  /* 手机端：内容变长后必须可滚动，否则顶出屏幕外。
+     V1.7.2 修：面板是 absolute 定位在 #mapArea 内（参照系是地图区，不是视口），
+     原来的 calc(100vh - 90px) 只算了自己的 top(66px)，漏了顶栏(72px)+底部留白(12px)，
+     设置项一多（新增「移动轨迹」组）底部就顶出屏幕。补足偏移量 → 面板始终留在视口内。 */
+  max-height: calc(100vh - 150px); overflow-y: auto; overscroll-behavior: contain;
 }
 /* 已完成标记：隐藏类目 chips */
 .st-cats { margin-top: 8px; }
@@ -259,6 +262,9 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 }
 .st-opt:hover { border-color: var(--gold-dim); }
 .st-opt.sel { border-color: var(--gold); color: var(--gold); background: rgba(242,201,76,.12); font-weight: 600; }
+/* 「清除」这类一次性动作按钮：与状态按钮区分，不参与选中态 */
+.st-opt.st-act { border-style: dashed; color: var(--text-dim); }
+.st-opt.st-act:hover { color: var(--accent); border-color: var(--accent); }
 .st-picker { position: relative; overflow: hidden; }
 .st-picker input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
 .st-row { display: flex; align-items: center; gap: 8px; margin-top: 7px; }

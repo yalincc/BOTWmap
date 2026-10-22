@@ -1601,6 +1601,8 @@ const UI = (() => {
       setOptBtn('stLang', window.I18N ? window.I18N.getLang() : 'zh');
       setOptBtn('stDoneMode', S.s.doneMode);
       setOptBtn('stDragonPath', S.s.dragonPath ? 'show' : 'hide');
+      // 移动轨迹：缺键时按「显示」处理（保持原行为，老用户不会突然不画）
+      setOptBtn('stLiveTrail', S.s.liveTrail === false ? 'hide' : 'show');
       const dlcOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().quest || window.EnemyTiers.dlcState().dlc2));
       setOptBtn('stDlcQuest', dlcOn ? 'show' : 'hide');
       const masterOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().hardmode || window.EnemyTiers.dlcState().master));
@@ -1648,6 +1650,30 @@ const UI = (() => {
     document.querySelectorAll('#stDragonPath .st-opt').forEach(b => {
       b.addEventListener('click', () => {
         S.s.dragonPath = b.dataset.v === 'show';
+        S.save(); map.draw(); syncSettings();
+      });
+    });
+    // 玩家移动轨迹：显示 / 隐藏 / 清除（V1.7.2）
+    document.querySelectorAll('#stLiveTrail .st-opt').forEach(b => {
+      b.addEventListener('click', () => {
+        const v = b.dataset.v;
+        if (v === 'clear') {
+          // 「清除」是一次性动作：清空已记录的轨迹点，并把显示状态复位为「显示」
+          let n = 0;
+          try { if (typeof LIVE !== 'undefined' && LIVE.clearTrail) n = LIVE.clearTrail(); } catch (e) {}
+          if (!n && map && map.live && Array.isArray(map.live.trail)) {   // 兜底：live.js 未就绪时直接清
+            n = map.live.trail.length;
+            map.live.trail.length = 0;
+            map.draw();
+          }
+          S.s.liveTrail = true;
+          S.save(); syncSettings();
+          UI.toast(window.I18N
+            ? window.I18N.t('toast.trailCleared', '轨迹已清除') + (n > 0 ? '（' + n + '）' : '')
+            : '轨迹已清除');
+          return;
+        }
+        S.s.liveTrail = (v === 'show');
         S.save(); map.draw(); syncSettings();
       });
     });

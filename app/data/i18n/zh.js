@@ -106,6 +106,8 @@ window.BOTW_I18N.zh = {
   "settings.doneMode.hide": "隐藏",
   "settings.doneCats": "完成标记类型",
   "settings.dragonPath": "龙的轨迹",
+  "settings.liveTrail": "移动轨迹",
+  "settings.liveTrail.clear": "清除",
   "settings.show": "显示",
   "settings.hide": "隐藏",
   "settings.dlcQuest": "DLC2 任务怪（一击剑）",
@@ -196,6 +198,7 @@ window.BOTW_I18N.zh = {
 
   // 提示文案
   "toast.copied": "已复制：",
+  "toast.trailCleared": "轨迹已清除",
   "toast.shareCopied": "分享链接已复制",
   "toast.marked": "已标记完成：",
   "toast.unmarked": "已取消完成：",
