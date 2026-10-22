@@ -935,6 +935,10 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .flow-pts .fp.fp-hard.is-cur { border-color: #8a5cf6; background: rgba(139,92,246,.16); }
 .eq-obtain-h.fp-hard-h { color: #b18cff; }
 
+/* V1.7.2：装备卡宝箱 chip 已开启态（与地图宝箱完成态同源联动） */
+.flow-pts .fp.fp-done { opacity: .6; border-style: dashed; }
+.flow-pts .fp.fp-done .num { color: #7dd3a0; }
+
 /* 底部操作：金色统一操作栏 */
 .tk-actions { display: flex; gap: 8px; margin-top: 14px; }
 .tk-actions .btn {

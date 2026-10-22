@@ -17,6 +17,9 @@
  *   怪物营地掉落段 + 定位跳转）。
  * 存档同步（P4b）：save_upload.js 反查 weapon_collect_save.js（IsGet_Weapon
  *   190 条）→ EquipDone.loadSave 注入存档完成集；isDone = 存档 ∪ 手动标记。
+ * V1.7.2 点位级联动：isDone = 存档图鉴 ∪ 手动 ∪ 宝箱推导（该装备全部宝箱点已开）；
+ *   地图标绘制/命中按「点位级」判完成（该点宝箱开 = 该点装备灭），宝箱完成态为唯一
+ *   权威源（存档/手动同源），与宝箱一一对应，不新增存储。
  *
  * ★ 与地图引擎隔离：不侵入 map.js 业务逻辑，只注册绘制/命中回调。
  * ============================================================ */
@@ -91,6 +94,10 @@
     });
   });
 
+  /* id -> ITEMS 条目索引（V1.7.2：整件推导完成 allChestsDone 查表用） */
+  var ITEM_BY_ID = {};
+  ITEMS.forEach(function (it) { if (it.id) ITEM_BY_ID[it.id] = it; });
+
   var map = null;
   var ready = false;
   /* 勾选状态：{weapon:true, shield:true, armor:true} 默认全开（localStorage 记忆） */
@@ -112,7 +119,31 @@
   }
   var eqListeners = [];
   var EquipDone = {
-    isDone: function (id) { return !!id && (equipDone.has(id) || equipSaveDone.has(id)); },
+    /* V1.7.2：isDone = 手动 ∪ 存档图鉴 ∪ 推导（该装备所有宝箱点都完成）。
+       推导口径与宝箱一一对应：宝箱完成态是唯一权威源（存档/手动同源），不新增存储。 */
+    isDone: function (id) {
+      if (!id) return false;
+      if (equipDone.has(id) || equipSaveDone.has(id)) return true;
+      return EquipDone.allChestsDone(id);
+    },
+    /* V1.7.2：整件推导完成 = 至少有 1 个宝箱点 且 全部宝箱点（普通+大师）都完成 */
+    allChestsDone: function (id) {
+      var it = ITEM_BY_ID[id];
+      if (!it) return false;
+      var CP = window.ChestPanel;
+      if (!CP || !CP.isDone) return false;
+      var n = 0;
+      for (var k = 0; k < it.obtain.length; k++) {
+        var ob = it.obtain[k];
+        if (!ob || ob.kind !== 'chest') continue;
+        var pts = (ob.pts || []).concat(ob.hardPts || []);
+        for (var j = 0; j < pts.length; j++) {
+          n++;
+          if (!CP.isDone(pts[j])) return false;
+        }
+      }
+      return n > 0;
+    },
     /* P4b：存档注入（save_upload.js 反查 IsGet_Weapon 命中后调用；keys = dex key 数组）。
        与宝箱 ChestSync.loadSave 同语义：存档集整体替换 + 持久化 + 通知重绘。 */
     loadSave: function (keys) {
@@ -123,22 +154,27 @@
       return equipSaveDone.size;
     },
     saveCount: function () { return equipSaveDone.size; },
-    /* 标记/取消：标记完成时同步把该装备所有宝箱点（普通 + 大师）也存进「宝箱完成」 */
+    /* 标记/取消：标记完成时同步把该装备所有宝箱点（普通 + 大师）也存进「宝箱完成」。
+       V1.7.2：只在手动状态真正变化时才联动宝箱——推导完成态（宝箱已全开）下点
+       「取消完成」不误清宝箱标记（想撤请撤宝箱，与「以存档为准」口径一致）。 */
     toggle: function (it) {
       if (!it || !it.id) return null;
+      var had = equipDone.has(it.id);
       var st;
-      if (equipDone.has(it.id)) { equipDone.delete(it.id); st = { done: false }; }
+      if (had) { equipDone.delete(it.id); st = { done: false }; }
       else { equipDone.add(it.id); st = { done: true }; }
       persistEqDone();
-      var CP = window.ChestPanel;
-      if (CP && CP.markPoints) {
-        var all = [];
-        (it.obtain || []).forEach(function (ob) {
-          if (!ob || ob.kind !== 'chest') return;
-          (ob.pts || []).forEach(function (p) { all.push(p); });
-          (ob.hardPts || []).forEach(function (p) { all.push(p); });
-        });
-        CP.markPoints(all, st.done);
+      if (st.done || had) {
+        var CP = window.ChestPanel;
+        if (CP && CP.markPoints) {
+          var all = [];
+          (it.obtain || []).forEach(function (ob) {
+            if (!ob || ob.kind !== 'chest') return;
+            (ob.pts || []).forEach(function (p) { all.push(p); });
+            (ob.hardPts || []).forEach(function (p) { all.push(p); });
+          });
+          CP.markPoints(all, st.done);
+        }
       }
       eqListeners.forEach(function (fn) { try { fn(); } catch (e) {} });
       return st;
@@ -225,9 +261,6 @@
       var it = ITEMS[i];
       if (!on[it.kind]) continue;
       var color = CAT_COLOR[it.kind] || '#888';
-      var done = EquipDone.isDone(it.id);
-      /* V1.6.6：设置里勾了「隐藏已完成的装备」→ 直接跳过（与命中同步，见 hit()） */
-      if (done && window.BOTW_SETTINGS.hideCat('equip')) continue;
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
         if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
@@ -235,9 +268,14 @@
         for (var j = 0; j < pts.length; j++) {
           var px = pts[j];
           if (px[0] < x0 || px[0] > x1 || px[1] < y0 || px[1] > y1) continue;
+          /* V1.7.2：点位级完成态 = 该坐标宝箱已开（存档/手动同源推导）。
+             宝箱与装备一一对应：开一个灭一个，同名装备其他地区不受影响。 */
+          var pDone = (window.ChestPanel && window.ChestPanel.isDone) ? window.ChestPanel.isDone(px) : false;
+          /* V1.6.6：设置里勾了「隐藏已完成的装备」→ 已完成的点直接跳过（与命中同步，见 hit()） */
+          if (pDone && window.BOTW_SETTINGS.hideCat('equip')) continue;
           var sx = map.view.x + px[0] * scale, sy = map.view.y + px[1] * scale;
           ctx.save();
-          ctx.globalAlpha = done ? 0.65 : 1;   /* V1.6.2：完成态降透明 */
+          ctx.globalAlpha = pDone ? 0.65 : 1;   /* V1.6.2：完成态降透明 */
           /* 分类图标（武器=剑 / 盾牌=盾 / 防具=衣）；未就绪回退自绘 */
           var ic = iconCache[it.kind];
           if (ic) {
@@ -246,7 +284,7 @@
           } else if (it.kind === 'shield') drawShield(ctx, sx, sy, size, color);
           else if (it.kind === 'armor') drawTunic(ctx, sx, sy, size, color);
           else drawSword(ctx, sx, sy, size, color);
-          if (done) window.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
+          if (pDone) window.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
           ctx.restore();
         }
       }
@@ -261,13 +299,14 @@
     for (var i = 0; i < ITEMS.length; i++) {
       var it = ITEMS[i];
       if (!eLayers[it.kind]) continue;
-      /* V1.6.6：隐藏的已完成装备点不参与命中 */
-      if (window.BOTW_SETTINGS.hideCat('equip') && EquipDone.isDone(it.id)) continue;
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
         if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
         for (var j = 0; j < ob.pts.length; j++) {
           var p = ob.pts[j];
+          /* V1.7.2：点位级——隐藏的已完成点不参与命中（该点宝箱已开；V1.6.6 口径随点位级细化） */
+          if (window.BOTW_SETTINGS.hideCat('equip') && window.ChestPanel && window.ChestPanel.isDone &&
+              window.ChestPanel.isDone(p)) continue;
           var dx = p[0] - mx, dy = p[1] - my;
           if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) {
             var d = dx * dx + dy * dy;
@@ -550,9 +589,11 @@
     function ptsHtml(list, cls, base) {
       return '<div class="flow-pts">' + list.map(function (p, i) {
         var tLabel = esc(chestTypeCn(p));
-        var tip = isEn ? ('Click to locate this chest (' + tLabel + ')') : ('点击定位到该宝箱（' + tLabel + '）');
-        return '<span class="fp ' + cls + '" data-eq-pt="' + (base + i) + '" title="' + tip + '">' +
-          '<span class="num">' + (i + 1) + '</span><span class="txt">' + tLabel + '</span></span>';
+        /* V1.7.2：chip 显示该宝箱已开启态（与地图宝箱完成态同源，找宝箱更直观） */
+        var opened = (window.ChestPanel && window.ChestPanel.isDone) ? window.ChestPanel.isDone(p) : false;
+        var tip = isEn ? ('Click to locate this chest (' + tLabel + (opened ? ', opened' : '') + ')') : ('点击定位到该宝箱（' + tLabel + (opened ? '，已开启' : '') + '）');
+        return '<span class="fp ' + cls + (opened ? ' fp-done' : '') + '" data-eq-pt="' + (base + i) + '" title="' + tip + '">' +
+          '<span class="num">' + (i + 1) + '</span><span class="txt">' + tLabel + (opened ? ' ✓' : '') + '</span></span>';
       }).join('') + '</div>';
     }
     var obtainHtml = '';
@@ -784,6 +825,15 @@
       var ec = document.getElementById('equipCard');
       if (window.initCardDrag && ec) window.initCardDrag(ec);     /* V1.6.1 调整i：卡片拖动 */
       EquipDone.onChange(function () { if (map) map.draw(); });   /* V1.6.2：完成态变化重绘地图 */
+      /* V1.7.2：宝箱完成态变化（手动标记 / 存档同步注入）→ 重绘 + 装备卡开着则实时重渲染
+         （点位级联动口径：宝箱完成态是装备完成态的推导源） */
+      if (window.ChestPanel && window.ChestPanel.onChange) {
+        window.ChestPanel.onChange(function () {
+          if (map && map.draw) map.draw();
+          var card = document.getElementById('equipCard');
+          if (card && !card.classList.contains('hidden') && pv.ref) openCard(pv.ref);
+        });
+      }
       if (window.I18N && window.I18N.onChange) {
         window.I18N.onChange(function () {
           var grp = document.querySelector('.lg-group[data-group="装备"]');
