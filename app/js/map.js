@@ -666,16 +666,8 @@ class BotwMap {
       ctx.fillStyle = done ? 'rgba(180,195,180,.75)' : (mk.cat === 'shrine' ? '#eafffb' : '#ffffff');
       ctx.fillText(label, sx, ly);
     }
-
-    // 悬停高亮
-    if (this.hover) {
-      const [hsx, hsy] = this.m2s(this.hover.px);
-      ctx.beginPath();
-      ctx.arc(hsx, hsy, this._markerScreenSize(this.hover) / 2 + 5, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,.9)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    /* V1.7.2 小修2：移除悬停高亮圈（V1.0 时代装饰，白圈紧贴图标视觉似黄圈，与现 UI 不协调；
+       悬停反馈保留：顶部名称条 + 点击卡片，功能不受影响） */
   }
 
   /* ---------- 克洛格轨迹（v1.1.4）：黄色折线 + 起点小圆环 ---------- */
