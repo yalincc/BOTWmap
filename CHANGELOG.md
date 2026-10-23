@@ -2,8 +2,21 @@
 
 > 版本号语义 = **主.板块.迭代**，第三位每发布一批 +1（规则见 `docs/spec/DEV-HANDBOOK.md` §3.2）。
 > **本文件只记录已发布内容**；未发布的计划与待办一律记在 `docs/backlog/BACKLOG.md`，不在此占位。
-> ★ **本仓库含多个程序、版本号各自独立**（在线地图 `BOTWmap` / 导航程序 `xnavi`、`navicemu`、`botwnavi-eden`），
+> ★ **本仓库含多个程序、版本号各自独立**（在线地图 `BOTWmap` / 导航程序 `xnavi`），
 > 因此**每条版本标题一律带程序名**，格式固定 `## [程序名 VX.Y.Z] - YYYY-MM-DD 摘要`——网页版写 `BOTWmap`，导航程序写自己的名字，**禁止只写一个版本号**（规则见 `docs/spec/DEV-HANDBOOK.md` §3.1 命名表）。
+
+## 仓库维护：2026-10-23 仓库收敛整理（不占任何程序版本号）
+
+> **目标**：GitHub 仓库只放「成品 + 门面」，开发流水线、源数据、历史程序全部本地维护。双端 main 已推送 `649533d`，远端哈希核对一致。
+
+- **移出 GitHub（本地保留，git 历史可查）**：
+  - 5 个已并入 xnavi 的定位程序目录 → `归档\弃用\`：`live-go` / `live-eden` / `live-cemu` / `enavi` / `enavi-gui`（含 ENAVI-HANDBOOK 随程序归档）
+  - 源数据与生成输入：顶层 `data/`（msbt_zh 等 38 个）、`docs/`（11 个）、`tasks/`（153 个任务 YAML 底表）
+  - Wails 生成物与模板：`xnavi-gui/build/README.md`、`xnavi-gui/frontend/wailsjs/`
+- **规则变更**：版本报告 `docs/releases/*.md` 改为**本地维护、不入库**（发布记录以 CHANGELOG 为门面；DEV-HANDBOOK §3.1.1 / §3.5 已同步）；`.gitignore` 整体重写收敛
+- **结果**：GitHub 顶层仅剩 `app/` + `xnavi/` + `xnavi-gui/` + `README.md` / `CHANGELOG.md` / `.gitignore` / `edgeone.json`
+
+---
 
 ## [xnavi v3.2.1] - 2026-10-23 存档统计 18 项 · 打开地图改造 · 状态快照会话签名
 
