@@ -90,6 +90,28 @@ const LIVE = (() => {
     });
   }
 
+  /* ---------- 屏幕常亮（Wake Lock）：跟随定位轮询期间防息屏 ----------
+   * 浏览器规定 Wake Lock 仅在 secure context（https/localhost）可用：
+   *   - http 局域网镜像页：navigator.wakeLock 不存在 → 静默跳过（零副作用），
+   *     防息屏走 certs/ 自签证书 https 模式（v3.1.0）或系统「自动锁定」设置；
+   *   - 仅在 live 轮询活跃（跟随定位中）时持锁，离线退避即释放，避免无谓耗电；
+   *   - 页面隐藏时系统自动释放锁 → 回前台（visibilitychange）自动重新申请。
+   * 修复：certs/README.md 承诺的「屏幕保持常亮」此前从未实现（无调用代码）。 */
+  let wakeLock = null;
+  async function requestWakeLock() {
+    try {
+      if (!('wakeLock' in navigator) || wakeLock || document.hidden) return;
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e) { /* 用户拒绝或系统限制：静默，不打扰 */ }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && pollTimer) requestWakeLock();
+  });
+
   /* ---------- 轮询退避（V1.6.5）：定位器（xnavi live）未开时 600ms 轮询会刷屏
      ERR_CONNECTION_REFUSED——连续失败 3 次即停，30s 探测一次，恢复后自动重启轮询 ---------- */
   let pollTimer = null, probeTimer = null, progressTimer = null, failCnt = 0;
@@ -98,10 +120,12 @@ const LIVE = (() => {
     failCnt = 0;
     pollTimer = setInterval(poll, 600);
     if (!progressTimer) progressTimer = setInterval(loadProgress, 20000);
+    requestWakeLock();
   }
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+    releaseWakeLock();
     if (!probeTimer) {
       probeTimer = setInterval(async () => {
         try {

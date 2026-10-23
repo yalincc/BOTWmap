@@ -1,0 +1,30 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.yalincc.xnavimirror'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.yalincc.xnavimirror"
+        minSdk 24
+        targetSdk 34
+        versionCode 2
+        versionName "0.2.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+// 零第三方依赖：WebView + HttpURLConnection 全用系统 API，保持最小体积
