@@ -1,9 +1,12 @@
-# 第三方参考克隆（MrCheeze/botw-waypoint-map，仅本地参考，不入库）
+# 第三方参考克隆（仅本地参考，不入库）
 waypoint-data/
 
-# 开发流水线（原始数据/清洗脚本/瓦片工具），产物已打进 app/，不入库
+# 开发流水线 + 源数据 + 生成输入 + 规范文档（本地维护，不入库；成品已在 app/）
 source/
 tools/
+data/
+docs/
+tasks/
 
 # 系统/编辑器
 Thumbs.db
@@ -12,59 +15,21 @@ Desktop.ini
 # 工具工作目录（记忆/配置，不入库）
 .workbuddy/
 
-# source 下临时截图（调试产物，不入库）
-source/*.png
-data/map_config.json
-
 # 本地生成/个人进度（live 服务热重建；部署版不需要个人快照）
-data/progress_points.json
-
-# live-go 运行时配置不入库；分发物不入库；收集进度参考表入库（/progress 必需）
-live-go/data/*
-!live-go/data/progress_points.json
-live-go/dist/
+app/data/progress_points.json
 
 # 编辑器/构建备份
 *.exe~
 
-# live-go 浮窗版归档（复盘留底，不入库）
+# 归档与调试截图（本地留底，不入库）
 归档/
-live/_research/botw-re-notes/
-
-# 调试截图（本地留底，不入库）
 screenshot/
 
-# 过程文档(md)不入库：README 例外
+# 过程文档(md)不入库：README/CHANGELOG 例外
 *.md
-# 版本报告入库（白名单例外；gitignore 不支持行内注释，注释单独行）
-!docs/releases/*.md
 !README.md
-!live-go/README.md
-!live/README.md
 !CHANGELOG.md
 
-# live-go 运行时/编译产物不入库（本地位于 live-go/）
-live-go/known_addrs.json
-live-go/BotwNavi.exe
-live-go/run-events.log
-live-go/status.json
-live-go/run.log
-live-go/run.err
-live-go/*.zip
-
-# live-float 运行/编译产物与调试日志不入库；README 例外
-live-float/FloatNavi.exe
-live-float/*.log
-!live-float/README.md
-
-# live-npcs 运行/编译产物不入库（源码与数据文件入库）
-live-npcs/live-npcs.exe
-live-npcs/live-npcs.exe~
-live-npcs/run.log
-live-npcs/run.err
-live-npcs/data/*
-!live-npcs/README.md
-!live-npcs/REVERSE-NOTES.md
 # xnavi 通用定位程序：只入源码+进度参考表，运行/编译产物不入库
 xnavi/xnavi.exe
 xnavi/*.log
@@ -73,30 +38,27 @@ xnavi/status.json
 xnavi/known_*.json
 xnavi/data/*
 !xnavi/data/progress_points.json
-# v3.2.1：18 项统计精简字典（go:embed 必需，缺失则核心无法编译；由 source/build_save_stats.py 生成）
 !xnavi/data/save_stats.json
-# xnavi / xnavi-gui 一次性脚本与编译产物（不入库；2026-09-29 清理时补）
 xnavi/_*.py
 xnavi/xnavi-core.exe
+xnavi/xnavi-core-new.exe
 xnavi/diagnostics/
+
+# xnavi-gui：编译产物 / 运行配置 / Wails 生成物与模板文档不入库
 xnavi-gui/_*.py
 xnavi-gui/xnavi-gui.exe
-# v3.2.1：GUI 目录下的核心副本与实践产物（7.9MB 二进制曾被误判为待提交）
 xnavi-gui/xnavi-core.exe
 xnavi-gui/diagnostics/
 xnavi-gui/status.json
 xnavi-gui/*.log
 xnavi-gui/xnavi-gui-config.json
-xnavi-v2.1.0.zip
-_changelog.py
+xnavi-gui/build/README.md
+xnavi-gui/frontend/wailsjs/
 
 # 发布版本归档（本地留底，不入库）
 RELEASE/
 
-xnavi/xnavi-core-new.exe
-
-# v3.1.0 TLS 证书体系（机器相关 + 含私钥，不入库；rootCA/脚本随发布包走）
-# v1.3.2：live-cemu/certs 的两个生成脚本需入库（包内只带脚本+README，私钥/证书不入库）
+# 证书体系（机器相关 + 含私钥，不入库；生成脚本随发布包走）
 certs/*
 !certs/gen-cert.ps1
 !certs/serve-cert.ps1
