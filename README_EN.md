@@ -6,7 +6,7 @@ An interactive map of *The Legend of Zelda: Breath of the Wild* in Simplified Ch
 
 ![Latest release](https://img.shields.io/github/v/release/yalincc/BOTWmap?style=flat-square)　![Online demo](https://img.shields.io/badge/Demo-botw.yalin.site-9a7b4f)
 
-![Map interface](https://botw.yalin.site/media/readme-hero-v2.jpg)
+![Map interface](https://botw.yalin.site/media/readme-hero-en.jpg)
 
 ## Overview
 
@@ -25,7 +25,7 @@ Progress, layer selections and custom markers are saved automatically in your br
 
 Want to watch your character walk across the map in real time? Pair the map with **xnavi** — one tool for Cemu, Ryujinx, and Eden:
 
-![xnavi locating UI](https://botw.yalin.site/media/xnavi-gui-hero-v2.jpg)
+![xnavi locating UI](https://botw.yalin.site/media/xnavi-gui-hero-en.jpg)
 
 1. Launch your emulator and load the game.
 2. Run `xnavi.exe` and hit "Start Locating."
