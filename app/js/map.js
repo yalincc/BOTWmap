@@ -314,7 +314,21 @@ class BotwMap {
     this.canvas.width = Math.round(r.width * this.dpr);
     this.canvas.height = Math.round(r.height * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.fit();
+    /* V1.7.2 小修：首次布局才 fit 全图；之后（load 兜底 / 未来 resize 重排版）
+       以当前视图中心为锚重算缩放边界，不重置用户视图——否则页面图片加载完触发
+       load → fit() 会把跟随缩放（833%）/手动缩放冲回全图 100% */
+    if (this._viewInit) {
+      const s0 = this.view.scale;   /* ★ 先存用户缩放：fit() 会覆盖 view.scale，后 clamp 就晚了 */
+      const cx = (this.w / 2 - this.view.x) / s0;
+      const cy = (this.h / 2 - this.view.y) / s0;
+      this.fit();   /* 只为重算 minScale / maxScale / _regionScale（地名分级基准） */
+      this.view.scale = Math.min(Math.max(s0, this.minScale), this.maxScale);
+      this.view.x = this.w / 2 - cx * this.view.scale;
+      this.view.y = this.h / 2 - cy * this.view.scale;
+    } else {
+      this.fit();
+      this._viewInit = true;
+    }
     this.draw();
   }
 
