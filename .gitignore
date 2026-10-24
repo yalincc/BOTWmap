@@ -25,11 +25,12 @@ app/data/progress_points.json
 归档/
 screenshot/
 
-# 过程文档(md)不入库：README/README_EN/CHANGELOG 例外
+# 过程文档(md)不入库：README/README_EN/CHANGELOG/GUIDE 例外
 *.md
 !README.md
 !README_EN.md
 !CHANGELOG.md
+!GUIDE.md
 
 # xnavi 通用定位程序：只入源码+进度参考表，运行/编译产物不入库
 xnavi/xnavi.exe
