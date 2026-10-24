@@ -66,3 +66,4 @@ certs/*
 
 # 诊断导出与临时报告目录（不入库）
 report/
+screen/
