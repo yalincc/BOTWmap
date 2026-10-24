@@ -15,13 +15,13 @@
  */
 'use strict';
 
-// 本地追踪服务地址（V1.5.0 移动端镜像入口）：
+// 本地追踪服务地址（v3.2.2 端口自愈 + 多端口发现，PLAN-PORT-FAILOVER）：
 //   页面由 PC 以 http 提供（手机/iPad 局域网镜像）→ 用同源 location.origin，
 //   规避浏览器对 https 页面连 http/ws 局域网地址的混合内容 + PNA/LNA 限制；
-//   其余场景（PC 本机开 https 公网站 / localhost）维持原 127.0.0.1:8766 不变。
-const LIVE_API = (location.protocol === 'http:' && !/^(127\.0\.0\.1|localhost)$/.test(location.hostname))
-  ? location.origin
-  : 'http://127.0.0.1:8766';   // 本地追踪服务（Go 版"灵墟地图追踪助手"）
+//   其余场景（PC 本机开 https 公网站 / localhost）→ 在 127.0.0.1 的 8766~8770 中
+//   发现 xnavi（xnavi 独占绑定五端口，8766 被占时自动落后端口，见 discoverLiveAPI）。
+const LIVE_MIRROR = (location.protocol === 'http:' && !/^(127\.0\.0\.1|localhost)$/.test(location.hostname));
+let LIVE_API = LIVE_MIRROR ? location.origin : 'http://127.0.0.1:8766';
 
 const LIVE = (() => {
   let map = null;
@@ -84,10 +84,19 @@ const LIVE = (() => {
     if (cbStop) cbStop.addEventListener('click', () => { stopCollectMode(); UI.toast('已结束收集模式'); });
 
     loadProgress();
-    startPolling();
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) loadProgress();
+    // v3.2.2：页面加载即探一次（xnavi 启动会自动打开地图页 → 主流流程秒连）；
+    // 未发现则转入 30s 兜底探测；用户切回标签页/点击页面时立即再探（见下方事件）。
+    // 冷启动首发请求偶发瞬态失败（代理/WPAD 热身）→ 1.5s 后补探一次。
+    discoverLiveAPI().then(found => {
+      if (found) { startPolling(); return; }
+      startProbing();
+      setTimeout(probeNow, 1500);
     });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) { loadProgress(); probeNow(); }
+    });
+    document.addEventListener('pointerdown', probeNow);
+    document.addEventListener('keydown', probeNow);
   }
 
   /* ---------- 屏幕常亮（Wake Lock）：跟随定位轮询期间防息屏 ----------
@@ -112,12 +121,69 @@ const LIVE = (() => {
     if (!document.hidden && pollTimer) requestWakeLock();
   });
 
+  /* ---------- 端口发现（v3.2.2，PLAN-PORT-FAILOVER） ----------
+   * xnavi 独占绑定 8766~8770（8766 被占时自动落后端口），网页无状态全扫：
+   * 依次探各口 /pos，认准身份字段（app=="xnavi"），取第一个 ok:true 的在线口；
+   * 无在线者但有指纹命中 → 记为候补（显示离线）；全无 → 保持离线。
+   * 节奏（替代旧 30s 静默轮询）：页面加载探一次；切回标签页/点击页面立即探；
+   * 30s 兜底一探。在线后恢复 600ms 轮询（不变）。 */
+  const LIVE_PORTS = [8766, 8767, 8768, 8769, 8770];
+  let lastProbeAt = 0;
+  function probePort(port) {
+    return new Promise(resolve => {
+      const ctl = ('AbortController' in window) ? new AbortController() : null;
+      const timer = ctl ? setTimeout(() => ctl.abort(), 900) : null;
+      fetch('http://127.0.0.1:' + port + '/pos?who=web', { cache: 'no-store', signal: ctl && ctl.signal })
+        .then(r => r.ok ? r.json() : null)
+        .then(j => {
+          if (timer) clearTimeout(timer);
+          if (!j) { resolve(null); return; }
+          if (j.app === 'xnavi') { resolve({ port: port, ok: !!j.ok, rank: 2 }); return; }
+          // 旧版核心（v3.2.1 及以前无指纹字段）：按 /pos 形状兼容识别，
+          // 避免新版网页 + 未升级核心的组合失联（rank 低，指纹命中优先）
+          if (!j.app && typeof j.gx === 'number' && typeof j.verified === 'boolean') {
+            resolve({ port: port, ok: !!j.ok, rank: 1 });
+            return;
+          }
+          resolve(null);
+        })
+        .catch(() => { if (timer) clearTimeout(timer); resolve(null); });
+    });
+  }
+  async function discoverLiveAPI() {
+    if (LIVE_MIRROR) return true;   // 镜像同源页：无需发现
+    let fallback = null;
+    for (let i = 0; i < LIVE_PORTS.length; i++) {
+      const hit = await probePort(LIVE_PORTS[i]);
+      if (hit && hit.ok) { LIVE_API = 'http://127.0.0.1:' + LIVE_PORTS[i]; return true; }
+      if (hit && (!fallback || hit.rank > fallback.rank)) fallback = hit;   // 指纹优先于旧版兼容
+    }
+    if (fallback) LIVE_API = 'http://127.0.0.1:' + fallback.port;
+    return false;
+  }
+  function probeNow() {
+    if (pollTimer) return;                      // 在线轮询中无需探测
+    const now = Date.now();
+    if (now - lastProbeAt < 2000) return;       // 事件节流 2s
+    lastProbeAt = now;
+    discoverLiveAPI().then(found => {
+      if (found && !pollTimer) { stopProbing(); startPolling(); loadProgress(); }
+    });
+  }
+  function startProbing() {
+    if (!probeTimer) probeTimer = setInterval(probeNow, 30000);   // 30s 兜底
+  }
+  function stopProbing() {
+    if (probeTimer) { clearInterval(probeTimer); probeTimer = null; }
+  }
+
   /* ---------- 轮询退避（V1.6.5）：定位器（xnavi live）未开时 600ms 轮询会刷屏
-     ERR_CONNECTION_REFUSED——连续失败 3 次即停，30s 探测一次，恢复后自动重启轮询 ---------- */
+     ERR_CONNECTION_REFUSED——连续失败 3 次即停，转入 30s 兜底探测，恢复后自动重启轮询 ---------- */
   let pollTimer = null, probeTimer = null, progressTimer = null, failCnt = 0;
   function startPolling() {
     if (pollTimer) return;
     failCnt = 0;
+    stopProbing();
     pollTimer = setInterval(poll, 600);
     if (!progressTimer) progressTimer = setInterval(loadProgress, 20000);
     requestWakeLock();
@@ -126,18 +192,7 @@ const LIVE = (() => {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
     releaseWakeLock();
-    if (!probeTimer) {
-      probeTimer = setInterval(async () => {
-        try {
-          const r = await fetch(LIVE_API + '/pos?who=web&t=' + Date.now(), { cache: 'no-store' });
-          if (r.ok) {   /* 定位器恢复 → 重启正常轮询 */
-            clearInterval(probeTimer); probeTimer = null;
-            startPolling();
-            loadProgress();
-          }
-        } catch (e) { /* 仍未开，保持静默探测 */ }
-      }, 30000);
-    }
+    startProbing();
   }
 
   /* ---------- 玩家位置轮询 ---------- */

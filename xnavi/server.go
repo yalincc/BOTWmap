@@ -15,8 +15,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// lastWebHitUnix 最近一次 /pos 被网页命中的时刻（v3.2.2 诊断：定位锁定后
+// 网页端一直未连入时，statusLoop 据此打指路提示）。
+var lastWebHitUnix atomic.Int64
 
 type targetT struct {
 	Name string  `json:"name"`
@@ -357,9 +362,12 @@ func applySaveOverride(platName, path string) {
 }
 
 func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
+	lastWebHitUnix.Store(time.Now().Unix()) // 诊断：任意 /pos 命中即视为"网页端在用"
 	state.mu.RLock()
 	payload := map[string]any{
 		"ok":       state.ok,
+		"app":      "xnavi", // 身份指纹（PLAN-PORT-FAILOVER）：网页据此认出本服务，跳过占用端口的无关程序
+		"ver":      CoreVersion,
 		"game":     currentGame.Name(),
 		"gx":       state.gx,
 		"gy":       state.gy,

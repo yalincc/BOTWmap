@@ -59,6 +59,9 @@ var (
 	useSaveScan = true
 )
 
+// primaryPort HTTP 服务实际主端口（v3.2.2 端口自愈：8766 被占时顺延，status.json 回报给 GUI）。
+var primaryPort = 8766
+
 func setLock(addr uintptr, verified bool, copies int, source string) {
 	lock.mu.Lock()
 	lock.addr = addr

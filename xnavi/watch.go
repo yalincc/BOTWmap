@@ -194,6 +194,7 @@ func stateMachine() {
 	tickN := 0
 	zeroBlockN := 0
 	lastZeroProbe := time.Now()
+	lastWaitLog := time.Time{}
 
 	for {
 		select {
@@ -215,6 +216,11 @@ func stateMachine() {
 				state.ok = false
 				state.source = "waiting for emulator"
 				state.mu.Unlock()
+				// v3.2.2 诊断：模拟器未启动时用户在日志里看不到任何提示 → 30s 一次指路
+				if time.Since(lastWaitLog) >= 30*time.Second {
+					lastWaitLog = time.Now()
+					fmt.Println("  [wait] 未检测到模拟器 —— 请先启动 Cemu/Ryujinx/Eden 并进入游戏（30 秒后重试）/ No emulator detected — start Cemu/Ryujinx/Eden and enter the game")
+				}
 				continue
 			}
 

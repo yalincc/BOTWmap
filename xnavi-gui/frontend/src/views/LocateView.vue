@@ -51,12 +51,11 @@
         <button @click="toggleLocating"
           :class="{
             'bg-blue-600 hover:bg-blue-500 shadow-blue-950/50': locateState === 'idle',
-            'bg-amber-600 hover:bg-amber-500 shadow-amber-950/50': locateState === 'working',
-            'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50': locateState === 'ok'
+            'bg-amber-600 hover:bg-amber-500 shadow-amber-950/50': locateState === 'working'
           }"
           class="w-[128px] py-1.5 rounded-lg text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-lg active:scale-95">
-          <span>{{ locateState === 'ok' ? '✔' : (locateState === 'working' ? '■' : '▶') }}</span>
-          <span>{{ t('buttons.' + (locateState === 'ok' ? 'locateOk' : (locateState === 'working' ? 'locating' : 'start'))) }}</span>
+          <span>{{ locateState === 'working' ? '■' : '▶' }}</span>
+          <span>{{ t('buttons.' + (locateState === 'working' ? 'locating' : 'start')) }}</span>
         </button>
       </div>
     </section>
@@ -238,10 +237,10 @@ const emuShortLabel = computed(() => {
 
 const headerMapHost = 'botw.yalin.site'
 
-// 定位按钮三态：未开始 / 定位中 / 定位成功（真身已确认）
+// 定位按钮两态：开始定位（蓝）/ 停止定位（橙）——秒锁时代"定位中/成功"中间态已无信息量
 const locateState = computed(() => {
   if (!isLocating.value) return 'idle'
-  return pos.verified ? 'ok' : 'working'
+  return 'working'
 })
 
 function fmt(v) { return (!pos.ok || v == null) ? '-' : Number(v).toFixed(1) }

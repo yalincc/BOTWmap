@@ -141,7 +141,7 @@ func (w *progressWatcher) refresh() {
 	anchors := currentGame.SaveAnchors(plat)
 	if len(anchors) == 0 {
 		if !w.init {
-			fmt.Println("  [progress] no usable save file yet - will watch for it")
+			fmt.Println("  [progress] 尚未读到可用存档 —— 进游戏手动存一次档即可；仍无则用 GUI「手工指定存档目录」/ no usable save file yet — save once in game, or set the save dir in GUI")
 		}
 		w.ok = false
 		w.init = true

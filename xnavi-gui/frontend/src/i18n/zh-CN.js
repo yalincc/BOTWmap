@@ -39,8 +39,7 @@ export default {
   buttons: {
     openMap: '打开网页地图',
     start: '开始定位',
-    locating: '正在定位中',
-    locateOk: '定位成功',
+    locating: '停止定位',
     browse: '浏览',
     openDir: '打开目录',
     save: '保存',

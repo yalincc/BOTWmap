@@ -18,6 +18,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -28,13 +29,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
 func main() {
 	enableLogTimestamps()
+	primaryPort = 8766 // 实际主端口由 listenOwnedPorts 回填（8766 被占时顺延）
 	// 单实例锁：防多开（2026-10-08 真机事故——孤儿 core 占 8766 端口，
 	// 新 core HTTP 绑定失败 + 每次重启重新 auto 探测 → 表现为平台"换来换去"）。
 	// 已有实例（含残留）时本实例直接退出，提示用户先关旧实例。
@@ -149,42 +153,32 @@ func main() {
 	progress = newProgressWatcher()
 	go progress.loop()
 
-	// 服务器先于定位启动（踩坑固化：网页端要能第一时间连上）
-	// v3.0.2：绑定全部接口（":port"），供手机/iPad 局域网镜像访问；PC 本机不受防火墙影响（回环豁免）
-	addr := fmt.Sprintf(":%d", port)
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		// 端口占用/防火墙拦截：不阻塞定位（ds 双入口原则——GUI 与网页端独立）。
-		// 定位与状态照常，仅网页端不可用；GUI/日志仍可经 status.json + run-events.log 工作。
-		fmt.Printf("  !! HTTP %s failed: %v\n", addr, err)
-		fmt.Println("  !! HTTP 端口被占用：网页端不可用，定位导航照常运行")
-	} else if tlsMode {
-		// v3.1.0：--tls 双协议共存（http + https 同端口）。手机镜像页走 https
-		// （secure context，wakeLock 防息屏）；在线地图 http 轮询、旧 http 书签、
-		// GUI 端口探测继续走明文通道。证书缺失时降级 http（定位照常，防息屏不可用）。
-		certFile := filepath.Join(certDir, "server.pem")
-		keyFile := filepath.Join(certDir, "server.key")
-		cert, errCert := tls.LoadX509KeyPair(certFile, keyFile)
-		if errCert != nil {
-			fmt.Printf("  !! --tls 证书缺失/无效（%s），已降级 http 模式；先运行 certs/gen-cert.ps1 生成证书\n", certFile)
-			tlsMode = false
-			fmt.Printf("  API -> http://127.0.0.1:%d/pos\n", port)
-			go http.Serve(ln, &server{})
-		} else {
-			tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
-			dl := newDualListener(ln, tlsCfg)
-			go dl.run()
-			hdl := &server{}
-			errLog := log.New(&errFilter{w: os.Stderr}, "", log.LstdFlags)
-			plainSrv := &http.Server{Handler: hdl, ErrorLog: errLog}
-			secureSrv := &http.Server{Handler: hdl, ErrorLog: log.New(io.Discard, "", 0)}
-			fmt.Printf("  API -> https://127.0.0.1:%d/pos (http + https dual mode)\n", port)
-			go plainSrv.Serve(dl.plain)
-			go secureSrv.Serve(dl.secure)
-		}
+	// 服务器先于定位启动（踩坑固化：网页端要能第一时间连上）。
+	// v3.2.2 端口自愈（PLAN-PORT-FAILOVER）：独占绑定 + 端口池 port..port+4。
+	// 背景：Windows 默认允许双重绑定——8766 被残留程序（navicemu/旧版 core）占用时
+	// Listen 仍"成功"，但连接全被先占者收走，表现为"定位正常、地图永远离线"且零报错。
+	// 独占绑定（SO_EXCLUSIVEADDRUSE）让冲突变成真实报错，自动顺延下一个端口。
+	tlsCfg := loadTLSCfgIfEnabled(tlsMode, certDir)
+	if tlsCfg == nil {
+		tlsMode = false // 证书缺失降级 http（定位照常，防息屏不可用）
+	}
+	owned, skipped := listenOwnedPorts(port, tlsCfg)
+	if len(owned) == 0 {
+		fmt.Printf("  !! HTTP %d~%d 全部被占用：网页端不可用，定位导航照常运行\n", port, port+4)
+		fmt.Println("  !! 排查：netstat -ano | findstr 876  →  结束残留的 navicemu.exe / 旧版 xnavi-core.exe 后重启")
 	} else {
-		fmt.Printf("  API -> http://127.0.0.1:%d/pos\n", port)
-		go http.Serve(ln, &server{})
+		port = owned[0] // 主端口 = 最低已拥有端口（lanUrl/二维码/状态面板都用它）
+		primaryPort = port
+		if tlsCfg != nil {
+			fmt.Printf("  API -> https://127.0.0.1:%d/pos (http + https dual mode)\n", port)
+		} else {
+			fmt.Printf("  API -> http://127.0.0.1:%d/pos\n", port)
+		}
+		if len(skipped) > 0 {
+			fmt.Printf("  [server] owned ports: %s  (被占用跳过: %s)\n", joinPorts(owned), joinPorts(skipped))
+		} else {
+			fmt.Printf("  [server] owned ports: %s\n", joinPorts(owned))
+		}
 	}
 	lanURL = makeLanURL(port, currentGame.Name(), tlsMode) // 手机镜像 URL（/pos.lanUrl 供网页二维码面板读取）
 
@@ -452,6 +446,74 @@ func (l *chanListener) Close() error {
 	return nil
 }
 func (l *chanListener) Addr() net.Addr { return l.addr }
+
+// exclusiveAddrControl 给 socket 设 SO_EXCLUSIVEADDRUSE（仅 Windows 生效）：
+// 禁止其他进程再绑定同一端口，确保"绑定成功 = 独占拥有"，
+// 根治 Windows 双重绑定下"Listen 成功但连接被先占者收走"的静默饥饿（PLAN-PORT-FAILOVER）。
+// 注意：Winsock 里 SO_EXCLUSIVEADDRUSE = (int)(~SO_REUSEADDR) = -5，不是 0x04（那是 SO_REUSEADDR 本尊）。
+const soExclusiveAddrUse = -5
+
+func exclusiveAddrControl(network, address string, c syscall.RawConn) error {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	var serr error
+	if err := c.Control(func(fd uintptr) {
+		serr = syscall.SetsockoptInt(syscall.Handle(fd), syscall.SOL_SOCKET, soExclusiveAddrUse, 1)
+	}); err != nil {
+		return err
+	}
+	return serr
+}
+
+// loadTLSCfgIfEnabled --tls 模式加载证书；缺失/无效时打印降级提示并返回 nil（走明文）。
+func loadTLSCfgIfEnabled(tlsMode bool, certDir string) *tls.Config {
+	if !tlsMode {
+		return nil
+	}
+	certFile := filepath.Join(certDir, "server.pem")
+	keyFile := filepath.Join(certDir, "server.key")
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		fmt.Printf("  !! --tls 证书缺失/无效（%s），已降级 http 模式；先运行 certs/gen-cert.ps1 生成证书\n", certFile)
+		return nil
+	}
+	return &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+}
+
+// listenOwnedPorts 依次独占绑定 port..port+4，成功的口立即进入服务
+// （tlsCfg 非 nil 时每个口走 http+https 双协议）。
+// 返回 (成功端口升序, 被占跳过端口)。全部失败时 owned 为空。
+func listenOwnedPorts(base int, tlsCfg *tls.Config) (owned []int, skipped []int) {
+	lc := net.ListenConfig{Control: exclusiveAddrControl}
+	hdl := &server{}
+	errLog := log.New(&errFilter{w: os.Stderr}, "", log.LstdFlags)
+	for p := base; p < base+5; p++ {
+		ln, err := lc.Listen(context.Background(), "tcp", fmt.Sprintf(":%d", p))
+		if err != nil {
+			skipped = append(skipped, p)
+			continue
+		}
+		owned = append(owned, p)
+		if tlsCfg != nil {
+			dl := newDualListener(ln, tlsCfg)
+			go dl.run()
+			go (&http.Server{Handler: hdl, ErrorLog: log.New(io.Discard, "", 0)}).Serve(dl.secure)
+			go (&http.Server{Handler: hdl, ErrorLog: errLog}).Serve(dl.plain)
+		} else {
+			go http.Serve(ln, hdl)
+		}
+	}
+	return owned, skipped
+}
+
+func joinPorts(ps []int) string {
+	parts := make([]string, len(ps))
+	for i, p := range ps {
+		parts[i] = strconv.Itoa(p)
+	}
+	return strings.Join(parts, " ")
+}
 
 // dualListener 分派器：底层 tcp 监听 → 按首字节分派到明文/TLS 通道。
 type dualListener struct {

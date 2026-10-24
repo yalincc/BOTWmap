@@ -39,8 +39,7 @@ export default {
   buttons: {
     openMap: 'Open Map',
     start: 'Start Locating',
-    locating: 'Locating...',
-    locateOk: 'Located',
+    locating: 'Stop Locating',
     browse: 'Browse',
     openDir: 'Open Dir',
     save: 'Save',

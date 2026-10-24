@@ -23,7 +23,7 @@ import (
 // guiVersion 导航程序版本（三合一统一版本 v3.0.0，2026-10-07 拍板：
 // GUI 壳与导航核心 xnavi 共享同一版本号，不再各自解耦）。
 // 注意：必须与 xnavi/version.go 的 CoreVersion 保持一致。
-const guiVersion = "v3.2.1"
+const guiVersion = "v3.2.2"
 
 // App Wails 后端：管理核心子进程 + 读 status.json / xnavi-gui-core.log + 网页端端口探测。
 // 与核心的通信完全走文件（status.json、xnavi-gui-core.log），不依赖 8766 HTTP——
@@ -246,7 +246,7 @@ func (a *App) ApplySavePath(path string) string {
 	// 若 core 正在运行，通过 HTTP /save-override 实时通知生效
 	if a.CoreRunning() {
 		body, _ := json.Marshal(map[string]any{"path": cleanPath})
-		req, err := http.NewRequest("POST", "http://127.0.0.1:8766/save-override", strings.NewReader(string(body)))
+		req, err := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%d/save-override", a.coreHTTPPort()), strings.NewReader(string(body)))
 		if err == nil {
 			req.Header.Set("Content-Type", "application/json")
 			client := http.Client{Timeout: 1 * time.Second}
@@ -270,7 +270,7 @@ func (a *App) ResetSaveDetection() string {
 
 	if a.CoreRunning() {
 		body, _ := json.Marshal(map[string]any{"clear": true})
-		req, err := http.NewRequest("POST", "http://127.0.0.1:8766/save-override", strings.NewReader(string(body)))
+		req, err := http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%d/save-override", a.coreHTTPPort()), strings.NewReader(string(body)))
 		if err == nil {
 			req.Header.Set("Content-Type", "application/json")
 			client := http.Client{Timeout: 1 * time.Second}
@@ -411,6 +411,44 @@ func (a *App) CoreRunning() bool {
 // statusPath 核心每 2s 写的会话快照。
 func (a *App) statusPath() string { return filepath.Join(a.workDir, "status.json") }
 
+// coreHTTPPort 核心 HTTP 实际主端口（v3.2.2 端口自愈，PLAN-PORT-FAILOVER）：
+// 核心独占绑定 8766~8770，8766 被占时自动顺延，并把实际主端口写进 status.json 的
+// "port" 字段（每 2s 刷新）。GUI 全部 HTTP 调用（save-override / rescan）由此跟随，
+// 读不到（旧版核心 / 尚未写入 / 字段缺失）时回退 8766。
+func (a *App) coreHTTPPort() int {
+	port := 8766
+	if buf, err := os.ReadFile(a.statusPath()); err == nil {
+		var obj map[string]any
+		if json.Unmarshal(buf, &obj) == nil {
+			if v, ok := obj["port"].(float64); ok && v >= 1024 && v <= 65535 {
+				port = int(v)
+			}
+		}
+	}
+	return port
+}
+
+// navPorts 端口池（与核心 listenOwnedPorts 保持一致）。
+var navPorts = []int{8766, 8767, 8768, 8769, 8770}
+
+func anyNavPortInUse() bool {
+	for _, p := range navPorts {
+		if portInUse(p) {
+			return true
+		}
+	}
+	return false
+}
+
+func allNavPortsInUse() bool {
+	for _, p := range navPorts {
+		if !portInUse(p) {
+			return false
+		}
+	}
+	return true
+}
+
 // snapshotSignedBy 校验快照里的 corePid 是否就是本次拉起的子进程号。
 // v3.2.1：status.json 会残留在磁盘上，若不做会话签名校验，上次会话的旧坐标
 // 与 verified=true 会被当成本次状态，导致地图带着旧位置自动弹出。
@@ -444,20 +482,21 @@ func (a *App) CoreStatus() map[string]any {
 			obj["note"] = "核心未运行"
 		}
 	}
-	// 网页端可用性：核心运行且 8766 未被外部占用 → 可用。
-	// 核心日志里出现 "HTTP 端口被占用" 说明核心启动时 listen 失败。
-	obj["webOK"] = !portInUse(8766) || running
+	// 网页端可用性（v3.2.2 端口自愈）：核心运行 → 网页可用——核心独占绑定
+	// 8766~8770 中至少一个口，实际主端口见 status.json 的 "port" 字段（GUI HTTP 调用已跟随）。
+	obj["webOK"] = running || !anyNavPortInUse()
 	obj["webNote"] = ""
 	if !running {
-		if portInUse(8766) {
+		if allNavPortsInUse() {
 			obj["webOK"] = false
-			obj["webNote"] = "端口 8766 被其他程序占用：网页端不可用（GUI 定位不受影响）"
+			obj["webNote"] = "端口 8766~8770 全部被其他程序占用：网页端将不可用（GUI 定位不受影响）"
 		} else {
 			obj["webNote"] = "网页端待核心启动后可用"
 		}
-	} else if strings.Contains(a.lastLog(), "HTTP 端口被占用") {
+	} else if strings.Contains(a.lastLog(), "全部被占用") {
+		// 核心运行但五口全败（日志 "HTTP 8766~8770 全部被占用"）的罕见场景
 		obj["webOK"] = false
-		obj["webNote"] = "HTTP 端口被占用：网页端不可用，GUI 定位正常（双入口独立）"
+		obj["webNote"] = "端口 8766~8770 全部被占用：网页端不可用，GUI 定位正常（双入口独立）"
 	}
 	return obj
 }
@@ -550,7 +589,7 @@ func (a *App) OpenLogDir() string {
 
 // ManualCalibrate 手工坐标校准（向核心发送 /rescan?x=...&z=...）
 func (a *App) ManualCalibrate(x, z float64) string {
-	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:8766/rescan?x=%.1f&z=%.1f", x, z))
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/rescan?x=%.1f&z=%.1f", a.coreHTTPPort(), x, z))
 	if err != nil {
 		return "发送校准请求失败（核心可能未启动）"
 	}
@@ -560,7 +599,7 @@ func (a *App) ManualCalibrate(x, z float64) string {
 
 // Rescan 触发一次全局重新扫描
 func (a *App) Rescan() string {
-	resp, err := http.Get("http://127.0.0.1:8766/rescan")
+	resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/rescan", a.coreHTTPPort()))
 	if err != nil {
 		return "发送重扫请求失败"
 	}
