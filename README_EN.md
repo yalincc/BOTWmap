@@ -30,6 +30,7 @@ Want to watch your character walk across the map in real time? Pair the map with
 1. Launch your emulator and load the game.
 2. Run `xnavi.exe` and hit "Start Locating."
 3. Open the online map — your position appears live at the bottom-right corner.
+4. Phone/tablet follow (optional): requires the local offline map — download `botwmap-vX.Y.Z.zip` (tags prefixed `botwmap-vX.Y.Z` on Releases), unzip it next to `xnavi.exe` (merge the two packages), then scan the QR code in the GUI; see the README inside the xnavi package for details.
 
 - Auto-detects all three emulators; reads memory only — no injection, no game modification
 - Save sync: your progress refreshes on the map within 2 seconds of saving in-game
