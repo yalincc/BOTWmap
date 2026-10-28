@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=67&b=1641016">
+<link rel="stylesheet" href="css/style.css?v=68&b=1641016">
 <style>
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
@@ -89,12 +89,13 @@
 
     <div class="save-upload">
       <div class="su-row">
-        <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）" data-i18n="save.loadBtn" data-i18n-title="save.loadBtn.title">📂 从存档加载进度…</button>
-        <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里" data-i18n-aria="save.help">?</span>
-        <span class="su-clear-wrap">
-          <button id="btnClearDone" type="button" class="su-clear" aria-label="清空旧存档数据">🧹</button>
-          <span class="su-clear-tip hidden" id="suClearTip" data-i18n="save.clearTip">清空旧存档数据</span>
+        <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）" data-i18n="save.loadBtn" data-i18n-title="save.loadBtn.title">📂 加载存档</button>
+        <!-- V1.7.2 存档区精简：修改存档由独立整行收为 18px 圆形小图标，位于「加载存档」与「?」之间；悬停出提示气泡 -->
+        <span class="su-edit-wrap">
+          <button id="btnSaveEdit" type="button" class="su-edit" aria-label="修改本地存档" title="修改本地存档" data-i18n-aria="save.editBtn" data-i18n-title="save.editBtn" onclick="window.open('save-edit/editor.html?v=6','_blank')">🛠</button>
+          <span class="su-edit-tip" id="suEditTip" data-i18n="save.editBtn">修改本地存档</span>
         </span>
+        <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里" data-i18n-aria="save.help">?</span>
       </div>
       <div class="su-tip hidden" id="suTip">
         <b data-i18n-html="save.tip.file">存档文件：game_data.sav（Switch 与 Wii U·Cemu 同名，上传自动识别端序）</b>
@@ -187,8 +188,8 @@
         <button id="hbClose" class="card-close" title="关闭" data-i18n-title="common.close">×</button>
       </div>
       <div class="hq">
-        <h4 data-i18n="help.q1">📂 加载存档进度（网页上传）</h4>
-        <p data-i18n-html="help.a1_1">存档文件：<code>game_data.sav</code>（Switch 与 Wii U·Cemu 同名，上传后自动识别端序），拖进左侧面板或点「从存档加载进度…」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
+        <h4 data-i18n="help.q1">📂 加载存档（网页上传 / 自动同步）</h4>
+        <p data-i18n-html="help.a1_1">存档文件：<code>game_data.sav</code>（Switch 与 Wii U·Cemu 同名，上传后自动识别端序），拖进左侧面板或点「加载存档」即可，<b>文件只在浏览器内解析，不会上传</b>。</p>
         <p data-i18n="help.a1_2">常见存档位置：</p>
         <p data-i18n-html="help.a1_3">Cemu：<code>%APPDATA%\Cemu\mlc01\usr\save\00050000\101c9300\user\80000001\&lt;槽&gt;\game_data.sav</code><br>Ryujinx / Eden：<code>%APPDATA%\Ryujinx\bis\user\save\...\01007EF00011E000\&lt;槽&gt;\game_data.sav</code></p>
         <p class="hq-note" data-i18n-html="help.a1_note">中间的用户/标题 ID 目录每个人不一样；找不到时按 <code>Win + R</code> 粘贴上面的根路径回车，逐层进到 <code>game_data.sav</code> 为止。<code>101c9300</code> 为日版（中文补丁一般基于日版 rom），美版 <code>101c9400</code>、欧版 <code>101c9500</code>。</p>
@@ -414,8 +415,8 @@
 
 </div>
 
-<script src="data/i18n/zh.js?v=6&b=1641016"></script>
-<script src="data/i18n/en.js?v=7&b=1641016"></script>
+<script src="data/i18n/zh.js?v=7&b=1641016"></script>
+<script src="data/i18n/en.js?v=8&b=1641016"></script>
 <script src="data/i18n/quests_en.js?v=1&b=1641016"></script>
 <script src="js/i18n.js?v=4&b=1641016"></script>
 <script src="js/data.js?v=6&b=1641016"></script>
@@ -435,12 +436,12 @@
 <script src="js/supercluster.min.js"></script>
 <script src="js/materials.js?v=1&b=1641016"></script>
 <script src="js/regions.js?v=rn6&b=1641016"></script>
-<script src="js/map.js?v=52&b=1641016"></script>
+<script src="js/map.js?v=53&b=1641016"></script>
 <script src="js/card-layout.js?v=6&b=1641016"></script>
 <script src="js/spot-mark.js?v=1&b=1641016"></script>
 <script src="js/ui.js?v=76&b=1641016"></script>
 <script src="js/main.js?v=11&b=1641016"></script>
-<script src="js/live.js?v=22&b=1641016"></script>
+<script src="js/live.js?v=23&b=1641016"></script>
 <script src="data/save_flags.js?v=1&b=1641016"></script>
 <script src="data/quest_save.js?v=2&b=1641016"></script>
 <script src="data/chest_save.js?v=1&b=1641016"></script>

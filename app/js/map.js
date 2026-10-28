@@ -400,31 +400,72 @@ class BotwMap {
   }
 
   /* ---------- 绘制 ---------- */
+  /* V1.7.2 绘制架构改造：分层管道（layer pipeline）
+   * 旧实现是一条无隔离的长链——任何一环抛错，排在后面的图层全部静默消失
+   * （导航距离文字少个变量就能让任务/装备/宝箱三个图层一起不见）。
+   * 新实现三层保障：
+   *   1) 故障隔离：每层独立 try/catch，一层坏只丢自己，其余照常；
+   *   2) 状态沙箱：每层前后强制 ctx.save()/restore()，任何一层都无法把线宽/透明度/
+   *      虚线样式泄漏给后续图层（"路线与图标打架"的根因就在这）；
+   *   3) 层序语义化：线（轨迹/导航引导线）永远在图标之下，玩家永远在所有图标之上。
+   * 错误按层名去重记录在 this._layerErr，验收脚本可断言「0 层报错」。 */
+  _stage(name, fn) {
+    const ctx = this.ctx;
+    ctx.save();
+    try { fn(ctx); }
+    catch (e) {
+      const E = this._layerErr || (this._layerErr = {});
+      if (!E[name]) {
+        E[name] = { n: 0, msg: String((e && e.message) || e) };
+        if (window.console && console.warn) console.warn('[draw] 图层「' + name + '」异常（已隔离）:', e);
+      }
+      E[name].n++;
+    } finally {
+      try { ctx.restore(); } catch (e2) { /* restore 失败兜底：不让隔离机制自己抛错 */ }
+    }
+  }
+
   draw() {
     const ctx = this.ctx;
-    const { w, h, view } = this;
+    const { w, h } = this;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = '#10150f';
     ctx.fillRect(0, 0, w, h);
 
-    this._drawTiles(ctx);
+    // 视口内标记只算一次，供线层（克洛格轨迹）与图标层共用
+    const vis = this._visibleMarkers();
 
-    this._drawRegions(ctx);   // 地形/区域名（瓦片之上、标记之下，作为背景标注）
+    /* —— 底层 —— */
+    this._stage('tiles', c => this._drawTiles(c));
+    this._stage('regions', c => this._drawRegions(c));
 
-    this._drawMeasure(ctx);
-    this._drawMaterials(ctx); // 材料追踪层（下层：不遮挡神庙/塔等主标记）
-    this._drawMarkers(ctx);
+    /* —— 线层：所有折线/引导线画在图标之下，不遮挡图标 —— */
+    this._stage('korokPaths', c => this._drawKorokPaths(c, vis));
+    this._stage('dragonPaths', c => this._drawDragonPaths(c));
+    // live 线（玩家轨迹 + 导航引导线）：新版拆出 _drawLiveRoutes；旧 live.js 无此方法时跳过
+    if (typeof this._drawLiveRoutes === 'function') this._stage('liveRoutes', c => this._drawLiveRoutes(c));
+
+    this._stage('measure', c => this._drawMeasure(c));
+    this._stage('materials', c => this._drawMaterials(c)); // 材料层（下层：不遮挡神庙/塔等主标记）
+
+    /* —— 图标层 —— */
+    this._stage('markers', c => this._drawMarkers(c, vis));
     // v1.4.0：移除材料选中白色描边环（原 _drawMatSel）；选中材料仅图标略微放大作为点击反馈
-    this._drawCustom(ctx);
-    // live 层：玩家位置 / 轨迹 / 导航线（live.js 注入；live.js 加载前的早期 draw 可能未挂载，防御）
-    if (typeof this._drawLive === 'function') this._drawLive(ctx);
-    // V1.6.0 外部图层：任务 / 装备点（quest.js / equip.js 注册，独立绘制不侵入主线）
-    for (const fn of this._extDraw) {
-      try { fn(ctx); } catch (e) { /* 外部图层异常不影响主地图 */ }
+    this._stage('custom', c => this._drawCustom(c));
+    // V1.6.0 外部图层：任务 / 装备 / 宝箱 / 营地 / 自定义标记（各自注册，独立隔离）
+    const exts = this._extDraw;
+    for (let i = 0; i < exts.length; i++) this._stage('ext' + i, exts[i]);
+
+    /* —— 顶层：玩家位置永远压在所有图标之上 —— */
+    if (typeof this._drawLivePlayer === 'function') {
+      this._stage('livePlayer', c => this._drawLivePlayer(c));
+    } else if (typeof this._drawLive === 'function') {
+      // 兼容旧 live.js（缓存混合期）：退回单段绘制，至少保证玩家可见
+      this._stage('live', c => this._drawLive(c));
     }
     // V1.6.1 调整g：定位脉冲光圈（标记之上、UI 之下）
-    this._drawPulses(ctx);
-    this._updateZoomPct();
+    this._stage('pulses', c => this._drawPulses(c));
+    this._stage('zoomPct', () => this._updateZoomPct());
   }
 
   /* V1.6.1 卡片避让统一内核：定位光圈改由 CardLayout 提层到 DOM（z-index 940），
@@ -624,14 +665,14 @@ class BotwMap {
            (!!this.liveDone && this.liveDone.has(mk.id));
   }
 
-  _drawMarkers(ctx) {
-    const vis = this._visibleMarkers();
+  _drawMarkers(ctx, visIn) {
+    // V1.7.2：视口标记由 draw() 统一算一次传入（线层也要用）；单独调用时自行兜底
+    const vis = visIn || this._visibleMarkers();
     // 按绘制优先级排序，保证重要标记画在最上层
     vis.sort((a, b) => (CAT_CFG[a.cat]?.order || 0) - (CAT_CFG[b.cat]?.order || 0));
 
-    // 克洛格轨迹（v1.1.4）+ 龙飞行轨迹（v1.4.3）：先画折线，图标覆盖在上面
-    this._drawKorokPaths(ctx, vis);
-    this._drawDragonPaths(ctx);
+    /* V1.7.2 架构改造：克洛格轨迹 / 龙飞行轨迹已上移到 draw() 的「线层」，
+       先于所有图标绘制 —— 线不再压在图标上，也不受本层异常影响 */
 
     const labelList = [];
     const scale = this.view.scale;

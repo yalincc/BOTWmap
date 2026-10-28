@@ -358,6 +358,22 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   background: #1d1a10; border: 1px solid rgba(242,201,76,.3); border-radius: 6px; padding: 4px 9px;
   font-size: 11px; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,.45); z-index: 30; }
 
+/* 存档区：修改存档入口（V1.7.2）。由整行按钮收为 18px 圆形图标，与「?」同排；
+   悬停显示气泡（纯 CSS，无需 JS）。 */
+.save-upload .su-edit-wrap { position: relative; flex: 0 0 auto; display: flex; }
+.save-upload .su-edit { display: block; width: 18px; height: 18px; padding: 0;
+  font-size: 11px; line-height: 16px; text-align: center; color: var(--gold);
+  background: transparent; border: 1px solid rgba(242,201,76,.4); border-radius: 50%;
+  cursor: pointer; user-select: none; }
+.save-upload .su-edit:hover, .save-upload .su-edit:focus { background: rgba(242,201,76,.22);
+  border-color: rgba(242,201,76,.75); outline: none; }
+.su-edit-tip { display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%); white-space: nowrap; background: #1d1a10;
+  border: 1px solid rgba(242,201,76,.3); border-radius: 6px; padding: 4px 9px;
+  font-size: 11px; color: var(--text); box-shadow: 0 4px 12px rgba(0,0,0,.45);
+  z-index: 30; pointer-events: none; }
+.su-edit-wrap:hover .su-edit-tip, .su-edit-wrap:focus-within .su-edit-tip { display: block; }
+
 /* 世界等级徽标（V1.7.1）：挂「探索度」折叠行右端（老大二次指示——敌人大类不协调、
    英文在组标题行会被挤截断；探索度行整宽够放）。绝对定位于按钮行，平级不触发折叠 */
 .stats-head-wrap { position: relative; }

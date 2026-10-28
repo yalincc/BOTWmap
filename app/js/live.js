@@ -68,7 +68,7 @@ const LIVE = (() => {
         follow = !follow;
         try { localStorage.setItem(K_FOLLOW, follow ? '1' : '0'); } catch (e) {}
         b.classList.toggle('on', follow);
-        if (follow && map.live.mx != null) { centerOnPlayer(); map.draw(); }
+        if (follow && map.live.mx != null) { centerOnPlayer({ pull: true }); map.draw(); }
         UI.toast(follow ? '已开启：视图跟随玩家' : '已关闭跟随');
       });
     }
@@ -241,6 +241,8 @@ const LIVE = (() => {
       L.lastMx = p.mx;
       L.lastMy = p.my;
 
+      /* V1.7.2：首次定位成功记为一次「拉近」机会（之后跟随只平移，不再干预用户缩放） */
+      const firstFix = (L.mx == null);
       L.mx = p.mx; L.my = p.my;
       L.gx = p.gx; L.gy = p.gy; L.gz = p.gz;
       L.verified = !!p.verified;
@@ -251,7 +253,7 @@ const LIVE = (() => {
         lastPosKey = key;
         L.trail.push([p.mx, p.my]);
         if (L.trail.length > 600) L.trail.shift();
-        if (follow) { centerOnPlayer(); }
+        if (follow) { centerOnPlayer(firstFix ? { pull: true } : null); }
       }
       syncConfig();
       // 进度代次变化（游戏内保存 → 存档更新）→ 立即重新拉取收集进度
@@ -389,11 +391,23 @@ const LIVE = (() => {
         done.add(mk.id);
       }
     }
-    const changed = map.liveDone.size !== done.size;
-    map.liveDone = done;
+    /* V1.7.2：/progress 只负责 5 类可收集点（神庙/塔/克洛格/回忆/神兽）的判定；
+       其余类别（讨伐 BOSS、宝箱、任务、武器图鉴等）由存档解析（/save → applySave）注入，
+       原样继承 —— 旧实现直接 map.liveDone = done 整体替换，每 2s 轮询都会把刚同步进来的
+       讨伐标记抹掉（历史上全靠本地 doneSet 兜底侥幸保住，属于隐性依赖）。 */
+    const next = new Set(done);
+    if (map.liveDone) {
+      for (const id of map.liveDone) {
+        if (next.has(id)) continue;
+        const mk = byId(id);
+        if (mk && !DONE_TYPES[mk.cat]) next.add(id);   // 非 5 类：继承存档解析结果
+      }
+    }
+    const changed = map.liveDone.size !== next.size;
+    map.liveDone = next;
     // 吸收式合并：存档已收集 → 写回本地完成集合（持久化，离线打开也保留；以存档为准）
     let grew = false;
-    for (const id of done) {
+    for (const id of next) {
       if (!map.doneSet.has(id)) { map.doneSet.add(id); grew = true; }
     }
     if (grew) UI.persistDone();
@@ -403,10 +417,18 @@ const LIVE = (() => {
   }
 
   /* ---------- 视图跟随玩家 ---------- */
-  function centerOnPlayer() {
+  /* V1.7.2：跟随只负责「平移」，不再改动缩放。
+   * 旧实现每次位置更新都执行 缩放 = max(当前缩放, 0.55)，0.55 相当于全图适配的 ~1222%，
+   * 于是用户主动缩到 100% / 200% 想看大范围，下一 tick 就被硬拽回跟随级别。
+   * 现在只有「刚开启跟随」或「首次定位成功」时做一次性拉近（且仅当当前比可读阈值更远），
+   * 之后用户缩放多少就保持多少。 */
+  const FOLLOW_MIN_SCALE = 0.55;   // 一次性拉近的目标缩放（能看清地形的档位）
+  function centerOnPlayer(opts) {
     const L = map.live;
     if (L.mx == null) return;
-    const s = Math.max(map.view.scale, 0.55);
+    const pull = !!(opts && opts.pull);
+    let s = map.view.scale;
+    if (pull && s < FOLLOW_MIN_SCALE) s = FOLLOW_MIN_SCALE;
     map.view.x = map.w / 2 - L.mx * s;
     map.view.y = map.h / 2 - L.my * s;
     map.view.scale = s;
@@ -670,8 +692,17 @@ const LIVE = (() => {
     return n;
   }
 
-  /* ---------- 画布绘制（挂到 BotwMap.prototype._drawLive） ---------- */
-  function drawLive(ctx) {
+  /* ---------- 画布绘制（V1.7.2 拆为「线层」与「玩家层」两段） ----------
+   * 旧实现是一个 drawLive 混装轨迹 + 引导线 + 玩家 + 距离文字，且 rad 变量声明在
+   * if/else 块内、却在块外引用 → 只要存在导航目标（L.tgt 且 L.tdist 非空）就抛
+   * ReferenceError，把 map.draw() 整条链的后半段（任务/装备/宝箱/营地图层）全部带走。
+   * 现在拆成两段，由 map.draw() 挂到不同层：
+   *   _drawLiveRoutes = 线（玩家轨迹 + 导航引导线/目标环）→ 画在图标之下
+   *   _drawLivePlayer = 图标（玩家箭头/圆点 + 距离文字）→ 画在所有图标之上
+   * rad 提到函数作用域顶层，块内不再重复声明，从根上消除这类跨块引用错误。 */
+
+  /* 线层：移动轨迹 + 导航引导线 */
+  function drawLiveRoutes(ctx) {
     const L = this.live;
     if (!L) return;
     const w = this.w, h = this.h;
@@ -701,7 +732,7 @@ const LIVE = (() => {
     const [px, py] = this.m2s([L.mx, L.my]);
     if (px < -40 || py < -40 || px > w + 40 || py > h + 40) return;
 
-    // 目标引导线（金色虚线 + 目标环）
+    // 目标引导线（金色虚线 + 目标环）—— 与玩家保持同一视野判定
     if (L.tgt) {
       const [tx, ty] = this.m2s([L.tgt.x, L.tgt.y]);
       ctx.save();
@@ -715,11 +746,23 @@ const LIVE = (() => {
       ctx.lineWidth = 2; ctx.stroke();
       ctx.restore();
     }
+  }
+
+  /* 玩家层：位置图标 + 目标距离 */
+  function drawLivePlayer(ctx) {
+    const L = this.live;
+    if (!L || L.mx == null) return;
+    const w = this.w, h = this.h;
+    const [px, py] = this.m2s([L.mx, L.my]);
+    if (px < -40 || py < -40 || px > w + 40 || py > h + 40) return;
+
+    // 玩家点半径（箭头 / 圆点各一套，均在函数作用域顶层声明，供距离文字复用）
+    const rad = L.verified ? 8 : 6;
+    const radDot = L.verified ? 7 : 5;
 
     // 玩家位置：有朝向（运动推算或服务提供）画角色箭头，无朝向/初始静止态画圆点
     ctx.save();
     if (typeof L.heading === 'number') {
-      const rad = L.verified ? 8 : 6;
       ctx.translate(px, py);
       ctx.rotate(L.heading * Math.PI / 180);
       ctx.shadowColor = 'rgba(255,50,50,.85)';
@@ -737,18 +780,17 @@ const LIVE = (() => {
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
     } else {
-      const rad = L.verified ? 7 : 5;
       ctx.shadowColor = 'rgba(255,60,60,.85)';
       ctx.shadowBlur = 10;
       ctx.fillStyle = '#ff3b3b';
       ctx.beginPath();
-      ctx.arc(px, py, rad, 0, Math.PI * 2);
+      ctx.arc(px, py, radDot, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(px, py, rad + 2.5, 0, Math.PI * 2);
+      ctx.arc(px, py, radDot + 2.5, 0, Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -766,7 +808,11 @@ const LIVE = (() => {
   }
 
   if (typeof BotwMap !== 'undefined') {
-    BotwMap.prototype._drawLive = drawLive;
+    BotwMap.prototype._drawLiveRoutes = drawLiveRoutes;
+    BotwMap.prototype._drawLivePlayer = drawLivePlayer;
+    /* 兼容旧 map.js（网页/脚本缓存混合期）：旧代码只认 _drawLive，退回玩家层，
+       至少保证玩家位置可见；新版 map.js 优先用上面两个拆开的方法。 */
+    BotwMap.prototype._drawLive = drawLivePlayer;
   }
 
   return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive, clearTrail, loadProgress };
