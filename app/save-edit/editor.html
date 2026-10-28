@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>旷野之息 · 存档修改</title>
+<link rel="stylesheet" href="editor.css?v=6">
+</head>
+<body>
+<div id="app">
+
+  <!-- 手机顶栏 -->
+  <div id="mobileBar" class="mobile-bar">
+    <button id="btnRail" class="icon-btn" type="button" aria-label="打开模块菜单">☰</button>
+    <div class="mobile-brand">旷野之息 <em>存档修改</em></div>
+    <button id="btnMobileDownload" class="btn mini gold" type="button" disabled>下载</button>
+  </div>
+
+  <div id="railScrim" class="rail-scrim"></div>
+
+  <!-- 左侧模块面板（TOTKmap 风格） -->
+  <aside id="rail" class="rail" aria-label="模块导航">
+    <div class="rail-head">
+      <div class="brand">
+        <span class="brand-mark">◈</span>
+        <div class="brand-text">
+          <h1>旷野之息 <em>存档修改</em></h1>
+          <p>本地处理 · 不传存档</p>
+        </div>
+      </div>
+      <button id="btnRailClose" class="icon-btn rail-close" type="button" aria-label="关闭模块菜单">×</button>
+      <a class="back-link" href="../index.html">← 返回地图</a>
+    </div>
+
+    <div id="saveCard" class="save-card">
+      <div class="sc-empty">未载入存档</div>
+    </div>
+
+    <nav id="moduleNav" class="module-nav" aria-label="功能模块"></nav>
+
+    <div class="rail-foot">
+      <div id="dirtyLine" class="dirty-line">未载入存档</div>
+      <button id="btnOpen" class="btn gold block" type="button">打开存档</button>
+      <button id="btnFromNavi" class="btn ghost block" type="button">从 xnavi 读取最新档</button>
+      <div id="naviNotice" class="navi-notice hidden">
+        当前是 <b>file://</b>，浏览器不允许页面连本机 xnavi。<br>
+        <a href="http://127.0.0.1:8766/botw/save-edit/editor.html?v=6" target="_blank" rel="noopener">用 xnavi 本地页打开</a> 后再点一次。
+      </div>
+      <div class="rail-actions">
+        <button id="btnBackup" class="btn ghost" type="button" disabled>备份原档</button>
+        <button id="btnReset" class="btn ghost" type="button" disabled>还原修改</button>
+      </div>
+      <button id="btnDownload" class="btn gold block" type="button" disabled>下载修改档</button>
+      <input id="fileInput" type="file" accept=".sav" hidden>
+      <p class="rail-tip">只写白名单字段；改前先备份。</p>
+    </div>
+  </aside>
+
+  <!-- 主工作区 -->
+  <main id="main" class="main">
+    <div id="emptyState" class="empty-state">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-mark">◈</div>
+        <h2>把 game_data.sav 拖进来</h2>
+        <p>或点击选择文件 · 支持 v1.0–v1.6 · Wii U / Switch</p>
+        <div class="dz-actions">
+          <button class="btn gold" id="btnOpen2" type="button">选择存档</button>
+          <button class="btn ghost" id="btnFromNavi2" type="button">从 xnavi 读取最新档</button>
+        </div>
+        <p class="dz-note">文件只在浏览器内存里处理，不会上传。</p>
+      </div>
+    </div>
+    <section id="moduleView" class="module-view hidden"></section>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
+</div>
+
+<script src="marc-file.js?v=6"></script>
+<script src="botw-data.js?v=6"></script>
+<script src="botw-core.js?v=6"></script>
+<script src="botw-icons.js?v=6"></script>
+<script src="botw-ui.js?v=6"></script>
+</body>
+</html>
