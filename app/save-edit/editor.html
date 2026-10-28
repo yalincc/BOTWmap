@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 · 存档修改</title>
-<link rel="stylesheet" href="editor.css?v=6">
+<link rel="stylesheet" href="editor.css?v=10">
 </head>
 <body>
 <div id="app">
@@ -44,7 +44,7 @@
       <button id="btnFromNavi" class="btn ghost block" type="button">从 xnavi 读取最新档</button>
       <div id="naviNotice" class="navi-notice hidden">
         当前是 <b>file://</b>，浏览器不允许页面连本机 xnavi。<br>
-        <a href="http://127.0.0.1:8766/botw/save-edit/editor.html?v=6" target="_blank" rel="noopener">用 xnavi 本地页打开</a> 后再点一次。
+        <a href="http://127.0.0.1:8766/botw/save-edit/editor.html?v=10" target="_blank" rel="noopener">用 xnavi 本地页打开</a> 后再点一次。
       </div>
       <div class="rail-actions">
         <button id="btnBackup" class="btn ghost" type="button" disabled>备份原档</button>
@@ -70,15 +70,18 @@
         <p class="dz-note">文件只在浏览器内存里处理，不会上传。</p>
       </div>
     </div>
-    <section id="moduleView" class="module-view hidden"></section>
+    <div class="module-view">
+      <div id="changeSlot"></div>
+      <section id="moduleView" class="hidden"></section>
+    </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
   </main>
 </div>
 
-<script src="marc-file.js?v=6"></script>
-<script src="botw-data.js?v=6"></script>
-<script src="botw-core.js?v=6"></script>
-<script src="botw-icons.js?v=6"></script>
-<script src="botw-ui.js?v=6"></script>
+<script src="marc-file.js?v=10"></script>
+<script src="botw-data.js?v=10"></script>
+<script src="botw-core.js?v=10"></script>
+<script src="botw-icons.js?v=10"></script>
+<script src="botw-ui.js?v=10"></script>
 </body>
 </html>

@@ -34,6 +34,32 @@
   const ICON_COLS = 16;
   const ICON_SIZE = 64;
 
+  // 每张精灵图的实际像素尺寸。格子恒为 64×64，但**列数各不相同**
+  // （Item_Fruit 12 列、Item_Ore 10 列、Item_FishGet 15 列…），
+  // 早期统一按 16 列推算，导致列数不足的表从第 N 个起全部错位。
+  const SPRITE = {
+    Weapon_Sword: [1024, 256],
+    Weapon_Lsword: [1024, 192],
+    Weapon_Spear: [1024, 192],
+    Weapon_Bow: [1024, 128],
+    Weapon_Shield: [1024, 192],
+    Item_Fruit: [768, 64],
+    Item_MushroomGet: [768, 64],
+    Item_InsectGet: [1024, 128],
+    Item_FishGet: [960, 64],
+    Item_Ore: [640, 64],
+    Item_PlantGet: [832, 64],
+    Item_Meat: [384, 64],
+    Item_Roast: [1024, 192],
+    Item_RoastFish: [576, 64],
+    Item_Chilled: [384, 64],
+    Item_ChilledFish: [576, 64],
+    Item_Enemy: [1024, 256],
+    Item_Material: [512, 64],
+    Item_Cook: [1024, 512],
+    Other: [1024, 384]
+  };
+
   function resolveIcon(id) {
     var fileName, idx, match;
     if (match = id.match(/^Weapon_(Sword|Lsword|Spear|Bow|Shield)_([0-9]{3})/)) { fileName = 'Weapon_' + match[1]; idx = match[2]; }
@@ -51,22 +77,27 @@
     return { file: fileName, index: i };
   }
 
-  // 返回 CSS background 样式（按 size 缩放精灵）
+  // 返回 CSS background 样式（按 size 缩放精灵；列/行数按该图实际尺寸推算）
   function iconStyle(id, size) {
     var r = resolveIcon(id);
     if (!r) return null;
+    var sp = SPRITE[r.file];
+    if (!sp) return null;
     size = size || 48;
-    var x = (r.index % ICON_COLS) * size;
-    var y = Math.floor(r.index / ICON_COLS) * size;
+    var cols = sp[0] / ICON_SIZE;
+    var col = r.index % cols;
+    var row = Math.floor(r.index / cols);
+    var scale = size / ICON_SIZE;
     return {
       backgroundImage: 'url(assets/' + r.file + '.png)',
-      backgroundPosition: '-' + x + 'px -' + y + 'px',
+      backgroundPosition: (-col * size) + 'px ' + (-row * size) + 'px',
       backgroundRepeat: 'no-repeat',
       width: size + 'px',
       height: size + 'px',
-      backgroundSize: (ICON_COLS * size) + 'px auto'
+      // 用显式宽高，不用 auto：避免非等比表把格子拉成非方形
+      backgroundSize: (sp[0] * scale) + 'px ' + (sp[1] * scale) + 'px'
     };
   }
 
-  return { ICONS: ICONS, ICON_COLS: ICON_COLS, ICON_SIZE: ICON_SIZE, resolveIcon: resolveIcon, iconStyle: iconStyle };
+  return { ICONS: ICONS, ICON_COLS: ICON_COLS, ICON_SIZE: ICON_SIZE, SPRITE: SPRITE, resolveIcon: resolveIcon, iconStyle: iconStyle };
 });

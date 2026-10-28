@@ -27,9 +27,13 @@
     itemSearch: '',
     foodSearch: '',
     teleportEnabled: false,
-    teleportAutoMap: true
+    teleportAutoMap: true,
+    changeOpen: false
   };
   var teleportOriginal = null;
+  // 载入时的原始存档对象（解析一次常驻），改动明细靠它对比，避免每次输入重解析 1MB
+  var origSave = null;
+  var origIndex = {};
   var toastTimer = null;
 
   var $ = function (id) { return document.getElementById(id); };
@@ -74,9 +78,10 @@
 
   function iconHtml(id, size, cls) {
     var st = ICONS && ICONS.iconStyle ? ICONS.iconStyle(id, size) : null;
-    var style = st
+    var style = (st
       ? 'background-image:' + st.backgroundImage + ';background-position:' + st.backgroundPosition + ';background-size:' + st.backgroundSize + ';background-repeat:no-repeat;'
-      : '';
+      : '') +
+      'width:' + size + 'px;height:' + size + 'px;';
     var fallback = st ? '' : esc((DATA.NAMES[id] || id || '?').charAt(0));
     return '<div class="' + cls + '" style="' + style + '">' + fallback + '</div>';
   }
@@ -96,6 +101,167 @@
   function getDirty() {
     if (!save || !originalBytes) return 0;
     return save.countChangedFields(originalBytes);
+  }
+
+  /* ================= 改动明细 ================= */
+  function fmtRupee(n) { return Number(n || 0).toLocaleString('zh-CN'); }
+  function posText(p) { return p.x.toFixed(2) + ' / ' + p.y.toFixed(2) + ' / ' + p.z.toFixed(2); }
+  function qtyGroup(it) {
+    if (it.cat === 'food') return '料理和药物';
+    if (it.cat === 'ammo') return '箭矢';
+    return '材料和道具';
+  }
+
+  // 结构化改动清单（原始档 vs 当前档）；面板与导出摘要共用这一个数据源
+  // 每一项带 undo()，支持「只撤销这一项」
+  function collectChanges() {
+    var out = [];
+    if (!save || !origSave) return out;
+
+    if (origSave.getRupees() !== save.getRupees()) {
+      var ru = origSave.getRupees();
+      out.push({
+        g: '基础数值', n: '卢比', from: fmtRupee(ru), to: fmtRupee(save.getRupees()),
+        undo: function () { save.setRupees(ru); }
+      });
+    }
+    if (origSave.getHearts() !== save.getHearts()) {
+      var he = origSave.getHearts();
+      out.push({
+        g: '基础数值', n: '生命上限', from: he + ' 心', to: save.getHearts() + ' 心',
+        undo: function () { save.setHearts(he); }
+      });
+    }
+    if (origSave.getStaminaBits() !== save.getStaminaBits()) {
+      var st = origSave.getStaminaBits();
+      out.push({
+        g: '基础数值', n: '精力上限',
+        from: BotWSave.staminaLabel(st), to: BotWSave.staminaLabel(save.getStaminaBits()),
+        undo: function () { save.setStaminaBits(st); }
+      });
+    }
+
+    save.items.forEach(function (it) {
+      var o = origIndex[it.gi];
+      var name = save.nameOf(it.id);
+      // 克洛格特例新增的物品没有「原值」，不给撤销按钮
+      if (!o) { out.push({ g: qtyGroup(it), n: name, from: '—', to: '新增 ' + it.qty }); return; }
+
+      if (o.qty !== it.qty) {
+        var oq = o.qty;
+        var undoQty = function () { save.setQuantity(it.gi, oq); it.qty = oq; };
+        if (it.cat === 'weapons' || it.cat === 'bows' || it.cat === 'shields') {
+          out.push({
+            g: '装备强化', n: name + ' 耐久',
+            from: BotWSave.durabilityToPercent(oq) + '%',
+            to: BotWSave.durabilityToPercent(it.qty) + '%',
+            undo: undoQty
+          });
+        } else {
+          out.push({ g: qtyGroup(it), n: name, from: String(oq), to: String(it.qty), undo: undoQty });
+        }
+      }
+      if (o.flags !== it.flags || o.flagsV !== it.flagsV) {
+        var of = o.flags, ov = o.flagsV;
+        var undoMod = function () {
+          save.setModifier(it.cat, it.local, of, ov);
+          it.flags = of;
+          it.flagsV = ov;
+        };
+        if (o.flags !== it.flags) {
+          out.push({
+            g: '装备强化', n: name + ' 附加属性',
+            from: BotWSave.modifierInfo(of).name,
+            to: BotWSave.modifierInfo(it.flags).name,
+            undo: undoMod
+          });
+        } else {
+          out.push({
+            g: '装备强化', n: name + ' 属性值',
+            from: String(ov), to: String(it.flagsV),
+            undo: undoMod
+          });
+        }
+      }
+    });
+
+    var op = origSave.getPosition(), np = save.getPosition();
+    if (op && np && (op.x !== np.x || op.y !== np.y || op.z !== np.z)) {
+      var ox = op.x, oy = op.y, oz = op.z;
+      out.push({
+        g: '坐标瞬移', n: '坐标', from: posText(op), to: posText(np),
+        undo: function () {
+          save.setPosition(ox, oy, oz);
+          save.setMap(origSave.getMap(), origSave.getMapType());
+          save.setTeleportEnabled(false);
+          state.teleportEnabled = false;
+        }
+      });
+    }
+    if (origSave.getMap() !== save.getMap() || origSave.getMapType() !== save.getMapType()) {
+      var om = origSave.getMap(), ot = origSave.getMapType();
+      out.push({
+        g: '坐标瞬移', n: '地图格', from: om || '—', to: save.getMap() || '—',
+        undo: function () { save.setMap(om, ot); }
+      });
+    }
+    return out;
+  }
+
+  function changePanelHtml(list) {
+    if (!list.length) return '';
+    var order = [], groups = {};
+    list.forEach(function (c, i) {
+      c._i = i;
+      if (!groups[c.g]) { groups[c.g] = []; order.push(c.g); }
+      groups[c.g].push(c);
+    });
+    var body = order.map(function (g) {
+      return '<div class="cgroup">' + esc(g) + '</div>' + groups[g].map(function (c) {
+        var btn = c.undo
+          ? '<button type="button" class="c-undo" data-undo="' + c._i + '" title="只还原这一项">撤销</button>'
+          : '';
+        return '<div class="citem"><span class="cn" title="' + esc(c.n) + '">' + esc(c.n) + '</span>' +
+          '<span class="citem-right"><span class="cval">' + esc(c.from) + ' → ' + esc(c.to) + '</span>' + btn + '</span></div>';
+      }).join('');
+    }).join('');
+    return '<div class="change-box' + (state.changeOpen ? ' open' : '') + '" id="changeBox">' +
+      '<div class="change-head" id="changeHead" role="button" tabindex="0">改动明细（<b>' + list.length + '</b>）' +
+      '<span class="ch-hint">' + (state.changeOpen ? '点击收起' : '点击展开核对 / 单项撤销') + '</span>' +
+      '<span class="chev">›</span></div>' +
+      '<div class="change-list">' + (state.changeOpen ? body : '') + '</div></div>';
+  }
+
+  // 只重绘明细面板，不碰模块内容 → 输入框焦点不丢
+  function refreshChangePanel() {
+    var slot = $('changeSlot');
+    if (!slot) return;
+    var list = collectChanges();
+    var old = slot.querySelector('.change-list');
+    var keep = old ? old.scrollTop : 0;
+    slot.innerHTML = changePanelHtml(list);
+    var box = slot.querySelector('.change-box');
+    if (!box) return;
+    var head = box.querySelector('.change-head');
+    function toggle() { state.changeOpen = !state.changeOpen; refreshChangePanel(); }
+    head.onclick = toggle;
+    head.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+
+    box.querySelectorAll('.c-undo').forEach(function (btn) {
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var target = list[Number(btn.getAttribute('data-undo'))];
+        if (!target || !target.undo) return;
+        target.undo();
+        // 重建当前模块让输入框回填，但保留滚动位置（撤销时不跳回顶部）
+        renderModule(true);
+        updateDirty();
+        toast('已撤销：' + target.n);
+      };
+    });
+
+    var ls = box.querySelector('.change-list');
+    if (ls) ls.scrollTop = keep;
   }
 
   function typeLabel(id) {
@@ -151,18 +317,16 @@
 
   /* ================= 导航 / 外壳 ================= */
   var MODULES = [
-    { id: 'info', no: '01', title: '存档信息', sub: '游戏时长 / 卢比 / 生命 / 精力', render: renderInfo },
-    { id: 'basic', no: '02', title: '基础信息修改', sub: '卢比 / 生命 / 精力 / 克洛格', render: renderBasic },
-    { id: 'items', no: '03', title: '材料和道具', sub: '食材 / 素材 / 矿石 / 虫 / 其他 / 箭矢', render: renderItems },
-    { id: 'food', no: '04', title: '料理和药物', sub: '料理 / 药物', render: renderFood },
-    { id: 'equip', no: '05', title: '装备强化', sub: '武器 / 弓 / 盾', render: renderEquip },
-    { id: 'teleport', no: '06', title: '坐标瞬移', sub: '实验性 · 读档后生效', render: renderTeleport }
+    { id: 'info', no: '01', title: '存档信息', sub: '游戏时长 / 卢比 / 生命 / 精力 / 克洛格', render: renderInfo },
+    { id: 'items', no: '02', title: '材料和道具', sub: '食材 / 素材 / 矿石 / 虫 / 其他 / 箭矢', render: renderItems },
+    { id: 'food', no: '03', title: '料理和药物', sub: '料理 / 药物', render: renderFood },
+    { id: 'equip', no: '04', title: '装备强化', sub: '武器 / 弓 / 盾', render: renderEquip },
+    { id: 'teleport', no: '05', title: '坐标瞬移', sub: '实验性 · 读档后生效', render: renderTeleport }
   ];
 
   function navCount(id) {
     if (!save) return '';
     if (id === 'info') return save.items.length + ' 件';
-    if (id === 'basic') return '4 项';
     if (id === 'items') return itemPool().length + ' 件';
     if (id === 'food') return foodPool().length + ' 件';
     if (id === 'equip') return save.items.filter(function (it) { return it.cat === 'weapons' || it.cat === 'bows' || it.cat === 'shields'; }).length + ' 件';
@@ -223,21 +387,32 @@
     $('btnMobileDownload').disabled = !save || n === 0;
     $('btnReset').disabled = !save || n === 0;
     $('btnBackup').disabled = !save;
+    var hb = $('headDirty');
+    if (hb) {
+      hb.textContent = n ? n + ' 项修改' : '未修改';
+      hb.className = 'badge ' + (n ? '' : 'ok');
+    }
+    var ds = $('dirtyState');
+    if (ds) ds.textContent = n ? n + ' 项待导出' : '没有修改';
     renderSaveCard();
+    refreshChangePanel();
   }
 
-  function renderModule() {
+  function renderModule(keepScroll) {
     var view = $('moduleView');
     if (!save) {
       view.classList.add('hidden');
       $('emptyState').classList.remove('hidden');
+      var slot = $('changeSlot');
+      if (slot) slot.innerHTML = '';
       return;
     }
     $('emptyState').classList.add('hidden');
     view.classList.remove('hidden');
     var m = MODULES.filter(function (x) { return x.id === state.module; })[0] || MODULES[0];
+    var keep = keepScroll ? $('main').scrollTop : 0;
     m.render();
-    $('main').scrollTop = 0;
+    $('main').scrollTop = keep;
   }
 
   function renderAll() {
@@ -256,25 +431,59 @@
     $('railScrim').classList.remove('show');
   }
 
-  /* ================= 01 存档信息 ================= */
+  /* ================= 01 存档信息（概览 + 基础数值修改） ================= */
   function renderInfo() {
     var pos = save.getPosition();
     var dirty = getDirty();
+    var korokItem = save.getKorokItem();
+    var bits = save.getStaminaBits();
     var badges = '<span class="badge dim">v' + esc(save.version) + ' · ' + esc(save.platform) + '</span>' +
-      '<span class="badge ' + (dirty ? '' : 'ok') + '">' + (dirty ? dirty + ' 项修改' : '未修改') + '</span>';
+      '<span id="headDirty" class="badge ' + (dirty ? '' : 'ok') + '">' + (dirty ? dirty + ' 项修改' : '未修改') + '</span>';
     var nameWarn = fileName !== 'game_data.sav'
       ? '<div class="warn-box">当前载入的是 <b>' + esc(fileName) + '</b>，不是标准的 <b>game_data.sav</b>。测试副本 / 备份改了不会进游戏；请确认载入的是模拟器实际读取的存档。</div>'
       : '';
+
+    var staminaOpts = BotWSave.staminaPresets().map(function (p) {
+      return '<option value="' + p.bits + '"' + (p.bits === bits ? ' selected' : '') + '>' + esc(p.label) + '</option>';
+    }).join('');
+    if (!BotWSave.staminaPresets().some(function (p) { return p.bits === bits; })) {
+      staminaOpts = '<option value="' + bits + '" selected>当前值（自定义）</option>' + staminaOpts;
+    }
+
+    var korokTile;
+    if (korokItem) {
+      korokTile = '<div class="tile-field"><div class="tf-k"><label for="inpKorok">克洛格果实</label></div>' +
+        '<input id="inpKorok" type="number" min="0" max="900" value="' + korokItem.qty + '">' +
+        '<div class="tf-h">背包持有数量 · 0–900</div></div>';
+    } else {
+      korokTile = '<div class="tile-field"><div class="tf-k">克洛格果实</div>' +
+        '<div class="tf-h">背包里没有（可能已全交给伯库林）</div>' +
+        '<button id="btnAddKorok" class="btn ghost mini" type="button" style="margin-top:6px">放入 1 个</button></div>';
+    }
+
     $('moduleView').innerHTML =
-      moduleHead('01', '存档信息', '只读概览；改数值请去「基础信息修改」。', badges) +
+      moduleHead('01', '存档信息', '只读概览 + 基础数值修改；只改上限和持有数量，不碰任务、神庙、事件标记。', badges) +
       nameWarn +
       '<div class="panel-card">' +
+      '<div class="card-head"><h3>基础数值</h3><span class="card-sub">改完自动进上方「改动明细」</span></div>' +
       '<div class="info-grid">' +
-      statTile('游戏时长', BotWSave.formatPlaytime(save.getPlaytime()), '') +
-      statTile('卢比', Number(save.getRupees()).toLocaleString('zh-CN'), '') +
-      statTile('生命上限', save.getHearts(), '心') +
-      statTile('精力上限', BotWSave.staminaLabel(save.getStaminaBits()), '') +
+      '<div class="stat-tile"><div class="st-label">游戏时长</div>' +
+      '<div class="st-value">' + esc(BotWSave.formatPlaytime(save.getPlaytime())) + '</div></div>' +
+      '<div class="tile-field"><div class="tf-k"><label for="inpRupees">卢比</label></div>' +
+      '<input id="inpRupees" type="number" min="0" max="999999" value="' + save.getRupees() + '">' +
+      '<div class="tf-h">0–999999</div></div>' +
+      '<div class="tile-field"><div class="tf-k"><label for="inpHearts">生命上限</label></div>' +
+      '<input id="inpHearts" type="number" min="1" max="30" value="' + save.getHearts() + '">' +
+      '<div class="tf-h">1–30 心；进游戏按上限回满</div></div>' +
+      '<div class="tile-field"><div class="tf-k"><label for="inpStamina">精力上限</label></div>' +
+      '<select id="inpStamina">' + staminaOpts + '</select>' +
+      '<div class="tf-h">耐力圈，1/5 圈步进</div></div>' +
+      korokTile +
       '</div>' +
+      '<p class="note"><b>克洛格果实</b>改的是背包持有数量，不是收集进度；不会补全未收集的克洛格。</p>' +
+      '</div>' +
+      '<div class="panel-card">' +
+      '<div class="card-head"><h3>存档文件</h3><span class="card-sub">核对是不是当前存档槽</span></div>' +
       '<div class="info-chips">' +
       '<span class="badge dim">武器 ' + save.items.filter(function (x) { return x.cat === 'weapons'; }).length + '</span>' +
       '<span class="badge dim">弓 ' + save.items.filter(function (x) { return x.cat === 'bows'; }).length + '</span>' +
@@ -291,52 +500,10 @@
       '<div class="file-row"><span class="k">文件大小 / 时间</span><span class="v">' + (fileSize ? formatBytes(fileSize) : '—') + ' · ' + (saveSource === 'xnavi' ? '读取于 ' + formatTime(loadedAt) : formatTime(fileModified)) + '</span></div>' +
       '<div class="file-row"><span class="k">背包物品</span><span class="v">' + save.items.length + ' 件</span></div>' +
       '<div class="file-row"><span class="k">当前地图</span><span class="v">' + esc(save.getMapType() || '—') + (pos && save.getMapType() === 'MainField' ? ' · ' + esc(BotWSave.guessMapGrid(pos.x, pos.z)) : '') + '</span></div>' +
-      '<div class="file-row"><span class="k">修改状态</span><span class="v">' + (dirty ? dirty + ' 项待导出' : '没有修改') + '</span></div>' +
+      '<div class="file-row"><span class="k">修改状态</span><span class="v" id="dirtyState">' + (dirty ? dirty + ' 项待导出' : '没有修改') + '</span></div>' +
       '</div>' +
       '<p class="note">Eden / Yuzu 的 <b>0–7</b> 是不同存档槽；载入后看上面的「游戏时长」，和游戏内读档界面一致的那个槽才是当前存档。改错槽位不会生效。</p>' +
       '<p class="note">改完 → 左下角「下载修改档」；下载后：<b>完全关闭模拟器</b> → 覆盖对应槽位的 game_data.sav → 启动读档。运行中替换会被退出保存覆盖。</p>' +
-      '</div>';
-  }
-
-  /* ================= 02 基础信息修改 ================= */
-  function renderBasic() {
-    var korokItem = save.getKorokItem();
-    var bits = save.getStaminaBits();
-    var staminaOpts = BotWSave.staminaPresets().map(function (p) {
-      return '<option value="' + p.bits + '"' + (p.bits === bits ? ' selected' : '') + '>' + esc(p.label) + '</option>';
-    }).join('');
-    if (!BotWSave.staminaPresets().some(function (p) { return p.bits === bits; })) {
-      staminaOpts = '<option value="' + bits + '" selected>当前值（自定义）</option>' + staminaOpts;
-    }
-
-    var korokField;
-    if (korokItem) {
-      korokField = '<div class="field"><label class="field-label" for="inpKorok">克洛格果实</label>' +
-        '<div class="field-control"><input id="inpKorok" type="number" min="0" max="900" value="' + korokItem.qty + '"><span class="unit">个</span></div>' +
-        '<div class="field-hint">背包持有数量，不是收集计数；上限 900。</div></div>';
-    } else {
-      korokField = '<div class="field"><label class="field-label">克洛格果实</label>' +
-        '<div class="field-hint">背包里没有克洛格果实（可能已全部交给伯库林）。</div>' +
-        '<button id="btnAddKorok" class="btn ghost" type="button">放入 1 个（特殊）</button></div>';
-    }
-
-    $('moduleView').innerHTML =
-      moduleHead('02', '基础信息修改', '只改上限和持有数量；不碰任务、神庙、事件标记。',
-        '<span class="badge dim">只改上限</span>') +
-      '<div class="panel-card">' +
-      '<div class="form-grid">' +
-      '<div class="field"><label class="field-label" for="inpRupees">卢比</label>' +
-      '<div class="field-control"><input id="inpRupees" type="number" min="0" max="999999" value="' + save.getRupees() + '"><span class="unit">卢比</span></div>' +
-      '<div class="field-hint">0–999999。</div></div>' +
-      '<div class="field"><label class="field-label" for="inpHearts">生命上限</label>' +
-      '<div class="field-control"><input id="inpHearts" type="number" min="1" max="30" value="' + save.getHearts() + '"><span class="unit">心</span></div>' +
-      '<div class="field-hint">存档里只有上限；当前心心是运行时数据，进游戏按上限回满。</div></div>' +
-      '<div class="field"><label class="field-label" for="inpStamina">精力</label>' +
-      '<div class="field-control"><select id="inpStamina">' + staminaOpts + '</select></div>' +
-      '<div class="field-hint">即耐力圈；1 圈–3 圈，1/5 圈步进。</div></div>' +
-      korokField +
-      '</div>' +
-      '<p class="note"><b>克洛格果实</b>改的是背包持有数量；不会补全未收集的克洛格，也不改收集计数器。</p>' +
       '</div>';
 
     function bindNum(id, setter, getter) {
@@ -368,7 +535,7 @@
     }
   }
 
-  /* ================= 03 材料和道具 ================= */
+  /* ================= 02 材料和道具 ================= */
   function currentItemShown() {
     var pool = itemPool();
     if (state.itemSearch) {
@@ -382,7 +549,7 @@
 
   function updateItemResults() {
     var shown = currentItemShown();
-    $('itemGrid').innerHTML = itemRowsHtml(shown, 'material');
+    $('itemGrid').innerHTML = itemTilesHtml(shown, 'material');
     $('itemCount').textContent = shown.length + ' 件';
     bindQtyInputs();
   }
@@ -393,20 +560,25 @@
     ITEM_CATS.forEach(function (c) { counts[c.id] = catCount(pool, itemCatOf, c.id); });
 
     var tabs = '<div class="tabs">' + ITEM_CATS.map(function (c) {
-      return '<button type="button" class="tab ' + (state.itemCat === c.id ? 'active' : '') + '" data-cat="' + c.id + '">' +
+      // 搜索时是跨全部类别搜，不能还亮着某个分类，否则会误导
+      return '<button type="button" class="tab ' + (state.itemCat === c.id && !state.itemSearch ? 'active' : '') + '" data-cat="' + c.id + '">' +
         esc(c.name) + '<span class="tab-count">' + counts[c.id] + '</span></button>';
     }).join('') + '</div>';
 
     var shown = currentItemShown();
 
     $('moduleView').innerHTML =
-      moduleHead('03', '材料和道具', '六类分组；只显示背包里已有的物品，数量 0–999。',
+      moduleHead('02', '材料和道具', '六类分组；只显示背包里已有的物品，数量 0–999。',
         '<span class="badge dim">' + pool.length + ' 件</span>') +
       '<div class="panel-card">' + tabs +
-      '<div class="toolbar-row"><div class="search"><input id="itemSearch" type="text" placeholder="搜索食材 / 素材 / 箭矢…" value="' + esc(state.itemSearch) + '"></div>' +
+      '<div class="toolbar-row"><div class="search">' +
+      '<input id="itemSearch" type="text" placeholder="搜索食材 / 素材 / 箭矢…" value="' + esc(state.itemSearch) + '">' +
+      (state.itemSearch ? '<button type="button" class="search-clear" id="itemClear" aria-label="清空搜索">×</button>' : '') +
+      '</div>' +
+      (state.itemSearch ? '<span class="badge">全部类别</span>' : '') +
       '<span class="badge dim" id="itemCount">' + shown.length + ' 件</span></div>' +
-      '<div id="itemGrid">' + itemRowsHtml(shown, 'material') + '</div>' +
-      '<p class="note">数量直接写背包堆叠数；没有“一键 999”。改 0 后重新进入该分类会隐藏。</p>' +
+      '<div id="itemGrid">' + itemTilesHtml(shown, 'material') + '</div>' +
+      '<p class="note">数量直接写背包堆叠数；格子上「+10 / +100 / 满」是快捷步进，改错了可在顶部改动明细里单项撤销。</p>' +
       '</div>';
 
     $('moduleView').querySelectorAll('.tab').forEach(function (b) {
@@ -417,13 +589,37 @@
       };
     });
     $('itemSearch').addEventListener('input', function () {
+      var was = !!state.itemSearch;
       state.itemSearch = this.value;
+      // 首次输入 / 清空回到分类浏览：tab 高亮和清空按钮要跟着变，重绘一次并还原光标
+      if (!!state.itemSearch !== was) {
+        var caret = this.selectionStart;
+        renderItems();
+        var el = $('itemSearch');
+        if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) { /* ignore */ } }
+        return;
+      }
       updateItemResults();
     });
+    var clearItem = $('itemClear');
+    if (clearItem) {
+      clearItem.onclick = function () {
+        state.itemSearch = '';
+        renderItems();
+        var el = $('itemSearch');
+        if (el) el.focus();
+      };
+    }
     bindQtyInputs();
   }
 
-  function itemRowsHtml(items, kind) {
+  // 与载入时原始档对比，标出改过的格子
+  function isItemChanged(it) {
+    var o = origIndex[it.gi];
+    return o ? o.qty !== it.qty : true;
+  }
+
+  function itemTilesHtml(items, kind) {
     if (!items.length) return '<div class="empty-mini">这个分类里没有背包现有的物品。</div>';
     var nameCounts = {};
     items.forEach(function (it) {
@@ -432,34 +628,58 @@
     });
     return '<div class="item-grid">' + items.map(function (it) {
       var name = save.nameOf(it.id);
-      var sub = kind === 'food' ? (foodCatOf(it) === 'drug' ? '药物' : '料理') : (it.cat === 'ammo' ? '箭矢' : '材料');
-      if (nameCounts[name] > 1) sub += ' · #' + it.gi;
-      return '<div class="item-row" data-gi="' + it.gi + '" title="' + esc(it.id) + '">' +
-        iconHtml(it.id, 30, 'item-icon') +
-        '<div><div class="item-name">' + esc(name) + '</div><div class="item-sub">' + esc(sub) + '</div></div>' +
-        '<input class="item-qty js-qty" type="number" min="0" max="999" value="' + it.qty + '" aria-label="' + esc(name) + ' 数量">' +
-        '</div>';
+      // 副标题只用来区分同名物品（#槽号），类别已由上方 tab 表达，不再重复
+      var sub = nameCounts[name] > 1 ? '#' + it.gi : '';
+      return '<div class="itile' + (isItemChanged(it) ? ' changed' : '') + '" data-gi="' + it.gi + '" title="' + esc(name + ' · ' + it.id) + '">' +
+        '<div class="itile-top">' + iconHtml(it.id, 32, 'item-icon') +
+        '<div style="min-width:0"><div class="itile-name">' + esc(name) + '</div>' +
+        (sub ? '<div class="itile-sub">' + esc(sub) + '</div>' : '') +
+        '</div></div>' +
+        '<div class="itile-step">' +
+        '<button type="button" class="step-btn js-step" data-step="-1" aria-label="' + esc(name) + ' 数量减一">−</button>' +
+        '<input class="js-qty" type="number" inputmode="numeric" min="0" max="999" value="' + it.qty + '" aria-label="' + esc(name) + ' 数量">' +
+        '<button type="button" class="step-btn js-step" data-step="1" aria-label="' + esc(name) + ' 数量加一">+</button>' +
+        '</div>' +
+        '<div class="itile-quick">' +
+        '<button type="button" class="q-btn js-step" data-step="10" aria-label="' + esc(name) + ' 加 10">+10</button>' +
+        '<button type="button" class="q-btn js-step" data-step="100" aria-label="' + esc(name) + ' 加 100">+100</button>' +
+        '<button type="button" class="q-btn js-step" data-step="999" aria-label="' + esc(name) + ' 拉满 999">满</button>' +
+        '</div></div>';
     }).join('') + '</div>';
   }
 
   function bindQtyInputs() {
-    $('moduleView').querySelectorAll('.js-qty').forEach(function (inp) {
-      var row = inp.closest('.item-row');
-      var gi = Number(row.getAttribute('data-gi'));
+    $('moduleView').querySelectorAll('.itile').forEach(function (tile) {
+      var gi = Number(tile.getAttribute('data-gi'));
       var it = save.items.filter(function (x) { return x.gi === gi; })[0];
       if (!it) return;
-      inp.addEventListener('input', function () {
-        if (inp.value === '') return;
-        var v = clamp(inp.value, 0, 999);
+      var inp = tile.querySelector('.js-qty');
+      function commit(v) {
+        v = clamp(v, 0, 999);
         save.setQuantity(gi, v);
         it.qty = v;
+        tile.classList.toggle('changed', isItemChanged(it));
         updateDirty();
+        return v;
+      }
+      if (inp) {
+        inp.addEventListener('input', function () {
+          if (inp.value === '') return;
+          commit(inp.value);
+        });
+        inp.addEventListener('blur', function () { inp.value = it.qty; });
+      }
+      tile.querySelectorAll('.js-step').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var step = Number(btn.getAttribute('data-step')) || 1;
+          var v = commit(it.qty + step);
+          if (inp) inp.value = v;
+        });
       });
-      inp.addEventListener('blur', function () { inp.value = it.qty; });
     });
   }
 
-  /* ================= 04 料理和药物 ================= */
+  /* ================= 03 料理和药物 ================= */
   function currentFoodShown() {
     var pool = foodPool();
     if (state.foodSearch) {
@@ -473,7 +693,7 @@
 
   function updateFoodResults() {
     var shown = currentFoodShown();
-    $('itemGrid').innerHTML = itemRowsHtml(shown, 'food');
+    $('itemGrid').innerHTML = itemTilesHtml(shown, 'food');
     $('itemCount').textContent = shown.length + ' 件';
     bindQtyInputs();
   }
@@ -483,19 +703,23 @@
     var counts = {};
     FOOD_CATS.forEach(function (c) { counts[c.id] = catCount(pool, foodCatOf, c.id); });
     var tabs = '<div class="tabs">' + FOOD_CATS.map(function (c) {
-      return '<button type="button" class="tab ' + (state.foodCat === c.id ? 'active' : '') + '" data-cat="' + c.id + '">' +
+      return '<button type="button" class="tab ' + (state.foodCat === c.id && !state.foodSearch ? 'active' : '') + '" data-cat="' + c.id + '">' +
         esc(c.name) + '<span class="tab-count">' + counts[c.id] + '</span></button>';
     }).join('') + '</div>';
 
     var shown = currentFoodShown();
 
     $('moduleView').innerHTML =
-      moduleHead('04', '料理和药物', '只改数量；不改食谱、效果或图标。',
+      moduleHead('03', '料理和药物', '只改数量；不改食谱、效果或图标。',
         '<span class="badge dim">' + pool.length + ' 件</span>') +
       '<div class="panel-card">' + tabs +
-      '<div class="toolbar-row"><div class="search"><input id="foodSearch" type="text" placeholder="搜索料理 / 药物…" value="' + esc(state.foodSearch) + '"></div>' +
+      '<div class="toolbar-row"><div class="search">' +
+      '<input id="foodSearch" type="text" placeholder="搜索料理 / 药物…" value="' + esc(state.foodSearch) + '">' +
+      (state.foodSearch ? '<button type="button" class="search-clear" id="foodClear" aria-label="清空搜索">×</button>' : '') +
+      '</div>' +
+      (state.foodSearch ? '<span class="badge">全部类别</span>' : '') +
       '<span class="badge dim" id="itemCount">' + shown.length + ' 件</span></div>' +
-      '<div id="itemGrid">' + itemRowsHtml(shown, 'food') + '</div>' +
+      '<div id="itemGrid">' + itemTilesHtml(shown, 'food') + '</div>' +
       '<p class="note">药物：精灵回力水、药剂（Item_Cook_C_16 / C_17 / _Mod*）；其余烤、冰、煮、料理都归料理。</p>' +
       '</div>';
 
@@ -507,13 +731,30 @@
       };
     });
     $('foodSearch').addEventListener('input', function () {
+      var was = !!state.foodSearch;
       state.foodSearch = this.value;
+      if (!!state.foodSearch !== was) {
+        var caret = this.selectionStart;
+        renderFood();
+        var el = $('foodSearch');
+        if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) { /* ignore */ } }
+        return;
+      }
       updateFoodResults();
     });
+    var clearFood = $('foodClear');
+    if (clearFood) {
+      clearFood.onclick = function () {
+        state.foodSearch = '';
+        renderFood();
+        var el = $('foodSearch');
+        if (el) el.focus();
+      };
+    }
     bindQtyInputs();
   }
 
-  /* ================= 05 装备强化 ================= */
+  /* ================= 04 装备强化 ================= */
   function modSelectHtml(it) {
     var opts = BotWSave.modifierOptions(it.cat);
     var normal = [], star = [];
@@ -534,6 +775,11 @@
     return html;
   }
 
+  function isEquipTouched(it) {
+    var o = origIndex[it.gi];
+    return !o || o.qty !== it.qty || o.flags !== it.flags || o.flagsV !== it.flagsV;
+  }
+
   function renderEquip() {
     var tabs = ['weapons', 'bows', 'shields'].map(function (cat) {
       var label = cat === 'weapons' ? '武器' : cat === 'bows' ? '弓' : '盾';
@@ -551,7 +797,7 @@
       var valueMax = mode === 'bonus' ? 999 : 4294967295;
       var valueHint = mode === 'none' ? '该属性不需要数值' : mode === 'advanced' ? '高级数值（游戏内倍率）' : '攻击 / 耐久 / 防御加成';
       var modBadge = it.flags === 0 ? '<span class="badge dim">无属性</span>' : '<span class="badge ec-mod">' + esc(info.name) + '</span>';
-      return '<article class="equip-card" data-gi="' + it.gi + '">' +
+      return '<article class="equip-card' + (isEquipTouched(it) ? ' changed' : '') + '" data-gi="' + it.gi + '">' +
         '<div class="ec-head">' + iconHtml(it.id, 44, 'ec-icon') +
         '<div class="ec-title"><div class="ec-name">' + esc(save.nameOf(it.id)) + '</div>' +
         '<div class="ec-sub">' + esc(typeLabel(it.id)) + ' · 本地 #' + (it.local + 1) + '</div></div>' +
@@ -569,12 +815,13 @@
     }).join('') : '<div class="empty-mini">背包里没有这一类装备。</div>';
 
     $('moduleView').innerHTML =
-      moduleHead('05', '装备强化', '只列出背包现有装备；属性按分类本地序号读写，弓/盾不会再错位。',
+      moduleHead('04', '装备强化', '只列出背包现有装备；属性按分类本地序号读写，弓/盾不会再错位。',
         '<span class="badge dim">' + items.length + ' 件</span>') +
       '<div class="panel-card">' +
       '<div class="card-head" style="margin-bottom:8px"><div class="tabs" style="margin:0">' + tabs + '</div>' +
+      '<div class="head-right"><button type="button" id="btnAllFullDur" class="btn ghost mini" title="把本类全部装备耐久设为 100%（可在改动明细里逐项撤销）">耐久全满</button>' +
       '<div class="view-toggle"><button type="button" class="seg ' + (state.equipCols === 1 ? 'active' : '') + '" data-cols="1">单列</button>' +
-      '<button type="button" class="seg ' + (state.equipCols === 2 ? 'active' : '') + '" data-cols="2">双列</button></div></div>' +
+      '<button type="button" class="seg ' + (state.equipCols === 2 ? 'active' : '') + '" data-cols="2">双列</button></div></div></div>' +
       '<div class="equip-grid cols-' + state.equipCols + '">' + cards + '</div>' +
       '<p class="note">耐久 100% = 存档满值 65500；五连射、暴击、冲浪不需要数值；远投/速射的数值是游戏内隐藏倍率，不确定就保持默认。</p>' +
       '</div>';
@@ -591,6 +838,24 @@
         renderEquip();
       };
     });
+    var allFull = $('btnAllFullDur');
+    if (allFull) {
+      allFull.onclick = function () {
+        var pool = equipPool();
+        var maxQty = BotWSave.percentToDurability(100);
+        var n = 0;
+        pool.forEach(function (it) {
+          if (it.qty === maxQty) return;
+          save.setQuantity(it.gi, maxQty);
+          it.qty = maxQty;
+          n++;
+        });
+        if (!n) { toast('本类装备耐久已经全是 100%'); return; }
+        renderEquip();
+        updateDirty();
+        toast('已把 ' + n + ' 件装备耐久设为 100%，改动明细里可逐项撤销');
+      };
+    }
     bindEquipCards();
   }
 
@@ -604,6 +869,7 @@
       var range = card.querySelector('.ec-dur-range');
       var durNum = card.querySelector('.ec-dur-num');
       var full = card.querySelector('.ec-full');
+      function syncCard() { card.classList.toggle('changed', isEquipTouched(it)); }
 
       select.addEventListener('change', function () {
         var newFlags = Number(select.value) >>> 0;
@@ -621,8 +887,24 @@
         save.setModifier(it.cat, it.local, newFlags, newValue);
         it.flags = newFlags;
         it.flagsV = newValue;
+
+        // 局部更新这张卡：不重建列表，滚动位置与焦点都保住
+        value.value = newValue;
+        value.disabled = newMode === 'none';
+        value.max = newMode === 'bonus' ? 999 : 4294967295;
+        value.min = 0;
+        var hintEl = card.querySelector('.value-hint');
+        if (hintEl) {
+          hintEl.textContent = newMode === 'none' ? '该属性不需要数值'
+            : newMode === 'advanced' ? '高级数值（游戏内倍率）' : '攻击 / 耐久 / 防御加成';
+        }
+        var badgeEl = card.querySelector('.ec-head > .badge');
+        if (badgeEl) {
+          badgeEl.className = 'badge ' + (newFlags === 0 ? 'dim' : 'ec-mod');
+          badgeEl.textContent = newFlags === 0 ? '无属性' : BotWSave.modifierInfo(newFlags).name;
+        }
+        syncCard();
         updateDirty();
-        renderEquip();
       });
 
       value.addEventListener('input', function () {
@@ -633,6 +915,7 @@
         var v = clamp(value.value, 0, max);
         save.setModifier(it.cat, it.local, it.flags, v);
         it.flagsV = v;
+        syncCard();
         updateDirty();
       });
       value.addEventListener('blur', function () { value.value = it.flagsV; });
@@ -644,6 +927,7 @@
         it.qty = qty;
         range.value = pct;
         durNum.value = pct;
+        syncCard();
         updateDirty();
       }
       range.addEventListener('input', function () { applyDur(range.value); });
@@ -653,7 +937,7 @@
     });
   }
 
-  /* ================= 06 坐标瞬移（实验） ================= */
+  /* ================= 05 坐标瞬移（实验） ================= */
   function renderTeleport() {
     var pos = save.getPosition();
     var map = save.getMap();
@@ -666,7 +950,7 @@
       : '<div class="warn-box">当前存档不在大地图（' + esc(mapType || '未知') + '），坐标瞬移暂不支持。请先回到大地图再保存。</div>';
 
     $('moduleView').innerHTML =
-      moduleHead('06', '坐标瞬移', '实验模块：先只改 X/Y/Z；测试通过后再决定是否保留。',
+      moduleHead('05', '坐标瞬移', '实验模块：先只改 X/Y/Z；测试通过后再决定是否保留。',
         '<span class="badge warn">实验</span>') +
       warning +
       '<div class="panel-card">' +
@@ -733,6 +1017,14 @@
     }
     save = s;
     originalBytes = u8.slice();
+    // 原始档单独解析一份常驻：改动明细靠它与当前档对比，不重复读 1MB
+    origSave = BotWSave.fromBuffer(originalBytes.slice());
+    origIndex = {};
+    if (origSave.load()) {
+      origSave.items.forEach(function (it) { origIndex[it.gi] = it; });
+    } else {
+      origSave = null;
+    }
     fileName = name || 'game_data.sav';
     fileSize = u8.length;
     fileModified = meta && meta.modified ? meta.modified : 0;
@@ -749,6 +1041,7 @@
     state.foodSearch = '';
     state.teleportEnabled = false;
     state.teleportAutoMap = true;
+    state.changeOpen = false;
     save.setTeleportEnabled(false);
     var p = save.getPosition();
     teleportOriginal = p ? { x: p.x, y: p.y, z: p.z, map: save.getMap(), mapType: save.getMapType() } : null;
@@ -776,43 +1069,9 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 200);
   }
 
-  function summarizeChanges(originalBytes) {
-    var out = [];
-    var orig = BotWSave.fromBuffer(originalBytes.slice());
-    if (!orig.load()) return out;
-    if (orig.getRupees() !== save.getRupees()) out.push('卢比 ' + orig.getRupees() + ' → ' + save.getRupees());
-    if (orig.getHearts() !== save.getHearts()) out.push('生命上限 ' + orig.getHearts() + ' → ' + save.getHearts());
-    if (orig.getStaminaBits() !== save.getStaminaBits()) out.push('精力 ' + BotWSave.staminaLabel(orig.getStaminaBits()) + ' → ' + BotWSave.staminaLabel(save.getStaminaBits()));
-
-    var origItems = {};
-    orig.items.forEach(function (it) { origItems[it.gi] = it; });
-    save.items.forEach(function (it) {
-      var o = origItems[it.gi];
-      var name = save.nameOf(it.id);
-      if (!o) { out.push(name + '（新增）'); return; }
-      if (o.qty !== it.qty) {
-        if (it.cat === 'weapons' || it.cat === 'bows' || it.cat === 'shields') {
-          out.push(name + ' 耐久 ' + BotWSave.durabilityToPercent(o.qty) + '% → ' + BotWSave.durabilityToPercent(it.qty) + '%');
-        } else {
-          out.push(name + ' ' + o.qty + ' → ' + it.qty);
-        }
-      }
-      if (o.flags !== it.flags) {
-        out.push(name + ' 附加属性 ' + BotWSave.modifierInfo(o.flags).name + ' → ' + BotWSave.modifierInfo(it.flags).name);
-      } else if (o.flagsV !== it.flagsV) {
-        out.push(name + ' 属性值 ' + o.flagsV + ' → ' + it.flagsV);
-      }
-    });
-
-    var op = orig.getPosition(), np = save.getPosition();
-    if (op && np && (op.x !== np.x || op.y !== np.y || op.z !== np.z)) {
-      out.push('坐标 ' + op.x.toFixed(2) + '/' + op.y.toFixed(2) + '/' + op.z.toFixed(2) + ' → ' +
-        np.x.toFixed(2) + '/' + np.y.toFixed(2) + '/' + np.z.toFixed(2));
-    }
-    if (orig.getMap() !== save.getMap() || orig.getMapType() !== save.getMapType()) {
-      out.push('地图格 ' + (orig.getMap() || '—') + ' → ' + (save.getMap() || '—'));
-    }
-    return out;
+  // 导出摘要：与改动明细共用同一份结构化清单
+  function summarizeChanges() {
+    return collectChanges().map(function (c) { return c.n + ' ' + c.from + ' → ' + c.to; });
   }
 
   function downloadBackup() {
@@ -830,7 +1089,7 @@
       return;
     }
     if (check.diff === 0) { toast('没有修改，无需导出'); return; }
-    var changes = summarizeChanges(originalBytes);
+    var changes = summarizeChanges();
     downloadBytes(save.getArrayBuffer(), 'game_data.sav');
     var summary = changes.length
       ? changes.slice(0, 3).join('；') + (changes.length > 3 ? '；+ ' + (changes.length - 3) + ' 项' : '')
@@ -955,6 +1214,7 @@
     loadBytes: loadBytes,
     getSave: function () { return save; },
     getOriginal: function () { return originalBytes; },
+    getChanges: collectChanges,
     downloadModified: downloadModified,
     downloadBackup: downloadBackup,
     reset: resetChanges,
