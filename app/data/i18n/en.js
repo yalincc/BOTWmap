@@ -274,6 +274,7 @@ window.BOTW_I18N.en = {
 
   // Chest Cards
   "chest.type": "Chest Type",
+  "chest.how": "How to get",
   "chest.count": "Count",
   "chest.normalCount": "Normal: {n} spots",
   "chest.masterCount": "Master Mode: {n} spots",

@@ -92,7 +92,7 @@
         <button id="btnSaveLoad" type="button" title="读取本机 Ryujinx/Cemu 的 game_data.sav，解析收集进度（文件仅在本机内存处理）" data-i18n="save.loadBtn" data-i18n-title="save.loadBtn.title">📂 加载存档</button>
         <!-- V1.7.2 存档区精简：修改存档由独立整行收为 18px 圆形小图标，位于「加载存档」与「?」之间；悬停出提示气泡 -->
         <span class="su-edit-wrap">
-          <button id="btnSaveEdit" type="button" class="su-edit" aria-label="修改本地存档" title="修改本地存档" data-i18n-aria="save.editBtn" data-i18n-title="save.editBtn" onclick="window.open('save-edit/editor.html?v=6','_blank')">🛠</button>
+          <button id="btnSaveEdit" type="button" class="su-edit" aria-label="修改本地存档" title="修改本地存档" data-i18n-aria="save.editBtn" data-i18n-title="save.editBtn" onclick="window.open('save-edit/editor.html?v=8','_blank')">🛠</button>
           <span class="su-edit-tip" id="suEditTip" data-i18n="save.editBtn">修改本地存档</span>
         </span>
         <span class="su-help" id="suHelp" tabindex="0" role="button" aria-label="存档在哪里" data-i18n-aria="save.help">?</span>
@@ -415,8 +415,8 @@
 
 </div>
 
-<script src="data/i18n/zh.js?v=7&b=1641016"></script>
-<script src="data/i18n/en.js?v=8&b=1641016"></script>
+<script src="data/i18n/zh.js?v=8&b=1641016"></script>
+<script src="data/i18n/en.js?v=9&b=1641016"></script>
 <script src="data/i18n/quests_en.js?v=1&b=1641016"></script>
 <script src="js/i18n.js?v=4&b=1641016"></script>
 <script src="js/data.js?v=6&b=1641016"></script>
@@ -464,10 +464,12 @@
 <script src="data/weapons.js?v=1&b=1641016"></script>
 <script src="data/armors.js?v=1&b=1641016"></script>
 <script src="data/camp_weapons.js?v=1&b=1641016"></script>
-<script src="js/equip.js?v=34&b=1641016"></script>
+<script src="js/equip.js?v=35&b=1641016"></script>
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
-<script src="data/chests.js?v=2&b=1641016"></script>
-<script src="js/chest.js?v=22&b=1641016"></script>
+<script src="data/chests.js?v=3&b=1641016"></script>
+<!-- 触发型宝箱查表（狗狗/DLC埋藏/联动/大树，非常驻；生成器 source/build_chest_trigger.js） -->
+<script src="data/chest_trigger.js?v=1&b=1641016"></script>
+<script src="js/chest.js?v=23&b=1641016"></script>
 <script src="js/camp.js?v=20&b=1641016"></script>
 </body>
 </html>

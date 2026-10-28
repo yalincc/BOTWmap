@@ -2,11 +2,12 @@
 waypoint-data/
 
 # 开发流水线 + 源数据 + 生成输入 + 规范文档（本地维护，不入库；成品已在 app/）
+# ⚠ 顶层目录必须锚定 /：写成 data/ 会连 app/data/ 一起吞，新增数据文件静默漏入库（2026-10-29 踩坑：chest_trigger.js）
 source/
 tools/
-data/
-docs/
-tasks/
+/data/
+/docs/
+/tasks/
 
 # 系统/编辑器
 Thumbs.db

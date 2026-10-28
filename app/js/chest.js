@@ -24,6 +24,68 @@
   var CHESTS = (typeof BOTW_CHESTS !== 'undefined' && BOTW_CHESTS.items) ? BOTW_CHESTS.items : [];
   var CHEST_TYPE_CN = (typeof BOTW_CHESTS !== 'undefined' && BOTW_CHESTS.chestTypeCn) ? BOTW_CHESTS.chestTypeCn : {};
 
+  /* ---------- 触发型宝箱（非常驻：需 NPC / 任务 / 动物触发才在游戏里生成） ----------
+   * 数据 = data/chest_trigger.js（BOTW_CHEST_TRIGGER），键 = "px,py" 一位小数，与 chests.js 点位同格式。
+   * 生成器 source/build_chest_trigger.js 断言：45 条全部命中 chests.js 点位 + 全部有存档 flag。
+   * 为什么要标注：这类宝箱游戏不预生成，玩家走到点位上什么都没有（磁力/静止均无反应），
+   *   不说明就等于「地图骗人」。典型：湿地驿站蛋白石（x927,z278）需喂狗才刨出来。 */
+  var TRIGGER = (typeof BOTW_CHEST_TRIGGER !== 'undefined' && BOTW_CHEST_TRIGGER.points) ? BOTW_CHEST_TRIGGER.points : {};
+
+  /* 文案口径（老大 2026-10-29 实机：喂苹果）。改措辞只动这张表，勿散落到渲染处。
+     未实机核实的机制不编造细节，统一「触发后才出现」+ 待核实标注。 */
+  var TRIGGER_HOW = {
+    dog: {
+      zh: function (t) { return '跟随「' + t.place + '」的狗：喂它苹果，它会跑去刨出这个宝箱（埋在地里）'; },
+      en: function (t) { return 'Follow the dog at ' + (t.placeEn || t.place) + ' — feed it an apple and it digs this chest up (buried)'; }
+    },
+    dlc: {
+      zh: function () { return 'DLC 埋藏：读「传闻杂志 EX」/ 米斯科的 EX 日志后才出现'; },
+      en: function () { return 'Appears after reading the EX journal rumours (DLC buried treasure)'; }
+    },
+    dlc_pad: {
+      zh: function () { return '英杰诗篇（DLC）推进后才出现（机制待实机核实）'; },
+      en: function () { return 'Appears during The Champions\' Ballad (DLC) — exact trigger unverified'; }
+    },
+    collabo: {
+      zh: function () { return '异度神剑2 联动内容激活后才出现（流星坠落点）'; },
+      en: function () { return 'Appears via the Xenoblade 2 collab (shooting-star fall)'; }
+    },
+    tree: {
+      zh: function (t) { return '「' + t.place + '」大树触发后才出现（机制待实机核实）'; },
+      en: function (t) { return 'Appears at the great tree in ' + (t.placeEn || t.place) + ' — exact trigger unverified'; }
+    }
+  };
+
+  function triggerKey(p) {
+    if (!p) return null;
+    /* 与生成器同口径：一位小数直拼（整数不带 .0，如 "8916,6477.4"） */
+    return (Math.round(p[0] * 10) / 10) + ',' + (Math.round(p[1] * 10) / 10);
+  }
+  function triggerOf(p) { return TRIGGER[triggerKey(p)] || null; }
+  function isEnLang() { return !!(window.I18N && window.I18N.getLang && window.I18N.getLang() === 'en'); }
+  /* 卡片正文一行；无触发信息返回 null */
+  function triggerHow(p) {
+    var t = triggerOf(p);
+    if (!t) return null;
+    var f = TRIGGER_HOW[t.kind];
+    if (!f) return null;
+    return isEnLang() ? f.en(t) : f.zh(t);
+  }
+  /* 列表 / chip 用的短标签（equip.js 复用） */
+  function triggerShort(p) {
+    var t = triggerOf(p);
+    if (!t) return null;
+    if (t.kind === 'dog') return isEnLang() ? ('Dug up by the ' + (t.placeEn || 'stable') + ' dog') : ('狗狗宝箱（' + t.place + '）');
+    var m = {
+      dlc: ['DLC 埋藏（触发才出现）', 'DLC buried (triggered)'],
+      dlc_pad: ['英杰诗篇（触发才出现）', "Champions' Ballad (triggered)"],
+      collabo: ['联动流星（触发才出现）', 'Collab meteor (triggered)'],
+      tree: ['大树宝箱（触发才出现）', 'Tree chest (triggered)']
+    }[t.kind];
+    return m ? (isEnLang() ? m[1] : m[0]) : null;
+  }
+  window.ChestTrigger = { get: triggerOf, how: triggerHow, short: triggerShort };
+
   /* contentCn 为 null 的中文名兜底（chests.js 数据缺口） */
   var CN_FALLBACK = {
     GameRomHorseReins_10: '古代缰绳',
@@ -81,11 +143,16 @@
         '木宝箱': 'Wooden Chest',
         '铁宝箱': 'Iron Chest',
         '铁宝箱（固定）': 'Iron Chest (Fixed)',
+        '铁宝箱（触发才出现）': 'Iron Chest (triggered)',
         '石宝箱': 'Stone Chest',
         '石宝箱（固定）': 'Stone Chest (Fixed)',
         '英杰诗篇宝箱': "Champions' Ballad Chest",
+        '英杰诗篇宝箱（触发才出现）': "Champions' Ballad Chest (triggered)",
+        'DLC 埋藏宝箱（触发才出现）': 'DLC Buried Chest (triggered)',
         '联动宝箱': 'Collab Chest',
+        '联动宝箱（触发才出现）': 'Collab Chest (triggered)',
         '大树宝箱': 'Tree Chest',
+        '大树宝箱（触发才出现）': 'Tree Chest (triggered)',
         '希卡宝箱': 'Sheikah Chest',
         '赌博宝箱': 'Gambling Chest',
         '敌人宝箱': 'Enemy Chest',
@@ -393,6 +460,13 @@
     var tCount = window.I18N ? window.I18N.t('chest.count', '数量') : '数量';
     h += '<div class="tk-kv"><span class="tk-k">' + tType + '</span><span class="tk-v">' +
       esc(chestTypeName(p[2])) + '</span></div>';
+
+    /* 触发型宝箱：获取方式说明（数据缺失时整行不出现，普通宝箱零影响） */
+    var how = triggerHow(p);
+    if (how) {
+      var tHow = window.I18N ? window.I18N.t('chest.how', '获取方式') : '获取方式';
+      h += '<div class="tk-kv"><span class="tk-k">' + tHow + '</span><span class="tk-v" style="color:#eac27e">' + esc(how) + '</span></div>';
+    }
 
     /* V1.6.2：去掉「坐标 X/Z 数字」行——游戏内并无此坐标，对玩家无意义（保留底部「定位」按钮） */
     var totalN = entry.hard ? (it.hardChestCount || 0) : (it.chestCount || 0);

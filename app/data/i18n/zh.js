@@ -274,6 +274,7 @@ window.BOTW_I18N.zh = {
 
   // 宝箱卡片
   "chest.type": "宝箱类型",
+  "chest.how": "获取方式",
   "chest.count": "数量",
   "chest.normalCount": "普通 {n} 处",
   "chest.masterCount": "大师模式 {n} 处",

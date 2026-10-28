@@ -462,11 +462,16 @@
         '木宝箱': 'Wooden Chest',
         '铁宝箱': 'Iron Chest',
         '铁宝箱（固定）': 'Iron Chest (Fixed)',
+        '铁宝箱（触发才出现）': 'Iron Chest (triggered)',
         '石宝箱': 'Stone Chest',
         '石宝箱（固定）': 'Stone Chest (Fixed)',
         '英杰诗篇宝箱': "Champions' Ballad Chest",
+        '英杰诗篇宝箱（触发才出现）': "Champions' Ballad Chest (triggered)",
+        'DLC 埋藏宝箱（触发才出现）': 'DLC Buried Chest (triggered)',
         '联动宝箱': 'Collab Chest',
+        '联动宝箱（触发才出现）': 'Collab Chest (triggered)',
         '大树宝箱': 'Tree Chest',
+        '大树宝箱（触发才出现）': 'Tree Chest (triggered)',
         '希卡宝箱': 'Sheikah Chest',
         '赌博宝箱': 'Gambling Chest',
         '敌人宝箱': 'Enemy Chest',
@@ -588,7 +593,9 @@
     var allPts = normalPts.concat(hardPts);
     function ptsHtml(list, cls, base) {
       return '<div class="flow-pts">' + list.map(function (p, i) {
-        var tLabel = esc(chestTypeCn(p));
+        /* 触发型宝箱（狗狗/DLC埋藏等）：chip 直接显示触发说明，点位找不到宝箱的元凶 */
+        var trg = (window.ChestTrigger && window.ChestTrigger.short) ? window.ChestTrigger.short(p) : null;
+        var tLabel = esc(trg || chestTypeCn(p));
         /* V1.7.2：chip 显示该宝箱已开启态（与地图宝箱完成态同源，找宝箱更直观） */
         var opened = (window.ChestPanel && window.ChestPanel.isDone) ? window.ChestPanel.isDone(p) : false;
         var tip = isEn ? ('Click to locate this chest (' + tLabel + (opened ? ', opened' : '') + ')') : ('点击定位到该宝箱（' + tLabel + (opened ? '，已开启' : '') + '）');
