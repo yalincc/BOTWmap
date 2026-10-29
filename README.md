@@ -63,7 +63,7 @@
 
 ## 版本
 
-网页版 **v1.7.2**；导航程序 xnavi 版本独立（Latest：`xnavi-v3.2.1`，见 [Releases](https://github.com/yalincc/BOTWmap/releases)）。更新明细见 [CHANGELOG.md](CHANGELOG.md)。
+网页版 **v1.7.4**；导航程序 xnavi 版本独立（Latest：`xnavi-v3.2.1`，见 [Releases](https://github.com/yalincc/BOTWmap/releases)）。更新明细见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 免责声明
 

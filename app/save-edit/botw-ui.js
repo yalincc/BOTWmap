@@ -504,7 +504,8 @@
       '</div>' +
       '<p class="note">Eden / Yuzu 的 <b>0–7</b> 是不同存档槽；载入后看上面的「游戏时长」，和游戏内读档界面一致的那个槽才是当前存档。改错槽位不会生效。</p>' +
       '<p class="note">改完 → 左下角「下载修改档」；下载后：<b>完全关闭模拟器</b> → 覆盖对应槽位的 game_data.sav → 启动读档。运行中替换会被退出保存覆盖。</p>' +
-      '</div>';
+      '</div>' +
+      convertCardHtml();
 
     function bindNum(id, setter, getter) {
       var el = $(id);
@@ -533,6 +534,128 @@
         toast('已放入 1 个克洛格果实，可继续调整数量');
       });
     }
+    var convBtn = $('btnConvert');
+    if (convBtn) convBtn.addEventListener('click', doConvert);
+    var convSel = $('selConvert');
+    if (convSel) convSel.addEventListener('change', updateConvertHint);
+  }
+
+  /* ================= 01b 存档转换（Switch ↔ Wii U） ================= */
+  var CONVERT_FORMATS = [
+    { key: 'wiiu15', label: 'Wii U · v1.5.0（Cemu）', platform: 'Wii U', version: '1.5' },
+    { key: 'switch16', label: 'Switch · v1.6.0', platform: 'Switch', version: '1.6' },
+    { key: 'switch19', label: 'Switch · v1.9.0（最新）', platform: 'Switch', version: '1.9' }
+  ];
+
+  function versionNum(v) {
+    var m = /^(\d+)\.(\d+)/.exec(v || '');
+    return m ? Number(m[1]) * 100 + Number(m[2]) : null;
+  }
+
+  function convertOptions() {
+    var opts = CONVERT_FORMATS.filter(function (o) {
+      return !(o.platform === save.platform && o.version === save.version);
+    });
+
+    var isSwitch = save.platform === 'Switch';
+    var keepPlatform = isSwitch ? 'Wii U' : 'Switch';
+    var keepValid = (keepPlatform === 'Switch') || (versionNum(save.version) !== null && versionNum(save.version) <= 105);
+    var dup = opts.some(function (o) { return o.platform === keepPlatform && o.version === save.version; });
+    if (!dup && keepValid) {
+      opts.push({
+        key: 'keep',
+        label: '保持 v' + save.version + '（只换字节序 → ' + keepPlatform + '）',
+        platform: keepPlatform, version: 'keep'
+      });
+    }
+    return opts;
+  }
+
+  function convertHintFor(opt) {
+    if (!opt) return '';
+    var plat = opt.platform === 'Wii U' ? 'Cemu' : 'Eden / Ryujinx';
+    if (opt.version === 'keep') {
+      return '保持 <b>v' + esc(save.version) + '</b>，只把字节序换成 ' + plat + ' 的；' +
+        '目标端游戏版本需不低于它，读档时由游戏自行升级。';
+    }
+    var d = window.SaveConvert ? SaveConvert.deltaInfo(save.version, opt.version) : null;
+    var parts = ['转换为 <b>' + esc(plat) + ' · v' + esc(opt.version) + '</b>，保留全部进度与物品'];
+    if (d && d.dropped.length) {
+      parts.push('丢弃 ' + d.dropped.length + ' 条新版本 flag（' + d.dropped.map(function (x) { return esc(x.name); }).join('、') + '）');
+    }
+    if (d && d.added.length) {
+      parts.push('补齐 ' + d.added.length + ' 条 flag（值 0）');
+    }
+    return parts.join('；') + '。';
+  }
+
+  function updateConvertHint() {
+    var hint = $('convertHint');
+    var sel = $('selConvert');
+    if (!hint || !sel) return;
+    var opts = convertOptions();
+    hint.innerHTML = convertHintFor(opts[Number(sel.value)]);
+  }
+
+  function convertCardHtml() {
+    if (!window.SaveConvert) return '';
+    var opts = convertOptions();
+    var head = '<div class="card-head"><h3>存档转换</h3><span class="card-sub">Switch ↔ Wii U · <b>测试中</b></span></div>';
+    var beta = '<div class="warn-box"><b>功能测试中</b>：转换前先备份目标槽；转换后进游戏确认进度、物品、装备无误再继续玩。</div>';
+    if (!opts.length) {
+      return '<div class="panel-card">' + head + beta +
+        '<p class="note">当前存档 <b>v' + esc(save.version) + ' · ' + esc(save.platform) + '</b> 还不在已适配的版本表里：' +
+        '工具目前支持 <b>v1.5 / v1.6 / v1.9</b> 互转（1.8.x 未采集样本）。</p>' +
+        '<p class="note">可选：① 用 v1.5 / v1.6 / v1.9 的游戏存一次档再转换；② 把这份存档发我，补齐版本表后即可支持。</p>' +
+        '</div>';
+    }
+    return '<div class="panel-card">' + head + beta +
+      '<div class="convert-row">' +
+      '<div class="convert-src">当前 <b>v' + esc(save.version) + ' · ' + esc(save.platform) + '</b></div>' +
+      '<div class="convert-pick">' +
+      '<label for="selConvert">导出格式</label>' +
+      '<select id="selConvert">' + opts.map(function (o, i) {
+        return '<option value="' + i + '">' + esc(o.label) + '</option>';
+      }).join('') + '</select>' +
+      '<button id="btnConvert" class="btn gold" type="button">导出</button>' +
+      '</div></div>' +
+      '<p class="note" id="convertHint">' + convertHintFor(opts[0]) + '</p>' +
+      '<p class="note">官方 Wii U 最高 <b>v1.5.0</b>；Switch 最新 <b>v1.9.0</b>（2026-02，Switch 2 Edition 时期）——' +
+      '当前支持 v1.5 / v1.6 / v1.9 互转。包含你在本页做过的修改；不改原文件、不上传，下载后<b>完全关闭模拟器</b>再覆盖目标槽位。</p>' +
+      '</div>';
+  }
+
+  function doConvert() {
+    if (!window.SaveConvert) return;
+    var opts = convertOptions();
+    var sel = $('selConvert');
+    var opt = opts[sel ? Number(sel.value) : 0];
+    if (!opt) return;
+    var res;
+    try {
+      res = SaveConvert.convert(new Uint8Array(save.getArrayBuffer()), { platform: opt.platform, version: opt.version });
+    } catch (e) {
+      toast('转换失败：' + (e && e.message ? e.message : e), true, 6500);
+      return;
+    }
+    var info = res.info;
+    var lines = [
+      '源：v' + info.srcVersion + '（' + info.srcPlatform + '）',
+      '目标：v' + info.targetVersion + '（' + info.targetPlatform + '）',
+      '条目：' + info.count + ' · ' + formatBytes(info.size)
+    ];
+    if (info.dropped.length) {
+      lines.push('丢弃：' + info.dropped.map(function (x) { return x.name; }).join('、'));
+    }
+    if (info.added.length) {
+      lines.push('补齐：' + info.added.map(function (x) { return x.name; }).join('、') + '（值 0）');
+    }
+    if (info.keepVersion) lines.push('保持源版本，仅换字节序');
+    lines.push('包含当前编辑中的修改');
+    lines.push('文件名：' + info.fileName);
+    if (!window.confirm(lines.join('\n') + '\n\n继续下载？')) return;
+    downloadBytes(res.bytes, info.fileName);
+    toast('已生成 ' + info.fileName + ' —— 覆盖目标槽位后读档生效', false, 5200);
   }
 
   /* ================= 02 材料和道具 ================= */

@@ -36,9 +36,9 @@
     0xa40ba103: 'PLAYER_POSITION', 0xa6d926bc: 'FLAGSV_WEAPON', 0xc5238d2b: 'FLAGS_SHIELD',
     0xd913b769: 'MAPTYPE'
   };
-  const VERSION = ['1.0', '1.1', '1.2', '1.3', '1.3.1', 'Kiosk', '1.3.3', '1.3.4', '1.4', '1.5', '1.5*', '1.6', '1.6*', '1.6**', '1.6***'];
-  const HEADER = [0x24e2, 0x24ee, 0x2588, 0x29c0, 0x2a46, 0x2f8e, 0x3ef8, 0x3ef9, 0x471a, 0x471b, 0x471b, 0x471e, 0x0f423d, 0x0f423e, 0x0f423f];
-  const FILESIZE = [896976, 897160, 897112, 907824, 907824, 916576, 1020648, 1020648, 1027208, 1027208, 1027248, 1027216, 1027216, 1027216, 1027216];
+  const VERSION = ['1.0', '1.1', '1.2', '1.3', '1.3.1', 'Kiosk', '1.3.3', '1.3.4', '1.4', '1.5', '1.5*', '1.6', '1.6*', '1.6**', '1.6***', '1.9'];
+  const HEADER = [0x24e2, 0x24ee, 0x2588, 0x29c0, 0x2a46, 0x2f8e, 0x3ef8, 0x3ef9, 0x471a, 0x471b, 0x471b, 0x471e, 0x0f423d, 0x0f423e, 0x0f423f, 0x4730];
+  const FILESIZE = [896976, 897160, 897112, 907824, 907824, 916576, 1020648, 1020648, 1027208, 1027208, 1027248, 1027216, 1027216, 1027216, 1027216, 1027248];
 
   const FLAGS_BASE = { weapons: 'FLAGS_WEAPON', bows: 'FLAGS_BOW', shields: 'FLAGS_SHIELD' };
   const FLAGSV_BASE = { weapons: 'FLAGSV_WEAPON', bows: 'FLAGSV_BOW', shields: 'FLAGSV_SHIELD' };

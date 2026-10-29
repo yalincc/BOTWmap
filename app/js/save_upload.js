@@ -27,7 +27,7 @@ const SAVE_UPLOAD = (() => {
   const H_KOROK_CNT = 0x8A94E07A;   // HiddenKorok_Number（计数器，仅参考）
 
   // 存档格式版本号（Switch/Wii U 共用同一版本表，仅字节序相反）
-  const VALID_VERSIONS = [0x24E2, 0x24EE, 0x2588, 0x29C0, 0x2A46, 0x3EF8, 0x3EF9, 0x471A, 0x471B, 0x471E];
+  const VALID_VERSIONS = [0x24E2, 0x24EE, 0x2588, 0x29C0, 0x2A46, 0x3EF8, 0x3EF9, 0x471A, 0x471B, 0x471E, 0x4730];
 
   const CAT_CN = { shrine: '神庙', tower: '希卡塔', korok: '克洛格', memory: '回忆', beast: '神兽' };
 
