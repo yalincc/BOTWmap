@@ -49,6 +49,7 @@ Want to watch your character walk across the map in real time? Pair the map with
 | Camp farming | 555 Blood-Moon camps with dropped-weapon info — "where do I farm this weapon?" answered at a glance |
 | Quest tracker | All 147 official quests (16 main, 89 side, 42 shrine); completion synced from save + manual fallback |
 | Equipment compendium | 90 weapons + 31 armors with acquisition sources and map locations, each one locatable |
+| Save editor | Browser-based save editing: rupees, hearts, stamina, Korok seeds, equipment durability & seals, material/meal counts; also Switch ↔ Wii U save conversion (beta). Runs fully offline — nothing uploaded, nothing written to disk |
 | Handy tools | Distance measuring, custom markers, shareable links, coordinate readout, dragon flight paths |
 
 ## What's Inside
@@ -63,7 +64,7 @@ Want to watch your character walk across the map in real time? Pair the map with
 
 ## Version
 
-Web app **v1.7.2** · xnavi (independent versioning) **v3.2.1** — see [Releases](https://github.com/yalincc/BOTWmap/releases) and [CHANGELOG.md](CHANGELOG.md).
+Web app **v1.7.4** · xnavi (independent versioning) **v3.2.2** — see [Releases](https://github.com/yalincc/BOTWmap/releases) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Disclaimer
 
