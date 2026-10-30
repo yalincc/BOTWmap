@@ -1,7 +1,7 @@
 /* BOTWmap 触发型宝箱查表（生成器 source/build_chest_trigger.js，勿手改）
- * kind: dog=狗狗宝箱 / dlc=DLC埋藏 / dlc_pad=英杰诗篇传送Pad / collabo=联动流星 / tree=科莫德之树 */
+ * kind: dog=狗狗宝箱 / dlc=DLC埋藏 / dlc_pad=英杰诗篇传送Pad / collabo=联动流星 / tree=科莫德之树 / ichigeki=一击之剑试炼 */
 var BOTW_CHEST_TRIGGER = {
-  meta:{"desc":"触发型宝箱（需 NPC / 任务 / 动物触发才在游戏里生成，非常驻）","generated":"2026-10-29","v":"1.0.0","source":"romfs radar mubin 快照 + save_flags_master + Dynamic.mubin 直提表对拍","kinds":{"dog":16,"dlc_pad":1,"dlc":23,"collabo":3,"tree":2},"count":45,"note":"键 = \"px,py\"（与 chests.js 点位同格式）；dog.px/py 为守宝狗位置，可用于找狗"},
+  meta:{"desc":"触发型宝箱（需 NPC / 任务 / 动物触发才在游戏里生成，非常驻）","generated":"2026-10-30","v":"1.0.0","source":"romfs radar mubin 快照 + save_flags_master + Dynamic.mubin 直提表对拍","kinds":{"dog":16,"dlc_pad":1,"dlc":23,"collabo":3,"tree":2,"ichigeki":4,"story_fallback":1,"wild_set":3},"count":53,"note":"键 = \"px,py\"（与 chests.js 点位同格式）；dog.px/py 为守宝狗位置，可用于找狗"},
   points: {
   "20399.5,4504.1":{"kind":"dog","hash":"2782068585","flag":"MainField_TBox_Field_Iron_NoReaction_2782068585","place":"东阿卡莱驿站","placeEn":"East Akkala Stable","placeCat":"stable","placeD":14.8,"x":4199.8,"z":-2747.9,"inGround":true,"cell":"J-2_Static","dog":{"x":4227.2,"z":-2733.2,"px":20454.3,"py":4533.6,"d":31.1,"actor":"Animal_Dog_C"}},
   "13072.9,16850.4":{"kind":"dog","hash":"2463472452","flag":"MainField_TBox_Field_Iron_NoReaction_2463472452","place":"高原驿站","placeEn":"Highland Stable","placeCat":"stable","placeD":28.9,"x":536.5,"z":3425.2,"inGround":true,"cell":"F-8_Static","dog":{"x":529.9,"z":3479.9,"px":13059.8,"py":16959.9,"d":55.1,"actor":"Animal_Dog_A"}},
@@ -35,6 +35,7 @@ var BOTW_CHEST_TRIGGER = {
   "15338.4,16326":{"kind":"dlc","hash":"142903821","flag":"MainField_TBox_Field_Iron_NoReaction_Aoc_142903821","place":"湖畔驿站","placeEn":"Lakeside Stable","placeCat":"stable","placeD":392.9,"x":1669.2,"z":3163,"inGround":false,"cell":"G-8_Static"},
   "15665.7,16711":{"kind":"dlc","hash":"2234779324","flag":"MainField_TBox_Field_Iron_NoReaction_Aoc_2234779324","place":"湖畔驿站","placeEn":"Lakeside Stable","placeCat":"stable","placeD":334.9,"x":1832.8,"z":3355.5,"inGround":true,"cell":"G-8_Static"},
   "13443.4,6304.5":{"kind":"dlc","hash":"4123439869","flag":"MainField_TBox_Field_Iron_NoReaction_Aoc_4123439869","place":"克洛格森林","placeEn":"Korok Forest","placeCat":"village","placeD":412.6,"x":721.7,"z":-1847.7,"inGround":false,"cell":"F-3_Static"},
+  "10428,14511":{"kind":"story_fallback","hash":"4141537481","flag":"MainField_TBox_Field_Stone_4141537481","place":"老人的木屋","placeEn":"Woodcutter's Cabin","placeCat":"settlement","placeD":0,"x":-786,"z":2255.5,"inGround":false,"cell":"E-7_Static"},
   "10511.9,11780.3":{"kind":"dlc","hash":"135294763","flag":"MainField_TBox_Field_Iron_NoReaction_Aoc_135294763","place":"平原外围的驿站","placeEn":"Outskirt Stable","placeCat":"stable","placeD":800.9,"x":-744,"z":890.1,"inGround":true,"cell":"E-5_Static"},
   "9195.5,10438.7":{"kind":"dlc","hash":"408756811","flag":"MainField_TBox_Field_Iron_NoReaction_Aoc_408756811","place":"平原外围的驿站","placeEn":"Outskirt Stable","placeCat":"stable","placeD":1050.7,"x":-1402.3,"z":219.4,"inGround":true,"cell":"D-5_Static"},
   "10656.7,13045.2":{"kind":"dlc","hash":"473644037","flag":"MainField_TBox_Field_Iron_NoReaction_Aoc_473644037","place":"平原外围的驿站","placeEn":"Outskirt Stable","placeCat":"stable","placeD":818.2,"x":-671.7,"z":1522.6,"inGround":false,"cell":"E-6_Static"},
@@ -47,6 +48,13 @@ var BOTW_CHEST_TRIGGER = {
   "12252.1,15421.9":{"kind":"collabo","hash":"3715709569","flag":"MainField_TBox_Field_Iron_NoReaction_Collabo_3715709569","place":"高原驿站","placeEn":"Highland Stable","placeCat":"stable","placeD":842.9,"x":126,"z":2710.9,"inGround":false,"cell":"E-7_Static"},
   "6790,4696":{"kind":"collabo","hash":"1367988891","flag":"MainField_TBox_Field_Iron_NoReaction_Collabo_1367988891","place":"雪原驿站","placeEn":"Snowfield Stable","placeCat":"stable","placeD":953.4,"x":-2605,"z":-2652,"inGround":false,"cell":"C-2_Static"},
   "12127.8,6184.4":{"kind":"tree","hash":"111780462","flag":"MainField_TBox_Field_Iron_GodTree_111780462","place":"克洛格森林","placeEn":"Korok Forest","placeCat":"village","placeD":430.6,"x":63.9,"z":-1907.8,"inGround":false,"cell":"F-3_Static"},
-  "12144.6,6277.8":{"kind":"tree","hash":"2668399187","flag":"MainField_TBox_Field_Iron_GodTree_2668399187","place":"克洛格森林","placeEn":"Korok Forest","placeCat":"village","placeD":450.5,"x":72.3,"z":-1861.1,"inGround":false,"cell":"F-3_Static"}
+  "12144.6,6277.8":{"kind":"tree","hash":"2668399187","flag":"MainField_TBox_Field_Iron_GodTree_2668399187","place":"克洛格森林","placeEn":"Korok Forest","placeCat":"village","placeD":450.5,"x":72.3,"z":-1861.1,"inGround":false,"cell":"F-3_Static"},
+  "10054,13233.6":{"kind":"ichigeki","hash":"275527884","flag":"MainField_TBox_Field_Wood_275527884","place":"初始台地","placeEn":"Great Plateau","placeCat":"region","placeD":590,"x":-973,"z":1616.8,"inGround":false,"cell":"E-6_Dynamic"},
+  "10443,14250":{"kind":"ichigeki","hash":"748914894","flag":"MainField_TBox_Field_Wood_748914894","place":"初始台地","placeEn":"Great Plateau","placeCat":"region","placeD":1087.7,"x":-778.5,"z":2125,"inGround":false,"cell":"E-7_Dynamic"},
+  "10071.8,13219.8":{"kind":"ichigeki","hash":"1832321748","flag":"MainField_TBox_Field_Wood_1832321748","place":"初始台地","placeEn":"Great Plateau","placeCat":"region","placeD":593.2,"x":-964.1,"z":1609.9,"inGround":false,"cell":"E-6_Dynamic"},
+  "9531.4,14383":{"kind":"ichigeki","hash":"3724791764","flag":"MainField_TBox_Field_Wood_3724791764","place":"初始台地","placeEn":"Great Plateau","placeCat":"region","placeD":947.3,"x":-1234.3,"z":2191.5,"inGround":false,"cell":"D-7_Static"},
+  "9860,4633.7":{"kind":"wild_set","hash":"993561984","flag":"MainField_TBox_Field_Stone_NoReaction_993561984","place":"遗忘神殿","placeEn":"Forgotten Temple","placeCat":"settlement","placeD":0,"x":-1070,"z":-2683.2,"inGround":false,"cell":"D-2_Static"},
+  "9867.2,4634.5":{"kind":"wild_set","hash":"1761649191","flag":"MainField_TBox_Field_Stone_NoReaction_1761649191","place":"遗忘神殿","placeEn":"Forgotten Temple","placeCat":"settlement","placeD":0,"x":-1066.4,"z":-2682.8,"inGround":false,"cell":"D-2_Static"},
+  "9858,4626.8":{"kind":"wild_set","hash":"2896665769","flag":"MainField_TBox_Field_Stone_NoReaction_2896665769","place":"遗忘神殿","placeEn":"Forgotten Temple","placeCat":"settlement","placeD":0,"x":-1071,"z":-2686.6,"inGround":false,"cell":"D-2_Static"}
   }
 };

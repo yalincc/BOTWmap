@@ -53,6 +53,18 @@
     tree: {
       zh: function (t) { return '「' + t.place + '」大树触发后才出现（机制待实机核实）'; },
       en: function (t) { return 'Appears at the great tree in ' + (t.placeEn || t.place) + ' — exact trigger unverified'; }
+    },
+    ichigeki: {
+      zh: function () { return 'DLC2「英杰们的诗篇」一击之剑试炼期间在营地出现'; },
+      en: function () { return 'Appears at the monster camp during DLC2 The Champions\' Ballad (One-Hit Obliterator trial)'; }
+    },
+    story_fallback: {
+      zh: function () { return '【保底宝箱】初期在木屋给老人做料理或登上海利亚山顶对话直接赠送；若未取得，完成初始台地四神庙获得滑翔伞、老人消失后，此宝箱才会在木屋内生成'; },
+      en: function () { return '[Fallback Chest] Initially gifted by the Old Man via spicy meat & seafood fry cooking or speaking to him atop Mount Hylia; if missed, this chest spawns inside the cabin only after obtaining the Paraglider (Old Man departs)'; }
+    },
+    wild_set: {
+      zh: function () { return '【全神庙终极奖励】通关全部 120 座神庙后，前往遗忘神殿女神像前才会生成（旷野之勇者套装）'; },
+      en: function () { return '[120 Shrines Ultimate Reward] Only spawns before the Goddess Statue in the Forgotten Temple after completing all 120 shrines (Cap/Tunic/Trousers of the Wild)'; }
     }
   };
 
@@ -80,16 +92,42 @@
       dlc: ['DLC 埋藏（触发才出现）', 'DLC buried (triggered)'],
       dlc_pad: ['英杰诗篇（触发才出现）', "Champions' Ballad (triggered)"],
       collabo: ['联动流星（触发才出现）', 'Collab meteor (triggered)'],
-      tree: ['大树宝箱（触发才出现）', 'Tree chest (triggered)']
+      tree: ['大树宝箱（触发才出现）', 'Tree chest (triggered)'],
+      ichigeki: ['一击之剑（触发才出现）', 'One-Hit Obliterator (triggered)'],
+      story_fallback: ['保底生成（老人离开后）', 'Fallback (after Old Man departs)'],
+      wild_set: ['全神庙通关奖励', '120 Shrines Reward']
     }[t.kind];
     return m ? (isEnLang() ? m[1] : m[0]) : null;
   }
-  window.ChestTrigger = { get: triggerOf, how: triggerHow, short: triggerShort };
+
+  /* 判断宝箱是否埋在地下（需磁力抓取拉出） */
+  function isChestInGround(entry) {
+    if (!entry) return false;
+    if (entry.inGround || entry.IsInGround) return true;
+    var p = entry.pt || entry;
+    if (p) {
+      if (p.inGround || p.IsInGround || p[3] === 1 || p[3] === true) return true;
+      var k = triggerKey(p);
+      if (k) {
+        var tr = triggerOf(p);
+        if (tr && (tr.inGround || tr.IsInGround)) return true;
+        if (typeof BOTW_CHESTS !== 'undefined' && BOTW_CHESTS.inGround && BOTW_CHESTS.inGround[k]) return true;
+      }
+    }
+    return false;
+  }
+
+  window.ChestTrigger = { get: triggerOf, how: triggerHow, short: triggerShort, isInGround: isChestInGround };
 
   /* contentCn 为 null 的中文名兜底（chests.js 数据缺口） */
   var CN_FALLBACK = {
     GameRomHorseReins_10: '古代缰绳',
-    GameRomHorseSaddle_10: '古代马鞍'
+    GameRomHorseSaddle_10: '古代马鞍',
+    IceArrow: '冰箭',
+    PutRupee_Gold: '金卢比 (300)',
+    PutRupee_Silver: '银卢比 (100)',
+    PutRupee_Purple: '紫卢比 (50)',
+    PutRupee_Red: '红卢比 (20)'
   };
 
   /* 三子分组：过滤天然互斥（自检断言两两零重叠） */
@@ -214,6 +252,7 @@
 
   window.ChestPanel = {
     setAll: setAllChest,
+    isInGround: isChestInGround,
     isOn: function (sub) { return !!cLayers[sub]; },
     isDone: function (p) { if (!p) return false; var kk = ptKey(p); return chestDone.has(kk) || saveDone.has(kk); },
     toggleDone: function (p) {
@@ -435,6 +474,11 @@
       /* V1.6.2 修复：只有 DLC 宝箱点才可能显示「归属待确认」；普通宝箱一律不显示 */
       badgeHtml = '<span class="q-badge-hard" style="background:rgba(255,255,255,.1);border-color:#666;color:#aaa">' + (isEn ? 'DLC (Pending)' : 'DLC（归属待确认）') + '</span>';
     }
+    var inGround = isChestInGround(entry);
+    if (inGround) {
+      var inGroundTag = (window.I18N && window.I18N.t) ? window.I18N.t('chest.inGroundTag', '🧲 埋地') : (isEn ? '🧲 Buried' : '🧲 埋地');
+      badgeHtml += '<span class="q-badge-hard" style="background:rgba(234,179,8,.16);border-color:#ca8a04;color:#facc15">' + esc(inGroundTag) + '</span>';
+    }
 
     var done = window.ChestPanel.isDone(p);
     var chipName = entry.hard
@@ -466,6 +510,15 @@
     if (how) {
       var tHow = window.I18N ? window.I18N.t('chest.how', '获取方式') : '获取方式';
       h += '<div class="tk-kv"><span class="tk-k">' + tHow + '</span><span class="tk-v" style="color:#eac27e">' + esc(how) + '</span></div>';
+    }
+
+    /* 埋地属性：醒目提示（需使用磁力抓取拉出） */
+    if (inGround) {
+      var groundTip = (window.I18N && window.I18N.t)
+        ? window.I18N.t('chest.inGroundTip', '🧲 埋在地下（需使用磁力抓取拉出）')
+        : (isEn ? '🧲 Buried underground (pull out with Magnesis)' : '🧲 埋在地下（需使用磁力抓取拉出）');
+      h += '<div class="tk-kv tk-kv-ground" style="margin:4px 0 6px 0;padding:5px 8px;background:rgba(234,179,8,0.12);border:1px solid rgba(202,138,4,0.35);border-radius:4px;color:#facc15;font-size:12px;font-weight:500;line-height:1.4">' +
+        esc(groundTip) + '</div>';
     }
 
     /* V1.6.2：去掉「坐标 X/Z 数字」行——游戏内并无此坐标，对玩家无意义（保留底部「定位」按钮） */

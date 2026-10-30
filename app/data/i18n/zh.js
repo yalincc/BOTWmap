@@ -296,6 +296,8 @@ window.BOTW_I18N.zh = {
   "chest.type.gamble": "赌博宝箱",
   "chest.type.enemy": "敌人宝箱",
   "chest.type.buried": "埋地宝箱",
+  "chest.inGroundTip": "🧲 埋在地下（需使用磁力抓取拉出）",
+  "chest.inGroundTag": "🧲 埋地",
 
   // 营地卡片与图层
   "camp.title": "怪物营地",

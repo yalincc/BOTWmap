@@ -296,6 +296,8 @@ window.BOTW_I18N.en = {
   "chest.type.gamble": "Gambling Chest",
   "chest.type.enemy": "Enemy Chest",
   "chest.type.buried": "Buried Chest",
+  "chest.inGroundTip": "🧲 Buried underground (pull out with Magnesis)",
+  "chest.inGroundTag": "🧲 Buried",
 
   // Camp Cards & Layers
   "camp.title": "Monster Camp",

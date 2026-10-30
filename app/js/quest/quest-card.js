@@ -369,8 +369,14 @@
     var shrineMk = null;
     if (q.cat === 'shrine' && window.__botwMap && window.__botwMap.data && window.__botwMap.data.markers) {
       var _mks = window.__botwMap.data.markers;
+      var _deliv = (q.flowPts || []).find(function (f) { return f.type === 'deliver'; });
       for (var _i = 0; _i < _mks.length; _i++) {
-        if (_mks[_i].cat === 'shrine' && _mks[_i].name === q.name) { shrineMk = _mks[_i]; break; }
+        if (_mks[_i].cat === 'shrine') {
+          if (_mks[_i].name === q.name || (_deliv && _deliv.note && _deliv.note.indexOf(_mks[_i].name) >= 0)) {
+            shrineMk = _mks[_i];
+            break;
+          }
+        }
       }
     }
     if (shrineMk) place = { name: shrineMk.name, px: shrineMk.px, mk: shrineMk };
