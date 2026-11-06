@@ -6,7 +6,7 @@
 
 > 快速上手请看压缩包里的 **README.txt**（记事本可直接打开）；本文件是详细教程。
 
-![platform](https://img.shields.io/badge/platform-Windows-blue) ![emulator](https://img.shields.io/badge/emulator-Cemu%20%2F%20Ryujinx%20%2F%20Eden-success) ![version](https://img.shields.io/badge/version-v3.2.2-success)
+![platform](https://img.shields.io/badge/platform-Windows-blue) ![emulator](https://img.shields.io/badge/emulator-Cemu%20%2F%20Ryujinx%20%2F%20Eden-success) ![version](https://img.shields.io/badge/version-v3.3.0-success)
 
 ---
 
