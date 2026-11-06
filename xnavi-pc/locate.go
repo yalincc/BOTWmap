@@ -507,9 +507,10 @@ func (l *locator) checkCalibration() {
 	// 1) 当前锁就对：直接确认
 	if l.hasLock {
 		if cur, ok := l.tripleAt(l.obj + l.lock.Field); ok {
-			if math.Abs(float64(cur[0]-tx)) < 1.0 &&
-				math.Abs(float64(cur[1]-ty)) < 1.0 &&
-				math.Abs(float64(cur[2]-tz)) < 1.0 {
+			xMatch := math.Abs(float64(cur[0]-tx)) < 1.0
+			yMatch := (ty == 0) || (math.Abs(float64(cur[1]-ty)) < 1.0)
+			zMatch := math.Abs(float64(cur[2]-tz)) < 1.0
+			if xMatch && yMatch && zMatch {
 				fmt.Printf("  [calib] ★ 当前链式读数与校准值一致（%.2f/%.2f/%.2f），已确认\n", cur[0], cur[1], cur[2])
 				return
 			}

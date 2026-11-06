@@ -66,7 +66,7 @@ export default {
     calibration: 'Quick Calibration',
     calWhenFail: 'Search Target',
     submit: 'Search Target',
-    calHint: 'Enter nearby landmark coordinates to fast locate:',
+    calHint: 'Enter F10 screen XYZ coords or landmark preset to fast calibrate:',
     localProgress: 'Save Progress',
     waitingProgress: 'Waiting for save... (Start locating first)',
     saveInfo: 'Active Save File',

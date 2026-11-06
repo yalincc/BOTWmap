@@ -108,13 +108,18 @@
             </div>
           </div>
           <div class="text-[10px] text-slate-500 mb-1.5 leading-relaxed">{{ t('locate.calHint') }}</div>
-          <div class="flex items-center gap-2 mb-2">
-            <label class="flex-1 bg-[#0d1117] rounded border border-slate-800 px-2 py-1 flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 mb-2">
+            <label class="flex-1 bg-[#0d1117] rounded border border-slate-800 px-1.5 py-1 flex items-center gap-1">
               <span class="text-[10px] text-slate-500 shrink-0">X</span>
               <input v-model="calX" type="number" step="0.1" placeholder="-215.0"
                 class="bg-transparent outline-none text-white font-mono text-xs w-full placeholder:text-slate-600" />
             </label>
-            <label class="flex-1 bg-[#0d1117] rounded border border-slate-800 px-2 py-1 flex items-center gap-1.5">
+            <label class="flex-1 bg-[#0d1117] rounded border border-slate-800 px-1.5 py-1 flex items-center gap-1">
+              <span class="text-[10px] text-slate-500 shrink-0">Y</span>
+              <input v-model="calY" type="number" step="0.1" placeholder="选填(高度)"
+                class="bg-transparent outline-none text-white font-mono text-xs w-full placeholder:text-slate-600" />
+            </label>
+            <label class="flex-1 bg-[#0d1117] rounded border border-slate-800 px-1.5 py-1 flex items-center gap-1">
               <span class="text-[10px] text-slate-500 shrink-0">Z</span>
               <input v-model="calZ" type="number" step="0.1" placeholder="250.0"
                 class="bg-transparent outline-none text-white font-mono text-xs w-full placeholder:text-slate-600" />
@@ -122,9 +127,9 @@
           </div>
           <div class="flex items-center gap-1.5 flex-wrap text-[10px]">
             <span class="text-slate-500">预设:</span>
-            <button @click="fillPreset(-215, 250)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">平原之塔</button>
-            <button @click="fillPreset(-1071, 1913)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">复苏神庙</button>
-            <button @click="fillPreset(3435, 1968)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">哈特诺塔</button>
+            <button @click="fillPreset(-215, 236, 250)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">平原之塔</button>
+            <button @click="fillPreset(-1071, 248, 1913)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">复苏神庙</button>
+            <button @click="fillPreset(3435, 228, 1968)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">哈特诺塔</button>
           </div>
         </section>
       </div>
@@ -208,7 +213,7 @@ import AboutPop from '../components/AboutPop.vue'
 import {
   pos, steps, stepClass, stepDot, isLocating, toggleLocating, progressData,
   openMap, cfg, saveSettings, ver, syncText, syncClass, syncDot,
-  rt, manualCalibrate, openSave, pickSaveFile, pickSaveDir, detectSave,
+  rt, calibrateCoords, openSave, pickSaveFile, pickSaveDir, detectSave,
   saveTimeAgoText, saveTimeAgoClass
 } from '../composables/useCore'
 
@@ -279,19 +284,25 @@ function countText(k) {
 }
 
 const calX = ref('')
+const calY = ref('')
 const calZ = ref('')
 const calBusy = ref(false)
 
-function fillPreset(x, z) {
+function fillPreset(x, y, z) {
   calX.value = String(x)
+  calY.value = String(y)
   calZ.value = String(z)
 }
 
 async function doCalibrate() {
-  if (!calX.value || !calZ.value) return
+  if (!calX.value || !calZ.value) {
+    alert('请输入 X 与 Z 坐标（Y 高度选填）')
+    return
+  }
   calBusy.value = true
   try {
-    const msg = await manualCalibrate(calX.value, calZ.value)
+    const yVal = calY.value !== '' && !isNaN(Number(calY.value)) ? Number(calY.value) : 0
+    const msg = await calibrateCoords(calX.value, yVal, calZ.value)
     alert(msg || '已提交校准请求')
   } finally {
     calBusy.value = false

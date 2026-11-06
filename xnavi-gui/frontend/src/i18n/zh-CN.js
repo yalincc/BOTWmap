@@ -66,7 +66,7 @@ export default {
     calibration: '坐标校准',
     calWhenFail: '快速找人',
     submit: '定向找人',
-    calHint: '若未跟随，可输入神庙/高塔坐标定向秒搜：',
+    calHint: '若未跟随，可输入屏幕F10三维坐标或神庙预设秒级校准：',
     localProgress: '本地解析进度',
     waitingProgress: '等待读取存档...（需先开始定位）',
     saveInfo: '当前生效存档',

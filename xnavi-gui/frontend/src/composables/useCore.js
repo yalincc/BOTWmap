@@ -114,6 +114,10 @@ export async function toggleLocating() {
   }
 }
 
+export async function calibrateCoords(x, y, z) {
+  return await api.Calibrate(Number(x), Number(y), Number(z))
+}
+
 export async function manualCalibrate(x, z) {
   return await api.ManualCalibrate(Number(x), Number(z))
 }

@@ -293,9 +293,10 @@ func (l *locator) fullScanWithAnchor(anchor [3]float32) (chainLock, uintptr, boo
 				x := math.Float32frombits(binary.LittleEndian.Uint32(buf[i:]))
 				y := math.Float32frombits(binary.LittleEndian.Uint32(buf[i+4:]))
 				z := math.Float32frombits(binary.LittleEndian.Uint32(buf[i+8:]))
-				if math.Abs(float64(x-anchor[0])) > 0.05 ||
-					math.Abs(float64(y-anchor[1])) > 0.05 ||
-					math.Abs(float64(z-anchor[2])) > 0.05 {
+				xMatch := math.Abs(float64(x-anchor[0])) <= 0.05
+				yMatch := (anchor[1] == 0) || (math.Abs(float64(y-anchor[1])) <= 0.05)
+				zMatch := math.Abs(float64(z-anchor[2])) <= 0.05
+				if !xMatch || !yMatch || !zMatch {
 					continue
 				}
 				addr := r.base + off + uintptr(i)
