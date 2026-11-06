@@ -43,6 +43,12 @@
   function hitsTarget(r, tx, ty) {
     return !(r.right <= tx - PAD || r.left >= tx + PAD || r.bottom <= ty - PAD || r.top >= ty + PAD);
   }
+  /* 矩形 vs 任意避让点（V1.7.6：收集模式自动弹卡时把「林克箭头」也当避让点，
+     于是同一个标点天然有两个可选位——右侧压到人就落到左侧，反之亦然） */
+  function hitsPoint(r, ax, ay, pad) {
+    var p = pad == null ? PAD : pad;
+    return !(r.right <= ax - p || r.left >= ax + p || r.bottom <= ay - p || r.top >= ay + p);
+  }
   function hitsRect(a, b) {
     return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
   }
@@ -52,14 +58,24 @@
   }
 
   /* 一次完整求解：给定卡片尺寸与左边界约束，找出不压目标、不压其他卡的位置。
+     avoid：额外的避让点（视口坐标，通常是林克箭头），null = 不启用。
+     dir  ：偏好方向（单位向量，通常是「林克 → 标点」）。
+            V1.7.6：收集模式自动弹卡时按它排序候选位，把卡片放到标点的「外侧」——
+            线（林克→标点）在内侧、卡片在外侧，既不挡人也不挡引导线。
      返回 {x,y,r}（x/y 为容器相对坐标，r 为视口矩形）或 null。 */
-  function solve(hr, relX, relY, cw, ch, tx, ty, obstacles, guard) {
+  function solve(hr, relX, relY, cw, ch, tx, ty, obstacles, guard, avoid, dir) {
     var minX = guard, maxX = Math.max(guard, hr.width - cw - EDGE);
     var minY = EDGE, maxY = Math.max(EDGE, hr.height - ch - EDGE);
     var clampX = function (x) { return Math.max(minX, Math.min(x, maxX)); };
     var clampY = function (y) { return Math.max(minY, Math.min(y, maxY)); };
     var mk = function (x, y) {
       return { x: x, y: y, r: { left: hr.left + x, top: hr.top + y, right: hr.left + x + cw, bottom: hr.top + y + ch } };
+    };
+    var ok = function (r) {
+      if (hitsTarget(r, tx, ty)) return false;
+      if (avoid && hitsPoint(r, avoid.x, avoid.y)) return false;
+      if (blockedBy(r, obstacles)) return false;
+      return true;
     };
 
     /* 候选位（容器相对）：右 → 左 → 下 → 上 → 四个对角 */
@@ -69,12 +85,17 @@
       [relX + PAD, relY + PAD], [relX + PAD, relY - PAD - ch],
       [relX - PAD - cw, relY + PAD], [relX - PAD - cw, relY - PAD - ch]
     ];
+    /* 有偏好方向时：按「卡片中心在 dir 上的投影」从大到小重排 → 最外侧的候选排第一 */
+    if (dir) {
+      cands = cands.map(function (c, k) {
+        return { c: c, k: k, s: (c[0] + cw / 2 - relX) * dir.x + (c[1] + ch / 2 - relY) * dir.y };
+      }).sort(function (a, b) { return (b.s - a.s) || (a.k - b.k); }).map(function (o) { return o.c; });
+    }
     var i, p, r;
     for (i = 0; i < cands.length; i++) {
       p = mk(clampX(cands[i][0]), clampY(cands[i][1]));
       /* 夹取之后才做重叠校验（原实现夹取完就收工，夹取会把卡片拉回压住目标） */
-      if (hitsTarget(p.r, tx, ty)) continue;
-      if (blockedBy(p.r, obstacles)) continue;
+      if (!ok(p.r)) continue;
       return p;
     }
 
@@ -89,8 +110,7 @@
     grid.sort(function (a, b) { return a.d - b.d; });
     for (i = 0; i < grid.length; i++) {
       r = mk(grid[i].x, grid[i].y).r;
-      if (hitsTarget(r, tx, ty)) continue;
-      if (blockedBy(r, obstacles)) continue;
+      if (!ok(r)) continue;
       return mk(grid[i].x, grid[i].y);
     }
     return null;
@@ -100,8 +120,9 @@
      card : 卡片 DOM（position:absolute，定位原点 #mapArea）
      tx,ty: 目标点【视口坐标】
      obstacles: 已定位卡片的视口矩形数组
+     avoid: 额外避让点【视口坐标】{x,y}，通常传林克箭头（收集模式自动弹卡）
      返回：卡片最终视口矩形（供后续卡避让） */
-  function place(card, tx, ty, obstacles) {
+  function place(card, tx, ty, obstacles, avoid, dir) {
     if (!card) return null;
     obstacles = obstacles || [];
     /* 手机端：底部抽屉布局交给 CSS，清空所有内联定位让 CSS 生效 */
@@ -125,10 +146,10 @@
     card.style.width = '';
     var cw = card.offsetWidth || 300, ch = card.offsetHeight || 320;
 
-    var best = solve(hr, relX, relY, cw, ch, tx, ty, obstacles, guardLeft());
+    var best = solve(hr, relX, relY, cw, ch, tx, ty, obstacles, guardLeft(), avoid, dir);
 
     /* 降级一：放宽侧栏避让（卡片 z-index 高于侧栏，压侧栏优于压目标点） */
-    if (!best) best = solve(hr, relX, relY, cw, ch, tx, ty, obstacles, EDGE + 2);
+    if (!best) best = solve(hr, relX, relY, cw, ch, tx, ty, obstacles, EDGE + 2, avoid, dir);
 
     /* 降级二：压缩卡片宽度（窄窗口横向物理放不下时的唯一出路） */
     if (!best) {
@@ -138,7 +159,7 @@
       if (cw > maxW && maxW >= MIN_W) {
         card.style.width = Math.floor(maxW) + 'px';
         cw = card.offsetWidth || cw; ch = card.offsetHeight || ch;
-        best = solve(hr, relX, relY, cw, ch, tx, ty, obstacles, EDGE + 2);
+        best = solve(hr, relX, relY, cw, ch, tx, ty, obstacles, EDGE + 2, avoid, dir);
         if (!best) card.style.width = '';
       }
     }
@@ -169,17 +190,19 @@
   }
 
   /* 多卡协同避让：所有可见卡依次挪开，先放的优先占好位，后放的避开目标点 + 已定位卡片。
-     opts.primary = 卡片 id：本次定位的主卡排到最前（例如装备定位时先挪 equipCard）。 */
+     opts.primary = 卡片 id：本次定位的主卡排到最前（例如装备定位时先挪 equipCard）。
+     opts.avoid   = 额外避让点【视口坐标】，只作用于主卡（收集模式自动弹卡避让林克）。 */
   function placeAll(tx, ty, opts) {
     opts = opts || {};
     var list = [], i, id, c;
+    var primaryEl = opts.primary ? document.getElementById(opts.primary) : null;
     /* 用户手动拖过的卡不参与重排（manual 态），除非它就是本次定位的主卡 */
     var movable = function (el, cid) {
       if (cid === opts.primary) return !!el;
       return isVisible(el) && el.dataset.manual !== '1';
     };
     if (opts.primary) {
-      c = document.getElementById(opts.primary);
+      c = primaryEl;
       if (movable(c, opts.primary)) list.push(c);
     }
     for (i = 0; i < PRIORITY.length; i++) {
@@ -190,7 +213,9 @@
     }
     var placed = [];
     for (i = 0; i < list.length; i++) {
-      var r = place(list[i], tx, ty, placed);
+      var r = list[i] === primaryEl
+        ? place(list[i], tx, ty, placed, opts.avoid, opts.dir)
+        : place(list[i], tx, ty, placed);
       if (r) placed.push(r);
     }
     return placed;

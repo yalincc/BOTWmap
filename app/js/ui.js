@@ -33,6 +33,7 @@ const UI = (() => {
     initSideTabs();
     initStatsCollapse();
     initMatSearch();
+    watchCardSize();
   }
 
   /* ---------- 侧栏 Tab（v1.1.7）：探索/材料切换，CSS 显隐不重建 DOM，状态记忆 ---------- */
@@ -1249,6 +1250,81 @@ const UI = (() => {
       : (window.I18N ? window.I18N.t('card.nav', '导航') : '导航');
   }
 
+  /* ---------- 收集模式自动弹卡（V1.7.6，供 live.js 调用） ----------
+   * showMarkerCard：把探索卡切到该标点并显示，返回 true = 已显示；
+   *   让位规则：任务 / 宝箱 / 装备卡在显示，或探索卡正显示「材料 / 自定义标记 /
+   *   非同类别标点」时拒绝（返回 false），由调用方下一帧再试；
+   *   同类别（呀哈哈）卡片可以顶掉——收集链本身就在驱动卡片。
+   * hideMarkerCard：只收自己弹的那一张（标点不匹配则不动），避免误收用户的卡。
+   * relayoutInfoCard：卡片被林克箭头压住时重排（内核会把林克当第二个避让点 → 落到镜像侧）。
+   * autoCardId：非空 = 当前卡是系统自动弹的，positionCard 据此把林克位置当避让点。 */
+  let autoCardId = null;
+
+  function playerViewportPoint() {
+    const L = map && map.live;
+    if (!L || L.mx == null || !map.m2s) return null;
+    const c = map.canvas.getBoundingClientRect();
+    const p = map.m2s([L.mx, L.my]);
+    return { x: c.left + p[0], y: c.top + p[1] };
+  }
+
+  function showMarkerCard(mk) {
+    if (!mk || !map) return false;
+    const busy = ['questCard', 'chestCard', 'equipCard'].some(function (id) {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains('hidden');
+    });
+    if (busy) return false;
+    const info = $('infoCard');
+    const shown = info && !info.classList.contains('hidden');
+    if (shown) {
+      const sid = currentMarker ? currentMarker.id : null;
+      /* 让位：用户正在看任何「不是这张」的卡（材料卡 / 自定义标记 / 别的标点都算；
+         只有系统自己弹的旧卡 autoCardId 允许被新目标顶掉） */
+      if (sid !== mk.id && sid !== autoCardId) return false;
+    }
+    autoCardId = mk.id;
+    map._selectMarker(mk);
+    return true;
+  }
+
+  function hideMarkerCard(id) {
+    if (!id) return;
+    if (!currentMarker || currentMarker.id !== id) return;
+    autoCardId = null;
+    hideInfo();
+  }
+
+  function isAutoCardShowing() {
+    const info = $('infoCard');
+    if (!autoCardId || !currentMarker || currentMarker.id !== autoCardId) return false;
+    return !!(info && !info.classList.contains('hidden'));
+  }
+
+  function relayoutInfoCard() {
+    const card = $('infoCard');
+    if (!card || card.classList.contains('hidden')) return;
+    if (card.dataset.manual === '1') return;   // 用户拖过的卡不动
+    positionCard();
+  }
+
+  /* 卡片内容异步变大（克洛格解谜截图懒加载、长文案换行）→ 自动重排，
+     否则位置是按加载前的小尺寸算的，图片一进来下半截就出屏了。 */
+  let _cardRO = null;
+  function watchCardSize() {
+    if (_cardRO || !window.ResizeObserver) return;
+    const card = $('infoCard');
+    if (!card) return;
+    _cardRO = new ResizeObserver(function () {
+      const c = $('infoCard');
+      if (!c || c.classList.contains('hidden')) return;
+      if (c.dataset.manual === '1') return;         // 用户拖过 → 保持手动态位
+      if (window.innerWidth <= 760) return;         // 手机底部抽屉交给 CSS
+      positionCard();
+    });
+    _cardRO.observe(card);
+  }
+
   /* V1.6.1 卡片避让统一内核：实现迁至 js/card-layout.js（window.CardLayout）。
      锚点仍是最近一次点击地图位置（无记录用画布中心偏上），避让/夹取/多卡协同全交给内核。 */
   function positionCard() {
@@ -1273,7 +1349,19 @@ const UI = (() => {
       } else if (map._lastClick) {
         sx = map._lastClick.sx; sy = map._lastClick.sy;
       }
-      window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: 'infoCard' });
+      /* 自动弹卡：林克既当避让点，也当「偏好方向」的反向端点 ——
+         卡片被排到标点的外侧（背离林克那侧），于是人不会被压、引导线也不会被盖 */
+      let avoid = null, dir = null;
+      if (autoCardId && currentMarker && currentMarker.id === autoCardId) {
+        const pp = playerViewportPoint();
+        if (pp) {
+          avoid = pp;
+          const dx = (r.left + sx) - pp.x, dy = (r.top + sy) - pp.y;
+          const len = Math.hypot(dx, dy);
+          if (len > 1) dir = { x: dx / len, y: dy / len };
+        }
+      }
+      window.CardLayout.placeAll(r.left + sx, r.top + sy, { primary: 'infoCard', avoid: avoid, dir: dir });
       return;
     }
     // 兜底（内核未加载时）：保持原行为
@@ -1834,7 +1922,8 @@ const UI = (() => {
     }
   }
 
-  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn, refreshNavButton, onLangChange };
+  return { init, loadState, applyHash, toast, renderStats, updateLayerList, hideInfo, persistDone: saveDone, syncCollectBtn, refreshNavButton, onLangChange,
+           showMarkerCard, hideMarkerCard, isAutoCardShowing, relayoutInfoCard };
 })();
 
 window.UI = UI;

@@ -442,7 +442,15 @@ const LIVE = (() => {
     // 收集模式中导航其他类别标注 → 退出收集模式（当前引导线保留）
     if (mode && mk.cat !== mode.cat) stopCollectMode();
     curId = mk.id;
-    if (mode) { mode.arrivedShown = false; renderCollectBar(); }
+    /* V1.7.6：单点导航也进入卡片伴随 —— 目标是呀哈哈就按 50/60 弹收卡。
+       navFollow 内部按当前真实距离判定，不会把「离开 60m 收卡」弄失效。 */
+    navFollow(mk);
+    if (mode) {
+      /* 用户手动导航 = 主观选择 → 原地 30m 内不被就近切走（走开后自动恢复动态就近） */
+      if (mode.cat === 'seed' && map.live.mx != null) mode.pin = { x: map.live.mx, y: map.live.my };
+      if (mode.cat !== 'seed') mode.arrivedMem = distM(mk) <= ARRIVE_M_MEM;
+      renderCollectBar();
+    }
     navTgt = { x: mk.px[0], y: mk.px[1], name: mk.name || mk.en || '' };
     postTarget(mk, '已设置导航：' + (mk.name || mk.en || '目标'));
   }
@@ -453,6 +461,7 @@ const LIVE = (() => {
       body: JSON.stringify({ clear: true }),
     }).catch(() => {});
     navTgt = null;
+    resetCard();          // 停止导航 → 收卡、停止跟随
   }
 
   /* v1.4.0：导航/停止切换 —— 同一目标再次点击 = 停止导航（标记与材料点通用） */
@@ -470,22 +479,78 @@ const LIVE = (() => {
   }
   function currentTarget() { return navTgt; }
 
-  /* ---------- 收集模式（回忆 / 克洛格 连续自动导航） ----------
-   * 点回忆 / 克洛格标注的「导航」时，由标注卡上的「收集」按钮开启：
-   *   - 每 600ms 轮询：当前目标已收集（存档同步 / 手动勾选）→ 自动设下一个
-   *     = 离玩家最近的未收集同类点；全部收集完 → 自动退出
-   *   - 到达（≤15m）只提示不跳转：收集并保存后自动前进，避免还没解谜就被带走
-   *   - 范围：克洛格 = 全部未收集；回忆 = 有存档 flag 的 13 个主线回忆
-   *     （EX / 英杰回忆无收集记录，不自动排队，仍可手动导航单点）
+  /* ---------- 收集模式（克洛格 连续自动导航 + 自动弹卡） ----------
+   * V1.7.6 重构，对齐 TOTKmap explore-auto 的成熟玩法（BOTW 无高度，全按平面算，1px = 0.5m）：
+   *   - 驱动：沿用既有 600ms /pos 轮询，每帧用「实时坐标」重算最近未完成点
+   *           → 走路绕路、骑马跑偏、神庙传送，全靠下一次计算覆盖，不需要识别传送
+   *   - 切点：最近点比当前目标近 15m 以上才切（防两卡中线来回闪跳）
+   *   - 弹卡：≤50m 弹出该标点解谜卡，>60m 收起（50/60 之间是迟滞带）
+   *   - 弹卡资格：收集模式 + 已完成过至少 1 个目标。第一颗的选择权在用户，系统不弹
+   *   - 让位：用户正在看材料 / 任务 / 宝箱 / 装备 / 别类标点卡时不弹，关掉后仍在内圈补弹
+   *   - 保护：用户手动点选（收集 / 导航）的标点，原地 30m 内不被就近切走；走/传出 30m 自动解除
+   *   - 续导：当前目标完成（手动勾选 / 存档同步）→ 立刻取最近未完成点，≤50m 弹卡，>50m 收卡
+   *   - 回忆（memory）沿用旧口径：15m 仅提示、不弹卡、不切点（数量少，不值得上这套）
    *   - 退出：横幅「结束」/ 手动导航其他类别标注 / 服务离线自动暂停（恢复后继续）
    */
   // 照片回忆 13 个（tier='photo'，含最终 #17）才进收集自动队列；EX / 英杰 / 大师剑自动获得不排队
   function isPhotoMemory(mk) {
     return !!(mk.extra && mk.extra.tier === 'photo');
   }
-  const ARRIVE_M = 15;                 // 到达提示阈值（游戏米，1px = 0.5m）
-  let mode = null;                     // { cat, arrivedShown } 当前收集模式
-  let curId = null;                    // 当前导航目标标记 id
+  const ARRIVE_M = 50;        // 呀哈哈：进入 50m 弹卡
+  const LEAVE_M = 60;         // 呀哈哈：离开 60m 收卡
+  const ARRIVE_M_MEM = 15;    // 回忆：仅到达提示
+  const SWITCH_HYST = 15;     // 切点防抖：更近点必须再近 15m 才抢
+  const PIN_RELEASE = 30;     // 手动保护释放位移
+  let mode = null;            // 收集模式 { cat, done, pin, arrivedMem }（队列/切点/续导）
+  let curId = null;           // 当前导航目标标记 id
+  /* V1.7.6 统一规则：自动弹卡不再挂在收集模式上，而是挂「当前导航目标」——
+     任何入口（收集模式 / 单点导航 / 续导 / 自动切点）把目标设成呀哈哈，
+     到 50m 就弹卡、到 60m 就收卡。收集模式只负责找最近、切点、续导。 */
+  let cardNav = { id: null, arrived: false, autoId: null, flipLock: false };
+  let offlineAt = 0;          // 本次掉线起点（掉线 >3s 收掉自动卡，避免卡死）
+
+  /* 玩家到标点的平面距离（游戏米） */
+  function distM(mk) {
+    const L = map.live;
+    if (!mk || !mk.px || !L || L.mx == null) return Infinity;
+    return Math.hypot(mk.px[0] - L.mx, mk.px[1] - L.my) * 0.5;
+  }
+  /* 标点短名：呀哈哈用 No.xxx（与地图标签、卡片标题同口径） */
+  function mkLabel(mk) {
+    if (!mk) return '目标';
+    if (mk.cat === 'seed') return 'No.' + (mk.extra && mk.extra.korok_no ? mk.extra.korok_no : String(mk.id).replace(/\D/g, ''));
+    return mk.name || mk.en || '目标';
+  }
+
+  /* ---------- 状态诊断条（地址带 ?dbg=1 才出现，平时零开销） ---------- */
+  const DBG = _sp.get('dbg') === '1';
+  let _dbgEl = null;
+  function dbgUpdate() {
+    if (!DBG) return;
+    if (!_dbgEl) {
+      _dbgEl = document.createElement('div');
+      _dbgEl.id = 'liveDbg';
+      _dbgEl.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;pointer-events:none;' +
+        'background:rgba(0,0,0,.75);color:#9f9;font:12px/1.6 Consolas,"Courier New",monospace;' +
+        'padding:6px 10px;border-radius:6px;white-space:pre;max-width:62vw';
+      document.body.appendChild(_dbgEl);
+    }
+    const L = map.live;
+    const cur = curId ? byId(curId) : null;
+    const tracked = cardNav.id ? byId(cardNav.id) : null;
+    const d = tracked ? distM(tracked) : (cur ? distM(cur) : Infinity);
+    _dbgEl.textContent = [
+      '在线 ' + (L.online ? '√' : '×') + '  锁定 ' + (L.verified ? '√' : '×') +
+        '  掉线 ' + (offlineAt ? Math.round((Date.now() - offlineAt) / 1000) + 's' : '0'),
+      '模式 ' + (mode ? mode.cat : '单点导航') +
+        '  跟踪 ' + (tracked ? mkLabel(tracked) : '-') + '  ' + (isFinite(d) ? Math.round(d) + 'm' : '?'),
+      '到达 ' + (cardNav.arrived ? '√' : '×') +
+        '  完成 ' + (tracked && map._mkDone(tracked) ? '√' : '×') +
+        '  卡 ' + (cardNav.autoId ? 'auto' : '-'),
+      '本页已记完成 ' + (mode && mode.done ? mode.done.size : 0) +
+        '  剩余未收集 ' + (mode ? collectPool(mode.cat).length : '-'),
+    ].join('\n');
+  }
 
   function collectPool(cat) {
     const out = [];
@@ -493,6 +558,9 @@ const LIVE = (() => {
       if (mk.cat !== cat) continue;
       if (cat === 'memory' && !isPhotoMemory(mk)) continue;  // EX / 英杰 / 大师剑不进自动队列
       if (map._mkDone(mk)) continue;                      // 已收集（存档同步 / 手动勾选）
+      /* 本会话已确认完成的：存档同步每 20s 会重建完成集合、把手动勾的抹掉，
+         这里兜一层，队列不会回头指回刚收完的那颗（刷新页面即失效，不写盘） */
+      if (mode && mode.done && mode.done.has(mk.id)) continue;
       out.push(mk);
     }
     return out;
@@ -521,27 +589,10 @@ const LIVE = (() => {
     }
     return [d, t];
   }
-  let _idMap = null, _coordMap = null;
+  let _idMap = null;
   function byId(id) {
     if (!_idMap) { _idMap = new Map(); map.markers.forEach(mk => _idMap.set(mk.id, mk)); }
     return _idMap.get(id) || null;
-  }
-  function byCoords(x, y) {
-    if (!_coordMap) {
-      _coordMap = new Map();
-      map.markers.forEach(mk => _coordMap.set(Math.round(mk.px[0]) + '_' + Math.round(mk.px[1]), mk));
-    }
-    return _coordMap.get(Math.round(x) + '_' + Math.round(y)) || null;
-  }
-  // 当前服务端目标对应的标记（先按记忆的 curId 坐标核验，再按坐标兜底）
-  function targetMarker() {
-    const t = map.live.tgt;
-    if (!t) return null;
-    if (curId) {
-      const mk = byId(curId);
-      if (mk && Math.abs(mk.px[0] - t.x) < 2 && Math.abs(mk.px[1] - t.y) < 2) return mk;
-    }
-    return byCoords(t.x, t.y);
   }
   function postTarget(mk, toastTxt) {
     fetch(LIVE_API + '/target', {
@@ -556,32 +607,125 @@ const LIVE = (() => {
     if (mode) stopCollectMode();
     const pool = collectPool(cat);
     if (!pool.length) { UI.toast('🎉 ' + (CAT_CN[cat] || cat) + '已全部收集完成'); return; }
+    const near = nearestIn(pool);
     let first = null;
     if (cat === 'seed' && mk && !map._mkDone(mk)) first = mk;      // 克洛格：点哪个导航哪个
-    if (!first) first = nearestIn(pool);                           // 回忆：最近的未收集
-    mode = { cat, arrivedShown: false };
+    if (!first) first = near;                                      // 回忆：最近的未收集
+    mode = {
+      cat,
+      arrivedMem: false,        // 回忆模式：到达提示只弹一次
+      done: new Set(),          // 本会话已确认完成的标点（防存档同步抹回后队列原地打转）
+      /* 手动点选的标点若不是最近的 → 原地 30m 内保护它，不被就近切走 */
+      pin: (cat === 'seed' && near && first.id !== near.id && map.live.mx != null)
+        ? { x: map.live.mx, y: map.live.my } : null,
+    };
     navTgt = null;   // 进入收集模式：手动导航目标让位于自动队列
     curId = first.id;
-    UI.toast('🧭 收集模式开启 · 目标：' + first.name + '（剩余 ' + pool.length + ' 个）');
+    UI.toast('🧭 收集模式开启 · 目标：' + mkLabel(first) + '（剩余 ' + pool.length + ' 个）');
     postTarget(first, '');
+    navFollow(first);    // 卡片伴随切到这颗（呀哈哈且在 50m 内会立即弹）
     renderCollectBar();
     map.draw();
   }
   function stopCollectMode() {
     if (!mode) return;
     mode = null;
-    renderCollectBar();               // 隐藏横幅；当前引导线保留
+    offlineAt = 0;
+    resetCard();                      // 显式「结束」→ 收卡并停止跟随（导航线保留）
+    renderCollectBar();               // 隐藏横幅
     if (UI && UI.syncCollectBtn) UI.syncCollectBtn();
   }
   function isModeActive(cat) { return !!(mode && mode.cat === cat); }
 
-  // 每轮轮询的收集模式状态机
-  function tickCollectMode() {
-    if (!mode) return;
+  /* ---------- 自动弹卡：绑「当前导航目标」（V1.7.6 统一规则） ---------- */
+
+  /* 弹出标点卡（让位失败返回 false，下一帧会补弹） */
+  function tryShowCardNow(mk) {
+    if (!mk || mk.cat !== 'seed' || !UI.showMarkerCard) return false;
+    if (!UI.showMarkerCard(mk)) return false;      // 让位：用户正在看别的卡
+    cardNav.autoId = mk.id;
+    return true;
+  }
+  /* 收起系统自己弹的卡（用户手动开的卡不动） */
+  function closeAutoCard() {
+    const id = cardNav.autoId;
+    cardNav.autoId = null;
+    if (id && UI.hideMarkerCard) UI.hideMarkerCard(id);
+  }
+  /* 停止卡片伴随（连同自己弹的卡一起收掉） */
+  function resetCard() {
+    closeAutoCard();
+    cardNav = { id: null, arrived: false, autoId: null, flipLock: false };
+  }
+  /* 导航目标变化 → 跟随这颗（非呀哈哈不弹卡） */
+  function navFollow(mk) {
+    resetCard();
+    if (!mk || mk.cat !== 'seed') return;
+    cardNav.id = mk.id;
+    if (map.live.mx != null && distM(mk) <= ARRIVE_M) {
+      if (tryShowCardNow(mk)) cardNav.arrived = true;
+    }
+  }
+
+  /* 林克箭头是否压住了自动卡（压住 → 让内核落到镜像侧） */
+  function autoCardOverlapped() {
+    if (!cardNav.autoId) return false;
+    if (window.innerWidth <= 760) return false;                 // 手机：底部抽屉，不参与翻转
+    if (!UI.isAutoCardShowing || !UI.isAutoCardShowing()) return false;
     const L = map.live;
-    if (!L.online) { renderCollectBar(); return; }                // 离线暂停，恢复后继续
+    if (L.mx == null || !map.m2s) return false;
+    const card = document.getElementById('infoCard');
+    if (!card) return false;
+    const sp = map.m2s([L.mx, L.my]);
+    const c = map.canvas.getBoundingClientRect();
+    const px = c.left + sp[0], py = c.top + sp[1];
+    const r = card.getBoundingClientRect();
+    const M = 28;   // 箭头半径 + 余量
+    return px > r.left - M && px < r.right + M && py > r.top - M && py < r.bottom + M;
+  }
+
+  /* 卡片伴随状态机（每 600ms 一次，与收集模式解耦） */
+  function tickCard() {
+    if (!cardNav.id) return;
+    const mk = byId(cardNav.id);
+    if (!mk) { resetCard(); return; }                             // 目标失效
+    const L = map.live;
+    if (!L.online) {                                              // 掉线：>3s 收卡，恢复后重弹
+      if (!offlineAt) offlineAt = Date.now();
+      else if (Date.now() - offlineAt > 3000) {
+        closeAutoCard();
+        cardNav.arrived = false;
+      }
+      return;
+    }
+    offlineAt = 0;
+    if (map._mkDone(mk)) { resetCard(); return; }                 // 目标完成 → 收卡、停跟随
+    const d = distM(mk);
+    if (d <= ARRIVE_M) {
+      if (!cardNav.arrived) { if (tryShowCardNow(mk)) cardNav.arrived = true; }
+    } else if (d > LEAVE_M && cardNav.arrived) {
+      cardNav.arrived = false;
+      closeAutoCard();
+    }
+    /* 被林克箭头压住 → 镜像到另一侧。
+       锁按「本次被压」算：翻完还压着就不再翻（防两位置来回跳），人离开卡片后解锁。 */
+    if (cardNav.autoId) {
+      if (autoCardOverlapped()) {
+        if (!cardNav.flipLock) {
+          cardNav.flipLock = true;
+          if (UI.relayoutInfoCard) UI.relayoutInfoCard();
+        }
+      } else if (cardNav.flipLock) {
+        cardNav.flipLock = false;
+      }
+    }
+  }
+
+  /* 续导：当前目标完成 / 失效 → 立刻取最近未完成点 */
+  function advanceCollect(prev) {
+    if (!mode) return;
     const pool = collectPool(mode.cat);
-    if (!pool.length) {                                            // 该类别全部收集完成
+    if (!pool.length) {                                          // 该类别全部收集完成
       UI.toast('🎉 ' + (CAT_CN[mode.cat] || mode.cat) + '已全部收集完成');
       fetch(LIVE_API + '/target', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -590,24 +734,81 @@ const LIVE = (() => {
       stopCollectMode();
       return;
     }
-    const cur = targetMarker();
-    const curInPool = !!(cur && pool.some(x => x.id === cur.id));
-    if (!cur || cur.id !== curId || !curInPool) {                  // 无目标 / 已收集 / 目标失效 → 自动前进
-      const donePrev = !!(cur && cur.id === curId && map._mkDone(cur));
-      const next = nearestIn(pool);
-      if (!next) return;
-      curId = next.id;
-      mode.arrivedShown = false;
-      if (donePrev) UI.toast('已收集：' + cur.name + ' · 前往下一个：' + next.name);
-      postTarget(next, '');
-      renderCollectBar();
+    const wasDone = !!(prev && map._mkDone(prev));
+    const next = nearestIn(pool);
+    if (!next) return;
+    const d = distM(next);
+    curId = next.id;
+    mode.pin = null;
+    postTarget(next, '');
+    if (wasDone) {
+      UI.toast('已收集：' + mkLabel(prev) + ' · 前往下一个：' + mkLabel(next) +
+        (isFinite(d) ? ' · ' + Math.round(d) + 'm' : ''));
+    }
+    if (mode.cat === 'seed') {
+      /* 刚完成的那张卡已过期 → 收起（用户自己点开的也收，收集链继续走） */
+      if (prev && UI.hideMarkerCard) UI.hideMarkerCard(prev.id);
+      navFollow(next);          // 卡片伴随切到新目标：≤50m 立刻弹，>50m 保持收起
+    } else if (d <= ARRIVE_M_MEM) {
+      mode.arrivedMem = true;
+      UI.toast('已到达：' + mkLabel(next) + ' · 收集后自动前往下一个');
+    }
+    renderCollectBar();
+    map.draw();
+  }
+
+  // 每轮轮询的状态机（600ms 一次，全靠当前实时坐标重算）
+  function tickCollectMode() {
+    if (DBG) dbgUpdate();
+    tickCard();                       // ① 卡片伴随：与收集模式解耦，先跑
+    if (!mode) return;                // ② 以下是收集模式专属（队列/切点/续导）
+    const L = map.live;
+    if (!L.online) { renderCollectBar(); return; }                // 离线暂停，恢复后继续
+    const pool = collectPool(mode.cat);
+    if (!pool.length) { advanceCollect(null); return; }            // 交给续导统一收尾（含提示/退出）
+
+    /* 当前目标以本地 curId 为准（服务端 /pos 的目标回显有一帧滞后，不能拿来判完成） */
+    const cur = byId(curId);
+    if (!cur || map._mkDone(cur)) {
+      /* 本会话记住这颗已完成：存档同步每 20s 重建完成集合会把手动勾的抹掉，
+         抹掉后它又成了最近点，队列会原地打转（Bug 1 的根因） */
+      if (cur) mode.done.add(cur.id);
+      advanceCollect(cur);
       return;
     }
-    // 到达提示：只提示不跳转，等收集（存档同步 / 手动勾选）后再自动前进
-    if (mode.arrivedShown && L.tdist != null && L.tdist > ARRIVE_M * 1.5) mode.arrivedShown = false;
-    if (L.tdist != null && L.tdist <= ARRIVE_M && !mode.arrivedShown) {
-      mode.arrivedShown = true;
-      UI.toast('已到达：' + cur.name + ' · 收集后自动前往下一个');
+
+    const SEED = mode.cat === 'seed';
+    const d = distM(cur);
+
+    // 1) 手动保护释放：走 / 传出 30m 后恢复动态就近
+    if (mode.pin && L.mx != null) {
+      const moved = Math.hypot(L.mx - mode.pin.x, L.my - mode.pin.y) * 0.5;
+      if (moved >= PIN_RELEASE) mode.pin = null;
+    }
+
+    // 2) 就近切点（呀哈哈专属）：出现比当前目标近 15m 以上的未完成点 → 切过去
+    if (SEED && !mode.pin && L.mx != null) {
+      const best = nearestIn(pool);
+      if (best && best.id !== curId) {
+        const db = distM(best);
+        if (db + SWITCH_HYST < d) {
+          curId = best.id;
+          postTarget(best, '');
+          navFollow(best);        // 卡片跟着换目标（旧的收掉，近的弹出来）
+          renderCollectBar();
+          map.draw();
+          return;
+        }
+      }
+    }
+
+    // 3) 回忆：只保留原「到达提示」（呀哈哈的弹收卡已在 tickCard 里）
+    if (!SEED) {
+      if (d <= ARRIVE_M_MEM) {
+        if (!mode.arrivedMem) { mode.arrivedMem = true; UI.toast('已到达：' + mkLabel(cur) + ' · 收集后自动前往下一个'); }
+      } else if (d > ARRIVE_M_MEM * 1.5) {
+        mode.arrivedMem = false;
+      }
     }
     renderCollectBar();
   }
@@ -626,12 +827,15 @@ const LIVE = (() => {
       bar.classList.add('paused');
       curEl.textContent = '离线暂停中…（恢复连接后继续）';
     } else {
-      const cur = targetMarker();
-      if (mode.arrivedShown && cur && cur.id === curId && !map._mkDone(cur)) {
+      const cur = byId(curId);
+      const dm = cur ? distM(cur) : Infinity;
+      const dt = isFinite(dm) ? ' · ' + Math.round(dm) + 'm' : '';
+      const arrived = (mode.cat === 'seed') ? (cardNav.id === curId && cardNav.arrived) : !!mode.arrivedMem;
+      if (arrived && cur && !map._mkDone(cur)) {
         bar.classList.add('arrived');
-        curEl.textContent = '已到达 · 收集后自动前往下一个';
+        curEl.textContent = (mode.cat === 'seed' ? '已到达 50m 内 · 收集后自动续导' : '已到达 · 收集后自动前往下一个') + dt;
       } else {
-        curEl.textContent = (cur && cur.id === curId) ? '目标：' + cur.name : '正在定位目标…';
+        curEl.textContent = cur ? '目标：' + mkLabel(cur) + dt : '正在定位目标…';
       }
     }
     if (UI && UI.syncCollectBtn) UI.syncCollectBtn();
