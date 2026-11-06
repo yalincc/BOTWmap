@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xnavi-pc · 定位状态</title>
+<style>
+  :root { color-scheme: light; --bd:#e3e6ea; --muted:#68727d; --ink:#1d2430; --ok:#127a55; --bad:#b4443a; --warn:#a9761a; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px 18px 40px; font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:#f6f8fa; }
+  .wrap { max-width:720px; margin:0 auto; }
+  h1 { font-size:19px; font-weight:600; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin:0 0 22px; }
+  .card { background:#fff; border:1px solid var(--bd); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .badge { display:inline-flex; align-items:center; gap:7px; font-weight:600; padding:4px 12px; border-radius:999px; font-size:13px; }
+  .badge::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .badge.on { color:var(--ok); background:#e8f5ef; }
+  .badge.off { color:var(--bad); background:#fbecea; }
+  .badge.warn { color:var(--warn); background:#fbf2e2; }
+  .coords { display:flex; gap:12px; margin-top:18px; flex-wrap:wrap; }
+  .coord { flex:1 1 150px; background:#f6f8fa; border:1px solid var(--bd); border-radius:9px; padding:12px 14px; }
+  .coord span { display:block; color:var(--muted); font-size:12px; }
+  .coord b { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td { padding:7px 0; border-bottom:1px solid #f0f2f4; }
+  td:first-child { color:var(--muted); width:120px; }
+  td:last-child { word-break:break-all; font-variant-numeric:tabular-nums; }
+  tr:last-child td { border-bottom:0; }
+  .btns { display:flex; flex-wrap:wrap; gap:10px; }
+  button, a.btn { font:inherit; cursor:pointer; border:1px solid var(--bd); background:#fff; color:var(--ink);
+    padding:9px 16px; border-radius:8px; text-decoration:none; display:inline-block; }
+  button:hover, a.btn:hover { background:#f0f3f6; }
+  button.primary { background:#1d5fd0; border-color:#1d5fd0; color:#fff; }
+  button.primary:hover { background:#1750b4; }
+  .hint { color:var(--muted); font-size:12px; margin-top:14px; }
+  .lan { font-family:ui-monospace,Consolas,monospace; font-size:12px; background:#f6f8fa; padding:8px 10px; border-radius:6px; word-break:break-all; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>xnavi-pc · 定位状态</h1>
+  <p class="sub">旷野之息 PC 移植版（Savage Wind）· 只读内存导航</p>
+
+  <div class="card">
+    <span id="badge" class="badge warn">正在连接…</span>
+    <div class="coords">
+      <div class="coord"><span>X（东西）</span><b id="gx">—</b></div>
+      <div class="coord"><span>高度</span><b id="gy">—</b></div>
+      <div class="coord"><span>Z（南北）</span><b id="gz">—</b></div>
+    </div>
+    <p class="hint" id="note"></p>
+  </div>
+
+  <div class="card">
+    <table>
+      <tr><td>游戏</td><td id="game">—</td></tr>
+      <tr><td>定位方式</td><td id="source">—</td></tr>
+      <tr><td>端口</td><td id="port">—</td></tr>
+      <tr><td>存档</td><td id="save">—</td></tr>
+      <tr><td>进度更新</td><td id="gen">—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="btns">
+      <a class="btn primary" id="btnMapLocal" href="/botw/?follow=1&amp;game=botw">打开本地地图</a>
+      <a class="btn" href="https://botw.yalin.site/?follow=1&amp;game=botw" target="_blank" rel="noopener">打开在线地图</a>
+      <button id="btnRescan">重新定位</button>
+      <button id="btnCopy">复制手机镜像链接</button>
+    </div>
+    <p class="hint">手机与电脑连同一 WiFi 时，用下面的地址在手机上看地图并跟随：</p>
+    <div class="lan" id="lan">—</div>
+  </div>
+
+  <p class="hint">本程序只读取游戏内存与存档，不写入游戏、不修改存档。关闭此窗口不会停止定位，请关闭 xnavi-pc 的控制台窗口。</p>
+</div>
+
+<script>
+var lastLan = '';
+function txt(id, v) { document.getElementById(id).textContent = (v === null || v === undefined || v === '') ? '—' : v; }
+async function refresh() {
+  try {
+    var r = await fetch('/pos?t=' + Date.now(), { cache: 'no-store' });
+    var j = await r.json();
+    var badge = document.getElementById('badge');
+    if (j.ok && j.verified) { badge.className = 'badge on'; badge.textContent = '已定位 · 地图可跟随'; }
+    else if (j.ok) { badge.className = 'badge warn'; badge.textContent = '定位中…'; }
+    else { badge.className = 'badge off'; badge.textContent = '未连接游戏'; }
+    txt('gx', j.ok ? Number(j.gx).toFixed(1) : '—');
+    txt('gy', j.ok ? Number(j.gy).toFixed(1) : '—');
+    txt('gz', j.ok ? Number(j.gz).toFixed(1) : '—');
+    txt('game', '旷野之息 · Savage Wind');
+    txt('source', j.source || '—');
+    txt('port', location.port || '80');
+    txt('save', j.save || '未检测到存档');
+    txt('gen', j.progressGen || '—');
+    txt('note', j.ok ? '' : '请确认 Savage Wind 已启动并进入游戏。');
+    var lan = j.lanUrl || '';
+    if (lan !== lastLan) { lastLan = lan; txt('lan', lan || '未检测到局域网地址'); }
+  } catch (e) {
+    var b = document.getElementById('badge');
+    b.className = 'badge off'; b.textContent = '服务未响应';
+    txt('note', '定位服务可能已关闭。');
+  }
+}
+document.getElementById('btnRescan').onclick = async function () {
+  await fetch('/rescan'); this.textContent = '已请求'; var self = this;
+  setTimeout(function () { self.textContent = '重新定位'; }, 1500);
+};
+document.getElementById('btnCopy').onclick = async function () {
+  if (!lastLan) return;
+  try { await navigator.clipboard.writeText(lastLan); this.textContent = '已复制'; } catch (e) { this.textContent = '请手动复制'; }
+  var self = this; setTimeout(function () { self.textContent = '复制手机镜像链接'; }, 1500);
+};
+refresh(); setInterval(refresh, 1000);
+</script>
+</body>
+</html>

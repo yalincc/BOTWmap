@@ -1,0 +1,6 @@
+*.log
+status.json
+status.json.tmp
+xnavi-core.exe
+xnavi-pc-chain.json
+xnavi-pc.exe
