@@ -64,7 +64,7 @@ Want to watch your character walk across the map in real time? Pair the map with
 
 ## Version
 
-Web app **v1.7.6** · xnavi (independent versioning) **v3.3.0** — see [Releases](https://github.com/yalincc/BOTWmap/releases) and [CHANGELOG.md](CHANGELOG.md).
+Web app **v1.7.7** · xnavi (independent versioning) **v3.3.0** — see [Releases](https://github.com/yalincc/BOTWmap/releases) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Disclaimer
 
