@@ -1,6 +1,18 @@
 /* ============ 旷野之息互动地图 · 地图引擎（Canvas） ============ */
 'use strict';
 
+/* V1.7.7 瓦片外置：线上从独立瓦片站读，本地/离线包/局域网镜像仍读仓库内瓦片
+   —— 主站产物不含瓦片（构建时 tools/strip-tiles.js 会移除 app/assets/tiles），线上必须走 tiles.yalin.site；
+      file:// / localhost / 局域网 IP（xnavi 的 http://电脑IP:8766/botw/）都判定为本地 */
+const TILES_CDN_BASE = 'https://tiles.yalin.site/';
+const TILE_BASE = (() => {
+  const host = location.hostname;
+  if (location.protocol === 'file:') return 'assets/tiles/';
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(host)) return 'assets/tiles/';
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return 'assets/tiles/';
+  return TILES_CDN_BASE;
+})();
+
 /* 类别视觉配置：颜色 / 形状 / 绘制优先级 / 标签显示缩放阈值 / 游戏内图标 / 固定屏幕尺寸 */
 const CAT_CFG = {
   tower:      { color:'#3d8bff', shape:'tower',     order:3, lz:0.5,  icon:'icons_01.png', isz:[28,39] },
@@ -304,7 +316,7 @@ class BotwMap {
       }
     };
     img.onerror = () => this.tilePending.delete(key);
-    img.src = 'assets/tiles/' + key + '.webp';
+    img.src = TILE_BASE + key + '.webp';
   }
 
   /* ---------- 视口 ---------- */
