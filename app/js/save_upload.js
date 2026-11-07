@@ -31,17 +31,43 @@ const SAVE_UPLOAD = (() => {
 
   const CAT_CN = { shrine: '神庙', tower: '希卡塔', korok: '克洛格', memory: '回忆', beast: '神兽' };
 
+  let _saveTablesPromise = null;
+  function ensureSaveTablesLoaded() {
+    if (typeof SAVE_FLAGS !== 'undefined' && typeof CHEST_SAVE !== 'undefined' &&
+        typeof PB_LISTS !== 'undefined' && typeof ENEMY_SAVE !== 'undefined') {
+      flags = SAVE_FLAGS;
+      buildChestHash(); buildPbMat(); buildPbEnemy(); buildEnemyHash();
+      return Promise.resolve(true);
+    }
+    if (_saveTablesPromise) return _saveTablesPromise;
+    _saveTablesPromise = Promise.all([
+      window.loadScriptOnce('data/save_flags.js?v=20261107'),
+      window.loadScriptOnce('data/chest_save.js?v=20261107'),
+      window.loadScriptOnce('data/pb_lists.js?v=20261107'),
+      window.loadScriptOnce('data/enemy_save.js?v=20261107')
+    ]).then(() => {
+      flags = (typeof SAVE_FLAGS !== 'undefined') ? SAVE_FLAGS : null;
+      buildChestHash(); buildPbMat(); buildPbEnemy(); buildEnemyHash();
+      return true;
+    }).catch(e => {
+      _saveTablesPromise = null;
+      console.error('[save_upload] 按需加载存档查找表失败:', e);
+      return false;
+    });
+    return _saveTablesPromise;
+  }
+
   function init(m) {
     map = m;
     // V1.6.0 任务完成标志反查表：hash -> flagName（quest_save.js 提供 flagName -> hash）
     buildQuestHash();
-    buildChestHash();
     // P4b：武器收集反查表：hash -> flagName（weapon_collect_save.js 的 isGet 表）
     buildWeaponHash();
     buildPbHash();
-    buildPbMat();
-    buildPbEnemy();
-    buildEnemyHash();
+    if (typeof SAVE_FLAGS !== 'undefined') {
+      flags = SAVE_FLAGS;
+      buildChestHash(); buildPbMat(); buildPbEnemy(); buildEnemyHash();
+    }
     // V1.6.4：恢复上次存档同步的扩展计数（localStorage 展示缓存，权威每次随存档重注入——同 ChestSync 模式）
     try {
       const d = JSON.parse(localStorage.getItem('botwmap.saveCounts.v1') || 'null');
@@ -175,11 +201,8 @@ const SAVE_UPLOAD = (() => {
       if (f) handleFile(f);
     });
 
-    // 查找表：V1.4.4 改由 <script src="data/save_flags.js"> 内联引入（全局 SAVE_FLAGS）。
-    // 此前用 fetch(data/save_flags.json)，file:// 本地部署下 fetch 被浏览器禁止 → 查找表永远
-    // 加载不到 → 报「标志查找表尚未就绪」。script 标签在 file:// 下可用，线上行为不变。
+    // 查找表：按需由 ensureSaveTablesLoaded() 动态加载（支持 http(s):// 与 file://）
     flags = (typeof SAVE_FLAGS !== 'undefined') ? SAVE_FLAGS : null;
-    if (!flags) console.warn('[save_upload] SAVE_FLAGS 查找表未加载：index.html 未引入 data/save_flags.js？');
   }
 
   function handleFile(file) {
@@ -333,11 +356,24 @@ const SAVE_UPLOAD = (() => {
   }
 
   function applySave(buf, fileName, silent) {
-    if (!flags) { UI.toast('标志查找表尚未就绪，请稍后重试'); return; }
     const dv = new DataView(buf);
     const littleEndian = detectEndian(dv, fileName);
     if (littleEndian === null) {
       UI.toast('这不是旷野之息的存档（版本标识不匹配）——王国之泪等其它游戏的存档无法解析', 6000);
+      return;
+    }
+    const totalEntries = Math.floor(Math.max(0, dv.byteLength - 0x0C) / 8);
+    if (totalEntries < 10000) {
+      UI.toast((window.I18N && window.I18N.t)
+        ? window.I18N.t('save.entriesTooFew', '存档条目数不足，请确认上传的是 game_data.sav（主存档文件，不是 caption.sav / option.sav）')
+        : '存档条目数不足，请确认上传的是 game_data.sav（主存档文件，不是 caption.sav / option.sav）');
+      return;
+    }
+    if (!flags) {
+      ensureSaveTablesLoaded().then(ok => {
+        if (ok && flags) applySave(buf, fileName, silent);
+        else UI.toast('标志查找表尚未就绪，请稍后重试');
+      });
       return;
     }
     const srcName = littleEndian ? 'Switch（Ryujinx）' : 'Wii U（Cemu）';

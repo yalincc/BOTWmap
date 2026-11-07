@@ -36,6 +36,46 @@ const UI = (() => {
     watchCardSize();
   }
 
+  /* ---------- 按需加载：材料数据（materials.js）与克洛格详情（koroks.js + korok_paths.js） ---------- */
+  let _matLoadPromise = null;
+  function ensureMaterialsLoaded() {
+    if (map && map.MATS) return Promise.resolve(map.MATS);
+    if (_matLoadPromise) return _matLoadPromise;
+    _matLoadPromise = window.loadScriptOnce('js/materials.js?v=20261107').then(() => {
+      if (map && map.initMaterials) map.initMaterials();
+      try {
+        const ml = JSON.parse(localStorage.getItem('botwmap.matLayers.v1') || '[]');
+        if (map && map.MATS) {
+          ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
+        }
+      } catch (e) {}
+      buildMatLayerGroup();
+      initMatSearch();
+      buildSearchIndex();
+      updateLayerList();
+      if (map) map.draw();
+      return map ? map.MATS : null;
+    }).catch(() => { _matLoadPromise = null; return null; });
+    return _matLoadPromise;
+  }
+
+  let _korokLoadPromise = null;
+  function ensureKoroksLoaded() {
+    if (typeof BOTW_KOROKS !== 'undefined' && typeof KOROK_PATHS !== 'undefined') {
+      if (map && map.initKoroks) map.initKoroks();
+      return Promise.resolve(true);
+    }
+    if (_korokLoadPromise) return _korokLoadPromise;
+    _korokLoadPromise = Promise.all([
+      window.loadScriptOnce('js/koroks.js?v=20261107'),
+      window.loadScriptOnce('js/korok_paths.js?v=20261107')
+    ]).then(() => {
+      if (map && map.initKoroks) map.initKoroks();
+      return true;
+    }).catch(() => { _korokLoadPromise = null; return false; });
+    return _korokLoadPromise;
+  }
+
   /* ---------- 侧栏 Tab（v1.1.7）：探索/材料切换，CSS 显隐不重建 DOM，状态记忆 ---------- */
   function initSideTabs() {
     const sidebar = $('sidebar');
@@ -49,6 +89,14 @@ const UI = (() => {
         t.setAttribute('aria-selected', on ? 'true' : 'false');
       });
       try { localStorage.setItem('botwmap.sideTab.v1', tab); } catch (e) {}
+      if (tab === 'material') {
+        ensureMaterialsLoaded().then(() => {
+          document.querySelectorAll('#layerList img.lg-ic-mat[data-src]').forEach(img => {
+            img.src = img.dataset.src;
+            img.removeAttribute('data-src');
+          });
+        });
+      }
     };
     let saved = null;
     try { saved = localStorage.getItem('botwmap.sideTab.v1'); } catch (e) {}
@@ -87,7 +135,8 @@ const UI = (() => {
   function initMatSearch() {
     const input = $('matSearchInput');
     const box = $('matSearchResults');
-    if (!input || !box || !map.MATS) return;
+    if (!input || !box || !map.MATS || input._matSearchBound) return;
+    input._matSearchBound = true;
     let timer = null;
     const doMatSearch = () => {
       const q = input.value.trim().toLowerCase();
@@ -300,6 +349,7 @@ const UI = (() => {
         row.title = '点击整行切换显示 / 隐藏';
         row.addEventListener('click', () => {
           if (map.enabled.has(key)) map.enabled.delete(key); else map.enabled.add(key);
+          if (key === 'seed' && map.enabled.has('seed')) ensureKoroksLoaded();
           row.classList.toggle('on', map.enabled.has(key));
           saveLayers();
           updateLayerList();
@@ -316,6 +366,7 @@ const UI = (() => {
       const keys = CAT_GROUP[btn.dataset.group] || [];
       const allOn = keys.length > 0 && keys.every(k => map.enabled.has(k));
       keys.forEach(k => { if (allOn) map.enabled.delete(k); else map.enabled.add(k); });
+      if (map.enabled.has('seed')) ensureKoroksLoaded();
       wrap.querySelectorAll('.lrow[data-cat]').forEach(r => {
         if (keys.includes(r.dataset.cat)) r.classList.toggle('on', !allOn);
       });
@@ -332,26 +383,34 @@ const UI = (() => {
   /* 材料追踪组（v1.1.0）：6 类分组 + 74 种材料单材料行（v1.2.0 起整行点击，带官方图标） */
   function buildMatLayerGroup() {
     const wrap = $('layerList');
-    if (!map.MATS) return;
-    const grp = document.createElement('div');
-    grp.className = 'lg-group';
-    grp.dataset.group = '材料';
-    const g = document.createElement('div');
-    g.className = 'lg';
-    const gLabel = document.createElement('span');
-    gLabel.textContent = '材料 · 采集';
-    const gBtn = document.createElement('button');
-    gBtn.type = 'button';
-    gBtn.className = 'lg-btn';
-    gBtn.dataset.group = '材料';
-    gBtn.title = '全选 / 清空所有材料';
-    g.appendChild(gLabel);
-    g.appendChild(gBtn);
-    grp.appendChild(g);
-    const lrows = document.createElement('div');
-    lrows.className = 'lrows';
-    grp.appendChild(lrows);
-    wrap.appendChild(grp);
+    let grp = wrap.querySelector('.lg-group[data-group="材料"]');
+    if (!grp) {
+      grp = document.createElement('div');
+      grp.className = 'lg-group';
+      grp.dataset.group = '材料';
+      const g = document.createElement('div');
+      g.className = 'lg';
+      const gLabel = document.createElement('span');
+      gLabel.textContent = (window.I18N && window.I18N.getLang() === 'en') ? window.I18N.t('group.材料', 'Materials') : '材料 · 采集';
+      const gBtn = document.createElement('button');
+      gBtn.type = 'button';
+      gBtn.className = 'lg-btn';
+      gBtn.dataset.group = '材料';
+      gBtn.title = '全选 / 清空所有材料';
+      gBtn.textContent = (window.I18N && window.I18N.getLang() === 'en') ? 'Select' : '全选本组';
+      g.appendChild(gLabel);
+      g.appendChild(gBtn);
+      grp.appendChild(g);
+      const lrows0 = document.createElement('div');
+      lrows0.className = 'lrows';
+      grp.appendChild(lrows0);
+      wrap.appendChild(grp);
+    }
+    if (!map.MATS || grp._matBuilt) return;
+    grp._matBuilt = true;
+    const gBtn = grp.querySelector('.lg-btn');
+    const lrows = grp.querySelector('.lrows');
+    const isMatTab = ($('sidebar') && $('sidebar').dataset.tab === 'material');
     // 6 大类默认全部展开（v1.1.8：材料已独立成 tab，去掉手风琴互斥）；点大类行独立展开/收起
     window._matSetOpenCat = (cat) => {
       lrows.querySelectorAll('.mat-cat-body').forEach(b => {
@@ -395,7 +454,7 @@ const UI = (() => {
         row.dataset.matid = id;
         row.dataset.cat = cat;
         row.innerHTML = `
-          <img class="lg-ic lg-ic-mat" src="assets/materials/${m.entry}.webp" alt="" loading="lazy">
+          <img class="lg-ic lg-ic-mat" ${isMatTab ? `src="assets/materials/${m.entry}.webp"` : `data-src="assets/materials/${m.entry}.webp"`} alt="" loading="lazy">
           <span class="lname">${m.cn}</span>
           <span class="lprog">${m.count}</span>`;
         row.addEventListener('click', () => {
@@ -433,7 +492,10 @@ const UI = (() => {
   /* V1.6.6：全选 / 清空 —— 联动全部图层模块（原先只清 marker 层，装备/宝箱/任务/营地纹丝不动）
      材料（74 种 13524 点）不参与：一键全开会很卡，它本来也是按需勾选的性质 */
   function setAllLayers(on) {
-    if (on) map.data.categories.forEach(c => map.enabled.add(c.key));
+    if (on) {
+      map.data.categories.forEach(c => map.enabled.add(c.key));
+      ensureKoroksLoaded();
+    }
     else map.enabled.clear();
     document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', on));
     saveLayers();
@@ -732,15 +794,22 @@ const UI = (() => {
     // 供 quest.js 在移除旧任务标点后重建索引（防御性保留）
     window._rebuildSearch = buildSearchIndex;
     const input = $('searchInput');
-    let timer = null;
-    input.addEventListener('input', () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => doSearch(input.value), 90);
-    });
-    input.addEventListener('focus', () => { if (input.value) doSearch(input.value); });
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.search-wrap')) hideResults();
-    });
+    if (input && !input._searchBound) {
+      input._searchBound = true;
+      let timer = null;
+      input.addEventListener('input', () => {
+        if (!map.MATS) ensureMaterialsLoaded().then(() => { if (input.value) doSearch(input.value); });
+        clearTimeout(timer);
+        timer = setTimeout(() => doSearch(input.value), 90);
+      });
+      input.addEventListener('focus', () => {
+        if (!map.MATS) ensureMaterialsLoaded();
+        if (input.value) doSearch(input.value);
+      });
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.search-wrap')) hideResults();
+      });
+    }
   }
 
   function doSearch(q) {
@@ -1022,7 +1091,12 @@ const UI = (() => {
   function renderKorokBlock(mk) {
     const el = $('cardKorok');
     if (mk.cat !== 'seed') { el.classList.add('hidden'); el.innerHTML = ''; return; }
-    const k = KOROK_ITEMS.find(x => x.id === mk.id);
+    const korokItems = (typeof BOTW_KOROKS !== 'undefined' && BOTW_KOROKS.items) ? BOTW_KOROKS.items : KOROK_ITEMS;
+    if (!korokItems.length) {
+      ensureKoroksLoaded().then(() => { if (currentMarker === mk) renderKorokBlock(mk); });
+      return;
+    }
+    const k = korokItems.find(x => x.id === mk.id);
     if (!k) { el.classList.add('hidden'); el.innerHTML = ''; return; }
     const isEn = window.I18N && window.I18N.getLang() === 'en';
     $('cardCat').textContent = isEn ? ('Korok Seed · No.' + k.no) : ('克洛格的果实 · No.' + k.no);
@@ -1524,6 +1598,7 @@ const UI = (() => {
     if (l) {
       map.enabled.clear();
       l.split(',').forEach(k => { if (CAT_CFG[k]) map.enabled.add(k); });
+      if (map.enabled.has('seed')) ensureKoroksLoaded();
       document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
       updateLayerList(); renderStats();
     }
@@ -1559,10 +1634,17 @@ const UI = (() => {
         }
       } else def.forEach(k => map.enabled.add(k));
     } catch (e) { def.forEach(k => map.enabled.add(k)); }
+    if (map.enabled.has('seed')) ensureKoroksLoaded();
     // 材料追踪图层恢复（v1.1.0，单材料 id 数组）
     try {
       const ml = JSON.parse(localStorage.getItem(K_MAT_LAYERS) || '[]');
-      ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
+      if (Array.isArray(ml) && ml.length) {
+        if (map.MATS) {
+          ml.forEach(i => { if (Number.isInteger(i) && map.MATS.materials[i]) map.matIds.add(i); });
+        } else {
+          ensureMaterialsLoaded();
+        }
+      }
     } catch (e) {}
     // V1.6.6：显示设置统一走 window.BOTW_SETTINGS（旧 key 已在那里迁移过）
     map.showRegions = !!window.BOTW_SETTINGS.s.regionShow;

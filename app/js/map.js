@@ -1,6 +1,23 @@
 /* ============ 旷野之息互动地图 · 地图引擎（Canvas） ============ */
 'use strict';
 
+/* 通用按需脚本加载器（幂等缓存 Promise，失败可重试） */
+window.loadScriptOnce = window.loadScriptOnce || (function () {
+  const _cache = {};
+  return function (src) {
+    if (_cache[src]) return _cache[src];
+    _cache[src] = new Promise(function (resolve, reject) {
+      const s = document.createElement('script');
+      s.src = src;
+      s.async = true;
+      s.onload = function () { resolve(true); };
+      s.onerror = function (err) { delete _cache[src]; reject(err || new Error('load failed: ' + src)); };
+      document.head.appendChild(s);
+    });
+    return _cache[src];
+  };
+})();
+
 /* 类别视觉配置：颜色 / 形状 / 绘制优先级 / 标签显示缩放阈值 / 游戏内图标 / 固定屏幕尺寸 */
 const CAT_CFG = {
   tower:      { color:'#3d8bff', shape:'tower',     order:3, lz:0.5,  icon:'icons_01.png', isz:[28,39] },
@@ -167,11 +184,38 @@ class BotwMap {
     this.matByEntry = {};         // entry -> material
     this.matPointsBy = [];        // [id] -> [[px,py],...]
     this.matClusters = {};        // [id] -> Supercluster 实例（懒加载缓存）
-    if (this.MATS) { this._buildMatIndex(); this._loadMatIcons(); }
+    if (this.MATS) { this._buildMatIndex(); }
     this._bindEvents();
     // 等两帧确保 CSS 布局完成；再监听 load 事件兜底（rAF 时 flex 布局可能尚未算高）
     requestAnimationFrame(() => requestAnimationFrame(() => this._resize()));
     window.addEventListener('load', () => this._resize(), { once: true });
+  }
+
+  /* 合并重绘调度（避免图标/瓦片批量加载触发数十次同步重绘） */
+  _scheduleDraw() {
+    if (!this._tileDrawPending) {
+      this._tileDrawPending = true;
+      requestAnimationFrame(() => { this._tileDrawPending = false; this.draw(); });
+    }
+  }
+
+  /* 按需初始化克洛格数据（koroks.js + korok_paths.js 动态加载后调用） */
+  initKoroks() {
+    if (typeof KOROK_PATHS !== 'undefined' && KOROK_PATHS.items && !this.KOROK_PATHS.length) {
+      this.KOROK_PATHS = KOROK_PATHS.items;
+      this._pathById = new Map();
+      for (const p of this.KOROK_PATHS) this._pathById.set(p.id, p);
+    }
+    this._korokStarts = null;
+    this._scheduleDraw();
+  }
+
+  /* 按需初始化材料数据（materials.js 动态加载后调用） */
+  initMaterials() {
+    if (this.MATS || typeof BOTW_MATERIALS === 'undefined') return;
+    this.MATS = BOTW_MATERIALS;
+    this._buildMatIndex();
+    this._scheduleDraw();
   }
 
   /* ---------- 空间索引：256px 网格 ---------- */
@@ -192,26 +236,21 @@ class BotwMap {
     }
   }
 
-  /* 预加载游戏内图标（ali213） */
+  /* 按需加载游戏内类别图标（仅当对应图层实际绘制时才发起请求） */
   _loadIcons() {
     this.icons = {};
-    const seen = new Set();
-    const want = [];
-    for (const key in CAT_CFG) {
-      const ic = CAT_CFG[key].icon;
-      if (!ic || seen.has(ic)) continue;
-      seen.add(ic); want.push(ic);
-    }
-    // V1.4.3b：龙轨迹起点图标（官方图鉴 Fire/Ice/Electric 透明抠图）
-    for (const ic of ['icons_46.png', 'icons_47.png', 'icons_48.png']) {
-      if (!seen.has(ic)) { seen.add(ic); want.push(ic); }
-    }
-    for (const ic of want) {
-      const img = new Image();
-      img.onload = () => this.draw();
+  }
+
+  _getIcon(ic) {
+    if (!ic) return null;
+    let img = this.icons[ic];
+    if (!img) {
+      img = new Image();
+      img.onload = () => this._scheduleDraw();
       img.src = 'assets/icons/' + ic;
       this.icons[ic] = img;
     }
+    return img;
   }
 
   /* ---------- 瓦片（ali213 同款动态加载） ---------- */
@@ -286,25 +325,66 @@ class BotwMap {
     return null;
   }
 
+  /* 按需加载高阶瓦片包索引 tiles_idx.js（仅 z>=4 且非 file:// 时触发一次） */
+  _ensureTilePackIdx() {
+    if (window.BOTW_TILES_PACK) return Promise.resolve(window.BOTW_TILES_PACK);
+    if (this._tilePackFailed || location.protocol === 'file:') return Promise.resolve(null);
+    if (!this._tilePackPromise) {
+      this._tilePackPromise = window.loadScriptOnce('assets/tiles/tiles_idx.js').then(() => {
+        return window.BOTW_TILES_PACK || null;
+      }).catch(() => {
+        this._tilePackFailed = true;
+        return null;
+      });
+    }
+    return this._tilePackPromise;
+  }
+
   _loadTile(z, key) {
     if (this.tileCache.has(key) || this.tilePending.has(key)) return;
     this.tilePending.add(key);
     const img = new Image();
+    let objUrl = null;
     img.onload = () => {
+      if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
       this.tilePending.delete(key);
       if (this.tileCache.size >= 400) {
         const first = this.tileCache.keys().next().value;
         this.tileCache.delete(first);
       }
       this.tileCache.set(key, img);
-      // 合并重绘（瓦片批量到达时避免频繁重绘）
-      if (!this._tileDrawPending) {
-        this._tileDrawPending = true;
-        requestAnimationFrame(() => { this._tileDrawPending = false; this.draw(); });
-      }
+      this._scheduleDraw();
     };
-    img.onerror = () => this.tilePending.delete(key);
-    img.src = 'assets/tiles/' + key + '.webp';
+    const loadRaw = () => {
+      img.onerror = () => this.tilePending.delete(key);
+      img.src = 'assets/tiles/' + key + '.webp';
+    };
+    if (z <= 3 || location.protocol === 'file:' || this._tilePackFailed) {
+      loadRaw();
+      return;
+    }
+    this._ensureTilePackIdx().then(pack => {
+      const entry = pack && pack.idx && pack.idx[key];
+      if (!entry) { loadRaw(); return; }
+      const packName = pack.packs[entry[0]];
+      const off = entry[1], len = entry[2];
+      fetch('assets/tiles/' + packName, {
+        headers: { Range: 'bytes=' + off + '-' + (off + len - 1) }
+      }).then(res => {
+        if (res.status === 206) return res.arrayBuffer();
+        if (res.status === 200) return res.arrayBuffer().then(b => b.slice(off, off + len));
+        throw new Error('HTTP ' + res.status);
+      }).then(buf => {
+        objUrl = URL.createObjectURL(new Blob([buf], { type: 'image/webp' }));
+        img.onerror = () => {
+          if (objUrl) { URL.revokeObjectURL(objUrl); objUrl = null; }
+          loadRaw();
+        };
+        img.src = objUrl;
+      }).catch(() => {
+        loadRaw();
+      });
+    });
   }
 
   /* ---------- 视口 ---------- */
@@ -775,7 +855,7 @@ class BotwMap {
     const { w, h } = this;
     const COLORS = { farosh: 'rgba(232,190,64,.92)', dinraal: 'rgba(232,96,64,.92)', naydra: 'rgba(88,168,240,.92)' };
     const EDGE = { farosh: 'rgba(110,85,20,.65)', dinraal: 'rgba(110,40,20,.65)', naydra: 'rgba(30,80,140,.65)' };
-    const ICONS = { farosh: this.icons['icons_48.png'], dinraal: this.icons['icons_46.png'], naydra: this.icons['icons_47.png'] };
+    const ICONS = { farosh: this._getIcon('icons_48.png'), dinraal: this._getIcon('icons_46.png'), naydra: this._getIcon('icons_47.png') };
     const lw = Math.max(2.5, Math.min(6, 2.5 * Math.pow(scale, 0.5)));
     ctx.save();
     ctx.lineJoin = 'round';
@@ -980,7 +1060,7 @@ class BotwMap {
   _glyph(ctx, mk, x, y, size, done) {
     const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
     const isFinalMem = mk.cat === 'memory' && mk.extra && mk.extra.tier === 'final';
-    const img = (cfg.icon && !isFinalMem) ? this.icons[cfg.icon] : null;
+    const img = (cfg.icon && !isFinalMem) ? this._getIcon(cfg.icon) : null;
     // 敌人图标分级（v1.4.3）：全图/省区用色点，放大后逐步显示全尺寸图标，避免密集重叠
     const _e = this._enemyIconScale(mk.cat);
     ctx.save();
@@ -1658,10 +1738,16 @@ class BotwMap {
     return c;
   }
 
-  /* 材料图标：官方 StockItem 缩略图，缺失时回退类目色圆点 */
+  /* 材料图标：官方 StockItem 缩略图（按需加载），缺失时回退类目色圆点 */
   _matIcon(ctx, id, sx, sy, size) {
     const m = this.MATS.materials[id];
-    const img = this.matIcons[m.entry];
+    let img = this.matIcons[m.entry];
+    if (!img) {
+      img = new Image();
+      img.onload = () => this._scheduleDraw();
+      img.src = 'assets/materials/' + m.entry + '.webp';
+      this.matIcons[m.entry] = img;
+    }
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.drawImage(img, sx - size / 2, sy - size / 2, size, size);
     } else {

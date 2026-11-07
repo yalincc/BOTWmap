@@ -40,9 +40,21 @@ const LIVE = (() => {
    *   ?follow=1 → 导航启动，强制开启视图跟随并持久化（用户手动设置让位于导航启动意图）
    *   ?game=    → 导航当前识别的游戏（botw/totk），进度口径选择与提示参考 */
   const _sp = new URLSearchParams(location.search);
+  const K_LIVE_KNOWN = 'botwmap.liveKnown.v1';
+  let liveKnown = LIVE_MIRROR || _sp.get('follow') === '1';
+  try { if (localStorage.getItem(K_LIVE_KNOWN) === '1') liveKnown = true; } catch (e) {}
   if (_sp.get('follow') === '1') {
     follow = true;
-    try { localStorage.setItem(K_FOLLOW, '1'); } catch (e) {}
+    try {
+      localStorage.setItem(K_FOLLOW, '1');
+      localStorage.setItem(K_LIVE_KNOWN, '1');
+    } catch (e) {}
+  }
+  function markLiveKnown() {
+    if (!liveKnown) {
+      liveKnown = true;
+      try { localStorage.setItem(K_LIVE_KNOWN, '1'); } catch (e) {}
+    }
   }
   const urlGame = _sp.get('game');   // 'botw' | 'totk' | null
   let progWarned = false;            // TOTK 口径/格式不符提示只弹一次，不刷屏
@@ -68,13 +80,29 @@ const LIVE = (() => {
         follow = !follow;
         try { localStorage.setItem(K_FOLLOW, follow ? '1' : '0'); } catch (e) {}
         b.classList.toggle('on', follow);
+        if (!map.live.online) { liveKnown = true; lastProbeAt = 0; probeNow(); startProbing(); }
         if (follow && map.live.mx != null) { centerOnPlayer({ pull: true }); map.draw(); }
         UI.toast(follow ? '已开启：视图跟随玩家' : '已关闭跟随');
       });
     }
 
     const bMirror = document.getElementById('btnMirror');
-    if (bMirror) bMirror.addEventListener('click', toggleMirror);
+    if (bMirror) bMirror.addEventListener('click', () => {
+      if (!map.live.online) { liveKnown = true; lastProbeAt = 0; probeNow(); startProbing(); }
+      toggleMirror();
+    });
+    const stEl = document.getElementById('liveStatus');
+    if (stEl) {
+      stEl.style.cursor = 'pointer';
+      stEl.addEventListener('click', () => {
+        if (!map.live.online) {
+          liveKnown = true;
+          lastProbeAt = 0;
+          probeNow();
+          startProbing();
+        }
+      });
+    }
     const cMirror = document.getElementById('mirrorClose');
     if (cMirror) cMirror.addEventListener('click', hideMirror);
     const cpBtn = document.getElementById('mirrorCopy');
@@ -83,20 +111,21 @@ const LIVE = (() => {
     const cbStop = document.getElementById('collectStop');
     if (cbStop) cbStop.addEventListener('click', () => { stopCollectMode(); UI.toast('已结束收集模式'); });
 
-    loadProgress();
-    // v3.2.2：页面加载即探一次（xnavi 启动会自动打开地图页 → 主流流程秒连）；
-    // 未发现则转入 30s 兜底探测；用户切回标签页/点击页面时立即再探（见下方事件）。
-    // 冷启动首发请求偶发瞬态失败（代理/WPAD 热身）→ 1.5s 后补探一次。
-    discoverLiveAPI().then(found => {
-      if (found) { startPolling(); return; }
-      startProbing();
-      setTimeout(probeNow, 1500);
-    });
+    updateStatus();
+    // 仅当已知存在本地 xnavi（URL 含 ?follow=1 / 局域网镜像 / 历史曾连上过）时才在首屏自动探测端口，
+    // 避免普通公网访客首屏产生 11 个 127.0.0.1 ERR_CONNECTION_REFUSED 报错
+    if (liveKnown) {
+      discoverLiveAPI().then(found => {
+        if (found) { markLiveKnown(); loadProgress(); startPolling(); return; }
+        startProbing();
+      });
+    }
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) { loadProgress(); probeNow(); }
+      if (!document.hidden && liveKnown) {
+        if (map.live.online) loadProgress();
+        else probeNow();
+      }
     });
-    document.addEventListener('pointerdown', probeNow);
-    document.addEventListener('keydown', probeNow);
   }
 
   /* ---------- 屏幕常亮（Wake Lock）：跟随定位轮询期间防息屏 ----------
@@ -155,7 +184,7 @@ const LIVE = (() => {
     let fallback = null;
     for (let i = 0; i < LIVE_PORTS.length; i++) {
       const hit = await probePort(LIVE_PORTS[i]);
-      if (hit && hit.ok) { LIVE_API = 'http://127.0.0.1:' + LIVE_PORTS[i]; return true; }
+      if (hit && hit.ok) { LIVE_API = 'http://127.0.0.1:' + LIVE_PORTS[i]; markLiveKnown(); return true; }
       if (hit && (!fallback || hit.rank > fallback.rank)) fallback = hit;   // 指纹优先于旧版兼容
     }
     if (fallback) LIVE_API = 'http://127.0.0.1:' + fallback.port;
@@ -210,6 +239,7 @@ const LIVE = (() => {
       if (failCnt >= 3 && pollTimer) stopPolling();
     } else {
       failCnt = 0;
+      markLiveKnown();
     }
 
     const L = map.live;
