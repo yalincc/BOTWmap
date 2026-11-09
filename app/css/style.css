@@ -944,12 +944,16 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .flow-pts .fp.fp-t-npc .num { color: var(--fd-gold); }
 .flow-pts .fp.fp-t-other .num { color: #9fc6ff; }
 
-/* 装备卡片：获取点点击高亮 + 大师模式宝箱（紫） */
+/* 装备卡片：获取点点击高亮 + 大师模式宝箱（紫） + 野外刷新（绿） */
 .flow-pts .fp.is-cur { border-color: var(--fd-gold); background: rgba(242,201,76,.14); }
 .flow-pts .fp.fp-hard { border-color: rgba(139,92,246,.5); }
 .flow-pts .fp.fp-hard .num { color: #b18cff; }
 .flow-pts .fp.fp-hard.is-cur { border-color: #8a5cf6; background: rgba(139,92,246,.16); }
 .eq-obtain-h.fp-hard-h { color: #b18cff; }
+.flow-pts .fp.fp-field { border-color: rgba(52,211,153,.5); }
+.flow-pts .fp.fp-field .num { color: #34d399; }
+.flow-pts .fp.fp-field.is-cur { border-color: #10b981; background: rgba(52,211,153,.16); }
+.eq-obtain-h.fp-field-h { color: #34d399; }
 
 /* V1.7.2：装备卡宝箱 chip 已开启态（与地图宝箱完成态同源联动） */
 .flow-pts .fp.fp-done { opacity: .6; border-style: dashed; }

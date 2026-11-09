@@ -76,6 +76,10 @@
   Object.keys(WEAPON_ITEMS).forEach(function (id) {
     var w = WEAPON_ITEMS[id];
     var kind = (w.type === '盾') ? 'shield' : 'weapon';
+    var obList = [{ kind: 'chest', pts: w.chestPts || [], hardPts: w.hardPts || [] }];
+    if (w.fieldPts && w.fieldPts.length) {
+      obList.push({ kind: 'field', pts: w.fieldPts });
+    }
     ITEMS.push({
       id: id, kind: kind, name: w.name, en: w.en, type: w.type,
       atk: (w.atk != null ? w.atk : null), guard: (w.guard != null ? w.guard : null),
@@ -83,7 +87,7 @@
       element: w.element || null, strong: !!w.strong, stub: !!w.stub,
       hard: !!w.hard,
       camps: w.camps || [],                                   // P4a：怪物营地来源（[{m,f,t,a,n}]）
-      obtain: [{ kind: 'chest', pts: w.chestPts || [], hardPts: w.hardPts || [] }]
+      obtain: obList
     });
   });
   Object.keys(ARMOR_ITEMS).forEach(function (id) {
@@ -263,14 +267,13 @@
       var color = CAT_COLOR[it.kind] || '#888';
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
-        if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
+        if (!ob || (ob.kind !== 'chest' && ob.kind !== 'field') || !ob.pts) continue;
         var pts = ob.pts;
         for (var j = 0; j < pts.length; j++) {
           var px = pts[j];
           if (px[0] < x0 || px[0] > x1 || px[1] < y0 || px[1] > y1) continue;
-          /* V1.7.2：点位级完成态 = 该坐标宝箱已开（存档/手动同源推导）。
-             宝箱与装备一一对应：开一个灭一个，同名装备其他地区不受影响。 */
-          var pDone = (window.ChestPanel && window.ChestPanel.isDone) ? window.ChestPanel.isDone(px) : false;
+          /* V1.7.2：点位级完成态 = 该坐标宝箱已开（野外刷新点不受宝箱影响，血月重置，保持常驻可用态）。 */
+          var pDone = (ob.kind === 'chest' && window.ChestPanel && window.ChestPanel.isDone) ? window.ChestPanel.isDone(px) : false;
           /* V1.6.6：设置里勾了「隐藏已完成的装备」→ 已完成的点直接跳过（与命中同步，见 hit()） */
           if (pDone && window.BOTW_SETTINGS.hideCat('equip')) continue;
           var sx = map.view.x + px[0] * scale, sy = map.view.y + px[1] * scale;
@@ -301,11 +304,11 @@
       if (!eLayers[it.kind]) continue;
       for (var k = 0; k < it.obtain.length; k++) {
         var ob = it.obtain[k];
-        if (!ob || ob.kind !== 'chest' || !ob.pts) continue;
+        if (!ob || (ob.kind !== 'chest' && ob.kind !== 'field') || !ob.pts) continue;
         for (var j = 0; j < ob.pts.length; j++) {
           var p = ob.pts[j];
           /* V1.7.2：点位级——隐藏的已完成点不参与命中（该点宝箱已开；V1.6.6 口径随点位级细化） */
-          if (window.BOTW_SETTINGS.hideCat('equip') && window.ChestPanel && window.ChestPanel.isDone &&
+          if (ob.kind === 'chest' && window.BOTW_SETTINGS.hideCat('equip') && window.ChestPanel && window.ChestPanel.isDone &&
               window.ChestPanel.isDone(p)) continue;
           var dx = p[0] - mx, dy = p[1] - my;
           if (Math.abs(dx) <= tol && Math.abs(dy) <= tol) {
@@ -583,14 +586,18 @@
       h += '<div class="tk-kv"><span class="tk-k">' + esc(tSet) + '</span><span class="tk-v">' + (setVal ? esc(setVal) : '<span class="tk-pending">' + esc(tPending) + '</span>') + '</span></div>';
     }
 
-    /* 获取来源：普通模式宝箱（黄）/ 大师模式宝箱（紫），逐点可定位 + 点击高亮 */
-    var normalPts = [], hardPts = [];
+    /* 获取来源：普通模式宝箱（黄）/ 大师模式宝箱（紫）/ 野外刷新（绿），逐点可定位 + 点击高亮 */
+    var normalPts = [], hardPts = [], fieldPts = [];
     it.obtain.forEach(function (ob) {
-      if (!ob || ob.kind !== 'chest') return;
-      (ob.pts || []).forEach(function (p) { normalPts.push(p); });
-      (ob.hardPts || []).forEach(function (p) { hardPts.push(p); });
+      if (!ob) return;
+      if (ob.kind === 'chest') {
+        (ob.pts || []).forEach(function (p) { normalPts.push(p); });
+        (ob.hardPts || []).forEach(function (p) { hardPts.push(p); });
+      } else if (ob.kind === 'field') {
+        (ob.pts || []).forEach(function (p) { fieldPts.push(p); });
+      }
     });
-    var allPts = normalPts.concat(hardPts);
+    var allPts = normalPts.concat(hardPts).concat(fieldPts);
     function ptsHtml(list, cls, base) {
       return '<div class="flow-pts">' + list.map(function (p, i) {
         /* 触发型宝箱（狗狗/DLC埋藏等）：chip 直接显示触发说明，点位找不到宝箱的元凶 */
@@ -603,10 +610,20 @@
           '<span class="num">' + (i + 1) + '</span><span class="txt">' + tLabel + (opened ? ' ✓' : '') + '</span></span>';
       }).join('') + '</div>';
     }
+    function fieldPtsHtml(list, cls, base) {
+      return '<div class="flow-pts">' + list.map(function (p, i) {
+        var spotName = p[2] || (isEn ? 'Wild Spawn' : '野外刷新点');
+        var tip = isEn ? ('Click to locate spawn at ' + spotName + ' (resets on Blood Moon)') : ('点击定位到' + esc(spotName) + '的刷新点（血月重置）');
+        return '<span class="fp ' + cls + '" data-eq-pt="' + (base + i) + '" title="' + tip + '">' +
+          '<span class="num">' + (i + 1) + '</span><span class="txt">' + esc(spotName) + '</span></span>';
+      }).join('') + '</div>';
+    }
     var obtainHtml = '';
     var spotsUnit = window.I18N ? window.I18N.t('equip.spotsCount', '处') : '处';
     var normHeader = window.I18N ? window.I18N.t('equip.normalChests', '普通模式宝箱') : '普通模式宝箱';
     var hardHeader = window.I18N ? window.I18N.t('equip.masterChests', '大师模式宝箱') : '大师模式宝箱';
+    var fieldHeader = window.I18N ? window.I18N.t('equip.fieldSpawns', '野外刷新（血月重置）') : '野外刷新（血月重置）';
+    if (fieldPts.length) obtainHtml += '<div class="eq-obtain-h fp-field-h">' + fieldHeader + '<span class="tk-src">' + fieldPts.length + ' ' + spotsUnit + '</span></div>' + fieldPtsHtml(fieldPts, 'fp-field', normalPts.length + hardPts.length);
     if (normalPts.length) obtainHtml += '<div class="eq-obtain-h">' + normHeader + '<span class="tk-src">' + normalPts.length + ' ' + spotsUnit + '</span></div>' + ptsHtml(normalPts, 'fp-normal', 0);
     if (hardPts.length) obtainHtml += '<div class="eq-obtain-h fp-hard-h">' + hardHeader + '<span class="tk-src">' + hardPts.length + ' ' + spotsUnit + '</span></div>' + ptsHtml(hardPts, 'fp-hard', normalPts.length);
     /* P4a：怪物营地掉落段（dex camps 已按 actor 聚合；点击反查 CAMP_WEAPONS 定位到刷点）
