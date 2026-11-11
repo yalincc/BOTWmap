@@ -72,3 +72,9 @@ screen/
 .edgeone/
 /*.rar
 /*.zip
+
+# 高阶散装瓦片（已合并为 .pack；本地解包供离线包使用，不入库以免超 EdgeOne 20,000 文件上限）
+app/assets/tiles/4_*.webp
+app/assets/tiles/5_*.webp
+app/assets/tiles/6_*.webp
+app/assets/tiles/7_*.webp
