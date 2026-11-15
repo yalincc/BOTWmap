@@ -28,7 +28,7 @@ import (
 )
 
 // CoreVersion 遵循发布版本号（与模拟器版一致）。
-const CoreVersion = "v3.3.0"
+const CoreVersion = "v3.3.1"
 
 var (
 	loc         *locator
@@ -170,6 +170,11 @@ func watchLoop() {
 // ---- status.json（运行时健康快照，GUI/诊断可读；发布包禁带） ----
 func statusLoop() {
 	for {
+		if ts := lastWebHitUnix.Load(); ts > 0 && time.Now().Unix()-ts > 15 {
+			if webConnState.CompareAndSwap(2, 0) {
+				fmt.Println("  [web] disconnected (timeout 15s)")
+			}
+		}
 		writeStatusFile()
 		time.Sleep(2 * time.Second)
 	}
@@ -177,6 +182,7 @@ func statusLoop() {
 
 func writeStatusFile() {
 	st := loc.snapshot()
+	webConnected, webOrigin := webConnectionInfo()
 	obj := map[string]any{
 		"time":      time.Now().Format("2006-01-02 15:04:05"),
 		// GUI 会话签名：xnavi-gui 用它确认快照来自本次拉起的核心，缺失会一直显示「启动中」。
@@ -192,9 +198,11 @@ func writeStatusFile() {
 		"layer":     0,
 		"note":      st.Note,
 		"rescans":   st.Rescans,
-		"port":      primaryPort,
-		"ver":       CoreVersion,
-		"lanUrl":    lanURL,
+		"port":         primaryPort,
+		"ver":          CoreVersion,
+		"lanUrl":       lanURL,
+		"webConnected": webConnected,
+		"webOrigin":    webOrigin,
 		"pos": map[string]any{
 			"gx": st.GX, "gy": st.GY, "gz": st.GZ,
 			"mx": st.MX, "my": st.MY,

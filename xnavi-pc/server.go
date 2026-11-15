@@ -25,8 +25,25 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+var (
+	lastWebHitUnix atomic.Int64
+	webConnState   atomic.Int32
+	lastWebOrigMu  sync.Mutex
+	lastWebOrigin  string
+)
+
+func webConnectionInfo() (connected bool, origin string) {
+	ts := lastWebHitUnix.Load()
+	connected = ts > 0 && time.Now().Unix()-ts <= 10
+	lastWebOrigMu.Lock()
+	origin = lastWebOrigin
+	lastWebOrigMu.Unlock()
+	return connected, origin
+}
 
 //go:embed status.html mirror_fallback.html
 var pageFS embed.FS
@@ -136,6 +153,9 @@ func (s *apiServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "/"
 	}
 	if r.Method == http.MethodOptions {
+		if orig := r.Header.Get("Origin"); orig != "" && webConnState.CompareAndSwap(0, 1) {
+			fmt.Printf("  [web] preflight OPTIONS from %s (waiting GET /pos)\n", orig)
+		}
 		h := w.Header()
 		h.Set("Access-Control-Allow-Origin", "*")
 		h.Set("Access-Control-Allow-Private-Network", "true")
@@ -162,7 +182,7 @@ func (s *apiServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch path {
 	case "/pos":
-		s.handlePos(w)
+		s.handlePos(w, r)
 	case "/status", "/gui":
 		buf, _ := pageFS.ReadFile("status.html")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -234,7 +254,18 @@ func (s *apiServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *apiServer) handlePos(w http.ResponseWriter) {
+func (s *apiServer) handlePos(w http.ResponseWriter, r *http.Request) {
+	lastWebHitUnix.Store(time.Now().Unix())
+	orig := r.Header.Get("Origin")
+	if orig == "" {
+		orig = "direct"
+	}
+	lastWebOrigMu.Lock()
+	lastWebOrigin = orig
+	lastWebOrigMu.Unlock()
+	if webConnState.Swap(2) != 2 {
+		fmt.Printf("  [web] connected (origin=%s)\n", orig)
+	}
 	st := loc.snapshot()
 	targetMu.Lock()
 	t := curTarget
