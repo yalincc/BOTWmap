@@ -19,9 +19,23 @@ import (
 	"time"
 )
 
-// lastWebHitUnix 最近一次 /pos 被网页命中的时刻（v3.2.2 诊断：定位锁定后
-// 网页端一直未连入时，statusLoop 据此打指路提示）。
-var lastWebHitUnix atomic.Int64
+// lastWebHitUnix 最近一次 /pos 被网页命中的时刻（v3.2.2 诊断）。
+// webConnState 连接状态机：0=未连接/已断开, 1=已收到预检 OPTIONS, 2=已连接（收到 GET /pos）。
+var (
+	lastWebHitUnix atomic.Int64
+	webConnState   atomic.Int32
+	lastWebOrigMu  sync.Mutex
+	lastWebOrigin  string
+)
+
+func webConnectionInfo() (connected bool, origin string) {
+	ts := lastWebHitUnix.Load()
+	connected = ts > 0 && time.Now().Unix()-ts <= 10
+	lastWebOrigMu.Lock()
+	origin = lastWebOrigin
+	lastWebOrigMu.Unlock()
+	return connected, origin
+}
 
 type targetT struct {
 	Name string  `json:"name"`
@@ -188,6 +202,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		path = "/"
 	}
 	if r.Method == http.MethodOptions {
+		if orig := r.Header.Get("Origin"); orig != "" && webConnState.CompareAndSwap(0, 1) {
+			fmt.Printf("  [web] preflight OPTIONS from %s (waiting GET /pos)\n", orig)
+		}
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -363,6 +380,16 @@ func applySaveOverride(platName, path string) {
 
 func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 	lastWebHitUnix.Store(time.Now().Unix()) // 诊断：任意 /pos 命中即视为"网页端在用"
+	orig := r.Header.Get("Origin")
+	if orig == "" {
+		orig = "direct"
+	}
+	lastWebOrigMu.Lock()
+	lastWebOrigin = orig
+	lastWebOrigMu.Unlock()
+	if webConnState.Swap(2) != 2 {
+		fmt.Printf("  [web] connected (origin=%s)\n", orig)
+	}
 	state.mu.RLock()
 	payload := map[string]any{
 		"ok":       state.ok,

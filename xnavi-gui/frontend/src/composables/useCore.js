@@ -8,8 +8,10 @@ const rt = window.runtime
 export { api, rt }
 
 export const ver = ref('')
+export const edition = ref('emu')
 export const coreRunning = ref(false)
 export const isLocating = ref(false)
+export const webConnected = ref(false)
 export const updateInfo = ref(null)
 
 export const pos = reactive({
@@ -30,20 +32,22 @@ export const envDetect = reactive({ cemu: false, ryujinx: false, eden: false })
 export const detectedGame = ref('')
 
 export const syncText = computed(() => {
-  if (coreRunning.value && pos.ok) return t('sync.syncing')
-  if (coreRunning.value) {
-    return pos.pid > 0 ? t('sync.attached', { pid: pos.pid }) : t('sync.waitingProcess')
-  }
-  return t('sync.waiting')
+  if (!coreRunning.value) return t('sync.waiting')
+  if (!pos.ok) return pos.pid > 0 ? t('sync.attached', { pid: pos.pid }) : t('sync.waitingProcess')
+  return webConnected.value ? t('sync.syncing') : t('sync.waitWeb')
 })
 
 export const syncDot = computed(() => {
-  if (coreRunning.value && pos.ok) return 'bg-emerald-400'
-  if (coreRunning.value) return 'bg-amber-400 animate-pulse'
-  return 'bg-slate-600'
+  if (!coreRunning.value) return 'bg-slate-600'
+  if (!pos.ok) return 'bg-sky-400 animate-pulse'
+  return webConnected.value ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
 })
 
-export const syncClass = computed(() => coreRunning.value ? 'text-amber-400' : 'text-slate-500')
+export const syncClass = computed(() => {
+  if (!coreRunning.value) return 'text-slate-500'
+  if (!pos.ok) return 'text-sky-400'
+  return webConnected.value ? 'text-emerald-400' : 'text-amber-400'
+})
 
 const STEP_KEYS = ['ready', 'scanning', 'verifying', 'locked']
 export const steps = ref(STEP_KEYS.map(key => ({ key, state: key === 'ready' ? 'done' : 'idle' })))
@@ -69,6 +73,7 @@ export const MAP_URL = 'https://botw.yalin.site/?follow=1&game=botw'
 // 用 Wails 自带的浏览器打开能力：走系统 ShellExecute，URL 里的 & 不会被 shell 截断。
 export function openMap() {
   rt.BrowserOpenURL(MAP_URL)
+  api.LogMapOpened(MAP_URL).catch(() => {})
 }
 
 export const logs = ref([])
@@ -88,10 +93,10 @@ export function pushLogs(lines) {
     let text = m ? m[2] : l
     let level = 'info', color = 'text-slate-400', levelColor = 'text-sky-500'
     if (/ERROR|FAILED|panic/i.test(text)) { level = 'error'; color = 'text-red-400'; levelColor = 'text-red-500' }
-    else if (/!!|占用/i.test(text)) { level = 'warn'; color = 'text-amber-400'; levelColor = 'text-amber-500' }
-    else if (/confirmed live|confirmed\]|完全锁定|locked!|confirmed!/i.test(text)) { level = 'ok'; color = 'text-emerald-400'; levelColor = 'text-emerald-500' }
+    else if (/WARN|!!|占用|\[web\] (disconnected|preflight)/i.test(text)) { level = 'warn'; color = 'text-amber-400'; levelColor = 'text-amber-500' }
+    else if (/confirmed live|confirmed\]|完全锁定|locked!|confirmed!|\[web\] connected/i.test(text)) { level = 'ok'; color = 'text-emerald-400'; levelColor = 'text-emerald-500' }
     else if (/\[verify\]|候选/i.test(text)) { level = 'warn'; color = 'text-amber-400'; levelColor = 'text-amber-500' }
-    else if (/\[scan\]/i.test(text)) { level = 'info'; color = 'text-sky-400'; levelColor = 'text-sky-500' }
+    else if (/\[scan\]|\[gui\]/i.test(text)) { level = 'info'; color = 'text-sky-400'; levelColor = 'text-sky-500' }
     else if (/\[shrine\]|\[warp\]/i.test(text)) { level = 'info'; color = 'text-teal-400'; levelColor = 'text-teal-500' }
     text = text.replace(/^\[sm\]\s*/, '')
     return { time, text, level, color, levelColor }
@@ -102,14 +107,19 @@ export function pushLogs(lines) {
 
 export function clearLogs() { logs.value = [] }
 
+let lockedAtMs = 0
+let envDiagDone = false
+
 export async function toggleLocating() {
+  lockedAtMs = 0
+  envDiagDone = false
   if (isLocating.value) {
     await api.StopCore()
     isLocating.value = false
     mapAutoOpened.value = false
   } else {
     mapAutoOpened.value = false
-    await api.StartCore(cfg.emulator)
+    await api.StartCore(edition.value === 'pc' ? 'pc' : cfg.emulator)
     isLocating.value = true
   }
 }
@@ -194,6 +204,7 @@ export const saveTimeAgoClass = computed(() => {
 })
 
 export async function exportDiag() { await api.ExportDiagnostics() }
+export async function uploadDiag(note) { return await api.UploadDiagnostics(note || '') }
 export async function openLogDir() { await api.OpenLogDir() }
 export async function openSave() { return await api.OpenSaveDir() }
 export async function pickSaveFile() {
@@ -207,6 +218,7 @@ export async function pickSaveDir() {
 
 export async function initCore() {
   ver.value = await api.Version()
+  try { edition.value = await api.Edition() } catch (e) { edition.value = 'emu' }
   await loadConfig()
   const initial = await api.TailLog()
   pushLogs(initial)
@@ -214,7 +226,17 @@ export async function initCore() {
   rt.EventsOn('update:available', (info) => { updateInfo.value = info })
   rt.EventsOn('status:update', (st) => {
     coreRunning.value = !!st.running
+    webConnected.value = !!st.webConnected
     pos.ok = !!st.ok
+    if (st.running && st.verified && !st.webConnected) {
+      if (!lockedAtMs) lockedAtMs = Date.now()
+      else if (!envDiagDone && Date.now() - lockedAtMs >= 8000) {
+        envDiagDone = true
+        api.RunEnvDiag().catch(() => {})
+      }
+    } else if (!st.running || st.webConnected) {
+      lockedAtMs = 0
+    }
     pos.pid = st.pid || 0
     if (st.pos) {
       pos.gx = st.pos.gx || 0

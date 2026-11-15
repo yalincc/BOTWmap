@@ -10,10 +10,12 @@ export default {
     close: '关闭'
   },
   sync: {
-    waiting: '等待坐标流',
-    syncing: '坐标流同步中',
+    waiting: '未启动',
+    locating: '定位中…',
+    waitWeb: '已锁定 · 等待网页连接',
+    syncing: '网页已连接 · 同步中',
     attached: '已附加 pid={pid}，定位中...',
-    waitingProcess: '等待模拟器进程...',
+    waitingProcess: '等待进程...',
     ready: '就绪'
   },
   steps: {
@@ -34,6 +36,7 @@ export default {
     cemu: 'Cemu (Wii U)',
     ryujinx: 'Ryujinx (Switch)',
     eden: 'Eden (Switch)',
+    pc: 'PC · Savage Wind',
     pickTitle: '选择模拟器（改后需重启定位）'
   },
   buttons: {
@@ -50,6 +53,9 @@ export default {
     clear: '清屏',
     checkUpdate: '检查更新',
     exportDiag: '导出诊断包',
+    uploadDiag: '上传日志',
+    send: '发送',
+    notePlaceholder: '可选：简述遇到的问题或联系方式',
     chooseFile: '选择存档',
     chooseDir: '存档目录',
     locateFile: '定位存档',

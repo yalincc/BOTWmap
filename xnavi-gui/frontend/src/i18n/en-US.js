@@ -10,10 +10,12 @@ export default {
     close: 'Close'
   },
   sync: {
-    waiting: 'Waiting for stream',
-    syncing: 'Stream connected',
+    waiting: 'Idle',
+    locating: 'Locating...',
+    waitWeb: 'Locked · Waiting for web',
+    syncing: 'Web connected · Syncing',
     attached: 'Attached pid={pid}, locating...',
-    waitingProcess: 'Waiting for emulator...',
+    waitingProcess: 'Waiting for process...',
     ready: 'Ready'
   },
   steps: {
@@ -34,6 +36,7 @@ export default {
     cemu: 'Cemu (Wii U)',
     ryujinx: 'Ryujinx (Switch)',
     eden: 'Eden (Switch)',
+    pc: 'PC · Savage Wind',
     pickTitle: 'Select emulator (restart locating to apply)'
   },
   buttons: {
@@ -50,6 +53,9 @@ export default {
     clear: 'Clear',
     checkUpdate: 'Check Update',
     exportDiag: 'Export Diag',
+    uploadDiag: 'Upload Log',
+    send: 'Send',
+    notePlaceholder: 'Optional: brief issue note or contact',
     chooseFile: 'Select Save',
     chooseDir: 'Save Dir',
     locateFile: 'Locate Save',

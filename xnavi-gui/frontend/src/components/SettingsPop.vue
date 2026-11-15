@@ -13,8 +13,8 @@
       </label>
     </div>
 
-    <!-- 模拟器存档路径 -->
-    <div class="space-y-2.5">
+    <!-- 模拟器存档路径（仅模拟器版显示） -->
+    <div v-if="edition !== 'pc'" class="space-y-2.5">
       <div>
         <label class="block text-slate-400 mb-1">{{ t('settings.cemuPath') }}</label>
         <div class="flex gap-1">
@@ -66,7 +66,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LangSelect from './LangSelect.vue'
-import { cfg, saveSettings, api } from '../composables/useCore'
+import { cfg, edition, saveSettings, api } from '../composables/useCore'
 
 const emit = defineEmits(['close'])
 const { t } = useI18n()

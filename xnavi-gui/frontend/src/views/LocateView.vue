@@ -38,13 +38,14 @@
         </template>
       </div>
       <div class="flex items-center gap-2.5 shrink-0">
-        <select v-model="cfg.emulator" @change="onEmuChange" :title="t('emu.pickTitle')"
+        <select v-if="edition !== 'pc'" v-model="cfg.emulator" @change="onEmuChange" :title="t('emu.pickTitle')"
           class="bg-[#0d1117] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-500 focus:outline-none transition">
           <option value="auto">{{ t('emu.auto') }}</option>
           <option value="cemu">{{ t('emu.cemu') }}</option>
           <option value="ryujinx">{{ t('emu.ryujinx') }}</option>
           <option value="eden">{{ t('emu.eden') }}</option>
         </select>
+        <span v-else class="bg-[#0d1117] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs font-medium text-sky-300">{{ t('emu.pc') }}</span>
         <button @click="openMap" class="w-[124px] py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-medium border border-slate-700 flex items-center justify-center gap-1.5 transition">
           🧭 {{ t('buttons.openMap') }}
         </button>
@@ -212,7 +213,7 @@ import SettingsPop from '../components/SettingsPop.vue'
 import AboutPop from '../components/AboutPop.vue'
 import {
   pos, steps, stepClass, stepDot, isLocating, toggleLocating, progressData,
-  openMap, cfg, saveSettings, ver, syncText, syncClass, syncDot,
+  openMap, cfg, saveSettings, ver, edition, syncText, syncClass, syncDot,
   rt, calibrateCoords, openSave, pickSaveFile, pickSaveDir, detectSave,
   saveTimeAgoText, saveTimeAgoClass
 } from '../composables/useCore'
@@ -236,6 +237,7 @@ function minWin() { rt.WindowMinimise() }
 function closeWin() { rt.Quit() }
 
 const emuShortLabel = computed(() => {
+  if (edition.value === 'pc') return t('emu.pc')
   const e = cfg.emulator || 'auto'
   return { auto: '自动探测', cemu: 'Cemu', ryujinx: 'Ryujinx', eden: 'Eden' }[e] || e
 })
