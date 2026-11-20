@@ -46,6 +46,11 @@
           <option value="eden">{{ t('emu.eden') }}</option>
         </select>
         <span v-else class="bg-[#0d1117] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs font-medium text-sky-300">{{ t('emu.pc') }}</span>
+        <select v-if="edition !== 'pc'" v-model="cfg.locateMode" :title="t('locate.hint')"
+          class="bg-[#0d1117] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-500 focus:outline-none transition">
+          <option value="auto">{{ t('locate.auto') }}</option>
+          <option value="mod-inject" :disabled="cfg.emulator !== 'auto' && cfg.emulator !== 'eden'">{{ t('locate.modInject') }}</option>
+        </select>
         <button @click="openMap" class="w-[124px] py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-medium border border-slate-700 flex items-center justify-center gap-1.5 transition">
           🧭 {{ t('buttons.openMap') }}
         </button>

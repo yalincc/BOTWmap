@@ -177,7 +177,9 @@ func main() {
 		}
 	}
 	if locateMode == "mod-inject" {
-		fmt.Println("  [locate] 模组注入定位（Eden 信标）")
+		fmt.Println("  [locate] 定位方式：模组注入（Eden 信标）")
+	} else {
+		fmt.Println("  [locate] 定位方式：自动探测（内存扫描）")
 	}
 	// 进度 watcher：BOTW 只认 game_data.sav
 	// （TOTK 的 progress.sav 口径已随 TOTK 一并移交 live-go）

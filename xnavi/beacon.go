@@ -10,6 +10,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
 	"math"
 	"os"
@@ -214,6 +215,9 @@ func (br *beaconRAM) read(h uintptr, p *edenPlatform) (Beacon, bool) {
 // 包级信标读取器。
 var beacon = beaconRAM{}
 
+// beaconActive 记录信标当前是否生效，仅在状态翻转时输出提示。
+var beaconActive bool
+
 // tryBeaconTiers 尝试 tier1(RAM) 与 tier2(pos.json)。命中即发布统一状态并
 // 返回 true（调用方 continue，跳过扫描器）；均未命中返回 false（落 tier3）。
 // tier1/2 数据权威，verified=true，跳过扫描器运动确认。
@@ -221,6 +225,10 @@ func tryBeaconTiers(h uintptr, p *edenPlatform) bool {
 	if b, ok := beacon.read(h, p); ok {
 		setLock(beacon.hostAddr, true, 1, "beacon")
 		publishState(true, b.X, b.Y, b.Z, true, 1, "beacon")
+		if !beaconActive {
+			beaconActive = true
+			fmt.Println("  [beacon] 信标定位已生效，坐标来自游戏内插件")
+		}
 		return true
 	}
 	dir := edenSdmcXnaviDir(p)
@@ -230,8 +238,16 @@ func tryBeaconTiers(h uintptr, p *edenPlatform) bool {
 			time.Since(fi.ModTime()) <= beaconStaleAfter && beaconCoordOK(b) {
 			setLock(0, true, 1, "beacon-json")
 			publishState(true, b.X, b.Y, b.Z, true, 1, "beacon-json")
+			if !beaconActive {
+				beaconActive = true
+				fmt.Println("  [beacon] 信标定位已生效（文件通道）")
+			}
 			return true
 		}
+	}
+	if beaconActive {
+		beaconActive = false
+		fmt.Println("  [beacon] 信标不可用，回退内存扫描")
 	}
 	return false
 }

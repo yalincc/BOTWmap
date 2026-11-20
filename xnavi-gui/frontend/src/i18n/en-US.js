@@ -39,6 +39,12 @@ export default {
     pc: 'PC · Savage Wind',
     pickTitle: 'Select emulator (restart locating to apply)'
   },
+  locate: {
+    title: 'Select positioning method (restart locating to apply)',
+    auto: 'Auto detection (memory scan)',
+    modInject: 'Mod injection (Eden beacon)',
+    hint: 'Mod injection requires the beacon mod; Eden only'
+  },
   buttons: {
     openMap: 'Open Map',
     start: 'Start Locating',

@@ -39,6 +39,12 @@ export default {
     pc: 'PC · Savage Wind',
     pickTitle: '选择模拟器（改后需重启定位）'
   },
+  locate: {
+    title: '选择定位方式（改后需重启定位）',
+    auto: '自动探测（内存扫描）',
+    modInject: '模组注入（Eden 信标）',
+    hint: '模组注入需安装信标 mod，仅 Eden 可用'
+  },
   buttons: {
     openMap: '打开网页地图',
     start: '开始定位',
@@ -112,10 +118,6 @@ export default {
   settings: {
     title: '设置与存档管理',
     autoOpenMap: '锁定后自动打开网页地图',
-    locateMode: '定位方式',
-    locateAuto: '自动探测（内存扫描）',
-    locateModInject: '模组注入（Eden 信标）',
-    locateModeHint: '模组注入仅支持 Eden，需安装信标 mod；自动探测兼容各模拟器。',
     cemuPath: 'Cemu 的 BOTW 存档路径（留空自动探测）：',
     ryuPath: 'Ryujinx 的 BOTW 存档路径（留空自动探测）：',
     edenPath: 'Eden 的 BOTW 存档路径（留空自动探测）：',

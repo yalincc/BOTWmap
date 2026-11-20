@@ -12,6 +12,7 @@
 #include "nn/os.hpp"
 #include "beacon.h"
 #include <span>
+#include <cmath>
 #include <cstring>
 
 namespace {
@@ -25,23 +26,49 @@ uint32_t DetectState(float x, float y, float z) {
     return XNAV_STATE_OVERWORLD;
 }
 
+// 坐标合理性检查。切场景/传送过场期间演员指针可能短暂失效或指向已释放的
+// 旧对象，此时读到的数值不可信，不写入信标：序号保持不变，宿主据此判定
+// 插件失联并回退内存扫描，不会把脏坐标显示在地图上。
+bool Plausible(float x, float y, float z) {
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z))
+        return false;
+    if (std::fabs(x) > 7000.0f || std::fabs(z) > 7000.0f)
+        return false;
+    if (y < -600.0f || y > 5000.0f)
+        return false;
+    return true;
+}
+
 void UpdateBeacon() {
-    // MainBody 矩阵 [[main+2CA1140]+60]+398（12 float，行主序 3x4）。
+    float x, y, z;
+    void* src = nullptr;
+
+    // 主用：MainBody 矩阵 [[main+2CA1140]+60]+398（12 float，行主序 3x4），
     // 平移分量 m[3]/m[7]/m[11]（+3A4/+3B4/+3C4）= 世界坐标。
     float* m = exl::util::pointer_path::FollowSafe<float,
         0x2CA1140, 0x60, 0x398>();
-    if (!m) return;
-    float x = m[3], y = m[7], z = m[11];
+    if (m) {
+        x = m[3]; y = m[7]; z = m[11];
+        src = m;
+    } else {
+        // 备用：Location 坐标链 [[[main+2D399B0]+260]+C4B8]+1C0/1C4/1C8
+        float* l = exl::util::pointer_path::FollowSafe<float,
+            0x2D399B0, 0x260, 0xC4B8, 0x1C0>();
+        if (!l) return; // 演员未就绪：保持旧值，序号不增
+        x = l[0]; y = l[1]; z = l[2];
+        src = l;
+    }
+    if (!Plausible(x, y, z)) return;
 
     g_Beacon.magic = XNAV_BEACON_MAGIC;
     g_Beacon.schema = XNAV_BEACON_SCHEMA;
-    g_Beacon.build = 1;
+    g_Beacon.build = 2;
     g_Beacon.seq++;
     g_Beacon.x = x; g_Beacon.y = y; g_Beacon.z = z;
     g_Beacon.yaw = 0.0f;
     g_Beacon.state = DetectState(x, y, z);
     g_Beacon.gameClock = 0;
-    g_Beacon.actorPtrHash = (uint32_t)(uintptr_t)m;
+    g_Beacon.actorPtrHash = (uint32_t)(uintptr_t)src;
     g_Beacon.hp = 0.0f; g_Beacon.stamina = 0.0f;
     g_Beacon.flags = 0; g_Beacon.reserved = 0;
     g_Beacon.crc = exl::util::Crc32::Hash(
