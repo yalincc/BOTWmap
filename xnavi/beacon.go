@@ -218,6 +218,13 @@ var beacon = beaconRAM{}
 // beaconActive 记录信标当前是否生效，仅在状态翻转时输出提示。
 var beaconActive bool
 
+// beaconProbeSince 记录本次寻找信标的起始时间；模组注入模式下长时间找不到
+// 信标时提示用户可能尚未安装信标模组。beaconMissingWarned 保证只提醒一次。
+var (
+	beaconProbeSince    time.Time
+	beaconMissingWarned bool
+)
+
 // tryBeaconTiers 尝试 tier1(RAM) 与 tier2(pos.json)。命中即发布统一状态并
 // 返回 true（调用方 continue，跳过扫描器）；均未命中返回 false（落 tier3）。
 // tier1/2 数据权威，verified=true，跳过扫描器运动确认。
@@ -225,6 +232,7 @@ func tryBeaconTiers(h uintptr, p *edenPlatform) bool {
 	if b, ok := beacon.read(h, p); ok {
 		setLock(beacon.hostAddr, true, 1, "beacon")
 		publishState(true, b.X, b.Y, b.Z, true, 1, "beacon")
+		beaconMissingWarned = false
 		if !beaconActive {
 			beaconActive = true
 			fmt.Println("  [beacon] 信标定位已生效，坐标来自游戏内插件")
@@ -248,6 +256,14 @@ func tryBeaconTiers(h uintptr, p *edenPlatform) bool {
 	if beaconActive {
 		beaconActive = false
 		fmt.Println("  [beacon] 信标不可用，回退内存扫描")
+	}
+	if beaconProbeSince.IsZero() {
+		beaconProbeSince = time.Now()
+	}
+	if locateMode == "mod-inject" && !beaconMissingWarned &&
+		time.Since(beaconProbeSince) > 10*time.Second {
+		beaconMissingWarned = true
+		fmt.Println("  [locate] 模组注入模式未找到信标：请确认已安装 Xnavi-Beacon 模组并重启游戏，或改用内存探测")
 	}
 	return false
 }

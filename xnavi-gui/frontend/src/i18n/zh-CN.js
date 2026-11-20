@@ -39,11 +39,12 @@ export default {
     pc: 'PC · Savage Wind',
     pickTitle: '选择模拟器（改后需重启定位）'
   },
-  locate: {
-    title: '选择定位方式（改后需重启定位）',
-    auto: '自动探测（内存扫描）',
-    modInject: '模组注入（Eden 信标）',
-    hint: '模组注入需安装信标 mod，仅 Eden 可用'
+  locateMode: {
+    title: '定位方式',
+    auto: '内存探测（推荐）',
+    modInject: '模组注入',
+    hint: '内存探测：通用，无需安装任何东西；模组注入：需安装信标模组，仅 Eden 可用',
+    missing: '未检测到信标模组'
   },
   buttons: {
     openMap: '打开网页地图',
