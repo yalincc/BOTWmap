@@ -13,6 +13,16 @@
       </label>
     </div>
 
+    <!-- 定位方式（仅模拟器版） -->
+    <div v-if="edition !== 'pc'" class="bg-[#0d1117] border border-slate-800 rounded-lg p-2.5 space-y-1.5">
+      <label class="block text-slate-400">{{ t('settings.locateMode') }}</label>
+      <select v-model="cfg.locateMode" class="w-full bg-[#161b22] border border-slate-700 rounded px-2 py-1.5 text-white text-[11px] focus:border-blue-500 focus:outline-none">
+        <option value="auto">{{ t('settings.locateAuto') }}</option>
+        <option value="mod-inject">{{ t('settings.locateModInject') }}</option>
+      </select>
+      <p class="text-[10px] text-slate-500">{{ t('settings.locateModeHint') }}</p>
+    </div>
+
     <!-- 模拟器存档路径（仅模拟器版显示） -->
     <div v-if="edition !== 'pc'" class="space-y-2.5">
       <div>

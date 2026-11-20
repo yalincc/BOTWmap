@@ -112,6 +112,10 @@ export default {
   settings: {
     title: 'Settings & Save Management',
     autoOpenMap: 'Auto open web map upon lock',
+    locateMode: 'Positioning method',
+    locateAuto: 'Auto detection (memory scan)',
+    locateModInject: 'Mod injection (Eden beacon)',
+    locateModeHint: 'Mod injection supports Eden only and requires the beacon mod; auto detection works across emulators.',
     cemuPath: 'Cemu BOTW save path (leave empty for auto):',
     ryuPath: 'Ryujinx BOTW save path (leave empty for auto):',
     edenPath: 'Eden BOTW save path (leave empty for auto):',

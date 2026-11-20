@@ -78,3 +78,12 @@ app/assets/tiles/4_*.webp
 app/assets/tiles/5_*.webp
 app/assets/tiles/6_*.webp
 app/assets/tiles/7_*.webp
+
+# Mimosa 安全工具运行残留（不入库）
+.mimosa/
+
+# Xnavi 信标 mod 模块：源码与文档入库（覆盖上方 *.md 忽略）
+!xnavi-beacon/**/*.md
+# 模块构建产物（生成物，不入库；源码 config.json/Makefile 入库）
+xnavi-beacon/deploy/
+xnavi-beacon/build/

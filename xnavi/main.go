@@ -36,6 +36,25 @@ import (
 	"time"
 )
 
+// locateMode 定位方式：auto（默认，内存扫描）| mod-inject（Eden 模组注入信标）。
+// 可由 --locate 显式指定，或从同目录 xnavi-gui-config.json 的 locateMode 字段读取。
+var locateMode = "auto"
+
+// readLocateModeConfig 从 GUI 配置文件读取定位方式（core 与 GUI 同目录运行）。
+func readLocateModeConfig() string {
+	buf, err := os.ReadFile("xnavi-gui-config.json")
+	if err != nil {
+		return ""
+	}
+	var c struct {
+		LocateMode string `json:"locateMode"`
+	}
+	if json.Unmarshal(buf, &c) != nil {
+		return ""
+	}
+	return c.LocateMode
+}
+
 func main() {
 	enableLogTimestamps()
 	primaryPort = 8766 // 实际主端口由 listenOwnedPorts 回填（8766 被占时顺延）
@@ -52,6 +71,7 @@ func main() {
 	useSave := true
 	emu := "auto"
 	gameName := "auto"
+	locateExplicit := false
 	dump := false
 	tlsMode := false // --tls：8766 起 HTTPS 双协议（v3.1.0，手机镜像页防息屏）
 	certDir := "certs"
@@ -71,6 +91,9 @@ func main() {
 			emu = strings.TrimPrefix(a, "--emu=")
 		case strings.HasPrefix(a, "--game="):
 			gameName = strings.TrimPrefix(a, "--game=")
+		case strings.HasPrefix(a, "--locate="):
+			locateMode = strings.TrimPrefix(a, "--locate=")
+			locateExplicit = true
 		case strings.HasPrefix(a, "--save-dir="):
 			// v3.0.0 通用存档路径已弃用（跨平台污染），改平台独立 --*-save-dir
 		case strings.HasPrefix(a, "--cemu-save-dir="):
@@ -148,6 +171,14 @@ func main() {
 	}
 
 	loadConfig()
+	if !locateExplicit {
+		if m := readLocateModeConfig(); m != "" {
+			locateMode = m
+		}
+	}
+	if locateMode == "mod-inject" {
+		fmt.Println("  [locate] 模组注入定位（Eden 信标）")
+	}
 	// 进度 watcher：BOTW 只认 game_data.sav
 	// （TOTK 的 progress.sav 口径已随 TOTK 一并移交 live-go）
 	progress = newProgressWatcher()
@@ -219,10 +250,10 @@ func main() {
 
 // detectGame 自动识别当前游戏（--game=auto）。
 // xnavi 只服务 BOTW，此函数用于确认当前运行的游戏确实是 BOTW：
-//   1) 窗口标题判定（Q8 主判定）：模拟器自报的硬标识，零内存扫描；
-//      若识别到 TOTK，明确提示用户改用 live-go（TOTKmap 项目）。
-//   2) 内存感知（重试 3 次）：BOTW 任一已知偏移读出合法坐标 → BOTW。
-//      读数有瞬时性（传送/加载瞬间全 invalid），一次失败不能下结论。
+//  1. 窗口标题判定（Q8 主判定）：模拟器自报的硬标识，零内存扫描；
+//     若识别到 TOTK，明确提示用户改用 live-go（TOTKmap 项目）。
+//  2. 内存感知（重试 3 次）：BOTW 任一已知偏移读出合法坐标 → BOTW。
+//     读数有瞬时性（传送/加载瞬间全 invalid），一次失败不能下结论。
 func detectGame(p Platform) Game {
 	if p != nil && p.Attach() {
 		h := p.Handle()
