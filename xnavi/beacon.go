@@ -10,7 +10,6 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"hash/crc32"
 	"math"
 	"os"
@@ -225,6 +224,72 @@ var (
 	beaconMissingWarned bool
 )
 
+// 信标事件识别状态：用于输出与内存探测路径同等级、同措辞的
+// 大传送 / 进出神庙 / 庙内静止日志。
+var (
+	beaconLastPos    [3]float32
+	beaconHasLast    bool
+	beaconLastState  uint32
+	beaconStateKnown bool
+	beaconLastMove   time.Time
+	beaconStillTold  bool
+)
+
+// beaconEvent 识别信标侧的状态变化并按内存探测路径的等级输出：
+// 大传送 → info、进出神庙 → info、庙内静止保持 → info。
+func beaconEvent(b Beacon) {
+	pos := [3]float32{b.X, b.Y, b.Z}
+	if beaconHasLast {
+		if d := dist3(beaconLastPos, pos); d > 300.0 {
+			dest := formatDestName(pos)
+			logInfo("Eden 信标检测到大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [直接跟随] / Beacon fast travel (dist=%.1fm) -> %s [Direct takeover]",
+				d, dest, pos[0], pos[1], pos[2], d, dest)
+			beaconStillTold = false
+		}
+	}
+	if beaconHasLast && dist3(beaconLastPos, pos) > 0.05 {
+		beaconLastMove = time.Now()
+		beaconStillTold = false
+	}
+	beaconLastPos = pos
+	beaconHasLast = true
+
+	inShrine := b.State == stShrine || b.State == stTrial
+	if !beaconStateKnown {
+		beaconStateKnown = true
+		beaconLastState = b.State
+		return
+	}
+	if b.State != beaconLastState {
+		prev := beaconLastState
+		beaconLastState = b.State
+		beaconStillTold = false
+		switch {
+		case inShrine:
+			logInfo("Eden 信标：角色进入试炼场 -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Beacon: entered shrine -> holding entrance",
+				pos[0], pos[1], pos[2])
+		case prev == stShrine || prev == stTrial:
+			logInfo("Eden 信标：角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) / Beacon: left shrine -> resumed world tracking",
+				pos[0], pos[1], pos[2])
+		}
+		return
+	}
+	if !inShrine {
+		beaconLastMove = time.Time{}
+		beaconStillTold = false
+		return
+	}
+	if beaconLastMove.IsZero() {
+		beaconLastMove = time.Now()
+		return
+	}
+	if !beaconStillTold && time.Since(beaconLastMove) > 8*time.Second {
+		beaconStillTold = true
+		logInfo("Eden 信标：庙内位置静止 (%.1f, %.1f, %.1f)，保持庙内坐标 / Beacon: standing still in shrine, holding local coords",
+			pos[0], pos[1], pos[2])
+	}
+}
+
 // tryBeaconTiers 尝试 tier1(RAM) 与 tier2(pos.json)。命中即发布统一状态并
 // 返回 true（调用方 continue，跳过扫描器）；均未命中返回 false（落 tier3）。
 // tier1/2 数据权威，verified=true，跳过扫描器运动确认。
@@ -238,8 +303,9 @@ func tryBeaconTiers(h uintptr, p *edenPlatform, gameReady bool) bool {
 		beaconMissingWarned = false
 		if !beaconActive {
 			beaconActive = true
-			fmt.Println("  [beacon] 信标定位已生效，坐标来自游戏内插件")
+			logOK("Eden 信标定位已生效，坐标来自游戏内插件 / Beacon positioning active")
 		}
+		beaconEvent(b)
 		return true
 	}
 	dir := edenSdmcXnaviDir(p)
@@ -252,14 +318,15 @@ func tryBeaconTiers(h uintptr, p *edenPlatform, gameReady bool) bool {
 			beaconMissingWarned = false
 			if !beaconActive {
 				beaconActive = true
-				fmt.Println("  [beacon] 信标定位已生效（文件通道）")
+				logOK("Eden 信标定位已生效（文件通道）/ Beacon positioning active (file channel)")
 			}
+			beaconEvent(b)
 			return true
 		}
 	}
 	if beaconActive {
 		beaconActive = false
-		fmt.Println("  [beacon] 信标不可用，回退内存探测")
+		logWarn("Eden 信标不可用，回退内存探测 / Beacon unavailable, falling back to memory scan")
 	}
 	if !gameReady {
 		// 游戏尚未加载完：不判定"模组缺失"，重置计时等待游戏就绪。
@@ -273,8 +340,7 @@ func tryBeaconTiers(h uintptr, p *edenPlatform, gameReady bool) bool {
 	if locateMode == "mod-inject" && !beaconMissingWarned &&
 		time.Since(beaconProbeSince) > 20*time.Second {
 		beaconMissingWarned = true
-		fmt.Println("  [warn] 模组注入模式：游戏已运行但未找到信标模组，" +
-			"请安装 Xnavi-Beacon 模组并重启游戏；当前回退内存探测")
+		logWarn("模组注入模式：游戏已运行但未找到信标模组，请安装 Xnavi-Beacon 模组并重启游戏；当前回退内存探测 / Beacon mod not found, falling back to memory scan")
 	}
 	return false
 }

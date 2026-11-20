@@ -9,7 +9,6 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -217,7 +216,7 @@ func edenFindPid() uint32 {
 		if err == nil && h != 0 {
 			closeHandle(h)
 			if len(pids) > 1 {
-				fmt.Printf("  [platform] Eden 多实例：%d 个候选，跳过打不开的进程，选用 PID %d\n", len(pids), pid)
+				logInfo("Eden 多实例：%d 个候选，跳过打不开的进程，选用 PID %d\n", len(pids), pid)
 			}
 			return pid
 		}

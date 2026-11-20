@@ -14,7 +14,6 @@ package main
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"os"
 	"sync"
@@ -89,7 +88,7 @@ func readEdenActorMode(h uintptr, addr uintptr, shrine bool) ([3]float32, bool) 
 }
 
 func (t *EdenTracker) Start(ctx context.Context) {
-	fmt.Println("  [pipeline] Eden 追踪管道已启动 (Run>=2 动力学门禁 / 零重扫传送) / Eden pipeline started (Run>=2 gate, warp zero-rescan)")
+	logInfo("Eden 追踪管道已启动 (Run>=2 动力学门禁 / 零重扫传送) / Eden pipeline started (Run>=2 gate, warp zero-rescan)")
 
 	tick := time.NewTicker(100 * time.Millisecond) // 10Hz
 	defer tick.Stop()
@@ -156,7 +155,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 		probeEntrance = lastWorldPos
 		probeSince = time.Now()
 		lastProbeScan = time.Time{}
-		fmt.Printf("  [probe] Eden %s -> 开始神庙本地尺度探测（红点暂保持最后位置，需正向证据确认进庙） / Lock stale (%s), probing for shrine with positive-evidence requirement\n",
+		logInfo("Eden %s -> 开始神庙本地尺度探测（红点暂保持最后位置，需正向证据确认进庙） / Lock stale (%s), probing for shrine with positive-evidence requirement",
 			reason, reason)
 	}
 
@@ -315,7 +314,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 			cands = nil
 			setLock(lockedAddr, true, 1, "eden-shrine-lock")
 			publishState(true, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], true, 0, "shrine")
-			fmt.Printf("  [shrine] Eden 神庙内探测锁定成功（本地坐标持续运动）Addr: 0x%X 本地 (%.1f, %.1f, %.1f) -> 红点锚定入口 (%.1f, %.1f, %.1f) / Shrine confirmed by live local motion, holding entrance\n",
+			logOK("Eden 神庙内探测锁定成功（本地坐标持续运动）Addr: 0x%X 本地 (%.1f, %.1f, %.1f) -> 红点锚定入口 (%.1f, %.1f, %.1f) / Shrine confirmed by live local motion, holding entrance",
 				lockedAddr, cur[0], cur[1], cur[2], shrineEntrance[0], shrineEntrance[1], shrineEntrance[2])
 			return true
 		}
@@ -347,14 +346,14 @@ func (t *EdenTracker) Start(ctx context.Context) {
 			setLock(lockedAddr, true, 1, "eden-motion-lock")
 			edenSetRefCenter(cur)
 			publishState(true, cur[0], cur[1], cur[2], true, 1, "player")
-			fmt.Printf("  [lock] Eden 运动学锁定成功！扫描期间持续平移，真身锁定 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【已完全锁定】 / Motion-verified lock at 0x%X -> [Fully locked]\n",
+			logOK("Eden 运动学锁定成功！扫描期间持续平移，真身锁定 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【已完全锁定】 / Motion-verified lock at 0x%X -> [Fully locked]",
 				lockedAddr, cur[0], cur[1], cur[2], lockedAddr)
 			return true
 		}
 
 		setLock(lockedAddr, false, len(groups), "eden-scan")
 		publishState(true, cur[0], cur[1], cur[2], false, len(groups), "eden-scan")
-		fmt.Printf("  [verify] Eden 捕获动力学候选地址 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【请在游戏内移动角色以完成验证】 / Candidate locked: 0x%X -> [Please move Link in-game to verify]\n",
+		logInfo("Eden 捕获动力学候选地址 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【请在游戏内移动角色以完成验证】 / Candidate locked: 0x%X -> [Please move Link in-game to verify]",
 			lockedAddr, cur[0], cur[1], cur[2], lockedAddr)
 		return true
 	}
@@ -362,23 +361,23 @@ func (t *EdenTracker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("  [pipeline] Eden pipeline stopped (context cancelled)")
+			logInfo("Eden pipeline stopped (context cancelled)")
 			return
 		case <-t.stopCh:
-			fmt.Println("  [pipeline] Eden 追踪管道已停止 (请求停止) / Eden pipeline stopped (stop requested)")
+			logInfo("Eden 追踪管道已停止 (请求停止) / Eden pipeline stopped (stop requested)")
 			return
 		case req := <-t.rescanCh:
 			reset("Eden /rescan requested")
 			if req != nil && req.HasTarget {
 				hasManual = true
 				manualTarget = [3]float32{req.TargetX, 0, req.TargetZ}
-				fmt.Printf("  [scan] Eden 手工校准目标: (%.1f, %.1f) / Eden manual target set: (%.1f, %.1f)\n", req.TargetX, req.TargetZ, req.TargetX, req.TargetZ)
+				logInfo("Eden 手工校准目标: (%.1f, %.1f) / Eden manual target set: (%.1f, %.1f)", req.TargetX, req.TargetZ, req.TargetX, req.TargetZ)
 			}
 		case <-tick.C:
 			// 1. 确保模拟器附加
 			if !t.p.Attach() {
 				if lockedAddr != 0 {
-					fmt.Println("  [lost] Eden 模拟器进程断开或退出 / Eden emulator process exited or detached")
+					logWarn("Eden 模拟器进程断开或退出 / Eden emulator process exited or detached")
 					reset("Eden lost")
 				} else {
 					state.mu.Lock()
@@ -432,16 +431,16 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				case hasManual:
 					scanCenter = manualTarget
 					radius = 150.0
-					fmt.Printf("  [scan] Eden 扫描手工定向窗口 150m (%.1f, %.1f)... / Scanning manual window 150m near (%.1f, %.1f)...\n", scanCenter[0], scanCenter[2], scanCenter[0], scanCenter[2])
+					logInfo("Eden 扫描手工定向窗口 150m (%.1f, %.1f)... / Scanning manual window 150m near (%.1f, %.1f)...", scanCenter[0], scanCenter[2], scanCenter[0], scanCenter[2])
 				case latestSaveAnchor != nil:
 					// 始终以最新存档锚点为中心扫描（绝不拿切场景掉锁前的旧废弃坐标当中心）
 					scanCenter = latestSaveAnchor.Pos
 					radius = 120.0
 					if saveIsFresh {
-						fmt.Printf("  [scan] Eden 发现新鲜存档 (<=120s)，扫描 120m 锚点窗口 (%.1f, %.1f, %.1f)... / Fresh save detected, scanning window 120m...\n",
+						logInfo("Eden 发现新鲜存档 (<=120s)，扫描 120m 锚点窗口 (%.1f, %.1f, %.1f)... / Fresh save detected, scanning window 120m...",
 							scanCenter[0], scanCenter[1], scanCenter[2])
 					} else {
-						fmt.Printf("  [scan] Eden 扫描存档锚点 120m 窗口 (%.1f, %.1f, %.1f)... / Scanning save anchor window 120m...\n",
+						logInfo("Eden 扫描存档锚点 120m 窗口 (%.1f, %.1f, %.1f)... / Scanning save anchor window 120m...",
 							scanCenter[0], scanCenter[1], scanCenter[2])
 					}
 				default:
@@ -462,7 +461,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				if found {
 					hasManual = false
 				} else {
-					fmt.Println("  [scan] Eden 扫描未发现活动玩家 (等待进入 3D 游戏世界)... / No live player found (waiting for 3D world)...")
+					logInfo("Eden 扫描未发现活动玩家 (等待进入 3D 游戏世界)... / No live player found (waiting for 3D world)...")
 				}
 				continue
 			}
@@ -525,7 +524,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				}
 
 				if !holdLogged {
-					fmt.Println("  [hold] Eden reading transient/loading -> holding position")
+					logInfo("Eden reading transient/loading -> holding position")
 					holdLogged = true
 					holdSince = time.Now()
 					// 已验证真身突然持续读空：可能是进庙，也可能是槽位释放。
@@ -544,7 +543,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 					}
 					// 探测 30s 无正向证据 → 不是进庙，常规掉锁重扫（恢复原行为）。
 					if time.Since(probeSince) > 30*time.Second {
-						fmt.Println("  [lost] Eden 读空探测 30s 未发现庙内运动目标，按槽位释放重扫 / Probe found no live shrine target, rescanning")
+						logWarn("Eden 读空探测 30s 未发现庙内运动目标，按槽位释放重扫 / Probe found no live shrine target, rescanning")
 						reset("Eden probe timeout (slot freed)")
 						continue
 					}
@@ -557,7 +556,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				// 演员槽位已被释放/复用（实测传送后槽位被清零），旧实现会永远
 				// 钉死在废弃坐标上 → 解锁重扫，以最新存档锚点重新定位。
 				if time.Since(holdSince) > 20*time.Second {
-					fmt.Println("  [lost] Eden 锁定地址持续读空 >20s，判定演员槽位已释放，自动重扫 / Locked slot freed, auto-rescanning")
+					logWarn("Eden 锁定地址持续读空 >20s，判定演员槽位已释放，自动重扫 / Locked slot freed, auto-rescanning")
 					reset("Eden hold timeout (slot freed)")
 					continue
 				}
@@ -582,7 +581,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				if !isShrine && !frozenEcho {
 					shrineProbeActive = false
 					lastMoveAt = time.Now()
-					fmt.Printf("  [probe] Eden 探测期间读到大世界新位置 -> 锁定仍有效，恢复跟随 (%.1f, %.1f, %.1f) / Live world read during probe, resuming\n",
+					logInfo("Eden 探测期间读到大世界新位置 -> 锁定仍有效，恢复跟随 (%.1f, %.1f, %.1f) / Live world read during probe, resuming",
 						cur[0], cur[1], cur[2])
 					prev = cur
 					hasPrev = true
@@ -603,7 +602,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 						shrineMode = true
 						shrineEntrance = probeEntrance
 						shrineProbeActive = false
-						fmt.Printf("  [shrine] Eden 确认进入试炼场（本地坐标持续运动）-> 锚定入口 (%.1f, %.1f, %.1f) / Shrine entry confirmed by live local motion\n",
+						logInfo("Eden 确认进入试炼场（本地坐标持续运动）-> 锚定入口 (%.1f, %.1f, %.1f) / Shrine entry confirmed by live local motion",
 							shrineEntrance[0], shrineEntrance[1], shrineEntrance[2])
 						publishState(true, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], true, 0, "shrine")
 						prev = cur
@@ -619,7 +618,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 					}
 				}
 				if time.Since(probeSince) > 30*time.Second {
-					fmt.Println("  [lost] Eden 冻结探测 30s 无庙内运动证据，按锁定失效重扫 / Probe found no live shrine target, rescanning")
+					logWarn("Eden 冻结探测 30s 无庙内运动证据，按锁定失效重扫 / Probe found no live shrine target, rescanning")
 					reset("Eden probe timeout (stale lock)")
 					continue
 				}
@@ -656,7 +655,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 					// 出庙：脱离神庙本地尺度，恢复大世界跟踪
 					shrineMode = false
 					destName := formatDestName(cur)
-					fmt.Printf("  [shrine] Eden 角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) [%s] / Left shrine -> Resumed world tracking\n",
+					logInfo("Eden 角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) [%s] / Left shrine -> Resumed world tracking",
 						cur[0], cur[1], cur[2], destName)
 					publishState(true, cur[0], cur[1], cur[2], verified, len(cands), "player")
 					prev = cur
@@ -680,7 +679,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				shrineMode = true
 				shrineEntrance = prev
 				destName := formatDestName(prev)
-				fmt.Printf("  [shrine] Eden 角色进入试炼场 [%s] -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Entered shrine [%s] -> Holding entrance\n",
+				logInfo("Eden 角色进入试炼场 [%s] -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Entered shrine [%s] -> Holding entrance",
 					destName, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], destName)
 				publishState(true, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], true, 0, "shrine")
 				continue
@@ -726,7 +725,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 						trackAddrs = c.addrs
 						cands = nil
 						setLock(lockedAddr, true, 1, "eden-move-confirm")
-						fmt.Printf("  [lock] Eden 走动仲裁成功！真身锁定 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【已完全锁定】 / Movement arbitration confirmed! Locked at 0x%X -> [Fully locked]\n",
+						logOK("Eden 走动仲裁成功！真身锁定 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【已完全锁定】 / Movement arbitration confirmed! Locked at 0x%X -> [Fully locked]",
 							lockedAddr, cur[0], cur[1], cur[2], lockedAddr)
 						break
 					}
@@ -742,7 +741,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				cands = nil
 				edenSetRefCenter(cur)
 				destName := formatDestName(cur)
-				fmt.Printf("  [warp] Eden 角色大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [零重扫接管] / Fast travel (dist=%.1fm) -> %s [Direct takeover]\n",
+				logInfo("Eden 角色大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [零重扫接管] / Fast travel (dist=%.1fm) -> %s [Direct takeover]",
 					delta, destName, cur[0], cur[1], cur[2], delta, destName)
 				publishState(true, cur[0], cur[1], cur[2], verified, 1, "player")
 				prev = cur
@@ -762,7 +761,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 				// 持续大跳变 >10s：槽位很可能已被别的演员复用（坐标持续漂移），
 				// 旧实现会永远 hold 在旧坐标 → 解锁重扫。
 				if time.Since(jumpSince) > 10*time.Second {
-					fmt.Println("  [lost] Eden 锁定地址持续大跳变 >10s，判定槽位被复用，自动重扫 / Slot reused, auto-rescanning")
+					logWarn("Eden 锁定地址持续大跳变 >10s，判定槽位被复用，自动重扫 / Slot reused, auto-rescanning")
 					reset("Eden persistent jump (slot reused)")
 					continue
 				}
@@ -780,7 +779,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 					cands = nil
 					setLock(lockedAddr, true, 1, "eden-live")
 					edenSetRefCenter(cur)
-					fmt.Printf("  [lock] Eden 角色移动确认成功！真身锁定 Addr: 0x%X -> 【已完全锁定】 / Movement confirmed! Live actor locked at 0x%X -> [Fully locked]\n", lockedAddr, lockedAddr)
+					logOK("Eden 角色移动确认成功！真身锁定 Addr: 0x%X -> 【已完全锁定】 / Movement confirmed! Live actor locked at 0x%X -> [Fully locked]", lockedAddr, lockedAddr)
 				}
 			} else {
 				moveN = 0
@@ -792,7 +791,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 			// 提示机制：若锁定后持续未确认走动，友好提醒用户
 			if !verified && time.Since(lockSince) > 6*time.Second && time.Since(lastUnverifiedHint) > 15*time.Second {
 				lastUnverifiedHint = time.Now()
-				fmt.Println("  [hint] 主角未确认走动 (verified=false)。请在游戏内走动几步 / Link movement not confirmed. Please move a few steps in-game")
+				logWarn("主角未确认走动 (verified=false)。请在游戏内走动几步 / Link movement not confirmed. Please move a few steps in-game")
 			}
 
 			// 超时自愈：90s 仍未确认且候选全体冻结 → 锁的很可能是静态数据，
@@ -807,7 +806,7 @@ func (t *EdenTracker) Start(ctx context.Context) {
 					}
 				}
 				if allFrozen {
-					fmt.Println("  [rescan] Eden 锁定 90s 未确认走动且候选全体冻结，判定静态误锁，自动重扫 / Static lock suspected, auto-rescanning")
+					logInfo("Eden 锁定 90s 未确认走动且候选全体冻结，判定静态误锁，自动重扫 / Static lock suspected, auto-rescanning")
 					reset("Eden static-lock timeout")
 					continue
 				}

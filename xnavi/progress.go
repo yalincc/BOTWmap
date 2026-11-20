@@ -11,7 +11,6 @@ package main
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -106,7 +105,7 @@ func (w *progressWatcher) loadRefs() {
 	defer w.mu.Unlock()
 	buf, err := progressRefsFS.ReadFile("data/progress_points.json")
 	if err != nil {
-		fmt.Printf("  [progress] embedded reference table unreadable: %v\n", err)
+		logInfo("embedded reference table unreadable: %v", err)
 		w.ok = false
 		return
 	}
@@ -114,7 +113,7 @@ func (w *progressWatcher) loadRefs() {
 		Points []ProgressPoint `json:"points"`
 	}
 	if json.Unmarshal(buf, &obj) != nil || len(obj.Points) == 0 {
-		fmt.Println("  [progress] embedded reference table invalid")
+		logInfo("embedded reference table invalid")
 		w.ok = false
 		return
 	}
@@ -124,7 +123,7 @@ func (w *progressWatcher) loadRefs() {
 	for _, p := range w.refs {
 		n[progIdx(p.T)]++
 	}
-	fmt.Printf("  [progress] reference table: %d points (shrine %d, tower %d, korok %d, memory %d, beast %d)\n",
+	logInfo("reference table: %d points (shrine %d, tower %d, korok %d, memory %d, beast %d)",
 		len(w.refs), n[0], n[1], n[2], n[3], n[4])
 }
 
@@ -141,7 +140,7 @@ func (w *progressWatcher) refresh() {
 	anchors := currentGame.SaveAnchors(plat)
 	if len(anchors) == 0 {
 		if !w.init {
-			fmt.Println("  [progress] 尚未读到可用存档 —— 进游戏手动存一次档即可；仍无则用 GUI「手工指定存档目录」/ no usable save file yet — save once in game, or set the save dir in GUI")
+			logInfo("尚未读到可用存档 —— 进游戏手动存一次档即可；仍无则用 GUI「手工指定存档目录」/ no usable save file yet — save once in game, or set the save dir in GUI")
 		}
 		w.ok = false
 		w.init = true
@@ -151,7 +150,7 @@ func (w *progressWatcher) refresh() {
 	entries, _ := parseGameData(primary.Path)
 	if entries == nil {
 		if !w.init {
-			fmt.Printf("  [progress] parse save failed: %s\n", primary.Path)
+			logInfo("parse save failed: %s", primary.Path)
 		}
 		w.ok = false
 		w.init = true
@@ -235,8 +234,8 @@ func (w *progressWatcher) refresh() {
 	}
 	w.ok = true
 	if !w.init {
-		fmt.Printf("  [progress] save=%s\n", primary.Path)
-		fmt.Printf("  [progress] done: shrines %d/%d, towers %d/%d, koroks %d/%d, memories %d/%d, beasts %d/%d\n",
+		logInfo("save=%s", primary.Path)
+		logInfo("done: shrines %d/%d, towers %d/%d, koroks %d/%d, memories %d/%d, beasts %d/%d",
 			doneN[0], totalN[0], doneN[1], totalN[1], doneN[2], totalN[2], doneN[3], totalN[3], doneN[4], totalN[4])
 	}
 	w.init = true

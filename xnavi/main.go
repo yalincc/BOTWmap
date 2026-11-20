@@ -148,7 +148,7 @@ func main() {
 	// 游戏选择：xnavi 只服务 BOTW（TOTK 已移交 live-go），仍接受显式 --game=botw。
 	switch gameName {
 	case "botw":
-		fmt.Println("  [game] explicit: botw")
+		logInfo("explicit: botw")
 		currentGame = &gameBotw{}
 	default:
 		currentGame = detectGame(currentPlatform())
@@ -177,9 +177,9 @@ func main() {
 		}
 	}
 	if locateMode == "mod-inject" {
-		fmt.Println("  [locate] 定位方式：模组注入（Eden 信标）")
+		logInfo("定位方式：模组注入（Eden 信标）")
 	} else {
-		fmt.Println("  [locate] 定位方式：内存探测")
+		logInfo("定位方式：内存探测")
 	}
 	// 进度 watcher：BOTW 只认 game_data.sav
 	// （TOTK 的 progress.sav 口径已随 TOTK 一并移交 live-go）
@@ -208,9 +208,9 @@ func main() {
 			fmt.Printf("  API -> http://127.0.0.1:%d/pos\n", port)
 		}
 		if len(skipped) > 0 {
-			fmt.Printf("  [server] owned ports: %s  (被占用跳过: %s)\n", joinPorts(owned), joinPorts(skipped))
+			logInfo("owned ports: %s  (被占用跳过: %s)", joinPorts(owned), joinPorts(skipped))
 		} else {
-			fmt.Printf("  [server] owned ports: %s\n", joinPorts(owned))
+			logInfo("owned ports: %s", joinPorts(owned))
 		}
 	}
 	lanURL = makeLanURL(port, currentGame.Name(), tlsMode) // 手机镜像 URL（/pos.lanUrl 供网页二维码面板读取）
@@ -268,9 +268,9 @@ func detectGame(p Platform) Game {
 				if game == "totk" {
 					// xnavi 只服务 BOTW；检测到 TOTK 就明确提示，
 					// 免得用户对着一个永远锁不上的界面找原因
-					fmt.Println("  [game] 检测到 TOTK：本程序只服务 BOTW，TOTK 请改用 live-go（TOTKmap 项目）")
+					logInfo("检测到 TOTK：本程序只服务 BOTW，TOTK 请改用 live-go（TOTKmap 项目）")
 				} else {
-					fmt.Printf("  [game] auto-detected: botw (window title TID)\n")
+					logInfo("auto-detected: botw (window title TID)")
 					return &gameBotw{}
 				}
 			}
@@ -284,7 +284,7 @@ func detectGame(p Platform) Game {
 			for _, blk := range blks {
 				for _, off := range botwOffs {
 					if d := gb.DecodeAt(h, blk.Base+off); d != nil {
-						fmt.Printf("  [game] auto-detected: botw (fixed offset live @0x%X)\n", blk.Base+off)
+						logInfo("auto-detected: botw (fixed offset live @0x%X)", blk.Base+off)
 						return gb
 					}
 				}
@@ -293,7 +293,7 @@ func detectGame(p Platform) Game {
 	}
 	// xnavi 只服务 BOTW，不再做"存档兜底猜游戏"——那套逻辑当初是为了在
 	// BOTW / TOTK 之间做选择，现在没有第二个游戏可选了。
-	fmt.Println("  [game] auto-detected: botw (default)")
+	logInfo("auto-detected: botw (default)")
 	return &gameBotw{}
 }
 
@@ -301,49 +301,49 @@ func detectGame(p Platform) Game {
 func dumpDiagnostics() {
 	p := currentPlatform()
 	if p == nil {
-		fmt.Println("  [dump] no platform selected")
+		logInfo("no platform selected")
 		return
 	}
 	if !p.Attach() {
-		fmt.Println("  [dump] emulator not running - nothing to dump")
+		logInfo("emulator not running - nothing to dump")
 		return
 	}
 	h := p.Handle()
-	fmt.Printf("  [dump] platform: %s pid=%d\n", p.Name(), p.PID())
+	logInfo("platform: %s pid=%d", p.Name(), p.PID())
 	fmt.Println("  --- memory blocks (committed RW, >=16MB) ---")
 	blocks := p.Blocks(16.0)
 	for _, b := range blocks {
 		fmt.Printf("    block 0x%012X  %8.0f MB\n", b.Base, float64(b.Size)/1048576.0)
 	}
 	anchor, anchorSize := p.LargestBlock(0)
-	fmt.Printf("  [dump] anchor (largest block) = 0x%012X  (%8.0f MB)\n", anchor, float64(anchorSize)/1048576.0)
+	logInfo("anchor (largest block) = 0x%012X  (%8.0f MB)", anchor, float64(anchorSize)/1048576.0)
 
 	// Cemu 特有：memory_base 反推 + 社区链探针
 	if p.Name() == "Cemu" {
 		base, mem2, ok := findCemuBase(h)
 		if !ok {
-			fmt.Println("  [dump] memory_base NOT found (chains skipped; structural scan still works)")
+			logInfo("memory_base NOT found (chains skipped; structural scan still works)")
 		} else {
-			fmt.Printf("  [dump] memory_base = 0x%012X  MEM2 host = 0x%012X\n", base, mem2)
+			logInfo("memory_base = 0x%012X  MEM2 host = 0x%012X", base, mem2)
 			for _, c := range cemuChains {
 				va, rok := resolveChain(h, base, c)
 				if rok {
-					fmt.Printf("  [dump] chain %-8s resolve OK  actor=0x%012X (host 0x%012X)\n", c.Name, va, base+va)
+					logInfo("chain %-8s resolve OK  actor=0x%012X (host 0x%012X)", c.Name, va, base+va)
 				} else {
-					fmt.Printf("  [dump] chain %-8s resolve failed\n", c.Name)
+					logInfo("chain %-8s resolve failed", c.Name)
 				}
 			}
 			if res := chainLocate(h, base); res != nil {
-				fmt.Printf("  [dump] chainLocate -> slot 0x%012X mem=(%.1f, %.1f, %.1f)\n",
+				logInfo("chainLocate -> slot 0x%012X mem=(%.1f, %.1f, %.1f)",
 					res.Addr, res.Hud[0], res.Hud[1], res.Hud[2])
 			} else {
-				fmt.Println("  [dump] chainLocate: no slot candidate")
+				logInfo("chainLocate: no slot candidate")
 			}
 		}
 	}
 
 	// 结构扫描 top 组
-	fmt.Println("  [dump] structural scan (top groups) ...")
+	logInfo("structural scan (top groups) ...")
 	big := p.Blocks(minBlockMB)
 	hits := structuralScan(h, big, nil)
 	if len(hits) > 0 {
@@ -354,20 +354,20 @@ func dumpDiagnostics() {
 				g.Copies, g.Struct, g.X, g.Y, g.Z, g.Addrs[0])
 		}
 	} else {
-		fmt.Println("  [dump] no structural candidates")
+		logInfo("no structural candidates")
 	}
 
 	// remembered offsets 当前是否可用（锚 = 最大块）
 	if anchor != 0 {
 		for _, o := range loadOffsets() {
 			if d := decodeTripleAt(h, anchor+o); d != nil {
-				fmt.Printf("  [dump] known offset 0x%012X -> mem=(%.1f, %.1f, %.1f)\n", o, d[0], d[1], d[2])
+				logInfo("known offset 0x%012X -> mem=(%.1f, %.1f, %.1f)", o, d[0], d[1], d[2])
 			} else {
-				fmt.Printf("  [dump] known offset 0x%012X -> unreadable\n", o)
+				logInfo("known offset 0x%012X -> unreadable", o)
 			}
 		}
 	}
-	fmt.Println("  [dump] done")
+	logInfo("done")
 }
 
 func openBrowser(url string) {

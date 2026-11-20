@@ -117,7 +117,7 @@ func statusLoop() {
 		// 真实连接断流检测：曾连上过但超过 15s 无 /pos 心跳时记一次事件
 		if ts := lastWebHitUnix.Load(); ts > 0 && time.Now().Unix()-ts > 15 {
 			if webConnState.CompareAndSwap(2, 0) {
-				fmt.Println("  [web] disconnected (timeout 15s)")
+				logInfo("disconnected (timeout 15s)")
 			}
 		}
 		webConnected, webOrigin := webConnectionInfo()
@@ -132,20 +132,20 @@ func statusLoop() {
 			platName = plat.Name()
 		}
 		obj := map[string]any{
-			"time":     time.Now().Format(time.RFC3339),
-			"pid":      procPID,
-			"corePid":  os.Getpid(), // v3.2.1 会话签名：GUI 只认自己拉起的这个进程写的快照
-			"port":     primaryPort, // v3.2.2 端口自愈：GUI 按此端口调核心 HTTP（save-override/rescan）
-			"game":     currentGame.Name(),
-			"map_url":  currentGame.MapURL(), // V2.2.0 Q1：GUI 按识别游戏打开对应地图
-			"emulator": platName,
-			"emuVer":   emulatorExeVersion(),
-			"ok":       ok,
-			"pos":      map[string]any{"gx": gx, "gy": gy, "gz": gz, "mx": mx, "my": my},
-			"source":   src,
-			"verified": verified,
-			"copies":   copies,
-			"lockAddr": fmt.Sprintf("0x%X", addr),
+			"time":         time.Now().Format(time.RFC3339),
+			"pid":          procPID,
+			"corePid":      os.Getpid(), // v3.2.1 会话签名：GUI 只认自己拉起的这个进程写的快照
+			"port":         primaryPort, // v3.2.2 端口自愈：GUI 按此端口调核心 HTTP（save-override/rescan）
+			"game":         currentGame.Name(),
+			"map_url":      currentGame.MapURL(), // V2.2.0 Q1：GUI 按识别游戏打开对应地图
+			"emulator":     platName,
+			"emuVer":       emulatorExeVersion(),
+			"ok":           ok,
+			"pos":          map[string]any{"gx": gx, "gy": gy, "gz": gz, "mx": mx, "my": my},
+			"source":       src,
+			"verified":     verified,
+			"copies":       copies,
+			"lockAddr":     fmt.Sprintf("0x%X", addr),
 			"ageSec":       ageSec,
 			"webConnected": webConnected,
 			"webOrigin":    webOrigin,

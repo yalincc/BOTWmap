@@ -11,7 +11,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -72,7 +71,7 @@ func setPlatform(p Platform) {
 	curPlat = p
 	platMu.Unlock()
 	if p != nil {
-		fmt.Printf("  [platform] selected: %s\n", p.Name())
+		logInfo("selected: %s\n", p.Name())
 	}
 }
 
@@ -91,14 +90,14 @@ func probePlatform() Platform {
 	for _, p := range probeList {
 		if p.Attach() {
 			if curPlat == nil || curPlat.Name() != p.Name() {
-				fmt.Printf("  [platform] auto-detected: %s\n", p.Name())
+				logInfo("auto-detected: %s\n", p.Name())
 			}
 			curPlat = p
 			return p
 		}
 	}
 	if curPlat == nil && len(probeList) > 0 {
-		fmt.Printf("  [platform] no emulator running yet, defaulting to %s (will keep looking)\n", probeList[0].Name())
+		logInfo("no emulator running yet, defaulting to %s (will keep looking)\n", probeList[0].Name())
 		curPlat = probeList[0]
 	}
 	return curPlat
@@ -136,7 +135,7 @@ func platformWithGame(exclude Platform) Platform {
 			continue
 		}
 		if len(p.Blocks(256.0)) > 0 {
-			fmt.Printf("  [platform] %s has game memory (>=256MB block)\n", p.Name())
+			logInfo("%s has game memory (>=256MB block)\n", p.Name())
 			return p
 		}
 	}

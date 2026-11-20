@@ -12,7 +12,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"time"
 )
@@ -66,7 +65,7 @@ func readCemuActor(h uintptr, addr uintptr) ([3]float32, bool) {
 }
 
 func (t *CemuTracker) Start(ctx context.Context) {
-	fmt.Println("  [pipeline] Cemu 追踪管道已启动 (固定偏移 / Wii U 大端直读) / Cemu pipeline started (fixed-offset, Wii U big-endian)")
+	logInfo("Cemu 追踪管道已启动 (固定偏移 / Wii U 大端直读) / Cemu pipeline started (fixed-offset, Wii U big-endian)")
 
 	tick := time.NewTicker(100 * time.Millisecond) // 10Hz
 	defer tick.Stop()
@@ -91,10 +90,10 @@ func (t *CemuTracker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("  [pipeline] Cemu 追踪管道已停止 (上下文取消) / Cemu pipeline stopped (context cancelled)")
+			logInfo("Cemu 追踪管道已停止 (上下文取消) / Cemu pipeline stopped (context cancelled)")
 			return
 		case <-t.stopCh:
-			fmt.Println("  [pipeline] Cemu 追踪管道已停止 (请求停止) / Cemu pipeline stopped (stop requested)")
+			logInfo("Cemu 追踪管道已停止 (请求停止) / Cemu pipeline stopped (stop requested)")
 			return
 		case <-t.rescanCh:
 			reset("Cemu /rescan requested")
@@ -102,7 +101,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 			// 1. 确保模拟器附加
 			if !t.p.Attach() {
 				if lockedAddr != 0 {
-					fmt.Println("  [lost] Cemu 模拟器进程断开或退出 / Cemu emulator process exited or detached")
+					logWarn("Cemu 模拟器进程断开或退出 / Cemu emulator process exited or detached")
 					reset("Cemu lost")
 				} else {
 					state.mu.Lock()
@@ -120,7 +119,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 			if lockedAddr == 0 {
 				if time.Since(lastScanLogAt) > 5*time.Second {
 					lastScanLogAt = time.Now()
-					fmt.Println("  [scan] Cemu 尝试读取动力学根地址 0x1055300C (等待 3D 场景加载) / Reading fixed root 0x1055300C (waiting for 3D world)...")
+					logInfo("Cemu 尝试读取动力学根地址 0x1055300C (等待 3D 场景加载) / Reading fixed root 0x1055300C (waiting for 3D world)...")
 				}
 				blks := t.p.Blocks(256.0)
 				for _, blk := range blks {
@@ -142,7 +141,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 							shrineMode = false
 							holdLogged = false
 							setLock(lockedAddr, true, 1, "cemu-fixed")
-							fmt.Printf("  [lock] Cemu 固定偏移锁定成功！Addr: 0x%X (%.1f, %.1f, %.1f) [无需移动验证，已完全锁定] / Cemu fixed root locked! Addr: 0x%X [Verified, fully locked]\n",
+							logOK("Cemu 固定偏移锁定成功！Addr: 0x%X (%.1f, %.1f, %.1f) [无需移动验证，已完全锁定] / Cemu fixed root locked! Addr: 0x%X [Verified, fully locked]",
 								lockedAddr, d[0], d[1], d[2], lockedAddr)
 							publishState(true, d[0], d[1], d[2], true, 1, "cemu-fixed")
 							break
@@ -175,7 +174,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 				}
 
 				if !holdLogged {
-					fmt.Println("  [hold] Cemu 场景加载或瞬态过渡中 -> 保持上一位置 / Loading or transient -> holding position")
+					logInfo("Cemu 场景加载或瞬态过渡中 -> 保持上一位置 / Loading or transient -> holding position")
 					holdLogged = true
 				}
 				if hasPrev {
@@ -195,7 +194,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 					// 出庙：脱离神庙本地尺度，恢复大世界跟踪
 					shrineMode = false
 					destName := formatDestName(cur)
-					fmt.Printf("  [shrine] Cemu 角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) [%s] / Left shrine -> Resumed world tracking\n",
+					logInfo("Cemu 角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) [%s] / Left shrine -> Resumed world tracking",
 						cur[0], cur[1], cur[2], destName)
 					publishState(true, cur[0], cur[1], cur[2], true, 1, "cemu-fixed")
 					prev = cur
@@ -210,7 +209,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 				shrineMode = true
 				shrineEntrance = prev
 				destName := formatDestName(prev)
-				fmt.Printf("  [shrine] Cemu 角色进入试炼场 [%s] -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Entered shrine [%s] -> Holding entrance\n",
+				logInfo("Cemu 角色进入试炼场 [%s] -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Entered shrine [%s] -> Holding entrance",
 					destName, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], destName)
 				publishState(true, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], true, 1, "shrine")
 				continue
@@ -222,7 +221,7 @@ func (t *CemuTracker) Start(ctx context.Context) {
 			if hasPrev && delta > 300.0 {
 				shrineMode = false
 				destName := formatDestName(cur)
-				fmt.Printf("  [warp] Cemu 角色大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [零重扫接管] / Fast travel (dist=%.1fm) -> %s [Direct takeover]\n",
+				logInfo("Cemu 角色大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [零重扫接管] / Fast travel (dist=%.1fm) -> %s [Direct takeover]",
 					delta, destName, cur[0], cur[1], cur[2], delta, destName)
 				publishState(true, cur[0], cur[1], cur[2], true, 1, "cemu-fixed")
 				prev = cur

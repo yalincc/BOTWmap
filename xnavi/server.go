@@ -121,9 +121,9 @@ type server struct{}
 
 // BOTWmap 资产候选位置（v3.0.2 局域网镜像：存在即接管 /botw/，缺失不影响核心导航）
 // v3.1.0 排序（重要）：
-//   1. exe 同目录 app/ —— 发布形态，引导页就是这么教用户的，必须最优先
-//   2. cwd 相对 app/   —— 开发/命令行形态兜底
-//   3~4. 上级目录 / 开发机绝对路径 —— 历史遗留，保留兼容
+//  1. exe 同目录 app/ —— 发布形态，引导页就是这么教用户的，必须最优先
+//  2. cwd 相对 app/   —— 开发/命令行形态兜底
+//     3~4. 上级目录 / 开发机绝对路径 —— 历史遗留，保留兼容
 //
 // 注意：候选 1 必须基于 os.Executable() 而不是进程 cwd——从快捷方式或任意目录启动时
 // cwd ≠ exe 目录，只看 cwd 会出现"用户明明解压到 exe 同目录却仍找不到"的翻车。
@@ -184,7 +184,7 @@ func resolveBotwFS() http.Handler {
 		}
 		if fi, err := os.Stat(c); err == nil && fi.IsDir() {
 			botwFS = http.StripPrefix("/botw", http.FileServer(http.Dir(c)))
-			fmt.Printf("  [asset] BOTWmap assets mounted: %s\n", c)
+			logInfo("BOTWmap assets mounted: %s", c)
 			return botwFS
 		}
 	}
@@ -203,7 +203,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == http.MethodOptions {
 		if orig := r.Header.Get("Origin"); orig != "" && webConnState.CompareAndSwap(0, 1) {
-			fmt.Printf("  [web] preflight OPTIONS from %s (waiting GET /pos)\n", orig)
+			logInfo("preflight OPTIONS from %s (waiting GET /pos)", orig)
 		}
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Private-Network", "true")
@@ -257,7 +257,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if _, err1 := fmt.Sscanf(xs, "%f", &x); err1 == nil {
 					if _, err2 := fmt.Sscanf(zs, "%f", &z); err2 == nil {
 						requestRescanWithTarget(float32(x), float32(z))
-						fmt.Printf("  [server] /rescan manual target: (%.1f, %.1f)\n", x, z)
+						logInfo("/rescan manual target: (%.1f, %.1f)", x, z)
 						writeJSON(w, map[string]any{"started": true, "manual": true, "x": x, "z": z})
 						return
 					}
@@ -337,7 +337,7 @@ func (s *server) handleSaveOverride(w http.ResponseWriter, r *http.Request) {
 		if progress != nil {
 			progress.refresh()
 		}
-		fmt.Println("  [server] /save-override: restored auto detection")
+		logInfo("/save-override: restored auto detection")
 		writeJSON(w, map[string]any{"ok": true, "cleared": true})
 		return
 	}
@@ -350,7 +350,7 @@ func (s *server) handleSaveOverride(w http.ResponseWriter, r *http.Request) {
 	if progress != nil {
 		progress.refresh()
 	}
-	fmt.Printf("  [server] /save-override: applied %s\n", req.Path)
+	logInfo("/save-override: applied %s", req.Path)
 	writeJSON(w, map[string]any{"ok": true, "path": req.Path})
 }
 
@@ -388,7 +388,7 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 	lastWebOrigin = orig
 	lastWebOrigMu.Unlock()
 	if webConnState.Swap(2) != 2 {
-		fmt.Printf("  [web] connected (origin=%s)\n", orig)
+		logInfo("connected (origin=%s)", orig)
 	}
 	state.mu.RLock()
 	payload := map[string]any{
@@ -492,7 +492,7 @@ func (s *server) handleConfigPost(w http.ResponseWriter, r *http.Request) {
 	c := cfg
 	configMu.Unlock()
 	saveConfig()
-	fmt.Printf("  [config] cats=%d doneFilter=%s showAreas=%v\n", len(c.Cats), c.DoneFilter, c.ShowAreas)
+	logInfo("cats=%d doneFilter=%s showAreas=%v", len(c.Cats), c.DoneFilter, c.ShowAreas)
 	writeJSON(w, map[string]any{"ok": true, "config": c})
 }
 

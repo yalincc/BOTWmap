@@ -14,7 +14,6 @@ package main
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"math"
 	"os"
 	"sync"
@@ -70,7 +69,7 @@ func readRyujinxActor(h uintptr, addr uintptr) ([3]float32, bool) {
 }
 
 func (t *RyujinxTracker) Start(ctx context.Context) {
-	fmt.Println("  [pipeline] Ryujinx 追踪管道已启动 (动力学根运动缓冲 / Run>=2 门禁) / Ryujinx pipeline started (dynamic root core: Run>=2 gate)")
+	logInfo("Ryujinx 追踪管道已启动 (动力学根运动缓冲 / Run>=2 门禁) / Ryujinx pipeline started (dynamic root core: Run>=2 gate)")
 
 	tick := time.NewTicker(100 * time.Millisecond) // 10Hz
 	defer tick.Stop()
@@ -211,7 +210,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 
 		setLock(lockedAddr, false, len(groups), "ryujinx-scan")
 		publishState(true, cur[0], cur[1], cur[2], false, len(groups), "ryujinx-scan")
-		fmt.Printf("  [verify] Ryujinx 捕获动力学候选地址 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【请在游戏内移动角色以完成验证】 / Candidate locked: 0x%X -> [Please move Link in-game to verify]\n",
+		logInfo("Ryujinx 捕获动力学候选地址 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【请在游戏内移动角色以完成验证】 / Candidate locked: 0x%X -> [Please move Link in-game to verify]",
 			lockedAddr, cur[0], cur[1], cur[2], lockedAddr)
 		return true
 	}
@@ -219,23 +218,23 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("  [pipeline] Ryujinx 追踪管道已停止 (上下文取消) / Ryujinx pipeline stopped (context cancelled)")
+			logInfo("Ryujinx 追踪管道已停止 (上下文取消) / Ryujinx pipeline stopped (context cancelled)")
 			return
 		case <-t.stopCh:
-			fmt.Println("  [pipeline] Ryujinx 追踪管道已停止 (请求停止) / Ryujinx pipeline stopped (stop requested)")
+			logInfo("Ryujinx 追踪管道已停止 (请求停止) / Ryujinx pipeline stopped (stop requested)")
 			return
 		case req := <-t.rescanCh:
 			reset("Ryujinx /rescan requested")
 			if req != nil && req.HasTarget {
 				hasManual = true
 				manualTarget = [3]float32{req.TargetX, 0, req.TargetZ}
-				fmt.Printf("  [scan] Ryujinx 手工校准目标: (%.1f, %.1f) / Ryujinx manual target set: (%.1f, %.1f)\n", req.TargetX, req.TargetZ, req.TargetX, req.TargetZ)
+				logInfo("Ryujinx 手工校准目标: (%.1f, %.1f) / Ryujinx manual target set: (%.1f, %.1f)", req.TargetX, req.TargetZ, req.TargetX, req.TargetZ)
 			}
 		case <-tick.C:
 			// 1. 确保模拟器附加
 			if !t.p.Attach() {
 				if lockedAddr != 0 {
-					fmt.Println("  [lost] Ryujinx 模拟器进程断开或退出 / Ryujinx emulator process exited or detached")
+					logWarn("Ryujinx 模拟器进程断开或退出 / Ryujinx emulator process exited or detached")
 					reset("Ryujinx lost")
 				} else {
 					state.mu.Lock()
@@ -274,16 +273,16 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 				case hasManual:
 					scanCenter = manualTarget
 					radius = 150.0
-					fmt.Printf("  [scan] Ryujinx 扫描手工定向窗口 150m (%.1f, %.1f)... / Scanning manual window 150m near (%.1f, %.1f)...\n", scanCenter[0], scanCenter[2], scanCenter[0], scanCenter[2])
+					logInfo("Ryujinx 扫描手工定向窗口 150m (%.1f, %.1f)... / Scanning manual window 150m near (%.1f, %.1f)...", scanCenter[0], scanCenter[2], scanCenter[0], scanCenter[2])
 				case latestSaveAnchor != nil:
 					// 始终以最新存档锚点为中心扫描（绝不拿切场景掉锁前的旧废弃坐标当中心）
 					scanCenter = latestSaveAnchor.Pos
 					radius = 120.0
 					if saveIsFresh {
-						fmt.Printf("  [scan] Ryujinx 发现新鲜存档 (<=120s)，扫描 120m 锚点窗口 (%.1f, %.1f, %.1f)... / Fresh save detected, scanning window 120m...\n",
+						logInfo("Ryujinx 发现新鲜存档 (<=120s)，扫描 120m 锚点窗口 (%.1f, %.1f, %.1f)... / Fresh save detected, scanning window 120m...",
 							scanCenter[0], scanCenter[1], scanCenter[2])
 					} else {
-						fmt.Printf("  [scan] Ryujinx 扫描存档锚点 120m 窗口 (%.1f, %.1f, %.1f)... / Scanning save anchor window 120m...\n",
+						logInfo("Ryujinx 扫描存档锚点 120m 窗口 (%.1f, %.1f, %.1f)... / Scanning save anchor window 120m...",
 							scanCenter[0], scanCenter[1], scanCenter[2])
 					}
 				default:
@@ -304,7 +303,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 				if found {
 					hasManual = false
 				} else {
-					fmt.Println("  [scan] Ryujinx 扫描未发现活动玩家 (等待进入 3D 游戏世界)... / No live player found (waiting for 3D world)...")
+					logInfo("Ryujinx 扫描未发现活动玩家 (等待进入 3D 游戏世界)... / No live player found (waiting for 3D world)...")
 				}
 				continue
 			}
@@ -329,7 +328,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 				}
 
 				if !holdLogged {
-					fmt.Println("  [hold] Ryujinx reading transient/loading -> holding position")
+					logInfo("Ryujinx reading transient/loading -> holding position")
 					holdLogged = true
 				}
 				if hasPrev {
@@ -349,7 +348,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 					// 出庙：脱离神庙本地尺度，恢复大世界跟踪
 					shrineMode = false
 					destName := formatDestName(cur)
-					fmt.Printf("  [shrine] Ryujinx 角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) [%s] / Left shrine -> Resumed world tracking\n",
+					logInfo("Ryujinx 角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) [%s] / Left shrine -> Resumed world tracking",
 						cur[0], cur[1], cur[2], destName)
 					publishState(true, cur[0], cur[1], cur[2], verified, len(cands), "player")
 					prev = cur
@@ -364,7 +363,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 				shrineMode = true
 				shrineEntrance = prev
 				destName := formatDestName(prev)
-				fmt.Printf("  [shrine] Ryujinx 角色进入试炼场 [%s] -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Entered shrine [%s] -> Holding entrance\n",
+				logInfo("Ryujinx 角色进入试炼场 [%s] -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Entered shrine [%s] -> Holding entrance",
 					destName, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], destName)
 				publishState(true, shrineEntrance[0], shrineEntrance[1], shrineEntrance[2], true, 0, "shrine")
 				continue
@@ -384,7 +383,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 							verified = true
 							cands = nil
 							setLock(lockedAddr, true, 1, "ryujinx-move-confirm")
-							fmt.Printf("  [lock] Ryujinx 走动仲裁成功！真身锁定 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【已完全锁定】 / Movement arbitration confirmed! Locked at 0x%X -> [Fully locked]\n",
+							logOK("Ryujinx 走动仲裁成功！真身锁定 Addr: 0x%X (%.1f, %.1f, %.1f) -> 【已完全锁定】 / Movement arbitration confirmed! Locked at 0x%X -> [Fully locked]",
 								lockedAddr, cur[0], cur[1], cur[2], lockedAddr)
 							break
 						}
@@ -400,7 +399,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 				shrineMode = false
 				cands = nil
 				destName := formatDestName(cur)
-				fmt.Printf("  [warp] Ryujinx 角色大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [零重扫接管] / Fast travel (dist=%.1fm) -> %s [Direct takeover]\n",
+				logInfo("Ryujinx 角色大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [零重扫接管] / Fast travel (dist=%.1fm) -> %s [Direct takeover]",
 					delta, destName, cur[0], cur[1], cur[2], delta, destName)
 				publishState(true, cur[0], cur[1], cur[2], verified, 1, "player")
 				prev = cur
@@ -420,7 +419,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 					verified = true
 					cands = nil
 					setLock(lockedAddr, true, 1, "ryujinx-live")
-					fmt.Printf("  [lock] Ryujinx 角色移动确认成功！真身锁定 Addr: 0x%X -> 【已完全锁定】 / Movement confirmed! Live actor locked at 0x%X -> [Fully locked]\n", lockedAddr, lockedAddr)
+					logOK("Ryujinx 角色移动确认成功！真身锁定 Addr: 0x%X -> 【已完全锁定】 / Movement confirmed! Live actor locked at 0x%X -> [Fully locked]", lockedAddr, lockedAddr)
 				}
 			} else {
 				moveN = 0
@@ -429,7 +428,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 			// 提示机制：若锁定后持续未确认走动，友好提醒用户
 			if !verified && time.Since(lockSince) > 6*time.Second && time.Since(lastUnverifiedHint) > 15*time.Second {
 				lastUnverifiedHint = time.Now()
-				fmt.Println("  [hint] 主角未确认走动 (verified=false)。请在游戏内走动几步 / Link movement not confirmed. Please move a few steps in-game")
+				logWarn("主角未确认走动 (verified=false)。请在游戏内走动几步 / Link movement not confirmed. Please move a few steps in-game")
 			}
 
 			publishState(true, cur[0], cur[1], cur[2], verified, len(cands), "player")
