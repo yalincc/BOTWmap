@@ -155,10 +155,12 @@ func createTrackerForPlatform(p Platform) Tracker {
 	switch p.Name() {
 	case "Cemu":
 		if cp, ok := p.(*cemuPlatform); ok {
+			noticeModInjectUnsupported("Cemu")
 			return NewCemuTracker(cp)
 		}
 	case "Ryujinx":
 		if rp, ok := p.(*ryujinxPlatform); ok {
+			noticeModInjectUnsupported("Ryujinx")
 			return NewRyujinxTracker(rp)
 		}
 	case "Eden":
@@ -167,6 +169,17 @@ func createTrackerForPlatform(p Platform) Tracker {
 		}
 	}
 	return nil
+}
+
+// noticeModInjectUnsupported 提示模组注入只支持 Eden，其他平台自动用内存探测。
+var modInjectNoticeShown bool
+
+func noticeModInjectUnsupported(platform string) {
+	if locateMode != "mod-inject" || modInjectNoticeShown {
+		return
+	}
+	modInjectNoticeShown = true
+	fmt.Println("  [locate] 模组注入仅支持 Eden，当前平台 " + platform + " 使用内存探测")
 }
 
 // stateMachine 统一调度分发器。

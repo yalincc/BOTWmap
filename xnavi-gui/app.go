@@ -385,7 +385,8 @@ func (a *App) StartCore(emu string) string {
 	if game != "" && game != "auto" {
 		args = append(args, "--game="+game)
 	}
-	if a.cfg != nil && a.cfg.LocateMode == "mod-inject" && emu == "eden" {
+	// 模组注入模式交给核心按实际平台判定（仅 Eden 支持，其他平台自动回落内存探测）
+	if a.cfg != nil && a.cfg.LocateMode == "mod-inject" {
 		args = append(args, "--locate=mod-inject")
 	}
 	if appEdition != "pc" && a.cfg != nil {

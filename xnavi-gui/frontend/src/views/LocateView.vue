@@ -46,7 +46,7 @@
           <option value="eden">{{ t('emu.eden') }}</option>
         </select>
         <span v-else class="bg-[#0d1117] border border-slate-700/80 rounded-lg px-2.5 py-1.5 text-xs font-medium text-sky-300">{{ t('emu.pc') }}</span>
-        <select v-if="edition !== 'pc'" v-model="cfg.locateMode" :title="t('locateMode.hint')"
+        <select v-if="edition !== 'pc'" v-model="cfg.locateMode" @change="onLocateModeChange" :title="t('locateMode.hint')"
           class="bg-[#0d1117] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-slate-500 focus:outline-none transition">
           <option value="auto">{{ t('locateMode.auto') }}</option>
           <option value="mod-inject" :disabled="cfg.emulator !== 'auto' && cfg.emulator !== 'eden'">{{ t('locateMode.modInject') }}</option>
@@ -334,6 +334,22 @@ async function doDetectSave() {
 }
 
 async function onEmuChange() {
+  // 模组注入仅 Eden 可用：切到 Cemu/Ryujinx 时自动回落内存探测
+  if (cfg.emulator !== 'auto' && cfg.emulator !== 'eden' && cfg.locateMode === 'mod-inject') {
+    cfg.locateMode = 'auto'
+  }
   await saveSettings()
+}
+
+// 定位方式改动需落盘，否则核心启动时读到的仍是旧值
+async function onLocateModeChange() {
+  await saveSettings()
+  // 定位方式在核心启动时生效：正在定位则重启核心，使新方式立即生效
+  if (isLocating.value) {
+    await api.StopCore()
+    isLocating.value = false
+    await api.StartCore(edition.value === 'pc' ? 'pc' : cfg.emulator)
+    isLocating.value = true
+  }
 }
 </script>

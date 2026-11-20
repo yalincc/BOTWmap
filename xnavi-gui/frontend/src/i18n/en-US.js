@@ -40,7 +40,7 @@ export default {
     pickTitle: 'Select emulator (restart locating to apply)'
   },
   locateMode: {
-    title: 'Positioning',
+    title: 'Select positioning method (locating restarts on change)',
     auto: 'Memory scan (recommended)',
     modInject: 'Mod injection',
     hint: 'Memory scan: works anywhere, nothing to install; Mod injection: needs the beacon mod, Eden only',

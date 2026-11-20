@@ -40,7 +40,7 @@ export default {
     pickTitle: '选择模拟器（改后需重启定位）'
   },
   locateMode: {
-    title: '定位方式',
+    title: '选择定位方式（切换后自动重启定位）',
     auto: '内存探测（推荐）',
     modInject: '模组注入',
     hint: '内存探测：通用，无需安装任何东西；模组注入：需安装信标模组，仅 Eden 可用',
