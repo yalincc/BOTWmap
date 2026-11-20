@@ -148,3 +148,73 @@ func TestBeaconMissingDetectionNeedsGameReady(t *testing.T) {
 		t.Error("must not warn before the grace period elapses")
 	}
 }
+
+// 重置信标侧状态跟踪（测试之间互不干扰）。
+func resetBeaconTrack() {
+	beaconWorldPos = [3]float32{}
+	beaconHasWorld = false
+	beaconInTrial = false
+	beaconLocalPos = [3]float32{}
+	beaconHasLocal = false
+	beaconLastMove = time.Time{}
+	beaconStillTold = false
+	beaconNoAnchor = false
+}
+
+// 神庙/试炼场是独立场景，游戏给出的是场内局部坐标（近原点）。宿主必须把它们
+// 锚定到最后已知的世界坐标（入口），而不是当作世界坐标发布 —— 否则红点会跳到
+// 地图原点并在场内持续漂移。
+func TestPublishBeaconHoldsEntranceInTrial(t *testing.T) {
+	resetBeaconTrack()
+
+	// 大世界：正常跟随。
+	publishBeacon(Beacon{X: 3757.7, Y: 342.8, Z: 2157.6, State: stOverworld}, "beacon")
+	state.mu.RLock()
+	gx, gy, gz, src := state.gx, state.gy, state.gz, state.source
+	state.mu.RUnlock()
+	if src != "beacon" || gx != 3757.7 || gy != 342.8 || gz != 2157.6 {
+		t.Fatalf("world publish: src=%q pos=(%.1f,%.1f,%.1f)", src, gx, gy, gz)
+	}
+
+	// 进入试炼场：坐标变成场内局部值，state 声明为神庙。
+	publishBeacon(Beacon{X: 0, Y: 20, Z: 68, State: stShrine}, "beacon")
+	state.mu.RLock()
+	gx, gy, gz, src = state.gx, state.gy, state.gz, state.source
+	state.mu.RUnlock()
+	if src != "beacon-shrine" {
+		t.Fatalf("trial publish source = %q, want beacon-shrine", src)
+	}
+	if gx != 3757.7 || gy != 342.8 || gz != 2157.6 {
+		t.Fatalf("trial must hold entrance (3757.7,342.8,2157.6), got (%.1f,%.1f,%.1f)", gx, gy, gz)
+	}
+
+	// 场内移动：局部坐标变化不得带动红点。
+	publishBeacon(Beacon{X: 40, Y: 22, Z: 90, State: stShrine}, "beacon")
+	state.mu.RLock()
+	gx, gy, gz = state.gx, state.gy, state.gz
+	state.mu.RUnlock()
+	if gx != 3757.7 || gy != 342.8 || gz != 2157.6 {
+		t.Fatalf("trial movement must not move the dot, got (%.1f,%.1f,%.1f)", gx, gy, gz)
+	}
+
+	// 回到大世界：恢复实时跟随。
+	publishBeacon(Beacon{X: 3760.0, Y: 344.0, Z: 2160.0, State: stOverworld}, "beacon")
+	state.mu.RLock()
+	gx, gy, gz, src = state.gx, state.gy, state.gz, state.source
+	state.mu.RUnlock()
+	if src != "beacon" || gx != 3760.0 || gy != 344.0 || gz != 2160.0 {
+		t.Fatalf("back to world: src=%q pos=(%.1f,%.1f,%.1f)", src, gx, gy, gz)
+	}
+}
+
+// 没有任何大世界坐标时，绝不能把场内局部坐标发布出去（否则红点跳到原点）。
+func TestPublishBeaconTrialWithoutAnchor(t *testing.T) {
+	resetBeaconTrack()
+	publishBeacon(Beacon{X: 0, Y: 20, Z: 68, State: stShrine}, "beacon")
+	state.mu.RLock()
+	ok, gx, gz, src := state.ok, state.gx, state.gz, state.source
+	state.mu.RUnlock()
+	if ok && gx == 0 && gz == 68 {
+		t.Fatalf("trial-local coord published without anchor: (%.1f,%.1f) src=%q", gx, gz, src)
+	}
+}

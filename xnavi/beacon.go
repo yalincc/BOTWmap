@@ -224,70 +224,91 @@ var (
 	beaconMissingWarned bool
 )
 
-// 信标事件识别状态：用于输出与内存探测路径同等级、同措辞的
-// 大传送 / 进出神庙 / 庙内静止日志。
+// 信标侧状态跟踪：最后已知世界坐标、场内（试炼场）判定、场内静止检测。
+//
+// 神庙/试炼场是独立场景，游戏给出的是"场内局部坐标"（接近原点）。若直接当作
+// 世界坐标发布，红点会跑到千里之外，并随场内移动持续漂移；因此场内一律锚定
+// 最后已知的世界坐标（入口），与内存探测路径的语义保持一致。
 var (
-	beaconLastPos    [3]float32
-	beaconHasLast    bool
-	beaconLastState  uint32
-	beaconStateKnown bool
-	beaconLastMove   time.Time
-	beaconStillTold  bool
+	beaconWorldPos  [3]float32
+	beaconHasWorld  bool
+	beaconInTrial   bool
+	beaconLocalPos  [3]float32
+	beaconHasLocal  bool
+	beaconLastMove  time.Time
+	beaconStillTold bool
+	beaconNoAnchor  bool
 )
 
-// beaconEvent 识别信标侧的状态变化并按内存探测路径的等级输出：
-// 大传送 → info、进出神庙 → info、庙内静止保持 → info。
-func beaconEvent(b Beacon) {
+// publishBeacon 发布信标坐标；场内局部坐标时改为锚定入口。
+func publishBeacon(b Beacon, source string) {
 	pos := [3]float32{b.X, b.Y, b.Z}
-	if beaconHasLast {
-		if d := dist3(beaconLastPos, pos); d > 300.0 {
+	// 插件声明的状态（神庙/试炼）优先；坐标呈局部尺度时同样视为场内。
+	declared := b.State == stShrine || b.State == stTrial
+	local := isShrineScale(pos)
+	// 与最后已知世界坐标相距足够远才算"尺度突变"，避免大世界原点附近的
+	// 玩家被误判进场内。
+	far := beaconHasWorld && dist3(beaconWorldPos, pos) > 150
+	inTrial := declared || (local && far)
+
+	// 已在场内时，只有回到明确的世界尺度才退出，避免切换场景的过渡帧把
+	// 局部坐标当成世界坐标发布出去。
+	if beaconInTrial && !declared && !local {
+		beaconInTrial = false
+		beaconHasLocal = false
+		beaconLastMove = time.Time{}
+		beaconStillTold = false
+		logInfo("Eden 信标：回到大世界坐标 (%.1f, %.1f, %.1f) -> 恢复实时跟随 / Beacon: back to world coords -> resuming",
+			pos[0], pos[1], pos[2])
+	}
+
+	if inTrial {
+		if !beaconInTrial {
+			beaconInTrial = true
+			beaconHasLocal = false
+			beaconLastMove = time.Time{}
+			beaconStillTold = false
+			if beaconHasWorld {
+				logInfo("Eden 信标：进入试炼场，坐标为场内局部值 (%.1f, %.1f, %.1f) -> 红点锚定入口 (%.1f, %.1f, %.1f) / Beacon: trial-local coords -> holding entrance",
+					pos[0], pos[1], pos[2], beaconWorldPos[0], beaconWorldPos[1], beaconWorldPos[2])
+			} else {
+				logWarn("Eden 信标：进入试炼场但尚无大世界坐标可锚定，红点保持上一次位置 / Beacon: entered trial without a world anchor, keeping last position")
+			}
+		}
+		if beaconHasWorld {
+			publishState(true, beaconWorldPos[0], beaconWorldPos[1], beaconWorldPos[2], true, 0, "beacon-shrine")
+		} else if !beaconNoAnchor {
+			beaconNoAnchor = true
+			// 没有入口锚点时绝不发布局部坐标，否则红点会跳到地图原点。
+			logWarn("Eden 信标：场内局部坐标无入口锚点，已跳过发布（红点保持在进入试炼场前的位置） / Beacon: no entrance anchor, skipping publish to keep the last position")
+		}
+		// 场内静止：局部坐标长时间不变属正常（玩家站定）
+		if !beaconHasLocal || dist3(beaconLocalPos, pos) > 0.05 {
+			beaconLocalPos = pos
+			beaconHasLocal = true
+			beaconLastMove = time.Now()
+			beaconStillTold = false
+		} else if !beaconStillTold && !beaconLastMove.IsZero() && time.Since(beaconLastMove) > 8*time.Second {
+			beaconStillTold = true
+			logInfo("Eden 信标：试炼场内位置静止 (%.1f, %.1f, %.1f)，红点保持入口锚定 / Beacon: standing still in trial, holding entrance",
+				pos[0], pos[1], pos[2])
+		}
+		return
+	}
+
+	beaconNoAnchor = false
+	if beaconHasWorld {
+		if d := dist3(beaconWorldPos, pos); d > 300 {
 			dest := formatDestName(pos)
 			logInfo("Eden 信标检测到大传送 (距离=%.1fm) -> %s (%.1f, %.1f, %.1f) [直接跟随] / Beacon fast travel (dist=%.1fm) -> %s [Direct takeover]",
 				d, dest, pos[0], pos[1], pos[2], d, dest)
 			beaconStillTold = false
 		}
 	}
-	if beaconHasLast && dist3(beaconLastPos, pos) > 0.05 {
-		beaconLastMove = time.Now()
-		beaconStillTold = false
-	}
-	beaconLastPos = pos
-	beaconHasLast = true
-
-	inShrine := b.State == stShrine || b.State == stTrial
-	if !beaconStateKnown {
-		beaconStateKnown = true
-		beaconLastState = b.State
-		return
-	}
-	if b.State != beaconLastState {
-		prev := beaconLastState
-		beaconLastState = b.State
-		beaconStillTold = false
-		switch {
-		case inShrine:
-			logInfo("Eden 信标：角色进入试炼场 -> 锚定神庙入口 (%.1f, %.1f, %.1f) / Beacon: entered shrine -> holding entrance",
-				pos[0], pos[1], pos[2])
-		case prev == stShrine || prev == stTrial:
-			logInfo("Eden 信标：角色离开试炼场 -> 恢复大世界追踪 (%.1f, %.1f, %.1f) / Beacon: left shrine -> resumed world tracking",
-				pos[0], pos[1], pos[2])
-		}
-		return
-	}
-	if !inShrine {
-		beaconLastMove = time.Time{}
-		beaconStillTold = false
-		return
-	}
-	if beaconLastMove.IsZero() {
-		beaconLastMove = time.Now()
-		return
-	}
-	if !beaconStillTold && time.Since(beaconLastMove) > 8*time.Second {
-		beaconStillTold = true
-		logInfo("Eden 信标：庙内位置静止 (%.1f, %.1f, %.1f)，保持庙内坐标 / Beacon: standing still in shrine, holding local coords",
-			pos[0], pos[1], pos[2])
-	}
+	beaconWorldPos = pos
+	beaconHasWorld = true
+	beaconHasLocal = false
+	publishState(true, pos[0], pos[1], pos[2], true, 1, source)
 }
 
 // tryBeaconTiers 尝试 tier1(RAM) 与 tier2(pos.json)。命中即发布统一状态并
@@ -299,13 +320,12 @@ func beaconEvent(b Beacon) {
 func tryBeaconTiers(h uintptr, p *edenPlatform, gameReady bool) bool {
 	if b, ok := beacon.read(h, p); ok {
 		setLock(beacon.hostAddr, true, 1, "beacon")
-		publishState(true, b.X, b.Y, b.Z, true, 1, "beacon")
+		publishBeacon(b, "beacon")
 		beaconMissingWarned = false
 		if !beaconActive {
 			beaconActive = true
 			logOK("Eden 信标定位已生效，坐标来自游戏内插件 / Beacon positioning active")
 		}
-		beaconEvent(b)
 		return true
 	}
 	dir := edenSdmcXnaviDir(p)
@@ -314,13 +334,12 @@ func tryBeaconTiers(h uintptr, p *edenPlatform, gameReady bool) bool {
 		if fi, err := os.Stat(filepath.Join(dir, "pos.json")); err == nil &&
 			time.Since(fi.ModTime()) <= beaconStaleAfter && beaconCoordOK(b) {
 			setLock(0, true, 1, "beacon-json")
-			publishState(true, b.X, b.Y, b.Z, true, 1, "beacon-json")
+			publishBeacon(b, "beacon-json")
 			beaconMissingWarned = false
 			if !beaconActive {
 				beaconActive = true
 				logOK("Eden 信标定位已生效（文件通道）/ Beacon positioning active (file channel)")
 			}
-			beaconEvent(b)
 			return true
 		}
 	}
