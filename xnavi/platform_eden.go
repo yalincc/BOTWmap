@@ -113,7 +113,7 @@ func (p *edenPlatform) Attach() bool {
 	return true
 }
 
-func (p *edenPlatform) Handle() uintptr     { return p.h }
+func (p *edenPlatform) Handle() uintptr    { return p.h }
 func (p *edenPlatform) PID() uint32        { return p.pid }
 func (p *edenPlatform) LittleEndian() bool { return true }
 
@@ -327,6 +327,16 @@ func edenHeapBlocks(h uintptr, minMB float64) []MemBlock {
 	}
 	// 兜底：全进程 MEM_MAPPED RW 块（堆映射不在固定窗口内时）
 	return enum(0, uintptr(0x7FFFFFFFFFFF), true)
+}
+
+// edenGameReady 判断游戏是否已加载进模拟器：存在大块（≥256MB）已提交可读写内存。
+// 用于区分"游戏没开或未加载完"与"游戏在跑但没装信标模组"，避免模组注入模式
+// 在启动阶段被误判为缺失模组而误回退。
+func edenGameReady(h uintptr) bool {
+	if h == 0 {
+		return false
+	}
+	return len(edenHeapBlocks(h, 256.0)) > 0
 }
 
 // edenGuestBlocksWithOptions 向后兼容辅助方法。

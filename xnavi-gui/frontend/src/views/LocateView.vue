@@ -51,8 +51,6 @@
           <option value="auto">{{ t('locateMode.auto') }}</option>
           <option value="mod-inject" :disabled="cfg.emulator !== 'auto' && cfg.emulator !== 'eden'">{{ t('locateMode.modInject') }}</option>
         </select>
-        <span v-if="cfg.locateMode === 'mod-inject' && pos.source !== 'beacon'"
-          class="text-[10px] text-amber-400/90 whitespace-nowrap">{{ t('locateMode.missing') }}</span>
         <button @click="openMap" class="w-[124px] py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-medium border border-slate-700 flex items-center justify-center gap-1.5 transition">
           🧭 {{ t('buttons.openMap') }}
         </button>
@@ -102,8 +100,9 @@
           </div>
         </section>
 
-        <!-- 坐标校准卡（BOTW 定向找人） -->
-        <section class="bg-[#161b22] border border-slate-800 rounded-xl p-3 shrink-0">
+        <!-- 坐标校准卡（BOTW 定向找人）：模组注入模式下坐标由游戏内模组直接提供，此功能不可用 -->
+        <section class="relative bg-[#161b22] border border-slate-800 rounded-xl p-3 shrink-0">
+          <div :class="cfg.locateMode === 'mod-inject' ? 'blur-[3px] opacity-40 pointer-events-none select-none' : ''">
           <div class="flex items-center justify-between text-xs pb-1.5 border-b border-slate-800/80 mb-2">
             <span class="font-bold text-emerald-400 flex items-center gap-1.5">🧭 {{ t('locate.calibration') }}</span>
             <div class="flex items-center gap-2">
@@ -138,6 +137,12 @@
             <button @click="fillPreset(-215, 236, 250)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">平原之塔</button>
             <button @click="fillPreset(-1071, 248, 1913)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">复苏神庙</button>
             <button @click="fillPreset(3435, 228, 1968)" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">哈特诺塔</button>
+          </div>
+          </div>
+          <div v-if="cfg.locateMode === 'mod-inject'"
+            class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 rounded-xl px-4 text-center">
+            <span class="text-sm font-bold text-emerald-300">🧲 {{ t('locateMode.modActive') }}</span>
+            <span class="text-[10px] text-slate-400">{{ t('locateMode.modActiveHint') }}</span>
           </div>
         </section>
       </div>

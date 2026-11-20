@@ -123,6 +123,10 @@ func (t *EdenTracker) Start(ctx context.Context) {
 	probeSince := time.Time{}
 	lastProbeScan := time.Time{}
 	lastMoveAt := time.Now() // 最近一次观测到真身移动（冻结检测用）
+	// 游戏是否已加载到模拟器（每秒判一次）：区分"游戏没开/未加载完"与
+	// "游戏在跑但没装信标模组"，避免模组注入模式在启动阶段被误判回退。
+	gameReady := false
+	lastGameCheck := time.Time{}
 
 	reset := func(reason string) {
 		lockedAddr = 0
@@ -388,9 +392,16 @@ func (t *EdenTracker) Start(ctx context.Context) {
 
 			h := t.p.Handle()
 
-			// 模组注入定位：仅在显式选择该模式时启用（默认 auto 走下方内存扫描）。
-			// 信标缺失或停摆时回退扫描器。
-			if locateMode == "mod-inject" && tryBeaconTiers(h, t.p) {
+			// 游戏是否已加载（每秒判一次）：只有游戏确实在跑、却找不到信标时
+			// 才提示未装模组；启动阶段游戏未加载完不算缺失。
+			if time.Since(lastGameCheck) >= time.Second {
+				lastGameCheck = time.Now()
+				gameReady = edenGameReady(h)
+			}
+
+			// 模组注入定位：仅在显式选择该模式时启用（默认走下方内存探测）。
+			// 信标缺失或停摆时回退内存探测。
+			if locateMode == "mod-inject" && tryBeaconTiers(h, t.p, gameReady) {
 				continue
 			}
 

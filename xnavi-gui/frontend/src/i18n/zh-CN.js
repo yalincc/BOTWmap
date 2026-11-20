@@ -44,7 +44,8 @@ export default {
     auto: '内存探测（推荐）',
     modInject: '模组注入',
     hint: '内存探测：通用，无需安装任何东西；模组注入：需安装信标模组，仅 Eden 可用',
-    missing: '未检测到信标模组'
+    modActive: '模组定位已启用',
+    modActiveHint: '坐标由游戏内模组直接提供，无需内存校准'
   },
   buttons: {
     openMap: '打开网页地图',

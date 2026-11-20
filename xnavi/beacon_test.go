@@ -107,7 +107,7 @@ func TestTryBeaconTiersFileFallback(t *testing.T) {
 	t.Setenv("XNAVI_SDMC_DIR", dir)
 	// 新鲜 pos.json → tier2 命中（h=0 使 tier1 RAM 干净 miss）。
 	writePos(t, dir, sampleBeacon(), float64(time.Now().UnixNano())/1e9)
-	if !tryBeaconTiers(0, &edenPlatform{}) {
+	if !tryBeaconTiers(0, &edenPlatform{}, false) {
 		t.Fatal("fresh pos.json should hit tier2")
 	}
 	state.mu.RLock()
@@ -122,7 +122,29 @@ func TestTryBeaconTiersFileFallback(t *testing.T) {
 	if err := os.Chtimes(filepath.Join(dir, "pos.json"), old, old); err != nil {
 		t.Fatal(err)
 	}
-	if tryBeaconTiers(0, &edenPlatform{}) {
+	if tryBeaconTiers(0, &edenPlatform{}, false) {
 		t.Error("stale pos.json should not hit tier2")
+	}
+}
+
+// 游戏未就绪时不启动"缺模组"计时，避免启动阶段误判；游戏就绪后才开始计时。
+func TestBeaconMissingDetectionNeedsGameReady(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XNAVI_SDMC_DIR", dir)
+	beaconProbeSince = time.Time{}
+	beaconMissingWarned = false
+
+	// 游戏未就绪：不应开始计时。
+	tryBeaconTiers(0, &edenPlatform{}, false)
+	if !beaconProbeSince.IsZero() {
+		t.Error("probe timer must not start while game is not ready")
+	}
+	// 游戏就绪：开始计时（尚未到告警阈值，不应告警）。
+	tryBeaconTiers(0, &edenPlatform{}, true)
+	if beaconProbeSince.IsZero() {
+		t.Error("probe timer should start once game is ready")
+	}
+	if beaconMissingWarned {
+		t.Error("must not warn before the grace period elapses")
 	}
 }

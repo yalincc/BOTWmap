@@ -44,7 +44,8 @@ export default {
     auto: 'Memory scan (recommended)',
     modInject: 'Mod injection',
     hint: 'Memory scan: works anywhere, nothing to install; Mod injection: needs the beacon mod, Eden only',
-    missing: 'Beacon mod not detected'
+    modActive: 'Mod positioning enabled',
+    modActiveHint: 'Coordinates come straight from the in-game mod; memory calibration is not needed'
   },
   buttons: {
     openMap: 'Open Map',

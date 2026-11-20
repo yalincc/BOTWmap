@@ -12,6 +12,9 @@ import (
 var assets embed.FS
 
 func main() {
+	// 任务栏身份：需在窗口创建前声明，否则任务栏按"默认程序"归组、图标显示为系统默认图标
+	setAppUserModelID("ZoruaFox.Xnavi")
+
 	app := NewApp()
 
 	err := wails.Run(&options.App{
