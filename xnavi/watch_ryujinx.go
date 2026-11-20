@@ -186,7 +186,7 @@ func (t *RyujinxTracker) Start(ctx context.Context) {
 			return false
 		}
 
-		groups := GroupEdenHits(identHits)
+		groups := GroupEdenHits(identHits, nil)
 		if len(groups) == 0 {
 			return false
 		}
