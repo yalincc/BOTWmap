@@ -18,6 +18,64 @@ import (
 	"time"
 )
 
+func TestWarpArrivalNames(t *testing.T) {
+	var none [3]float32
+	for _, tc := range []struct {
+		pos, marker [3]float32
+		want        string
+	}{
+		{[3]float32{3779.74, 356, 2111.07}, none, "哈特诺古代研究所"},
+		{[3]float32{4507.4, 351.42, -3146.3}, none, "阿卡莱古代研究所"},
+		{[3]float32{2468.44, 993.31, -2540.13}, none, "神兽瓦·鲁达尼亚"},
+		{[3]float32{2468.44, 980, -2540.13}, none, "未识别落点"},
+		{[3]float32{-4022.127, 301.091, -3711.697}, none, "未识别落点"}, // Dungeon118 map icon
+		{[3]float32{123, 321, -999}, [3]float32{123, 320, -999}, "传送标注器（存档位置）"},
+		{[3]float32{3779.74, 356, 2111.07}, [3]float32{3779.74, 356, 2111.07}, "落点重叠"},
+		{none, none, "未识别落点"},
+	} {
+		if got := botwArrivalName(tc.pos, tc.marker); got != tc.want {
+			t.Errorf("%v: got %q, want %q", tc.pos, got, tc.want)
+		}
+	}
+	for _, point := range warpPoints {
+		if got := botwArrivalName(point.pos, none); got != point.name {
+			t.Errorf("%v: %s != %s", point.pos, got, point.name)
+		}
+	}
+}
+
+func TestWarpSaveVector(t *testing.T) {
+	for _, order := range []binary.ByteOrder{binary.LittleEndian, binary.BigEndian} {
+		data := make([]byte, 12)
+		order.PutUint32(data, 0x471E)
+		for _, hash := range []uint32{playerPositionHash, 0x51f28649} {
+			for _, v := range [3]float32{-321, 450, 987} {
+				var pair [8]byte
+				order.PutUint32(pair[:], hash)
+				order.PutUint32(pair[4:], math.Float32bits(v))
+				data = append(data, pair[:]...)
+			}
+		}
+		path := filepath.Join(t.TempDir(), "fixture.bin")
+		for _, complete := range []bool{true, false} {
+			if !complete {
+				data = data[:len(data)-1]
+			}
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, a := parseGameData(path)
+			want := [3]float32{}
+			if complete {
+				want = [3]float32{-321, 450, 987}
+			}
+			if a == nil || a.WarpMarker != want {
+				t.Fatalf("%v complete=%v: %v", order, complete, a)
+			}
+		}
+	}
+}
+
 func f32(v float32) []byte {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, math.Float32bits(v))

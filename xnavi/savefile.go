@@ -32,10 +32,11 @@ var validSaveVersions = []uint32{0x24E2, 0x24EE, 0x2588, 0x29C0, 0x2A46, 0x3EF8,
 
 // SaveAnchor 一条存档的解析结果：内存三元组 = (X east, Y altitude, Z south+)。
 type SaveAnchor struct {
-	Path     string
-	Playtime uint32
-	Koroks   uint32
-	Pos      [3]float32 // (X, alt, Z) 内存序
+	WarpMarker [3]float32
+	Path       string
+	Playtime   uint32
+	Koroks     uint32
+	Pos        [3]float32 // (X, alt, Z) 内存序
 }
 
 // detectEndian 按头部版本字段判定：返回 true=小端（Switch），false=大端（Wii U/Cemu）。
@@ -75,6 +76,16 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 		o += 8
 	}
 
+	var marker [3]float32
+	const warpPosHash = 0x51f28649 // WarpDLC_DestPos, vector3f, default (0,0,0)
+	for i := 0x0C; i+24 <= len(data); i += 8 {
+		if u32(data[i:]) == warpPosHash && u32(data[i+8:]) == warpPosHash && u32(data[i+16:]) == warpPosHash {
+			for j := range marker {
+				marker[j] = math.Float32frombits(u32(data[i+4+j*8:]))
+			}
+			break
+		}
+	}
 	var pos [3]float32
 	hasPos := false
 	for i := 0x0C; i+24 <= len(data); i += 8 {
@@ -92,10 +103,11 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 		return entries, nil
 	}
 	return entries, &SaveAnchor{
-		Path:     path,
-		Playtime: entries[playtimeHash],
-		Koroks:   entries[korokCounterHash],
-		Pos:      pos,
+		WarpMarker: marker,
+		Path:       path,
+		Playtime:   entries[playtimeHash],
+		Koroks:     entries[korokCounterHash],
+		Pos:        pos,
 	}
 }
 

@@ -129,15 +129,39 @@ func isShrineScale(pos [3]float32) bool {
 
 // formatDestName 识别传送或神庙位置对应的地标名称。
 func formatDestName(pos [3]float32) string {
-	if currentGame != nil {
-		if pnt := currentGame.MatchShrine(pos[0], pos[1], pos[2]); pnt != nil {
-			if pnt.T == "tower" {
-				return "高塔: " + pnt.Cn
+	if _, ok := currentGame.(*gameBotw); ok {
+		var marker [3]float32
+		if progress != nil {
+			progress.mu.RLock()
+			if progress.ok {
+				marker = progress.warpMarker
 			}
-			return "神庙: " + pnt.Cn
+			progress.mu.RUnlock()
+		}
+		return botwArrivalName(pos, marker)
+	}
+	return "未识别落点"
+}
+
+// Allow a few steps between arrival and the first observed sample. Callers log XYZ.
+func botwArrivalName(pos, marker [3]float32) string {
+	const tolerance = 5 // world metres, including altitude
+	name := ""
+	if marker != ([3]float32{}) && dist3(pos, marker) <= tolerance {
+		name = "传送标注器（存档位置）"
+	}
+	for _, point := range warpPoints {
+		if dist3(pos, point.pos) <= tolerance {
+			if name != "" {
+				return "落点重叠"
+			}
+			name = point.name
 		}
 	}
-	return "大世界"
+	if name == "" {
+		return "未识别落点"
+	}
+	return name
 }
 
 func setTarget(t *targetT) {
