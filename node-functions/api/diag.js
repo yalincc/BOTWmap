@@ -42,16 +42,18 @@ export async function onRequestPost(context) {
     const info = String(body.info || '').slice(0, 8000)
     const diag = String(body.diag || '').slice(0, 4000)
     const statusJson = String(body.status || '').slice(0, 16000)
+    const pcProfile = String(body.pcProfile || '').slice(0, 32000)
     const coreLog = String(body.coreLog || '').slice(0, 64000)
     const eventsLog = String(body.eventsLog || '').slice(0, 32000)
 
-    if (!coreLog && !info && !statusJson) {
+    if (!coreLog && !info && !statusJson && !pcProfile) {
       return jsonResp({ ok: false, error: 'Empty payload' }, 400)
     }
 
     const subject = `[xnavi ${version}][${edition}/${emu}]${note ? ' ' + note.slice(0, 40) : ' 诊断日志'}`
     const text = [
       note ? `用户描述：\n${note}\n` : '',
+      pcProfile ? `=== pcProfile (L1 配置单) ===\n${pcProfile}\n` : '',
       `=== 环境自检 ===\n${diag || '(无)'}\n`,
       `=== 系统信息 ===\n${info || '(无)'}\n`,
       `=== status.json ===\n${statusJson || '(无)'}\n`,
