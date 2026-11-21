@@ -28,7 +28,7 @@ import (
 )
 
 // CoreVersion 遵循发布版本号（与模拟器版一致）。
-const CoreVersion = "v3.3.1"
+const CoreVersion = "v3.3.2"
 
 var (
 	loc         *locator
