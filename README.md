@@ -34,6 +34,7 @@
 
 - 三平台自动识别，无需手选；仅读内存，不注入、不改游戏
 - 存档联动：游戏保存后 ≤2 秒地图进度自动刷新
+- Eden 进阶（可选）：安装[信标 mod](https://github.com/ZoruaFox/Xnavi-Beacon) 后可在 GUI 切换「模组注入」定位——游戏内插件直接上报坐标，神庙/传送等场景定位更稳（模组源码、文档与下载均在同一仓库）
 - 下载与使用说明见 [Releases](https://github.com/yalincc/BOTWmap/releases)（`xnavi-vX.Y.Z` 前缀）
 
 ## 核心功能

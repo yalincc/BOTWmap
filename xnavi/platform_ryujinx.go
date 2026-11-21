@@ -52,8 +52,8 @@ func (p *ryujinxPlatform) Attach() bool {
 	return true
 }
 
-func (p *ryujinxPlatform) Handle() uintptr { return p.h }
-func (p *ryujinxPlatform) PID() uint32     { return p.pid }
+func (p *ryujinxPlatform) Handle() uintptr    { return p.h }
+func (p *ryujinxPlatform) PID() uint32        { return p.pid }
 func (p *ryujinxPlatform) LittleEndian() bool { return true }
 
 // Blocks guest DRAM：MEM_MAPPED 提交区（剔除 32GB 高的镜像块）。

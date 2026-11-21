@@ -35,12 +35,12 @@ func abs32(v float32) float32 {
 // ---- 坐标校验（合并 live-go decodePos 与 live-cemu posRangeOK 的判据）----
 
 const (
-	gameMinX, gameMaxX         = -7000.0, 7000.0
-	gameMinZ, gameMaxZ         = -7000.0, 7000.0
-	gameMinAlt, gameMaxAlt     = -600.0, 5000.0
-	gameMatchShrineRadius      = 80.0     // 传送跳变目标与神庙坐标的像素匹配半径（px）
-	gameShrineExit             = 300.0    // 神庙内部坐标上限：|gx|,|gz| 超此判定已离开神庙
-	gameShrineReturnWindow     = 3 * 1000 // 毫秒：回跳撤销窗口 = 3s（与 live-cemu poll 3s 一致；
+	gameMinX, gameMaxX     = -7000.0, 7000.0
+	gameMinZ, gameMaxZ     = -7000.0, 7000.0
+	gameMinAlt, gameMaxAlt = -600.0, 5000.0
+	gameMatchShrineRadius  = 80.0     // 传送跳变目标与神庙坐标的像素匹配半径（px）
+	gameShrineExit         = 300.0    // 神庙内部坐标上限：|gx|,|gz| 超此判定已离开神庙
+	gameShrineReturnWindow = 3 * 1000 // 毫秒：回跳撤销窗口 = 3s（与 live-cemu poll 3s 一致；
 	// P3 曾误作微秒使用导致窗口实际为 3µs，2026-10-01 修正为真正的 3 秒）
 	gameShrineReturnDist = 50.0 // 米 回跳撤销距离
 )
@@ -173,8 +173,8 @@ func matchShrine(gx, alt, gz float32) *ProgressPoint {
 
 type gameBotw struct{}
 
-func (g *gameBotw) Name() string    { return "botw" }
-func (g *gameBotw) MapURL() string  { return "https://botw.yalin.site/" }
+func (g *gameBotw) Name() string   { return "botw" }
+func (g *gameBotw) MapURL() string { return "https://botw.yalin.site/" }
 
 // DecodeAt = 原 decodeTripleAt（locate.go）逻辑原样平移：
 // 按当前平台端序解码 12 字节 → gameHud 校验 → 返回展示序三元组 (X, alt, Z)。
@@ -215,7 +215,7 @@ func (g *gameBotw) ValidRaw(mem []float32, littleEndian bool) bool {
 
 // KnownOffsets BOTW 已知固定偏移（相对锚块基址），按平台：
 //   - Cemu: 0x1055300C（社区公开针位 koko-yl/BotWRamWatch，Cemu 2.6 + JP v208 实测有效）
-//           备用 0xC1F8BF4（navicemu 多块固定偏移试读的备选）
+//     备用 0xC1F8BF4（navicemu 多块固定偏移试读的备选）
 //   - Ryujinx / Eden: 空（统一走动力学根地址动态扫描锁定架构，不再使用外观槽固定偏移）
 func (g *gameBotw) KnownOffsets(p Platform) []uintptr {
 	if p == nil {
@@ -306,7 +306,7 @@ func logAnchorSkip(path string, playtime uint32, dones int) {
 	if _, seen := anchorSkipLogged.LoadOrStore(path, true); seen {
 		return
 	}
-	fmt.Printf("  [anchor] skip empty/new save slot: %s (playtime=%ds, shrines=%d)\n",
+	logInfo("skip empty/new save slot: %s (playtime=%ds, shrines=%d)",
 		path, playtime, dones)
 }
 
@@ -346,11 +346,11 @@ func logSaveFreshness(a *SaveAnchor) {
 		return
 	}
 	if age > saveFreshWindow {
-		fmt.Printf("  [save] 存档已 %.0f 分钟前写入，建议重新手工存档（新鲜存档能让首次定位快很多）\n",
+		logInfo("存档已 %.0f 分钟前写入，建议重新手工存档（新鲜存档能让首次定位快很多）",
 			age.Minutes())
 		return
 	}
-	fmt.Printf("  [save] 存档新鲜（%.0f 秒前写入）—— 锚点≈玩家位置，首次定位会快很多\n",
+	logInfo("存档新鲜（%.0f 秒前写入）—— 锚点≈玩家位置，首次定位会快很多",
 		age.Seconds())
 }
 
@@ -417,25 +417,25 @@ func (g *gameBotw) SaveAnchors(p Platform) []*SaveAnchor {
 		}
 		return nil
 	default: // Ryujinx / 兜底
-			var out []*SaveAnchor
-			seen := map[[3]int32]int{}
-			for _, f := range files {
-				_, a := parseGameData(f)
-				if a == nil {
-					continue
-				}
-				key := [3]int32{int32(round1(a.Pos[0])), int32(round1(a.Pos[2])), int32(round1(a.Pos[1]))}
-				if i, ok := seen[key]; ok {
-					if a.Playtime > out[i].Playtime { // 同位置多个槽：保留游玩时间最高者
-						out[i] = a
-					}
-					continue
-				}
-				seen[key] = len(out)
-				out = append(out, a)
+		var out []*SaveAnchor
+		seen := map[[3]int32]int{}
+		for _, f := range files {
+			_, a := parseGameData(f)
+			if a == nil {
+				continue
 			}
-			sort.Slice(out, func(i, j int) bool { return out[i].Playtime > out[j].Playtime })
-			return out
+			key := [3]int32{int32(round1(a.Pos[0])), int32(round1(a.Pos[2])), int32(round1(a.Pos[1]))}
+			if i, ok := seen[key]; ok {
+				if a.Playtime > out[i].Playtime { // 同位置多个槽：保留游玩时间最高者
+					out[i] = a
+				}
+				continue
+			}
+			seen[key] = len(out)
+			out = append(out, a)
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Playtime > out[j].Playtime })
+		return out
 	}
 }
 
@@ -443,4 +443,3 @@ func (g *gameBotw) SaveFileNames() []string { return []string{"game_data.sav"} }
 
 // currentGame 当前生效的游戏（main 解析 --game 后设置；默认 BOTW）。
 var currentGame Game = &gameBotw{}
-

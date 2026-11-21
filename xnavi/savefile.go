@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	playerPositionHash = 0xA40BA103 // PLAYER_POSITION
-	playtimeHash       = 0x73C29681 // PlayTime
-	korokCounterHash   = 0x8A94E07A // HiddenKorok_Number
+	playerPositionHash = 0xA40BA103         // PLAYER_POSITION
+	playtimeHash       = 0x73C29681         // PlayTime
+	korokCounterHash   = 0x8A94E07A         // HiddenKorok_Number
 	botwTitleID        = "01007EF00011E000" // BOTW Switch 标题 ID（Eden 存档根过滤用）
 )
 

@@ -52,7 +52,8 @@ type Config struct {
 	EdenSaveDir    string `json:"edenSaveDir"`    // Eden 的 BOTW 存档目录（可选）
 	Emulator       string `json:"emulator"`       // auto | cemu | ryujinx | eden
 	Game           string `json:"game"`           // auto | botw | totk
-	TLS            bool   `json:"tls"`             // v3.1.0：--tls 双协议，手机镜像页防息屏
+	LocateMode     string `json:"locateMode"`     // auto | mod-inject（仅 Eden 信标）
+	TLS            bool   `json:"tls"`            // v3.1.0：--tls 双协议，手机镜像页防息屏
 	AutoOpenMap    *bool  `json:"autoOpenMap"`    // 定位成功后自动打开在线地图（默认 true）
 	AutoDetectSave *bool  `json:"autoDetectSave"` // 自动检测存档（默认 true）
 	DiagUrl        string `json:"diagUrl,omitempty"`
@@ -68,8 +69,12 @@ func (a *App) loadConfig() *Config {
 	}
 	// 为指针类型设默认值（JSON 未写字段时保持 nil，这里补全）
 	defaultTrue := true
-	if cfg.AutoOpenMap == nil    { cfg.AutoOpenMap = &defaultTrue }
-	if cfg.AutoDetectSave == nil { cfg.AutoDetectSave = &defaultTrue }
+	if cfg.AutoOpenMap == nil {
+		cfg.AutoOpenMap = &defaultTrue
+	}
+	if cfg.AutoDetectSave == nil {
+		cfg.AutoDetectSave = &defaultTrue
+	}
 	return cfg
 }
 
@@ -95,6 +100,8 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.cfg = a.loadConfig()
+	// 任务栏图标：显式设置 exe 内图标，避免显示为系统默认图标
+	setWindowIcon()
 	// 清理孤儿 core（2026-10-08 真机事故修复）：GUI 崩溃/被杀后其 core 子进程
 	// 可能残留并独占 8766 端口 → 新 core 全部 HTTP 绑定失败 + 平台反复重新探测
 	// （表现为"换来换去"）。startup 时按进程名清理一次（core 是 GUI 专属子进程，
@@ -133,16 +140,22 @@ func (a *App) checkUpdate() {
 	defer func() { recover() }()
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get("https://api.github.com/repos/yalincc/BOTWmap/tags?per_page=30")
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var tags []struct {
 		Name string `json:"name"`
 	}
-	if json.Unmarshal(body, &tags) != nil { return }
+	if json.Unmarshal(body, &tags) != nil {
+		return
+	}
 	found := false
 	for _, t := range tags {
-		if !strings.HasPrefix(t.Name, "xnavi-") { continue }
+		if !strings.HasPrefix(t.Name, "xnavi-") {
+			continue
+		}
 		latest := strings.TrimPrefix(t.Name, "xnavi-")
 		if isNewerVersion(latest, guiVersion) {
 			runtime.EventsEmit(a.ctx, "update:available", map[string]string{
@@ -162,7 +175,9 @@ func (a *App) checkUpdate() {
 
 func (a *App) PickDir(title string) string {
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
-	if err != nil { return "" }
+	if err != nil {
+		return ""
+	}
 	return dir
 }
 
@@ -369,6 +384,10 @@ func (a *App) StartCore(emu string) string {
 	}
 	if game != "" && game != "auto" {
 		args = append(args, "--game="+game)
+	}
+	// 模组注入模式交给核心按实际平台判定（仅 Eden 支持，其他平台自动回落内存探测）
+	if a.cfg != nil && a.cfg.LocateMode == "mod-inject" {
+		args = append(args, "--locate=mod-inject")
 	}
 	if appEdition != "pc" && a.cfg != nil {
 		if a.cfg.CemuSaveDir != "" {
@@ -720,9 +739,24 @@ func (a *App) buildDiagInfoText() string {
 		stdruntime.NumCPU(), hostname(),
 		time.Now().Format("2006-01-02 15:04:05"),
 		emu,
-		func() string { if a.cfg != nil { return a.cfg.CemuSaveDir }; return "" }(),
-		func() string { if a.cfg != nil { return a.cfg.RyujinxSaveDir }; return "" }(),
-		func() string { if a.cfg != nil { return a.cfg.EdenSaveDir }; return "" }(),
+		func() string {
+			if a.cfg != nil {
+				return a.cfg.CemuSaveDir
+			}
+			return ""
+		}(),
+		func() string {
+			if a.cfg != nil {
+				return a.cfg.RyujinxSaveDir
+			}
+			return ""
+		}(),
+		func() string {
+			if a.cfg != nil {
+				return a.cfg.EdenSaveDir
+			}
+			return ""
+		}(),
 	)
 }
 

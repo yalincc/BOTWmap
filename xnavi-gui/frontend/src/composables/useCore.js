@@ -24,7 +24,7 @@ export const progressData = ref({})
 
 export const cfg = reactive({
   cemuSaveDir: '', ryujinxSaveDir: '', edenSaveDir: '',
-  emulator: 'auto', game: 'auto', tls: false,
+  emulator: 'auto', game: 'auto', locateMode: 'auto', tls: false,
   autoOpenMap: true, autoDetectSave: true
 })
 
@@ -139,6 +139,7 @@ export async function saveSettings() {
     edenSaveDir: cfg.edenSaveDir,
     emulator: cfg.emulator,
     game: cfg.game,
+    locateMode: cfg.locateMode,
     tls: cfg.tls,
     autoOpenMap: cfg.autoOpenMap,
     autoDetectSave: cfg.autoDetectSave
@@ -157,6 +158,7 @@ export async function loadConfig() {
   cfg.edenSaveDir = c.edenSaveDir || ''
   cfg.emulator = c.emulator || 'auto'
   cfg.game = c.game || 'auto'
+  cfg.locateMode = c.locateMode || 'auto'
   cfg.tls = !!c.tls
   cfg.autoOpenMap = c.autoOpenMap !== undefined ? !!c.autoOpenMap : true
   cfg.autoDetectSave = c.autoDetectSave !== undefined ? !!c.autoDetectSave : true

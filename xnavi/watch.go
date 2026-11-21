@@ -9,7 +9,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"time"
 )
 
@@ -82,7 +81,7 @@ func verifyLock(a uintptr, why string) {
 	lock.verified = true
 	lock.mu.Unlock()
 	if changed {
-		fmt.Printf("  [sm] lock 0x%X verified by %s\n", a, why)
+		logInfo("lock 0x%X verified by %s", a, why)
 	}
 }
 
@@ -155,10 +154,12 @@ func createTrackerForPlatform(p Platform) Tracker {
 	switch p.Name() {
 	case "Cemu":
 		if cp, ok := p.(*cemuPlatform); ok {
+			noticeModInjectUnsupported("Cemu")
 			return NewCemuTracker(cp)
 		}
 	case "Ryujinx":
 		if rp, ok := p.(*ryujinxPlatform); ok {
+			noticeModInjectUnsupported("Ryujinx")
 			return NewRyujinxTracker(rp)
 		}
 	case "Eden":
@@ -169,9 +170,20 @@ func createTrackerForPlatform(p Platform) Tracker {
 	return nil
 }
 
+// noticeModInjectUnsupported 提示模组注入只支持 Eden，其他平台自动用内存探测。
+var modInjectNoticeShown bool
+
+func noticeModInjectUnsupported(platform string) {
+	if locateMode != "mod-inject" || modInjectNoticeShown {
+		return
+	}
+	modInjectNoticeShown = true
+	logInfo("模组注入仅支持 Eden，当前平台 " + platform + " 使用内存探测")
+}
+
 // stateMachine 统一调度分发器。
 func stateMachine() {
-	fmt.Println("  [sm] dispatcher started, routing platforms to dedicated pipelines")
+	logInfo("dispatcher started, routing platforms to dedicated pipelines")
 
 	var activeTracker Tracker
 	var activeCancel context.CancelFunc
@@ -219,7 +231,7 @@ func stateMachine() {
 				// v3.2.2 诊断：模拟器未启动时用户在日志里看不到任何提示 → 10s 一次指路
 				if time.Since(lastWaitLog) >= 10*time.Second {
 					lastWaitLog = time.Now()
-					fmt.Println("  [wait] 未检测到模拟器 —— 请先启动 Cemu/Ryujinx/Eden 并进入游戏（10 秒后重试）/ No emulator detected — start Cemu/Ryujinx/Eden and enter the game")
+					logWarn("未检测到模拟器 —— 请先启动 Cemu/Ryujinx/Eden 并进入游戏（10 秒后重试）/ No emulator detected — start Cemu/Ryujinx/Eden and enter the game")
 				}
 				continue
 			}
@@ -236,7 +248,7 @@ func stateMachine() {
 					if zeroBlockN >= 5 && time.Since(lastZeroProbe) >= 15*time.Second {
 						lastZeroProbe = time.Now()
 						if alt := platformWithGame(p); alt != nil {
-							fmt.Printf("  [platform] %s 0 blocks for ~%ds, auto-switching to %s\n",
+							logInfo("%s 0 blocks for ~%ds, auto-switching to %s",
 								p.Name(), zeroBlockN, alt.Name())
 							setPlatform(alt)
 							p = alt
@@ -264,10 +276,10 @@ func stateMachine() {
 					activeTracker = tracker
 					var ctx context.Context
 					ctx, activeCancel = context.WithCancel(context.Background())
-					fmt.Printf("  [dispatcher] launching tracker pipeline: %s\n", tracker.Name())
+					logInfo("launching tracker pipeline: %s", tracker.Name())
 					go tracker.Start(ctx)
 				} else {
-					fmt.Printf("  [dispatcher] no tracker found for platform: %s\n", platName)
+					logInfo("no tracker found for platform: %s", platName)
 				}
 			}
 		}

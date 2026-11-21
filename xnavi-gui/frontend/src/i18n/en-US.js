@@ -39,6 +39,14 @@ export default {
     pc: 'PC · Savage Wind',
     pickTitle: 'Select emulator (restart locating to apply)'
   },
+  locateMode: {
+    title: 'Select positioning method (locating restarts on change)',
+    auto: 'Memory scan (recommended)',
+    modInject: 'Mod injection',
+    hint: 'Memory scan: works anywhere, nothing to install; Mod injection: needs the beacon mod, Eden only',
+    modActive: 'Mod positioning enabled',
+    modActiveHint: 'Coordinates come straight from the in-game mod; memory calibration is not needed'
+  },
   buttons: {
     openMap: 'Open Map',
     start: 'Start Locating',
@@ -112,6 +120,10 @@ export default {
   settings: {
     title: 'Settings & Save Management',
     autoOpenMap: 'Auto open web map upon lock',
+    locateMode: 'Positioning method',
+    locateAuto: 'Auto detection (memory scan)',
+    locateModInject: 'Mod injection (Eden beacon)',
+    locateModeHint: 'Mod injection supports Eden only and requires the beacon mod; auto detection works across emulators.',
     cemuPath: 'Cemu BOTW save path (leave empty for auto):',
     ryuPath: 'Ryujinx BOTW save path (leave empty for auto):',
     edenPath: 'Eden BOTW save path (leave empty for auto):',

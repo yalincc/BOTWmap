@@ -11,7 +11,6 @@ package main
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
 	"sync"
 )
 
@@ -20,18 +19,18 @@ var saveStatsFS embed.FS
 
 // 扩展统计的 12 个类别（顺序即内部位掩码位序）
 var saveStatsKeys = []string{
-	"quest_main",  // 0 主线挑战
-	"quest_side",  // 1 支线任务
-	"quest_shrine",// 2 神庙挑战
-	"quest_dlc",   // 3 DLC 任务
-	"chest",       // 4 宝箱
-	"weapon",      // 5 武器获得
-	"pb_equip",    // 6 图鉴·装备
-	"pb_mat",      // 7 图鉴·材料
-	"pb_enemy",    // 8 图鉴·怪物
-	"boss_hinox",  // 9 西诺克斯
-	"boss_talus",  // 10 岩石巨人
-	"boss_molduga",// 11 莫尔德拉吉克
+	"quest_main",   // 0 主线挑战
+	"quest_side",   // 1 支线任务
+	"quest_shrine", // 2 神庙挑战
+	"quest_dlc",    // 3 DLC 任务
+	"chest",        // 4 宝箱
+	"weapon",       // 5 武器获得
+	"pb_equip",     // 6 图鉴·装备
+	"pb_mat",       // 7 图鉴·材料
+	"pb_enemy",     // 8 图鉴·怪物
+	"boss_hinox",   // 9 西诺克斯
+	"boss_talus",   // 10 岩石巨人
+	"boss_molduga", // 11 莫尔德拉吉克
 }
 
 const saveStatsN = 12
@@ -70,12 +69,12 @@ func loadSaveStats() {
 	saveStatsOnce.Do(func() {
 		buf, err := saveStatsFS.ReadFile("data/save_stats.json")
 		if err != nil {
-			fmt.Printf("  [stats] embedded save_stats.json unreadable: %v\n", err)
+			logInfo("embedded save_stats.json unreadable: %v\n", err)
 			return
 		}
 		var t saveStatsTable
 		if err := json.Unmarshal(buf, &t); err != nil {
-			fmt.Printf("  [stats] embedded save_stats.json invalid: %v\n", err)
+			logInfo("embedded save_stats.json invalid: %v\n", err)
 			return
 		}
 		groups := [saveStatsN][]uint32{
@@ -92,7 +91,7 @@ func loadSaveStats() {
 			}
 		}
 		saveStatsOK = true
-		fmt.Printf("  [stats] 扩展统计表：任务 %d/%d/%d/%d，收集 %d/%d/%d/%d/%d，讨伐 %d/%d/%d\n",
+		logInfo("扩展统计表：任务 %d/%d/%d/%d，收集 %d/%d/%d/%d/%d，讨伐 %d/%d/%d\n",
 			saveStatsTotal[0], saveStatsTotal[1], saveStatsTotal[2], saveStatsTotal[3],
 			saveStatsTotal[4], saveStatsTotal[5], saveStatsTotal[6], saveStatsTotal[7], saveStatsTotal[8],
 			saveStatsTotal[9], saveStatsTotal[10], saveStatsTotal[11])

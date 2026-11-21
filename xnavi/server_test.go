@@ -82,7 +82,7 @@ func TestContractProgressBotwShape(t *testing.T) {
 	// BOTW 口径（协议 §2.2）：ok/points/counts/generated（+source/spot_int）
 	currentGame = &gameBotw{}
 	progress = &progressWatcher{
-		ok: true,
+		ok:   true,
 		body: []byte(`{"ok":true,"points":[{"t":"shrine","hash":1,"done_hash":2,"en":"a","cn":"甲","x":1.0,"y":2.0,"done":true}],"counts":{"shrine":[1,136]},"spot_int":0,"generated":"2026-10-01 12:00:00","source":"xnavi"}`),
 		gen:  "gen-botw",
 	}

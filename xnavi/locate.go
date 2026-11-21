@@ -28,18 +28,18 @@ const (
 )
 
 type Hit struct {
-	Addr     uintptr
-	X, Y, Z  float32 // (X, alt, Z) 内存顺序
-	Ri       int
-	Dist     float32
+	Addr    uintptr
+	X, Y, Z float32 // (X, alt, Z) 内存顺序
+	Ri      int
+	Dist    float32
 }
 
 type Group struct {
-	Addrs  []uintptr
-	Ri     int
-	Dist   float32
-	Struct int
-	Copies int
+	Addrs   []uintptr
+	Ri      int
+	Dist    float32
+	Struct  int
+	Copies  int
 	X, Y, Z float32 // 组坐标（内存顺序）
 }
 
@@ -590,6 +590,3 @@ func shortlistAddrs(sl []ShortlistEntry) int {
 	}
 	return n
 }
-
-
-

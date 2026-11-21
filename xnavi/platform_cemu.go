@@ -96,8 +96,8 @@ func (p *cemuPlatform) Attach() bool {
 	return true
 }
 
-func (p *cemuPlatform) Handle() uintptr { return p.h }
-func (p *cemuPlatform) PID() uint32     { return p.pid }
+func (p *cemuPlatform) Handle() uintptr    { return p.h }
+func (p *cemuPlatform) PID() uint32        { return p.pid }
 func (p *cemuPlatform) LittleEndian() bool { return false }
 
 // Blocks 已提交可读写连续区域（不限 Type，靠大小/位置交叉校验）。
@@ -325,10 +325,11 @@ func toF32BE(buf []byte, dst []float32) int {
 // ---- memory_base 锚定与社区指针链（best-effort 快路径资产）----
 
 // findCemuBase 反推 Cemu 的 memory_base。两条路线：
-// 1) 区域结构校验：MEM2（≥512MB @ +0x10000000）反推 → 校验 TEXT（+0x02000000，≥64MB）。
-//    （不要求 MEM1——Cemu 2.x 实测 MEM1 区可能未提交。）
-// 2) 链探针法（不依赖区域布局假设）：把每个大块当作 TEXT/MEM2/整空间 的候选基址，
-//    直接试解社区指针链（值必须落在合理 guest 地址区间），解通即确认。
+//  1. 区域结构校验：MEM2（≥512MB @ +0x10000000）反推 → 校验 TEXT（+0x02000000，≥64MB）。
+//     （不要求 MEM1——Cemu 2.x 实测 MEM1 区可能未提交。）
+//  2. 链探针法（不依赖区域布局假设）：把每个大块当作 TEXT/MEM2/整空间 的候选基址，
+//     直接试解社区指针链（值必须落在合理 guest 地址区间），解通即确认。
+//
 // 返回 (base, mem2HostBase, ok)。
 func findCemuBase(h uintptr) (uintptr, uintptr, bool) {
 	blocks := cemuRWBlocks(h, 64.0)
@@ -429,11 +430,11 @@ func chainLocate(h uintptr, base uintptr) *LocateResult {
 	for _, c := range cemuChains {
 		actorVA, ok := resolveChain(h, base, c)
 		if !ok {
-			fmt.Printf("  [chain] %s: resolve failed\n", c.Name)
+			logInfo("%s: resolve failed\n", c.Name)
 			continue
 		}
 		hits := slotScanAround(h, base, actorVA)
-		fmt.Printf("  [chain] %s: actor=0x%012X  %d slot candidates\n", c.Name, actorVA, len(hits))
+		logInfo("%s: actor=0x%012X  %d slot candidates\n", c.Name, actorVA, len(hits))
 		if len(hits) == 0 {
 			continue
 		}

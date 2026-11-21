@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -77,7 +76,7 @@ func goUnlocked(reason string) {
 	state.ok = false
 	state.source = "locating..."
 	state.mu.Unlock()
-	fmt.Printf("  [sm] -> UNLOCKED (%s)\n", reason)
+	logInfo("-> UNLOCKED (%s)\n", reason)
 }
 
 // publishState 发布全局统一位置状态。
@@ -158,4 +157,3 @@ func clearTarget() {
 	defer targetMu.Unlock()
 	target = nil
 }
-
