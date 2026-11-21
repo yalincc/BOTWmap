@@ -12,8 +12,13 @@ import (
 var assets embed.FS
 
 func main() {
-	// 任务栏身份：需在窗口创建前声明，否则任务栏按"默认程序"归组、图标显示为系统默认图标
-	setAppUserModelID("ZoruaFox.Xnavi")
+	// 任务栏身份：需在窗口创建前声明，否则任务栏按"默认程序"归组、图标显示为系统默认图标。
+	// 按版本区分，Emu / PC 两版在任务栏各自成组。
+	if appEdition == "pc" {
+		setAppUserModelID("Yalincc.Xnavi.PC")
+	} else {
+		setAppUserModelID("Yalincc.Xnavi.Emu")
+	}
 
 	app := NewApp()
 

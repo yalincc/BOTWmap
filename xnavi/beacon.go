@@ -1,6 +1,6 @@
 // beacon.go — Xnavi 信标读取层。
 //
-// 协议见 xnavi-beacon/beacon.h。插件把 64 字节信标写入静态内存缓冲，
+// 协议见信标模组仓库（github.com/ZoruaFox/Xnavi-Beacon，beacon.h）。插件把 64 字节信标写入静态内存缓冲，
 // 本文件按魔数扫描定位信标、缓存地址后直读，并做解析与校验
 //（魔数/版本/CRC/序号判活/按状态选择坐标校验器）。
 // 信标不可用时由 watch_eden.go 回退到原有内存扫描。
