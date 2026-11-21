@@ -1,4 +1,4 @@
-import { ref, reactive, computed, nextTick } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { i18n } from '../i18n'
 
 const t = (...args) => i18n.global.t(...args)
@@ -10,7 +10,7 @@ export { api, rt }
 export const ver = ref('')
 export const edition = ref('emu')
 export const coreRunning = ref(false)
-export const isLocating = ref(false)
+export const coreBusy = ref(false)
 export const webConnected = ref(false)
 export const updateInfo = ref(null)
 
@@ -39,8 +39,8 @@ export const syncText = computed(() => {
 
 export const syncDot = computed(() => {
   if (!coreRunning.value) return 'bg-slate-600'
-  if (!pos.ok) return 'bg-sky-400 animate-pulse'
-  return webConnected.value ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+  if (!pos.ok) return 'bg-sky-400'
+  return webConnected.value ? 'bg-emerald-400' : 'bg-amber-400'
 })
 
 export const syncClass = computed(() => {
@@ -51,8 +51,6 @@ export const syncClass = computed(() => {
 
 const STEP_KEYS = ['ready', 'scanning', 'verifying', 'locked']
 export const steps = ref(STEP_KEYS.map(key => ({ key, state: key === 'ready' ? 'done' : 'idle' })))
-export function stepClass(s) { return { done: 'text-emerald-400', active: 'text-amber-400 font-semibold', idle: 'text-slate-600' }[s] }
-export function stepDot(s) { return { done: 'bg-emerald-400', active: 'bg-amber-400 animate-pulse', idle: 'bg-slate-700' }[s] }
 
 export const mapAutoOpened = ref(false)
 
@@ -85,22 +83,28 @@ export const filteredLogs = computed(() => {
   return logs.value.filter(l => (l.text + ' ' + l.level).toLowerCase().includes(kw))
 })
 
+function legacyLogLevel(text) {
+  // Bracketed module names and quoted level tags are metadata, not legacy keywords.
+  text = text.replace(/\[(?:ok|info|warn|error)\]/gi, '')
+  if (/\b(error|failed|panic|fatal)\b|失败/i.test(text)) return 'error'
+  if (/\b(warn(?:ing)?|disconnected)\b|!!|占用|回退|失效|断开|falling back/i.test(text)) return 'warn'
+  if (/confirmed live|confirmed\]|完全锁定|\blocked!|confirmed!|定位已生效|\[web\] connected/i.test(text)) return 'ok'
+  return 'info'
+}
+
+function parseLogLine(line) {
+  const stamp = line.match(/^\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2}\.\d{3})(?:\s+|$)/)
+  const time = stamp ? stamp[1] : new Date().toTimeString().slice(0, 8)
+  let text = line.slice(stamp ? stamp[0].length : 0).trimStart().replace(/^\[sm\]\s*/i, '')
+  const tag = text.match(/^\[(ok|info|warn|error)\]\s*/i)
+  const level = tag ? tag[1].toLowerCase() : legacyLogLevel(text)
+  if (tag) text = text.slice(tag[0].length)
+  return { time, text, level }
+}
+
 export function pushLogs(lines) {
   if (!lines || !lines.length) return
-  const items = lines.map(l => {
-    const m = l.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}) ?(.*)$/)
-    const time = m ? m[1].slice(11) : new Date().toTimeString().slice(0, 8)
-    let text = m ? m[2] : l
-    let level = 'info', color = 'text-slate-400', levelColor = 'text-sky-500'
-    if (/ERROR|FAILED|panic/i.test(text)) { level = 'error'; color = 'text-red-400'; levelColor = 'text-red-500' }
-    else if (/WARN|!!|占用|\[web\] (disconnected|preflight)/i.test(text)) { level = 'warn'; color = 'text-amber-400'; levelColor = 'text-amber-500' }
-    else if (/confirmed live|confirmed\]|完全锁定|locked!|confirmed!|\[web\] connected/i.test(text)) { level = 'ok'; color = 'text-emerald-400'; levelColor = 'text-emerald-500' }
-    else if (/\[verify\]|候选/i.test(text)) { level = 'warn'; color = 'text-amber-400'; levelColor = 'text-amber-500' }
-    else if (/\[scan\]|\[gui\]/i.test(text)) { level = 'info'; color = 'text-sky-400'; levelColor = 'text-sky-500' }
-    else if (/\[shrine\]|\[warp\]/i.test(text)) { level = 'info'; color = 'text-teal-400'; levelColor = 'text-teal-500' }
-    text = text.replace(/^\[sm\]\s*/, '')
-    return { time, text, level, color, levelColor }
-  })
+  const items = lines.map(parseLogLine)
   logs.value = logs.value.concat(items)
   if (logs.value.length > 2000) logs.value = logs.value.slice(logs.value.length - 2000)
 }
@@ -110,17 +114,43 @@ export function clearLogs() { logs.value = [] }
 let lockedAtMs = 0
 let envDiagDone = false
 
-export async function toggleLocating() {
+async function startCore() {
   lockedAtMs = 0
   envDiagDone = false
-  if (isLocating.value) {
-    await api.StopCore()
-    isLocating.value = false
-    mapAutoOpened.value = false
-  } else {
-    mapAutoOpened.value = false
-    await api.StartCore(edition.value === 'pc' ? 'pc' : cfg.emulator)
-    isLocating.value = true
+  mapAutoOpened.value = false
+  const message = await api.StartCore(edition.value === 'pc' ? 'pc' : cfg.emulator)
+  coreRunning.value = await api.CoreRunning()
+  if (!coreRunning.value) throw new Error(message)
+}
+
+export async function toggleLocating() {
+  if (coreBusy.value) return
+  coreBusy.value = true
+  try {
+    if (coreRunning.value) {
+      await api.StopCore()
+      coreRunning.value = false
+      mapAutoOpened.value = false
+    } else {
+      await startCore()
+    }
+  } finally {
+    coreBusy.value = false
+  }
+}
+
+export async function changeLocateConfig(emulator, locateMode) {
+  if (coreBusy.value) return
+  if (!['eden', 'auto'].includes(emulator)) locateMode = 'auto'
+  if (emulator === cfg.emulator && locateMode === cfg.locateMode) return
+  coreBusy.value = true
+  try {
+    await api.SaveConfig({ ...cfg, emulator, locateMode })
+    Object.assign(cfg, { emulator, locateMode })
+    // StartCore replaces the current process under the backend lock.
+    if (coreRunning.value) await startCore()
+  } finally {
+    coreBusy.value = false
   }
 }
 

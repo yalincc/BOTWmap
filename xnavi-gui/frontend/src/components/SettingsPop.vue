@@ -1,62 +1,61 @@
 <template>
-  <div class="bg-[#161b22] border border-slate-700 rounded-xl p-4 shadow-2xl text-xs space-y-3 w-[440px] max-h-[85vh] overflow-y-auto" style="--wails-draggable:no-drag;">
-    <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+  <div class="bg-[var(--slate-panel)] text-[color:var(--slate-ink)] border border-[color:var(--slate-line)] rounded-lg max-w-[calc(100vw-2rem)] p-4 shadow-2xl text-xs space-y-3 w-[440px] max-h-[85vh] overflow-y-auto" style="--wails-draggable:no-drag;">
+    <div class="slate-heading">
       <span>{{ t('settings.title') }}</span>
-      <button class="text-slate-500 hover:text-white" @click="$emit('close')">✕</button>
+      <button type="button" :aria-label="t('header.close')" class="close-control" @click="$emit('close')">✕</button>
     </div>
 
     <!-- 自动打开地图 -->
-    <div class="bg-[#0d1117] border border-slate-800 rounded-lg p-2.5 space-y-2">
-      <label class="flex items-center gap-2 cursor-pointer select-none">
-        <input v-model="cfg.autoOpenMap" type="checkbox" class="accent-blue-600 w-3.5 h-3.5 rounded" />
-        <span class="text-white font-medium">{{ t('settings.autoOpenMap') }}</span>
-      </label>
+    <div class="bg-black/15 border border-[color:var(--slate-line)] rounded-lg p-2.5 space-y-2">
+      <n-checkbox v-model:checked="cfg.autoOpenMap">
+        <span class="text-[color:var(--slate-ink)] font-medium">{{ t('settings.autoOpenMap') }}</span>
+      </n-checkbox>
     </div>
 
     <!-- 模拟器存档路径（仅模拟器版显示） -->
     <div v-if="edition !== 'pc'" class="space-y-2.5">
       <div>
-        <label class="block text-slate-400 mb-1">{{ t('settings.cemuPath') }}</label>
+        <label class="block text-[color:var(--slate-muted)] mb-1">{{ t('settings.cemuPath') }}</label>
         <div class="flex gap-1">
-          <input v-model="cfg.cemuSaveDir" :placeholder="t('settings.pathAuto')" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-[11px] focus:border-blue-500 focus:outline-none placeholder-slate-600" />
-          <button @click="pickDir('cemu')" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">{{ t('buttons.browse') }}</button>
+          <n-input v-model:value="cfg.cemuSaveDir" size="small" :placeholder="t('settings.pathAuto')" class="flex-1 font-mono" />
+          <n-button size="small" @click="pickDir('cemu')">{{ t('buttons.browse') }}</n-button>
         </div>
       </div>
       <div>
-        <label class="block text-slate-400 mb-1">{{ t('settings.ryuPath') }}</label>
+        <label class="block text-[color:var(--slate-muted)] mb-1">{{ t('settings.ryuPath') }}</label>
         <div class="flex gap-1">
-          <input v-model="cfg.ryujinxSaveDir" :placeholder="t('settings.pathAuto')" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-[11px] focus:border-blue-500 focus:outline-none placeholder-slate-600" />
-          <button @click="pickDir('ryu')" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">{{ t('buttons.browse') }}</button>
+          <n-input v-model:value="cfg.ryujinxSaveDir" size="small" :placeholder="t('settings.pathAuto')" class="flex-1 font-mono" />
+          <n-button size="small" @click="pickDir('ryu')">{{ t('buttons.browse') }}</n-button>
         </div>
       </div>
       <div>
-        <label class="block text-slate-400 mb-1">{{ t('settings.edenPath') }}</label>
+        <label class="block text-[color:var(--slate-muted)] mb-1">{{ t('settings.edenPath') }}</label>
         <div class="flex gap-1">
-          <input v-model="cfg.edenSaveDir" :placeholder="t('settings.pathAuto')" class="flex-1 bg-[#0d1117] border border-slate-700 rounded px-2 py-1.5 text-white font-mono text-[11px] focus:border-blue-500 focus:outline-none placeholder-slate-600" />
-          <button @click="pickDir('eden')" class="bg-slate-700 hover:bg-slate-600 px-2 rounded text-xs">{{ t('buttons.browse') }}</button>
+          <n-input v-model:value="cfg.edenSaveDir" size="small" :placeholder="t('settings.pathAuto')" class="flex-1 font-mono" />
+          <n-button size="small" @click="pickDir('eden')">{{ t('buttons.browse') }}</n-button>
         </div>
       </div>
     </div>
 
     <!-- 手机防息屏 -->
-    <div class="pt-1 border-t border-slate-800">
+    <div class="pt-1 border-t border-[color:var(--slate-line)]">
       <label class="flex items-center gap-2 cursor-pointer select-none py-1">
-        <input v-model="cfg.tls" type="checkbox" class="accent-blue-600 w-3.5 h-3.5" />
-        <span class="text-slate-300">{{ t('settings.tls') }}</span>
-        <span class="text-[10px] text-amber-500/90">{{ t('settings.tlsWarn') }}</span>
+        <n-checkbox v-model:checked="cfg.tls" size="small" />
+        <span class="text-[color:var(--slate-ink)]">{{ t('settings.tls') }}</span>
+        <span class="text-[10px] text-[color:var(--slate-gold)]">{{ t('settings.tlsWarn') }}</span>
       </label>
     </div>
 
     <!-- 语言选择 -->
-    <div class="border-t border-slate-800 pt-1">
+    <div class="border-t border-[color:var(--slate-line)] pt-1">
       <LangSelect />
     </div>
 
-    <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-      <span v-if="savedMsg" class="text-[11px] font-mono text-emerald-400">{{ savedMsg }}</span>
+    <div class="flex items-center justify-between pt-2 border-t border-[color:var(--slate-line)]">
+      <span v-if="savedMsg" class="text-[11px] font-mono text-[color:var(--slate-cyan)]">{{ savedMsg }}</span>
       <div class="ml-auto flex gap-2">
-        <button class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded text-xs text-slate-300" @click="$emit('close')">{{ t('buttons.cancel') }}</button>
-        <button class="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded text-xs text-white font-medium" @click="doSave">{{ t('buttons.save') }}</button>
+        <n-button size="small" @click="$emit('close')">{{ t('buttons.cancel') }}</n-button>
+        <n-button size="small" type="primary" @click="doSave">{{ t('buttons.save') }}</n-button>
       </div>
     </div>
   </div>
@@ -65,6 +64,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { NCheckbox, NInput, NButton } from 'naive-ui'
 import LangSelect from './LangSelect.vue'
 import { cfg, edition, saveSettings, api } from '../composables/useCore'
 
@@ -91,3 +91,28 @@ async function doSave() {
 }
 </script>
 
+<style scoped>
+.slate-heading {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  font-size: .875rem;
+  font-weight: 600;
+}
+.slate-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--slate-gold), transparent);
+  opacity: .55;
+}
+.close-control {
+  order: 1;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: .25rem;
+  color: var(--slate-muted);
+}
+.close-control:hover { color: var(--slate-cyan); }
+:focus-visible { outline: 2px solid var(--slate-cyan); outline-offset: 2px; }
+</style>

@@ -1,23 +1,28 @@
 <template>
-  <div class="flex items-center justify-between py-1 text-slate-400">
+  <div class="flex items-center justify-between gap-3 py-1 text-[color:var(--slate-muted)]">
     <span class="text-xs">界面语言 / Language</span>
-    <select v-model="selected" @change="onChange"
-      class="bg-[#0d1117] border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-blue-500 focus:outline-none">
-      <option :value="LOCALES.SYSTEM">自动 / Follow System</option>
-      <option :value="LOCALES.ZH">简体中文</option>
-      <option :value="LOCALES.EN">English</option>
-    </select>
+    <n-select aria-label="界面语言 / Language" v-model:value="selected" :options="langOptions" @update:value="onChange"
+      size="small" class="language-select" :consistent-menu-width="false" />
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import { NSelect } from 'naive-ui'
 import { LOCALES, currentLocale, setLocale } from '../i18n'
 
 const selected = ref(currentLocale())
+const langOptions = [
+  { label: '自动 / Follow System', value: LOCALES.SYSTEM },
+  { label: '简体中文', value: LOCALES.ZH },
+  { label: 'English', value: LOCALES.EN }
+]
 
 function onChange() {
   setLocale(selected.value)
 }
 </script>
 
+<style scoped>
+.language-select { width: 10rem; max-width: 55%; }
+</style>

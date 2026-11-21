@@ -75,7 +75,8 @@ export default {
     liveCoords: 'Live Coordinates',
     offset: 'Dynamic Root Addr',
     waitingAddr: 'Waiting for lock',
-    axisZ: 'Altitude (Z)',
+    axisY: 'Altitude (Y)',
+    axisZ: 'Horizontal (Z)',
     currentLayer: 'Region / Mode',
     calibration: 'Quick Calibration',
     calWhenFail: 'Search Target',
@@ -84,6 +85,9 @@ export default {
     localProgress: 'Save Progress',
     waitingProgress: 'Waiting for save... (Start locating first)',
     saveInfo: 'Active Save File',
+    savePlaceholder: 'No save detected (auto-detect after startup)',
+    calNeedXZ: 'Enter X and Z coordinates (Y optional)',
+    calSubmitted: 'Calibration submitted',
     autoDetectSave: 'Auto detect save',
     latestSaveTime: 'Latest Save',
     justNow: 'Just now (0m ago)',
@@ -145,7 +149,8 @@ export default {
   update: {
     available: 'Update Available',
     current: 'Current',
-    latest: 'Latest'
+    latest: 'Latest',
+    latestHint: 'Already the latest version',
   },
   log: {
     title: 'Live Logs',

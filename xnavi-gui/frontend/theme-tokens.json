@@ -1,0 +1,23 @@
+{
+  "colors": {
+    "base": "#09171f",
+    "surface": "#10242c",
+    "edge": "#34505a",
+    "sheikah": "#72dce5",
+    "azure": "#289ee9",
+    "stamina": "#34d399",
+    "malice": "#f87171",
+    "warningAccent": "#f5a524",
+    "ink": "#f0ebd9",
+    "muted": "#a6b8b7",
+    "gold": "#c6a571"
+  },
+  "sans": [
+    "\"Calamity Sans\"",
+    "\"FOT-Rodin Pro\"",
+    "\"Noto Sans SC\"",
+    "\"Microsoft YaHei UI\"",
+    "system-ui",
+    "sans-serif"
+  ]
+}

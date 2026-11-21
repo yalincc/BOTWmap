@@ -1,3 +1,17 @@
+/* BOTW UI 字体复刻（非商业使用；来自 zeldamods/objmap-totk 捆绑分发） */
+@font-face {
+  font-family: 'Calamity Sans';
+  src: url('/fonts/Calamity-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Calamity Sans';
+  src: url('/fonts/Calamity-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -15,3 +29,37 @@ html, body, #app {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #3d444d; }
+
+:root {
+  --slate-panel: theme('colors.surface');
+  --slate-line: theme('colors.edge');
+  --slate-ink: theme('colors.ink');
+  --slate-muted: theme('colors.muted');
+  --slate-cyan: theme('colors.sheikah');
+  --slate-gold: theme('colors.gold');
+}
+.slate-shell {
+  background-color: theme('colors.base');
+  background-image: radial-gradient(ellipse at 25% 0%, #17374085, transparent 65%), url('./assets/contours.svg');
+}
+:focus-visible { outline-color: var(--slate-cyan); }
+
+/* Only animate interaction edges; live coordinates can update independently. */
+@media (prefers-reduced-motion: no-preference) {
+  .slate-pop-enter-active, .slate-pop-leave-active {
+    transition: opacity 120ms ease-out, transform 120ms ease-out;
+  }
+  .slate-pop-enter-from, .slate-pop-leave-to { opacity: 0; transform: translateY(-3px); }
+  .slate-pop-leave-active { pointer-events: none; }
+  .slate-shell .n-button:not(:disabled):active { translate: 0 1px; }
+  .sync-dot.acquired { position: relative; }
+  .sync-dot.acquired::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    border: 1px solid var(--slate-cyan); border-radius: 50%; opacity: 0;
+    animation: slate-acquire 340ms ease-out;
+  }
+  @keyframes slate-acquire {
+    from { opacity: .8; transform: scale(1); }
+    to { opacity: 0; transform: scale(2); }
+  }
+}

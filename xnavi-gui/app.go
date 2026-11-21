@@ -102,11 +102,7 @@ func (a *App) startup(ctx context.Context) {
 	a.cfg = a.loadConfig()
 	// 任务栏图标：显式设置 exe 内图标，避免显示为系统默认图标
 	setWindowIcon()
-	// 清理孤儿 core（2026-10-08 真机事故修复）：GUI 崩溃/被杀后其 core 子进程
-	// 可能残留并独占 8766 端口 → 新 core 全部 HTTP 绑定失败 + 平台反复重新探测
-	// （表现为"换来换去"）。startup 时按进程名清理一次（core 是 GUI 专属子进程，
-	// 用户不会单独运行；core 侧另有单实例锁兜底）。
-	exec.Command("taskkill", "/IM", "xnavi-core.exe", "/F").Run()
+	// 仅管理本次 GUI 启动的子进程。崩溃后留下的 core 由用户确认归属后处理。
 	a.tailInit()
 	go a.eventBridge(ctx)
 	// 手动检查更新（不在启动时自动弹出）

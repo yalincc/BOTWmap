@@ -75,7 +75,8 @@ export default {
     liveCoords: '实时同步坐标',
     offset: '动力学根地址',
     waitingAddr: '等待锁定',
-    axisZ: 'Z 高度',
+    axisY: 'Y 高度',
+    axisZ: 'Z 水平',
     currentLayer: '所在区域',
     calibration: '坐标校准',
     calWhenFail: '快速找人',
@@ -84,6 +85,9 @@ export default {
     localProgress: '本地解析进度',
     waitingProgress: '等待读取存档...（需先开始定位）',
     saveInfo: '当前生效存档',
+    savePlaceholder: '未检测到存档（启动后自动探测）',
+    calNeedXZ: '请输入 X 与 Z 坐标（Y 高度选填）',
+    calSubmitted: '已提交校准请求',
     autoDetectSave: '自动检测存档',
     latestSaveTime: '最新存档',
     justNow: '刚刚 (0分钟前)',
@@ -139,6 +143,7 @@ export default {
     note: '只读内存，不注入，不修改游戏。'
   },
   update: {
+    latestHint: '已是最新版本',
     available: '有新版本可用',
     current: '当前',
     latest: '最新'

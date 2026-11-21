@@ -2,6 +2,8 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "xnavi-gui",
   "outputfilename": "xnavi",
+  "frontend:install": "npm ci",
+  "frontend:build": "npm run build",
   "frontend:dist": "frontend/dist",
   "author": {
     "name": "yalincc",

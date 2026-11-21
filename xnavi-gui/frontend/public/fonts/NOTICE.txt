@@ -1,0 +1,3 @@
+Calamity Regular / Bold — bundled in the local Xnavi preview.
+Source: https://github.com/zeldamods/objmap-totk/tree/main/src/assets/fonts
+The upstream project credits the authors of the Calamity Sans fonts. The two OTF files contain no author or licence fields in their OpenType name tables. Confirm applicable redistribution terms before publishing a binary that includes these assets.
