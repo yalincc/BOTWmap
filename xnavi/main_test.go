@@ -10,7 +10,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -448,7 +451,7 @@ func TestProcessAnchoredSaveResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := findSaveFiles(singleSave, []string{"game_data.sav"})
-	if len(found) != 1 || found[0] != singleSave {
+	if len(found) != 1 || found[0].realPath != singleSave {
 		t.Fatalf("findSaveFiles single file mismatch: got %v", found)
 	}
 
@@ -515,5 +518,50 @@ func TestSaveDownloadEndpoint(t *testing.T) {
 	}
 	if len(rr.Body.Bytes()) != len(saveBytes) {
 		t.Fatalf("expected %d bytes, got %d", len(saveBytes), len(rr.Body.Bytes()))
+	}
+}
+
+// Eden「同步存档到 Ryujinx」：标题存档目录被替换为指向 Ryujinx 便携存储的
+// 符号链接（junction）。存档扫描必须跟随链接找到 game_data.sav，且逻辑路径
+// 保留标题 ID 链接名（真实路径在 Ryujinx 目录下，不含标题 ID）。
+func TestFindSaveFilesFollowsSymlinkedTitleDir(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "eden-nand")                  // Eden 存档根
+	target := filepath.Join(base, "ryujinx-portable", "save") // Ryujinx 便携存储在 Eden 根之外
+	if err := os.MkdirAll(filepath.Join(target, "0", "0"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	save := filepath.Join(target, "0", "0", "game_data.sav")
+	if err := os.WriteFile(save, makeSave(t, true), 0644); err != nil {
+		t.Fatal(err)
+	}
+	titleDir := filepath.Join(root, "0000000000000000", "21EF5E6B0F84C8BE4E570F086B825BFA", botwTitleID)
+	if err := os.MkdirAll(filepath.Dir(titleDir), 0755); err != nil {
+		t.Fatal(err)
+	}
+	linked := false
+	if err := os.Symlink(target, titleDir); err == nil {
+		linked = true
+	} else if runtime.GOOS == "windows" {
+		// 无特权时用 junction 替代（两者都作为符号链接被扫描跟随）
+		out, err := exec.Command("cmd", "/c", "mklink", "/J", titleDir, target).CombinedOutput()
+		if err == nil {
+			linked = true
+		} else {
+			t.Logf("junction create failed: %v: %s", err, out)
+		}
+	}
+	if !linked {
+		t.Skip("cannot create symlink/junction in this environment")
+	}
+	found := findSaveFiles(root, []string{"game_data.sav"})
+	if len(found) != 1 {
+		t.Fatalf("expected 1 save through symlink, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(strings.ToUpper(found[0].logicalPath), botwTitleID) {
+		t.Fatalf("logical path must keep the title-id link name: %q", found[0].logicalPath)
+	}
+	if fi, err := os.Stat(found[0].realPath); err != nil || fi.IsDir() {
+		t.Fatalf("realPath should be the save file: %q (%v)", found[0].realPath, err)
 	}
 }
