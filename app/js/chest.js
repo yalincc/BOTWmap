@@ -530,10 +530,14 @@
       countVal + '</span></div>';
 
     var tLocate = window.I18N ? window.I18N.t('card.locate', '定位') : '定位';
+    var tNav = window.I18N ? window.I18N.t('card.nav', '导航') : '导航';
+    var tNavStop = window.I18N ? window.I18N.t('card.navStop', '停止导航') : '停止导航';
+    var isNav = !!(typeof LIVE !== 'undefined' && LIVE.isSameTarget && LIVE.isSameTarget(p));
     var doneBtnText = done
       ? (window.I18N ? window.I18N.t('card.undone', '取消完成') : '取消完成')
       : (window.I18N ? window.I18N.t('card.done', '标记完成') : '标记完成');
     h += '<div class="tk-actions"><button type="button" class="btn act" id="chLocate">' + tLocate + '</button>' +
+      '<button type="button" class="btn act" id="chNav">' + (isNav ? tNavStop : tNav) + '</button>' +
       '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="chDone">' + doneBtnText + '</button></div>';
 
     body.innerHTML = h;
@@ -550,6 +554,9 @@
     if (dn) dn.addEventListener('click', function (e) {
       e.stopPropagation();
       var st = window.ChestPanel.toggleDone(p);
+      if (st.done && typeof LIVE !== 'undefined' && LIVE.isSameTarget && LIVE.clearNav && LIVE.isSameTarget(p)) {
+        LIVE.clearNav();
+      }
       openCard({ item: it, pt: p, hard: entry.hard });
       if (map) map.draw();
       if (typeof UI !== 'undefined' && UI.toast) {
@@ -563,6 +570,15 @@
       locate(p);
       if (window.SpotMark) window.SpotMark.set(p);   /* V1.6.2：红点脉冲 */
       positionCard();
+    });
+    var nv = document.getElementById('chNav');
+    if (nv) nv.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (typeof LIVE !== 'undefined' && LIVE.toggleNav) {
+        var navName = isEn ? (it.en || it.contentCn || it.content || 'Chest') : cnName(it);
+        LIVE.toggleNav({ id: 'chest:' + Math.round(p[0]) + ',' + Math.round(p[1]), name: navName, px: [p[0], p[1]], cat: 'chest' });
+        nv.textContent = (LIVE.isSameTarget && LIVE.isSameTarget(p)) ? tNavStop : tNav;
+      }
     });
     positionCard();
   }

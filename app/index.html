@@ -39,7 +39,7 @@
     <div class="tools">
       <button id="btnSidebar" class="tool" title="显示 / 隐藏图层面板" data-i18n-title="tool.layer.title"><span class="ico">☰</span><span class="label" data-i18n="tool.layer">图层</span></button>
       <button id="btnPin" class="tool" title="在地图上添加自定义标记" data-i18n-title="tool.pin.title"><span class="ico">📍</span><span class="label" data-i18n="tool.pin">标记</span></button>
-      <button id="btnVoice" class="tool active" title="语音导航开关（点击静音/开启）" data-i18n-title="tool.voice.title"><span class="ico">🔊</span><span class="label" data-i18n="tool.voice">语音</span></button>
+      <button id="btnVoice" class="tool active" title="打开语音导航设置" data-i18n-title="tool.voice.title"><span class="ico">🔊</span><span class="label" data-i18n="tool.voice">语音</span></button>
       <button id="btnReset" class="tool" title="重置到全图视图" data-i18n-title="tool.reset.title"><span class="ico">🏠</span><span class="label" data-i18n="tool.reset">全图</span></button>
       <button id="btnSettings" class="tool" title="地图设置（地名样式等）" data-i18n-title="tool.settings.title"><span class="ico">⚙️</span><span class="label" data-i18n="tool.settings">设置</span></button>
     </div>
@@ -108,7 +108,7 @@
     </div>
 
     <footer class="side-foot">
-      <p class="foot-version">BOTWMAP 1.7.8 © 2026 yalincc</p>
+      <p class="foot-version">BOTWMAP 1.7.9 © 2026 yalincc</p>
       <p>GitHub <a href="https://github.com/yalincc/BOTWmap" target="_blank" rel="noopener">https://github.com/yalincc/BOTWmap</a></p>
     </footer>
   </aside>
@@ -415,8 +415,8 @@
 
 </div>
 
-<script src="data/i18n/zh.js?v=10&b=20261122"></script>
-<script src="data/i18n/en.js?v=11&b=20261122"></script>
+<script src="data/i18n/zh.js?v=11&b=20261122"></script>
+<script src="data/i18n/en.js?v=12&b=20261122"></script>
 <script src="data/i18n/quests_en.js?v=1&b=1641016"></script>
 <script src="js/i18n.js?v=4&b=1641016"></script>
 <script src="js/data.js?v=6&b=1641016"></script>
@@ -436,10 +436,12 @@
 <script src="js/map.js?v=54&b=20261107"></script>
 <script src="js/card-layout.js?v=8&b=1641016"></script>
 <script src="js/spot-mark.js?v=1&b=1641016"></script>
-<script src="js/ui.js?v=82&b=20261122"></script>
+<script src="js/ui.js?v=83&b=20261122"></script>
 <script src="js/main.js?v=11&b=1641016"></script>
-<script src="voice/voice-nav.js?v=1&b=20261122"></script>
-<script src="js/live.js?v=29&b=20261122"></script>
+<script src="js/korok_paths.js?v=1&b=20261122"></script>
+<script src="data/marker_heights.js?v=1&b=20261122"></script>
+<script src="voice/voice-nav.js?v=5&b=20261122"></script>
+<script src="js/live.js?v=32&b=20261122"></script>
 <script src="data/quest_save.js?v=2&b=1641016"></script>
 <!-- P4b：武器收集查找表（IsGet_Weapon 190 条，save_upload.js 反查；其余大表按需加载） -->
 <script src="data/weapon_collect_save.js?v=2&b=1641016"></script>
@@ -458,13 +460,13 @@
 <script src="data/weapons.js?v=1&b=1641016"></script>
 <script src="data/armors.js?v=1&b=1641016"></script>
 <script src="data/camp_weapons.js?v=1&b=1641016"></script>
-<script src="js/equip.js?v=36&b=1641016"></script>
+<script src="js/equip.js?v=38&b=20261122"></script>
 <!-- V1.6.1：DLC / 大师模式宝箱层（数据在前，模块在后） -->
 <script src="data/chests.js?v=4&b=1641016"></script>
 <!-- 触发型宝箱查表（狗狗/DLC埋藏/联动/大树，非常驻；生成器 source/build_chest_trigger.js） -->
 <script src="data/chest_trigger.js?v=3&b=1641016"></script>
-<script src="js/chest.js?v=25&b=1641016"></script>
-<script src="js/camp.js?v=20&b=1641016"></script>
+<script src="js/chest.js?v=28&b=20261122"></script>
+<script src="js/camp.js?v=21&b=20261122"></script>
 </body>
 </html>
 

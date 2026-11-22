@@ -390,7 +390,12 @@
       h += '<div class="cp-empty">' + (isEn ? 'No weapon drops (Boss drops materials)' : '不掉武器（该 Boss 击杀掉落素材）') + '</div>';
     }
     var tLocate = window.I18N ? window.I18N.t('card.locate', '定位') : '定位';
-    h += '<div class="tk-actions"><button type="button" class="btn act" id="cpLocate">' + tLocate + '</button></div>';
+    var tNav = window.I18N ? window.I18N.t('card.nav', '导航') : '导航';
+    var tNavStop = window.I18N ? window.I18N.t('card.navStop', '停止导航') : '停止导航';
+    var curNav = (typeof LIVE !== 'undefined' && LIVE.currentTarget) ? LIVE.currentTarget() : null;
+    var isNav = !!(curNav && anchor && curNav.x === anchor[0] && curNav.y === anchor[1]);
+    h += '<div class="tk-actions"><button type="button" class="btn act" id="cpLocate">' + tLocate + '</button>' +
+      '<button type="button" class="btn act" id="cpNav">' + (isNav ? tNavStop : tNav) + '</button></div>';
 
     body.innerHTML = h;
     card.classList.remove('hidden');
@@ -425,6 +430,14 @@
       var p = anchor;
       locate(p);
       if (window.SpotMark) window.SpotMark.set(p);
+    });
+    var nv = document.getElementById('cpNav');
+    if (nv) nv.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!anchor || typeof LIVE === 'undefined' || !LIVE.toggleNav) return;
+      LIVE.toggleNav({ id: 'camp:' + camp.i, name: mainTitle, px: [anchor[0], anchor[1]], cat: 'camp' });
+      var cur = LIVE.currentTarget ? LIVE.currentTarget() : null;
+      nv.textContent = (cur && cur.x === anchor[0] && cur.y === anchor[1]) ? tNavStop : tNav;
     });
     /* 卡片定位：统一走 map.layoutCard 避让 */
     if (map && map.m2s) {

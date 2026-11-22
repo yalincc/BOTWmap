@@ -276,8 +276,13 @@ const LIVE = (() => {
       L.mx = p.mx; L.my = p.my;
       L.gx = p.gx; L.gy = p.gy; L.gz = p.gz;
       L.verified = !!p.verified;
-      L.tgt = (p.target && typeof p.target.x === 'number') ? p.target : null;
+      // 目标变更后 1.8s 内忽略服务端滞后一帧的旧 target 回显，防刚点导航即被旧目标打断重播
+      if (Date.now() >= targetMutateUntil) {
+        L.tgt = (p.target && typeof p.target.x === 'number') ? p.target : null;
+      }
       L.tdist = L.tgt ? Math.hypot(L.tgt.x - p.mx, L.tgt.y - p.my) * 0.5 : null;
+      checkKorokPathRelay();
+      checkNavTargetDone();
       feedVoice(null);
       const key = Math.round(p.mx) + ',' + Math.round(p.my);
       if (key !== lastPosKey) {
@@ -465,6 +470,74 @@ const LIVE = (() => {
     map.view.scale = s;
   }
 
+  /* ---------- 克洛格路径起点解析与二段接力（97 条追花 / 树桩赛跑：先导起点，到达起点 <=20m 自动切终点） ---------- */
+  let _kpMap = null;
+  const pathReachedStart = new Set(); // 已到达起点的路径克洛格 id（进入阶段 2：指向终点 mk.px）
+  const PATH_RELAY_M = 20;
+
+  function getKorokPathItem(id) {
+    if (!id || typeof window === 'undefined' || !window.KOROK_PATHS || !Array.isArray(window.KOROK_PATHS.items)) return null;
+    if (!_kpMap) {
+      _kpMap = new Map();
+      window.KOROK_PATHS.items.forEach(it => { if (it && it.id) _kpMap.set(it.id, it); });
+    }
+    return _kpMap.get(id) || null;
+  }
+
+  function resolveNavPoint(mk) {
+    if (!mk || !mk.px) return null;
+    let px = mk.px;
+    let voiceType = mk.cat || '';
+    let isPathStart = false;
+    let startTag = '';
+    if (mk.cat === 'seed') {
+      const kp = getKorokPathItem(mk.id);
+      if (kp && Array.isArray(kp.path) && kp.path.length >= 2) {
+        if (!pathReachedStart.has(mk.id)) {
+          px = kp.path[kp.path.length - 1];
+          isPathStart = true;
+          const hintEn = String(kp.hint_en || '').toLowerCase();
+          const isFlower = hintEn.indexOf('flower') >= 0 || kp.type === '追花';
+          voiceType = isFlower ? 'korok_flower' : 'korok_race';
+          startTag = isFlower ? '追花起点' : '赛跑起点';
+        }
+      }
+    }
+    return { x: px[0], y: px[1], voiceType, isPathStart, startTag };
+  }
+
+  /* 阶段 1 -> 阶段 2 自动接力：玩家抵达路径克洛格起点 (<=20m) 后，导航线自动切换指向终点 mk.px */
+  function checkKorokPathRelay() {
+    if (!curId || !map || !map.live || !map.live.online || map.live.mx == null) return;
+    const mk = byId(curId);
+    if (!mk || mk.cat !== 'seed' || pathReachedStart.has(mk.id)) return;
+    const kp = getKorokPathItem(mk.id);
+    if (!kp || !Array.isArray(kp.path) || kp.path.length < 2) return;
+    const startPx = kp.path[kp.path.length - 1];
+    const dStart = Math.hypot(startPx[0] - map.live.mx, startPx[1] - map.live.my) * 0.5;
+    if (dStart <= PATH_RELAY_M) {
+      pathReachedStart.add(mk.id);
+      if (navTgt) navTgt = { x: mk.px[0], y: mk.px[1], origX: mk.px[0], origY: mk.px[1], name: mk.name || mk.en || '' };
+      // 立即更新本地绘制目标，无需等下一帧 /pos 回显
+      map.live.tgt = { name: mk.name || mk.en || '', x: mk.px[0], y: mk.px[1], type: 'seed' };
+      map.live.tdist = Math.hypot(mk.px[0] - map.live.mx, mk.px[1] - map.live.my) * 0.5;
+      postTarget(mk, '已到达起点 · 引导线已切换至终点');
+    }
+  }
+
+  function lookupHeight(id, x, y) {
+    if (typeof window !== 'undefined' && window.BOTW_HEIGHTS && typeof window.BOTW_HEIGHTS.lookup === 'function') {
+      return window.BOTW_HEIGHTS.lookup(id, [x, y]);
+    }
+    return null;
+  }
+
+  function notifyNavChange() {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      try { window.dispatchEvent(new CustomEvent('botw:navchange')); } catch (e) {}
+    }
+  }
+
   /* ---------- 语音导航软钩子（零耦合：未加载 voice-nav.js 时静默跳过） ---------- */
   function feedVoice(ev, mkOverride) {
     if (typeof window === 'undefined' || !window.VoiceNav || typeof window.VoiceNav.feed !== 'function') return;
@@ -473,24 +546,31 @@ const LIVE = (() => {
       return;
     }
     const L = map && map.live;
-    const player = (L && L.online && L.mx != null) ? { x: L.mx, y: L.my, located: true } : null;
+    const player = (L && L.online && L.mx != null)
+      ? { x: L.mx, y: L.my, z: (typeof L.gy === 'number' && isFinite(L.gy)) ? L.gy : null, located: true }
+      : null;
     let target = null;
     if (mkOverride && mkOverride.px) {
+      const rp = resolveNavPoint(mkOverride);
       target = {
         id: mkOverride.id || '',
         name: mkOverride.name || mkOverride.en || '',
-        x: mkOverride.px[0],
-        y: mkOverride.px[1],
-        type: mkOverride.cat || '',
+        x: rp.x,
+        y: rp.y,
+        z: lookupHeight(mkOverride.id, rp.x, rp.y),
+        type: rp.voiceType,
       };
     } else if (L && L.tgt && typeof L.tgt.x === 'number') {
       const mk = curId ? byId(curId) : null;
+      const rp = mk ? resolveNavPoint(mk) : null;
+      const tx = L.tgt.x, ty = L.tgt.y;
       target = {
         id: curId || '',
         name: L.tgt.name || (mk ? (mk.name || mk.en || '') : ''),
-        x: L.tgt.x,
-        y: L.tgt.y,
-        type: (mk && mk.cat) || L.tgt.type || '',
+        x: tx,
+        y: ty,
+        z: lookupHeight(curId || '', tx, ty),
+        type: (rp && rp.voiceType) || L.tgt.type || '',
       };
     }
     window.VoiceNav.feed({ player, target, event: ev || null });
@@ -498,12 +578,42 @@ const LIVE = (() => {
 
   /* ---------- 导航目标 ---------- */
   let navTgt = null;   // v1.4.0：本地记录的手动导航目标（用于再次点击停止导航）
+  let targetMutateUntil = 0;  // 修改/清除目标后 1.8s 内屏蔽 /pos 旧目标回显
+
+  function isSameTarget(px) {
+    if (!px || px.length < 2) return false;
+    const cur = currentTarget();
+    if (!cur) return false;
+    if (Math.abs(cur.x - px[0]) < 2 && Math.abs(cur.y - px[1]) < 2) return true;
+    if (cur.origX != null && Math.abs(cur.origX - px[0]) < 2 && Math.abs(cur.origY - px[1]) < 2) return true;
+    return false;
+  }
+
+  /* 当前单点导航目标若已被标记完成（手动/存档同步）→ 自动停止导航 */
+  function checkNavTargetDone() {
+    if (mode) return;  // 收集模式由 tickCollectMode 负责自动续导下一个
+    const cur = currentTarget();
+    if (!cur) return;
+    // 1. 宝箱层完成检查（存档同步或手动勾选）
+    if (window.ChestPanel && typeof window.ChestPanel.isDone === 'function' && window.ChestPanel.isDone([cur.x, cur.y])) {
+      clearNav();
+      return;
+    }
+    // 2. 主标点完成检查
+    if (curId) {
+      const mk = byId(curId);
+      if (mk && map && map._mkDone && map._mkDone(mk)) {
+        clearNav();
+      }
+    }
+  }
 
   function navigate(mk) {
     if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
     // 收集模式中导航其他类别标注 → 退出收集模式（当前引导线保留）
     if (mode && mk.cat !== mode.cat) stopCollectMode();
-    curId = mk.id;
+    if (mk.id !== curId) pathReachedStart.delete(mk.id);
+    curId = mk.id || null;
     /* V1.7.6：单点导航也进入卡片伴随 —— 目标是呀哈哈就按 50/60 弹收卡。
        navFollow 内部按当前真实距离判定，不会把「离开 60m 收卡」弄失效。 */
     navFollow(mk);
@@ -513,27 +623,49 @@ const LIVE = (() => {
       if (mode.cat !== 'seed') mode.arrivedMem = distM(mk) <= ARRIVE_M_MEM;
       renderCollectBar();
     }
-    navTgt = { x: mk.px[0], y: mk.px[1], name: mk.name || mk.en || '' };
-    postTarget(mk, '已设置导航：' + (mk.name || mk.en || '目标'));
+    const rp = resolveNavPoint(mk);
+    navTgt = { x: rp.x, y: rp.y, origX: mk.px[0], origY: mk.px[1], name: mk.name || mk.en || '' };
+    targetMutateUntil = Date.now() + 1800;
+    map.live.tgt = { name: mk.name || mk.en || '', x: rp.x, y: rp.y, type: rp.voiceType || mk.cat || '' };
+    map.live.tdist = (map.live.mx != null) ? Math.hypot(rp.x - map.live.mx, rp.y - map.live.my) * 0.5 : null;
+    const baseName = mk.name || mk.en || '目标';
+    const toastMsg = rp.isPathStart
+      ? ('已设置导航：' + baseName + '（' + rp.startTag + '）')
+      : ('已设置导航：' + baseName);
+    postTarget(mk, toastMsg);
     feedVoice('start_nav', mk);
+    notifyNavChange();
+    if (map && map.draw) map.draw();
   }
 
   function clearNav() {
+    targetMutateUntil = Date.now() + 1800;
     fetch(LIVE_API + '/target', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clear: true }),
     }).catch(() => {});
     navTgt = null;
+    curId = null;
+    pathReachedStart.clear();
+    if (map && map.live) {
+      map.live.tgt = null;
+      map.live.tdist = null;
+    }
     resetCard();          // 停止导航 → 收卡、停止跟随
     feedVoice('clear');
+    notifyNavChange();
+    if (UI && UI.refreshNavButton) UI.refreshNavButton();
+    if (map && map.draw) map.draw();
   }
 
   /* v1.4.0：导航/停止切换 —— 同一目标再次点击 = 停止导航（标记与材料点通用） */
   function toggleNav(mk) {
     if (!mk || !mk.px) return;
     if (!map.live.online) { UI.toast('服务未连接，无法导航'); return; }
-    const x = mk.px[0], y = mk.px[1];
-    if (navTgt && navTgt.x === x && navTgt.y === y) {
+    const rp = resolveNavPoint(mk);
+    const x = rp ? rp.x : mk.px[0];
+    const y = rp ? rp.y : mk.px[1];
+    if (isSameTarget([x, y]) || isSameTarget(mk.px)) {
       clearNav();
       UI.toast('已停止导航：' + (mk.name || mk.en || '目标'));
     } else {
@@ -541,7 +673,7 @@ const LIVE = (() => {
     }
     if (UI && UI.refreshNavButton) UI.refreshNavButton();
   }
-  function currentTarget() { return navTgt; }
+  function currentTarget() { return navTgt || (map && map.live && map.live.tgt) || null; }
 
   /* ---------- 收集模式（克洛格 连续自动导航 + 自动弹卡） ----------
    * V1.7.6 重构，对齐 TOTKmap explore-auto 的成熟玩法（BOTW 无高度，全按平面算，1px = 0.5m）：
@@ -573,11 +705,12 @@ const LIVE = (() => {
   let cardNav = { id: null, arrived: false, autoId: null, flipLock: false };
   let offlineAt = 0;          // 本次掉线起点（掉线 >3s 收掉自动卡，避免卡死）
 
-  /* 玩家到标点的平面距离（游戏米） */
+  /* 玩家到标点的平面距离（游戏米；路径类克洛格按起点算） */
   function distM(mk) {
     const L = map.live;
     if (!mk || !mk.px || !L || L.mx == null) return Infinity;
-    return Math.hypot(mk.px[0] - L.mx, mk.px[1] - L.my) * 0.5;
+    const rp = resolveNavPoint(mk);
+    return Math.hypot(rp.x - L.mx, rp.y - L.my) * 0.5;
   }
   /* 标点短名：呀哈哈用 No.xxx（与地图标签、卡片标题同口径） */
   function mkLabel(mk) {
@@ -635,7 +768,8 @@ const LIVE = (() => {
     const py = L.my != null ? L.my : map.MH / 2;
     let best = null, bd = Infinity;
     for (const mk of pool) {
-      const d = Math.hypot(mk.px[0] - px, mk.px[1] - py);
+      const rp = resolveNavPoint(mk);
+      const d = Math.hypot(rp.x - px, rp.y - py);
       if (d < bd) { bd = d; best = mk; }
     }
     return best;
@@ -659,9 +793,10 @@ const LIVE = (() => {
     return _idMap.get(id) || null;
   }
   function postTarget(mk, toastTxt) {
+    const rp = resolveNavPoint(mk);
     fetch(LIVE_API + '/target', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: mk.name || mk.en || '', x: mk.px[0], y: mk.px[1], type: mk.cat }),
+      body: JSON.stringify({ name: mk.name || mk.en || '', x: rp.x, y: rp.y, type: rp.voiceType || mk.cat || '' }),
     }).then(r => r.json()).then(() => {
       if (toastTxt) UI.toast(toastTxt);
     }).catch(() => { if (toastTxt) UI.toast('导航设置失败'); });
@@ -1087,7 +1222,7 @@ const LIVE = (() => {
     BotwMap.prototype._drawLive = drawLivePlayer;
   }
 
-  return { init, navigate, clearNav, toggleNav, currentTarget, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive, clearTrail, loadProgress };
+  return { init, navigate, clearNav, toggleNav, currentTarget, isSameTarget, resolveNavPoint, checkKorokPathRelay, checkNavTargetDone, centerOnPlayer, startCollectMode, stopCollectMode, isModeActive, clearTrail, loadProgress };
 })();
 
 (function () {
