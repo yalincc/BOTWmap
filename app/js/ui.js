@@ -1487,7 +1487,7 @@ const UI = (() => {
       if (map.mode === 'pin') map.setMode('browse');
       else map.setMode('pin');
     });
-    $('btnShare').addEventListener('click', share);
+    if ($('btnShare')) $('btnShare').addEventListener('click', share);
     wireShare();
     $('cardClose').addEventListener('click', hideInfo);
     // 截图灯箱（v1.1.1）

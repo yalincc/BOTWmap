@@ -314,6 +314,32 @@ window.BOTW_I18N.en = {
   "camp.lynelDrops": "Camp Drops (Equipped Weapons)",
 
   // Search
-  "search.noResult": "No results"
+  "search.noResult": "No results",
+
+  // Voice Navigation
+  "tool.voice": "Voice",
+  "tool.voice.title": "Toggle live voice navigation",
+  "voice.topTitleOn": "Voice navigation ON (click to mute; configure in Settings)",
+  "voice.topTitleOff": "Voice navigation OFF (click to enable)",
+  "voice.setTitle": "Voice Navigation",
+  "voice.setHint": "8-compass live voice guidance (Zelda / Mature offline packs)",
+  "voice.on": "On",
+  "voice.off": "Off",
+  "voice.pack.zelda": "Princess (Zelda)",
+  "voice.pack.zeldaShort": "Zelda",
+  "voice.pack.yujie": "Navigator (Mature)",
+  "voice.pack.yujieShort": "Mature",
+  "voice.pack.chime": "Sheikah Chime",
+  "voice.pack.chimeShort": "Chime",
+  "voice.pack.tts": "System TTS",
+  "voice.pack.ttsShort": "TTS",
+  "voice.volume": "Vol",
+  "voice.testBtn": "▶ Test",
+  "voice.adv.freq": "Frequency",
+  "voice.freq.compact": "Compact (100m)",
+  "voice.freq.standard": "Standard (300/100m)",
+  "voice.freq.dense": "Detailed (500/300/100m)",
+  "voice.toastOff": "Voice navigation OFF",
+  "voice.autoplayHint": "Browser blocked auto audio — click anywhere on the map to unlock"
 };
 

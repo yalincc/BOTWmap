@@ -278,6 +278,7 @@ const LIVE = (() => {
       L.verified = !!p.verified;
       L.tgt = (p.target && typeof p.target.x === 'number') ? p.target : null;
       L.tdist = L.tgt ? Math.hypot(L.tgt.x - p.mx, L.tgt.y - p.my) * 0.5 : null;
+      feedVoice(null);
       const key = Math.round(p.mx) + ',' + Math.round(p.my);
       if (key !== lastPosKey) {
         lastPosKey = key;
@@ -464,6 +465,37 @@ const LIVE = (() => {
     map.view.scale = s;
   }
 
+  /* ---------- 语音导航软钩子（零耦合：未加载 voice-nav.js 时静默跳过） ---------- */
+  function feedVoice(ev, mkOverride) {
+    if (typeof window === 'undefined' || !window.VoiceNav || typeof window.VoiceNav.feed !== 'function') return;
+    if (ev === 'clear' || ev === 'all_done') {
+      window.VoiceNav.feed({ event: ev });
+      return;
+    }
+    const L = map && map.live;
+    const player = (L && L.online && L.mx != null) ? { x: L.mx, y: L.my, located: true } : null;
+    let target = null;
+    if (mkOverride && mkOverride.px) {
+      target = {
+        id: mkOverride.id || '',
+        name: mkOverride.name || mkOverride.en || '',
+        x: mkOverride.px[0],
+        y: mkOverride.px[1],
+        type: mkOverride.cat || '',
+      };
+    } else if (L && L.tgt && typeof L.tgt.x === 'number') {
+      const mk = curId ? byId(curId) : null;
+      target = {
+        id: curId || '',
+        name: L.tgt.name || (mk ? (mk.name || mk.en || '') : ''),
+        x: L.tgt.x,
+        y: L.tgt.y,
+        type: (mk && mk.cat) || L.tgt.type || '',
+      };
+    }
+    window.VoiceNav.feed({ player, target, event: ev || null });
+  }
+
   /* ---------- 导航目标 ---------- */
   let navTgt = null;   // v1.4.0：本地记录的手动导航目标（用于再次点击停止导航）
 
@@ -483,6 +515,7 @@ const LIVE = (() => {
     }
     navTgt = { x: mk.px[0], y: mk.px[1], name: mk.name || mk.en || '' };
     postTarget(mk, '已设置导航：' + (mk.name || mk.en || '目标'));
+    feedVoice('start_nav', mk);
   }
 
   function clearNav() {
@@ -492,6 +525,7 @@ const LIVE = (() => {
     }).catch(() => {});
     navTgt = null;
     resetCard();          // 停止导航 → 收卡、停止跟随
+    feedVoice('clear');
   }
 
   /* v1.4.0：导航/停止切换 —— 同一目标再次点击 = 停止导航（标记与材料点通用） */
@@ -653,6 +687,7 @@ const LIVE = (() => {
     curId = first.id;
     UI.toast('🧭 收集模式开启 · 目标：' + mkLabel(first) + '（剩余 ' + pool.length + ' 个）');
     postTarget(first, '');
+    feedVoice('start_auto', first);
     navFollow(first);    // 卡片伴随切到这颗（呀哈哈且在 50m 内会立即弹）
     renderCollectBar();
     map.draw();
@@ -757,6 +792,7 @@ const LIVE = (() => {
     const pool = collectPool(mode.cat);
     if (!pool.length) {                                          // 该类别全部收集完成
       UI.toast('🎉 ' + (CAT_CN[mode.cat] || mode.cat) + '已全部收集完成');
+      feedVoice('all_done');
       fetch(LIVE_API + '/target', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clear: true }),
@@ -771,6 +807,7 @@ const LIVE = (() => {
     curId = next.id;
     mode.pin = null;
     postTarget(next, '');
+    feedVoice('next_target', next);
     if (wasDone) {
       UI.toast('已收集：' + mkLabel(prev) + ' · 前往下一个：' + mkLabel(next) +
         (isFinite(d) ? ' · ' + Math.round(d) + 'm' : ''));
@@ -824,6 +861,7 @@ const LIVE = (() => {
         if (db + SWITCH_HYST < d) {
           curId = best.id;
           postTarget(best, '');
+          feedVoice('switch_near', best);
           navFollow(best);        // 卡片跟着换目标（旧的收掉，近的弹出来）
           renderCollectBar();
           map.draw();

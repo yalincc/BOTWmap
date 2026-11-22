@@ -314,6 +314,32 @@ window.BOTW_I18N.zh = {
   "camp.lynelDrops": "营地掉落（手持武器 = 击杀掉落）",
 
   // 搜索
-  "search.noResult": "无结果"
+  "search.noResult": "无结果",
+
+  // 语音导航
+  "tool.voice": "语音",
+  "tool.voice.title": "语音导航开关（点击静音/开启）",
+  "voice.topTitleOn": "语音导航已开启（点击静音，详细音色请在设置中调整）",
+  "voice.topTitleOff": "语音导航已关闭（点击开启）",
+  "voice.setTitle": "语音导航",
+  "voice.setHint": "罗盘 8 方位实时语音指路（塞尔达 / 御姐离线语音）",
+  "voice.on": "开启",
+  "voice.off": "关闭",
+  "voice.pack.zelda": "塞尔达风",
+  "voice.pack.zeldaShort": "塞尔达",
+  "voice.pack.yujie": "御姐领航员",
+  "voice.pack.yujieShort": "御姐音",
+  "voice.pack.chime": "希卡感应音",
+  "voice.pack.chimeShort": "感应音",
+  "voice.pack.tts": "系统语音",
+  "voice.pack.ttsShort": "系统语音",
+  "voice.volume": "音量",
+  "voice.testBtn": "▶ 试听",
+  "voice.adv.freq": "播报频次",
+  "voice.freq.compact": "精简（100m）",
+  "voice.freq.standard": "标准（300/100m）",
+  "voice.freq.dense": "详细（500/300/100m）",
+  "voice.toastOff": "已关闭语音导航",
+  "voice.autoplayHint": "浏览器限制自动语音，请点击地图任意处解锁"
 };
 
