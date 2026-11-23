@@ -1245,6 +1245,9 @@ const UI = (() => {
       if (mk.cat === 'memory' && map.saveLoaded()) { toast(window.I18N ? window.I18N.t('toast.memorySync', '回忆以存档为准：游戏中收集后自动同步，无需手动标记') : '回忆以存档为准：游戏中收集后自动同步，无需手动标记'); return; }
       map.doneSet.add(mk.id);
       if (map.saveLoaded()) map.liveDone.add(mk.id);
+      if (typeof LIVE !== 'undefined' && LIVE.isSameTarget && LIVE.clearNav && LIVE.isSameTarget(mk.px) && !(LIVE.isModeActive && LIVE.isModeActive(mk.cat))) {
+        LIVE.clearNav();
+      }
       saveDone(); renderCard(); map.draw(); updateLayerList(); renderStats(); toast((window.I18N ? window.I18N.t('toast.marked', '已标记完成：') : '已标记完成：') + mkName);
     };
     $('cardUndone').onclick = () => {
@@ -1487,7 +1490,7 @@ const UI = (() => {
       if (map.mode === 'pin') map.setMode('browse');
       else map.setMode('pin');
     });
-    $('btnShare').addEventListener('click', share);
+    if ($('btnShare')) $('btnShare').addEventListener('click', share);
     wireShare();
     $('cardClose').addEventListener('click', hideInfo);
     // 截图灯箱（v1.1.1）

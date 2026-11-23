@@ -647,11 +647,15 @@
 
     var tLocate = window.I18N ? window.I18N.t('equip.locate', '定位') : '定位';
     var tLocateSpawn = window.I18N ? window.I18N.t('equip.locateSpawn', '定位到刷点') : '定位到刷点';
+    var tNav = window.I18N ? window.I18N.t('card.nav', '导航') : '导航';
+    var tNavStop = window.I18N ? window.I18N.t('card.navStop', '停止导航') : '停止导航';
     var tDone = window.I18N ? window.I18N.t('card.done', '标记完成') : '标记完成';
     var tUndone = window.I18N ? window.I18N.t('card.undone', '取消完成') : '取消完成';
+    var hasNavTarget = !!(allPts.length || (it.camps && it.camps.length));
     h += '<div class="tk-actions">';
     if (allPts.length) h += '<button type="button" class="btn act" id="eqLocateFirst">' + esc(tLocate) + '</button>';
     else if (it.camps && it.camps.length) h += '<button type="button" class="btn act" id="eqLocateFirst" title="' + esc(tLocateSpawn) + '">' + esc(tLocateSpawn) + '</button>';
+    if (hasNavTarget) h += '<button type="button" class="btn act" id="eqNav">' + esc(tNav) + '</button>';
     h += '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="eqDone">' + (done ? esc(tUndone) : esc(tDone)) + '</button>';
     h += '</div>';
 
@@ -689,6 +693,27 @@
       }
       positionCard();
     });
+    var activePt = allPts.length ? allPts[0] : (it.camps && it.camps.length ? locateCampPt(it, 0) : null);
+    function syncEqNavBtn() {
+      var nv = document.getElementById('eqNav');
+      if (!nv || !activePt) return;
+      var cur = (typeof LIVE !== 'undefined' && LIVE.currentTarget) ? LIVE.currentTarget() : null;
+      nv.textContent = (cur && cur.x === activePt[0] && cur.y === activePt[1]) ? tNavStop : tNav;
+    }
+    syncEqNavBtn();
+    var eqNavBtn = document.getElementById('eqNav');
+    if (eqNavBtn) eqNavBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (!activePt) {
+        if (typeof UI !== 'undefined' && UI.toast) UI.toast('未找到该装备的坐标点');
+        return;
+      }
+      if (typeof LIVE !== 'undefined' && LIVE.toggleNav) {
+        var navName = isEn ? (it.en || it.name) : it.name;
+        LIVE.toggleNav({ id: 'equip:' + (it.content || it.name), name: navName, px: [activePt[0], activePt[1]], cat: 'equip' });
+        syncEqNavBtn();
+      }
+    });
     /* V1.6.4：营地段展开/收起 */
     var tg = document.getElementById('eqCampToggle');
     if (tg) tg.addEventListener('click', function (e) {
@@ -705,6 +730,8 @@
         e.stopPropagation();
         var cp = locateCampPt(it, +btn.dataset.eqCamp);
         if (!cp) { if (typeof UI !== 'undefined' && UI.toast) UI.toast('未找到该营地刷点坐标'); return; }
+        activePt = cp;
+        syncEqNavBtn();
         body.querySelectorAll('.fp.is-cur').forEach(function (x) { x.classList.remove('is-cur'); });
         btn.classList.add('is-cur');
         locateByPoint(cp);
@@ -718,6 +745,8 @@
         e.stopPropagation();
         var p = allPts[+btn.dataset.eqPt];
         if (!p) { if (typeof UI !== 'undefined' && UI.toast) UI.toast('定位失败：点位数据缺失（请 Ctrl+F5 强刷缓存后重试）'); return; }
+        activePt = p;
+        syncEqNavBtn();
         body.querySelectorAll('.fp.is-cur').forEach(function (x) { x.classList.remove('is-cur'); });
         btn.classList.add('is-cur');
         locateByPoint(p);
@@ -730,6 +759,13 @@
     if (dn) dn.addEventListener('click', function (e) {
       e.stopPropagation();
       var st = EquipDone.toggle(it);
+      if (st.done && typeof LIVE !== 'undefined' && LIVE.currentTarget && LIVE.clearNav) {
+        var cur = LIVE.currentTarget();
+        if (cur && ((activePt && cur.x === activePt[0] && cur.y === activePt[1]) ||
+            allPts.some(function (q) { return q[0] === cur.x && q[1] === cur.y; }))) {
+          LIVE.clearNav();
+        }
+      }
       openCard(it);
       if (map) map.draw();
       var dName = isEn ? (it.en || it.name) : it.name;
