@@ -1,10 +1,16 @@
 import nodemailer from 'nodemailer'
+import { createHash } from 'crypto'
 
 // EdgeOne Pages Node Function: POST /api/diag
 // 环境变量（在 EdgeOne Pages 项目控制台 → 设置 → 环境变量填写）：
 //   QQ_EMAIL     你的 QQ 邮箱（发件方 & 默认收件方）
 //   QQ_AUTH_CODE QQ 邮箱 16 位 SMTP 授权码
 //   QQ_TO        可选，指定收件邮箱（不填默认发给 QQ_EMAIL）
+//
+// 2026-11-24：TOTK L1 配置单分享去重——云端已收录的链不再发邮件，直接回执感谢。
+// 只影响 game=totk 且备注含 [分享本机 L1 配置] 的请求，其他诊断行为完全不变。
+
+const PROFILES_URL = 'https://totk.yalin.site/profiles/index.json'
 
 let transporter = null
 function getTransporter(user, pass) {
@@ -25,6 +31,47 @@ function jsonResp(obj, status = 200) {
   })
 }
 
+// parseProfiles 解析 GUI 上传的 pcProfile 文本：多份 JSON 以空行 + // 注释分隔。
+function parseProfiles(text) {
+  const out = []
+  for (const part of String(text || '').split(/\n{2,}(?=\/\/)/)) {
+    const body = part.replace(/^\s*\/\/[^\n]*\n?/, '').trim()
+    if (!body.startsWith('{')) continue
+    try {
+      const obj = JSON.parse(body)
+      if (obj && Array.isArray(obj.staticChains) && obj.staticChains.length) out.push(obj)
+    } catch {}
+  }
+  return out
+}
+
+// chainFingerprint 按 L1 链本身算指纹。
+// 关键：不按 exeSize、也不依赖 gameVersion——同一游戏版本不同构建反推出的链完全一致，
+// 而链本身就是版本决定的；版本探测失败的用户也能被正确识别为已收录。
+function chainFingerprint(profile) {
+  const chains = (profile.staticChains || [])
+    .map(c => `${c.ptrOffset}:${c.structOffset}`)
+    .sort()
+  if (!chains.length) return ''
+  return createHash('sha256').update(chains.join(',')).digest('hex')
+}
+
+// fetchCloudProfiles 拉取云端已验证配置索引；失败返回 null（调用方降级发邮件兜底）。
+async function fetchCloudProfiles() {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 4000)
+  try {
+    const res = await fetch(PROFILES_URL, { signal: ctrl.signal })
+    if (!res.ok) return null
+    const idx = await res.json()
+    return Array.isArray(idx.profiles) ? idx.profiles : null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function onRequestPost(context) {
   try {
     const env = context.env || process.env || {}
@@ -36,6 +83,7 @@ export async function onRequestPost(context) {
 
     const body = await context.request.json()
     const version = String(body.version || 'unknown').slice(0, 32)
+    const game = String(body.game || '').slice(0, 16)
     const edition = String(body.edition || 'emu').slice(0, 16)
     const emu = String(body.emulator || '-').slice(0, 32)
     const note = String(body.note || '').trim().slice(0, 300)
@@ -50,8 +98,36 @@ export async function onRequestPost(context) {
       return jsonResp({ ok: false, error: 'Empty payload' }, 400)
     }
 
-    const subject = `[xnavi ${version}][${edition}/${emu}]${note ? ' ' + note.slice(0, 40) : ' 诊断日志'}`
+    const isShareProfile = game === 'totk' && note.includes('[分享本机 L1 配置]')
+    let dedupInfo = ''
+    if (isShareProfile) {
+      const submitted = parseProfiles(pcProfile).map(chainFingerprint).filter(Boolean)
+      const cloud = await fetchCloudProfiles()
+      if (cloud) {
+        const known = new Set()
+        for (const p of cloud) {
+          const fp = chainFingerprint(p)
+          if (fp) known.add(fp)
+        }
+        const newOnes = submitted.filter(fp => !known.has(fp))
+        if (submitted.length > 0 && newOnes.length === 0) {
+          return jsonResp({ ok: true, duplicate: true, msg: '该版本配置云端已收录，感谢支持' }, 200)
+        }
+        dedupInfo = [
+          '=== L1 配置去重检查 ===',
+          `云端配置：${cloud.length} 份 · 已收录链：${known.size} 组`,
+          `本次提交：${submitted.length} 份（新链 ${newOnes.length} 份）`,
+          newOnes.length ? '提示：新链建议等 ≥2 份不同构建提交一致后再上线。' : '提示：未解析到有效链，请核对日志。',
+          ''
+        ].join('\n')
+      } else {
+        dedupInfo = '=== L1 配置去重检查 ===\n云端索引拉取失败，本次按新配置处理。\n\n'
+      }
+    }
+
+    const subject = `${isShareProfile && !dedupInfo.includes('拉取失败') ? '[新 L1 配置]' : ''}[xnavi ${version}][${edition}/${emu}]${note ? ' ' + note.slice(0, 40) : ' 诊断日志'}`
     const text = [
+      dedupInfo,
       note ? `用户描述：\n${note}\n` : '',
       pcProfile ? `=== pcProfile (L1 配置单) ===\n${pcProfile}\n` : '',
       `=== 环境自检 ===\n${diag || '(无)'}\n`,
@@ -68,7 +144,7 @@ export async function onRequestPost(context) {
       subject,
       text
     })
-    return jsonResp({ ok: true }, 200)
+    return jsonResp({ ok: true, duplicate: false }, 200)
   } catch (err) {
     return jsonResp({ ok: false, error: err && err.message ? err.message : 'send failed' }, 500)
   }
