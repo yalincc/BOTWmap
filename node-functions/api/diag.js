@@ -45,15 +45,21 @@ function parseProfiles(text) {
   return out
 }
 
-// chainFingerprint 按 L1 链本身算指纹。
-// 关键：不按 exeSize、也不依赖 gameVersion——同一游戏版本不同构建反推出的链完全一致，
-// 而链本身就是版本决定的；版本探测失败的用户也能被正确识别为已收录。
+// chainKeys 提取配置单内所有单条 L1 链的规范化键（大写 ptrOffset:structOffset，去重）。
+function chainKeys(profile) {
+  const seen = new Set()
+  for (const c of (profile.staticChains || [])) {
+    if (!c || !c.ptrOffset || !c.structOffset) continue
+    seen.add(`${String(c.ptrOffset).trim().toUpperCase()}:${String(c.structOffset).trim().toUpperCase()}`)
+  }
+  return [...seen].sort()
+}
+
+// chainFingerprint 按整组链算指纹（用于统计云端已收录组数）。
 function chainFingerprint(profile) {
-  const chains = (profile.staticChains || [])
-    .map(c => `${c.ptrOffset}:${c.structOffset}`)
-    .sort()
-  if (!chains.length) return ''
-  return createHash('sha256').update(chains.join(',')).digest('hex')
+  const keys = chainKeys(profile)
+  if (!keys.length) return ''
+  return createHash('sha256').update(keys.join(',')).digest('hex')
 }
 
 // fetchCloudProfiles 拉取云端已验证配置索引；失败返回 null（调用方降级发邮件兜底）。
@@ -101,21 +107,30 @@ export async function onRequestPost(context) {
     const isShareProfile = game === 'totk' && note.includes('[分享本机 L1 配置]')
     let dedupInfo = ''
     if (isShareProfile) {
-      const submitted = parseProfiles(pcProfile).map(chainFingerprint).filter(Boolean)
+      const submitted = parseProfiles(pcProfile)
       const cloud = await fetchCloudProfiles()
       if (cloud) {
-        const known = new Set()
+        const knownGroups = new Set()
+        const knownLinks = new Set()
         for (const p of cloud) {
           const fp = chainFingerprint(p)
-          if (fp) known.add(fp)
+          if (fp) knownGroups.add(fp)
+          for (const k of chainKeys(p)) knownLinks.add(k)
         }
-        const newOnes = submitted.filter(fp => !known.has(fp))
+        // 单条链重合判定：同一游戏版本手动走动校准可能在前 12 条里有 1~2 条候选差异，
+        // 只要命中 >=3 条已收录单链（短链则需全命中），即判定为同版本已收录，不再发重复邮件。
+        const newOnes = submitted.filter(p => {
+          const keys = chainKeys(p)
+          if (!keys.length) return false
+          const hits = keys.filter(k => knownLinks.has(k)).length
+          return hits < Math.min(3, keys.length)
+        })
         if (submitted.length > 0 && newOnes.length === 0) {
           return jsonResp({ ok: true, duplicate: true, msg: '该版本配置云端已收录，感谢支持' }, 200)
         }
         dedupInfo = [
           '=== L1 配置去重检查 ===',
-          `云端配置：${cloud.length} 份 · 已收录链：${known.size} 组`,
+          `云端配置：${cloud.length} 份 · 已收录链：${knownGroups.size} 组（${knownLinks.size} 条单链）`,
           `本次提交：${submitted.length} 份（新链 ${newOnes.length} 份）`,
           newOnes.length ? '提示：新链建议等 ≥2 份不同构建提交一致后再上线。' : '提示：未解析到有效链，请核对日志。',
           ''
