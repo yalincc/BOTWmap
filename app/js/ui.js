@@ -32,6 +32,7 @@ const UI = (() => {
     initCardDrag();
     initSideTabs();
     initStatsCollapse();
+    initAnnouncement();
     initMatSearch();
     watchCardSize();
   }
@@ -763,6 +764,87 @@ const UI = (() => {
       }
     }
     $('statsPanel').innerHTML = html;
+  }
+
+  /* ---------- 版本更新公告弹窗（每版首开自动弹一次，底部可随时回看） ---------- */
+  const APP_VERSION = '1.8.0';
+  const K_SEEN_VER = 'botwmap.seenVer.v1';
+  const ANNOUNCEMENTS = [
+    {
+      ver: 'v1.8.0',
+      date: '2026-11-27',
+      zh: [
+        '新增 60fps 平滑插值跟随与 80ms 高频轮询，地图跟随更丝滑',
+        '新增玩家视野扇形锥（PC 移植版支持右摇杆相机视角实时转动）',
+        '探索度面板改版为分组双列网格，同步状态并入「加载存档」按钮',
+        '存档修改器支持直接进入界面浏览全部模块，随时拖入或换档'
+      ],
+      en: [
+        '60fps smooth follow interpolation with 80ms live polling',
+        'Player FOV cone on map (real-time camera yaw on Savage Wind PC)',
+        'Two-column Exploration summary grid with synced status on Load Save button',
+        'Save Editor opens directly without blocking dropzone'
+      ]
+    },
+    {
+      ver: 'v1.7.9',
+      date: '2026-11-22',
+      zh: [
+        '新增独立网页实时语音导航（塞尔达 / 御姐双高清离线语音包）',
+        '新增 3D 海拔高度差播报，高崖正下方不再误报到达',
+        '97 个追花/树桩克洛格支持起点→终点二段自动接力导航',
+        '宝箱 / 装备 / 营地卡片新增独立「导航」按钮，完成自动停导'
+      ],
+      en: [
+        'Offline web voice navigation with 3D altitude difference alerts',
+        'Two-stage relay navigation for 97 Korok flower/race paths',
+        'Dedicated Navigate button on Chest / Equipment / Camp cards'
+      ]
+    }
+  ];
+  let syncAnnouncementFn = null;
+  function initAnnouncement() {
+    const modal = $('changelogModal');
+    const body = $('changelogBody');
+    const titleEl = $('clTitle');
+    const ackBtn = $('clAck');
+    const closeBtn = $('clClose');
+    const openBtn = $('btnChangelog');
+    if (!modal || !body) return;
+
+    const renderBody = () => {
+      const isEn = window.I18N && window.I18N.getLang() === 'en';
+      if (titleEl) titleEl.textContent = isEn ? '🎉 What\'s New' : '🎉 版本更新公告';
+      if (ackBtn) ackBtn.textContent = isEn ? 'Got it' : '我知道了';
+      if (openBtn) {
+        openBtn.textContent = isEn ? '📢 Changelog' : '📢 更新公告';
+        openBtn.title = isEn ? 'View version changelog' : '查看版本更新公告';
+      }
+      body.innerHTML = ANNOUNCEMENTS.map(a => {
+        const items = (isEn ? a.en : a.zh).map(t => `<li>${esc(t)}</li>`).join('');
+        return `<div class="cl-ver"><div class="cl-ver-head"><span class="cl-ver-tag">${esc(a.ver)}</span><span class="cl-ver-date">${esc(a.date)}</span></div><ul class="cl-list">${items}</ul></div>`;
+      }).join('');
+    };
+    syncAnnouncementFn = renderBody;
+
+    const open = () => { renderBody(); modal.classList.remove('hidden'); };
+    const close = () => {
+      modal.classList.add('hidden');
+      try { localStorage.setItem(K_SEEN_VER, APP_VERSION); } catch (e) {}
+    };
+
+    if (openBtn) openBtn.addEventListener('click', open);
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (ackBtn) ackBtn.addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) close();
+    });
+
+    renderBody();
+    let seen = '';
+    try { seen = localStorage.getItem(K_SEEN_VER) || ''; } catch (e) {}
+    if (seen !== APP_VERSION) open();
   }
   function pct(a, b, short) {
     if (!b) return short ? '' : '0%';
@@ -2025,6 +2107,7 @@ const UI = (() => {
     }
     if (typeof syncStatsToggle === 'function') syncStatsToggle();
     if (typeof syncSettingsFn === 'function') syncSettingsFn();
+    if (typeof syncAnnouncementFn === 'function') syncAnnouncementFn();
     updateLayerList();
     renderStats();
     if (currentMarker) {

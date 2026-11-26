@@ -1263,5 +1263,53 @@ html[lang="en"] .st-opt {
   }
 }
 
+/* ---------- 版本更新公告弹窗 ---------- */
+.side-foot .foot-version { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.foot-cl-btn {
+  background: none; border: none; padding: 0; color: var(--gold);
+  font-size: 11px; cursor: pointer; opacity: .88; white-space: nowrap;
+}
+.foot-cl-btn:hover { opacity: 1; text-decoration: underline; text-underline-offset: 2px; }
+.cl-modal {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(6, 10, 8, .66); backdrop-filter: blur(4px);
+}
+.cl-card {
+  width: min(460px, 94vw); max-height: 82vh;
+  display: flex; flex-direction: column;
+  background: #141f18; border: 1px solid rgba(242, 201, 76, .35);
+  border-radius: 12px; box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  color: var(--text); overflow: hidden;
+}
+.cl-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, .03);
+}
+.cl-head h3 { font-size: 15px; font-weight: 700; color: var(--gold); margin: 0; }
+.cl-close {
+  width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-dim); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.cl-close:hover { color: #fff; border-color: var(--gold-dim); }
+.cl-body { padding: 14px 16px; overflow-y: auto; font-size: 13px; line-height: 1.6; }
+.cl-ver + .cl-ver { margin-top: 14px; padding-top: 12px; border-top: 1px dashed rgba(255, 255, 255, .12); }
+.cl-ver-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.cl-ver-tag { font-size: 13.5px; font-weight: 700; color: var(--gold-lite); }
+.cl-ver-date { font-size: 11px; color: var(--text-dim); }
+.cl-list { margin: 0; padding-left: 18px; color: #d5dfd7; }
+.cl-list li { margin: 4px 0; }
+.cl-foot {
+  padding: 10px 16px 14px; border-top: 1px solid var(--border);
+  display: flex; justify-content: flex-end;
+}
+.cl-ack {
+  padding: 7px 18px; border-radius: 7px; border: 1px solid var(--gold);
+  background: linear-gradient(180deg, #e5be53, var(--gold)); color: #16180f;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.cl-ack:hover { filter: brightness(1.06); }
+
 
 
