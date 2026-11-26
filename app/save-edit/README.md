@@ -2,7 +2,7 @@
 
 BOTWmap 子页。纯静态、无构建、`file://` 直接开；存档只在浏览器内存里处理，不上传。
 
-入口：`save-edit/editor.html`（BOTWmap 侧栏「🛠 修改存档…」会带 `?v=11` 打开）。
+入口：`save-edit/editor.html`（BOTWmap 侧栏「🛠 修改存档…」会带 `?v=12` 打开）。
 
 ## 五个模块
 
@@ -32,7 +32,7 @@ BOTWmap 子页。纯静态、无构建、`file://` 直接开；存档只在浏�
 xnavi 已有 `GET /save`，返回当前最新存档字节 + `X-Save-Path`（Eden/Cemu 取 mtime 最新槽，Ryujinx 取最高 playtime）。
 
 - 推荐用 xnavi 自己托管的本地页打开，同源、不用处理跨域：
-  `http://127.0.0.1:8766/botw/save-edit/editor.html?v=11`
+  `http://127.0.0.1:8766/botw/save-edit/editor.html?v=12`
 - 点左侧「从 xnavi 读取最新档」；成功后显示 `xnavi · 槽 N · 游戏时长`，确认是不是刚存的档。
 - 游戏刚保存后等 1–2 秒，xnavi 的 progress watcher 是 2 秒轮询。
 - 直接双击 `editor.html`（`file://`）时浏览器禁止连本机 8766，页面会提示用上面的本地页。

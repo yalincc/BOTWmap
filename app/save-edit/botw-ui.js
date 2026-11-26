@@ -302,12 +302,15 @@
   ];
 
   function itemPool() {
+    if (!save) return [];
     return save.items.filter(function (it) { return it.cat === 'materials' || it.cat === 'ammo'; });
   }
   function foodPool() {
+    if (!save) return [];
     return save.items.filter(function (it) { return it.cat === 'food'; });
   }
   function equipPool() {
+    if (!save) return [];
     return save.items.filter(function (it) { return it.cat === state.equipCat; });
   }
 
@@ -325,7 +328,7 @@
   ];
 
   function navCount(id) {
-    if (!save) return '';
+    if (!save) return id === 'teleport' ? '实验' : '';
     if (id === 'info') return save.items.length + ' 件';
     if (id === 'items') return itemPool().length + ' 件';
     if (id === 'food') return foodPool().length + ' 件';
@@ -337,7 +340,7 @@
   function renderNav() {
     var nav = $('moduleNav');
     nav.innerHTML = MODULES.map(function (m) {
-      return '<button type="button" data-module="' + m.id + '" class="' + (state.module === m.id ? 'active' : '') + '"' + (!save ? ' disabled' : '') + '>' +
+      return '<button type="button" data-module="' + m.id + '" class="' + (state.module === m.id ? 'active' : '') + '">' +
         '<span class="mn-no">' + m.no + '</span>' +
         '<span class="mn-main"><span class="mn-title">' + esc(m.title) + '</span><span class="mn-sub">' + esc(m.sub) + '</span></span>' +
         '<span class="mn-count">' + esc(navCount(m.id)) + '</span>' +
@@ -345,7 +348,6 @@
     }).join('');
     nav.querySelectorAll('button').forEach(function (b) {
       b.onclick = function () {
-        if (!save) return;
         state.module = b.getAttribute('data-module');
         closeRail();
         renderNav();
@@ -398,17 +400,37 @@
     refreshChangePanel();
   }
 
-  function renderModule(keepScroll) {
-    var view = $('moduleView');
+  function renderLoadBanner() {
+    var banner = $('loadBanner');
+    if (!banner) return;
+    banner.classList.toggle('loaded', !!save);
+    var fn = $('lbFileName'), st = $('lbState'), sub = $('lbSub');
     if (!save) {
-      view.classList.add('hidden');
-      $('emptyState').classList.remove('hidden');
-      var slot = $('changeSlot');
-      if (slot) slot.innerHTML = '';
+      if (fn) fn.textContent = 'game_data.sav';
+      if (st) { st.textContent = '· 未载入'; st.className = 'lb-badge'; }
+      if (sub) sub.textContent = '把 game_data.sav 拖进页面，或点击右侧选择文件 · 支持 v1.0–v1.9 · Wii U / Switch';
       return;
     }
-    $('emptyState').classList.add('hidden');
+    if (fn) fn.textContent = fileName;
+    if (st) {
+      st.textContent = '· 已就绪' + (saveSource === 'xnavi' && saveSlot ? '（槽 ' + saveSlot + '）' : '');
+      st.className = 'lb-badge ok';
+    }
+    if (sub) {
+      sub.textContent = 'v' + save.version + ' · ' + save.platform +
+        (fileSize ? ' · ' + formatBytes(fileSize) : '') +
+        ' · ' + save.items.length + ' 件物品（可随时拖入或重选新档）';
+    }
+  }
+
+  function renderModule(keepScroll) {
+    var view = $('moduleView');
+    if (!view) return;
     view.classList.remove('hidden');
+    if (!save) {
+      var slot = $('changeSlot');
+      if (slot) slot.innerHTML = '';
+    }
     var m = MODULES.filter(function (x) { return x.id === state.module; })[0] || MODULES[0];
     var keep = keepScroll ? $('main').scrollTop : 0;
     m.render();
@@ -418,6 +440,7 @@
   function renderAll() {
     renderNav();
     renderSaveCard();
+    renderLoadBanner();
     renderModule();
     updateDirty();
   }
@@ -433,6 +456,48 @@
 
   /* ================= 01 存档信息（概览 + 基础数值修改） ================= */
   function renderInfo() {
+    if (!save) {
+      var emptyBadges = '<span class="badge dim">未载入存档</span>';
+      var emptyStamina = '<option value="" selected>载入存档后选择</option>' +
+        BotWSave.staminaPresets().map(function (p) {
+          return '<option value="' + p.bits + '">' + esc(p.label) + '</option>';
+        }).join('');
+      $('moduleView').innerHTML =
+        moduleHead('01', '存档信息', '只读概览 + 基础数值修改；只改上限和持有数量，不碰任务、神庙、事件标记。', emptyBadges) +
+        '<div class="panel-card">' +
+        '<div class="card-head"><h3>基础数值</h3><span class="card-sub">载入存档后可编辑</span></div>' +
+        '<div class="info-grid">' +
+        '<div class="stat-tile"><div class="st-label">游戏时长</div><div class="st-value">—</div></div>' +
+        '<div class="tile-field"><div class="tf-k"><label for="inpRupees">卢比</label></div>' +
+        '<input id="inpRupees" type="number" placeholder="—" disabled>' +
+        '<div class="tf-h">0–999999</div></div>' +
+        '<div class="tile-field"><div class="tf-k"><label for="inpHearts">生命上限</label></div>' +
+        '<input id="inpHearts" type="number" placeholder="—" disabled>' +
+        '<div class="tf-h">1–30 心；进游戏按上限回满</div></div>' +
+        '<div class="tile-field"><div class="tf-k"><label for="inpStamina">精力上限</label></div>' +
+        '<select id="inpStamina" disabled>' + emptyStamina + '</select>' +
+        '<div class="tf-h">耐力圈，1/5 圈步进</div></div>' +
+        '<div class="tile-field"><div class="tf-k"><label for="inpKorok">克洛格果实</label></div>' +
+        '<input id="inpKorok" type="number" placeholder="—" disabled>' +
+        '<div class="tf-h">背包持有数量 · 0–900</div></div>' +
+        '</div>' +
+        '<p class="note"><b>克洛格果实</b>改的是背包持有数量，不是收集进度；不会补全未收集的克洛格。</p>' +
+        '</div>' +
+        '<div class="panel-card">' +
+        '<div class="card-head"><h3>存档文件</h3><span class="card-sub">核对是不是当前存档槽</span></div>' +
+        '<div class="file-card" style="margin-top:0;padding-top:0;border-top:none">' +
+        '<div class="file-row"><span class="k">存档文件</span><span class="v">未载入</span></div>' +
+        '<div class="file-row"><span class="k">版本 / 平台</span><span class="v">—</span></div>' +
+        '<div class="file-row"><span class="k">背包物品</span><span class="v">—</span></div>' +
+        '<div class="file-row"><span class="k">当前地图</span><span class="v">—</span></div>' +
+        '</div>' +
+        '<p class="note">Eden / Yuzu 的 <b>0–7</b> 是不同存档槽；载入后看上面的「游戏时长」，和游戏内读档界面一致的那个槽才是当前存档。改错槽位不会生效。</p>' +
+        '<p class="note">改完 → 左下角「下载修改档」；下载后：<b>完全关闭模拟器</b> → 覆盖对应槽位的 game_data.sav → 启动读档。运行中替换会被退出保存覆盖。</p>' +
+        '</div>' +
+        convertCardHtml();
+      return;
+    }
+
     var pos = save.getPosition();
     var dirty = getDirty();
     var korokItem = save.getKorokItem();
@@ -599,9 +664,14 @@
 
   function convertCardHtml() {
     if (!window.SaveConvert) return '';
-    var opts = convertOptions();
     var head = '<div class="card-head"><h3>存档转换</h3><span class="card-sub">Switch ↔ Wii U · <b>测试中</b></span></div>';
     var beta = '<div class="warn-box"><b>功能测试中</b>：转换前先备份目标槽；转换后进游戏确认进度、物品、装备无误再继续玩。</div>';
+    if (!save) {
+      return '<div class="panel-card">' + head + beta +
+        '<p class="note">载入存档后自动识别版本与平台，支持 <b>Wii U v1.5.0 / Switch v1.6.0 / Switch v1.9.0</b> 互转（1.0–1.4 支持仅换字节序转 Switch）。</p>' +
+        '</div>';
+    }
+    var opts = convertOptions();
     if (!opts.length) {
       return '<div class="panel-card">' + head + beta +
         '<p class="note">当前存档 <b>v' + esc(save.version) + ' · ' + esc(save.platform) + '</b> 还不在已适配的版本表里：' +
@@ -689,18 +759,21 @@
     }).join('') + '</div>';
 
     var shown = currentItemShown();
+    var gridHtml = save
+      ? itemTilesHtml(shown, 'material')
+      : '<div class="empty-mini">载入存档后显示背包已有物品（可点击上方或左侧栏选择存档，或直接拖入 game_data.sav）。</div>';
 
     $('moduleView').innerHTML =
       moduleHead('02', '材料和道具', '六类分组；只显示背包里已有的物品，数量 0–999。',
-        '<span class="badge dim">' + pool.length + ' 件</span>') +
+        '<span class="badge dim">' + (save ? pool.length + ' 件' : '未载入') + '</span>') +
       '<div class="panel-card">' + tabs +
       '<div class="toolbar-row"><div class="search">' +
-      '<input id="itemSearch" type="text" placeholder="搜索食材 / 素材 / 箭矢…" value="' + esc(state.itemSearch) + '">' +
+      '<input id="itemSearch" type="text" placeholder="搜索食材 / 素材 / 箭矢…" value="' + esc(state.itemSearch) + '"' + (!save ? ' disabled' : '') + '>' +
       (state.itemSearch ? '<button type="button" class="search-clear" id="itemClear" aria-label="清空搜索">×</button>' : '') +
       '</div>' +
       (state.itemSearch ? '<span class="badge">全部类别</span>' : '') +
-      '<span class="badge dim" id="itemCount">' + shown.length + ' 件</span></div>' +
-      '<div id="itemGrid">' + itemTilesHtml(shown, 'material') + '</div>' +
+      '<span class="badge dim" id="itemCount">' + (save ? shown.length + ' 件' : '—') + '</span></div>' +
+      '<div id="itemGrid">' + gridHtml + '</div>' +
       '<p class="note">数量直接写背包堆叠数；格子上「+10 / +100 / 满」是快捷步进，改错了可在顶部改动明细里单项撤销。</p>' +
       '</div>';
 
@@ -831,18 +904,21 @@
     }).join('') + '</div>';
 
     var shown = currentFoodShown();
+    var gridHtml = save
+      ? itemTilesHtml(shown, 'food')
+      : '<div class="empty-mini">载入存档后显示背包已有料理与药物。</div>';
 
     $('moduleView').innerHTML =
       moduleHead('03', '料理和药物', '只改数量；不改食谱、效果或图标。',
-        '<span class="badge dim">' + pool.length + ' 件</span>') +
+        '<span class="badge dim">' + (save ? pool.length + ' 件' : '未载入') + '</span>') +
       '<div class="panel-card">' + tabs +
       '<div class="toolbar-row"><div class="search">' +
-      '<input id="foodSearch" type="text" placeholder="搜索料理 / 药物…" value="' + esc(state.foodSearch) + '">' +
+      '<input id="foodSearch" type="text" placeholder="搜索料理 / 药物…" value="' + esc(state.foodSearch) + '"' + (!save ? ' disabled' : '') + '>' +
       (state.foodSearch ? '<button type="button" class="search-clear" id="foodClear" aria-label="清空搜索">×</button>' : '') +
       '</div>' +
       (state.foodSearch ? '<span class="badge">全部类别</span>' : '') +
-      '<span class="badge dim" id="itemCount">' + shown.length + ' 件</span></div>' +
-      '<div id="itemGrid">' + itemTilesHtml(shown, 'food') + '</div>' +
+      '<span class="badge dim" id="itemCount">' + (save ? shown.length + ' 件' : '—') + '</span></div>' +
+      '<div id="itemGrid">' + gridHtml + '</div>' +
       '<p class="note">药物：精灵回力水、药剂（Item_Cook_C_16 / C_17 / _Mod*）；其余烤、冰、煮、料理都归料理。</p>' +
       '</div>';
 
@@ -906,13 +982,15 @@
   function renderEquip() {
     var tabs = ['weapons', 'bows', 'shields'].map(function (cat) {
       var label = cat === 'weapons' ? '武器' : cat === 'bows' ? '弓' : '盾';
-      var count = save.items.filter(function (it) { return it.cat === cat; }).length;
+      var count = save ? save.items.filter(function (it) { return it.cat === cat; }).length : 0;
       return '<button type="button" class="tab ' + (state.equipCat === cat ? 'active' : '') + '" data-cat="' + cat + '">' +
         label + '<span class="tab-count">' + count + '</span></button>';
     }).join('');
     var items = equipPool();
 
-    var cards = items.length ? items.map(function (it) {
+    var cards = !save
+      ? '<div class="empty-mini">载入存档后显示背包现有装备。</div>'
+      : (items.length ? items.map(function (it) {
       var info = BotWSave.modifierInfo(it.flags);
       var mode = BotWSave.modifierValueMode(it.flags);
       var pct = BotWSave.durabilityToPercent(it.qty);
@@ -935,14 +1013,14 @@
         '<span class="unit">%</span><button class="mini-btn ec-full" type="button">满</button>' +
         '</div></div>' +
         '</div></article>';
-    }).join('') : '<div class="empty-mini">背包里没有这一类装备。</div>';
+    }).join('') : '<div class="empty-mini">背包里没有这一类装备。</div>');
 
     $('moduleView').innerHTML =
       moduleHead('04', '装备强化', '只列出背包现有装备；属性按分类本地序号读写，弓/盾不会再错位。',
-        '<span class="badge dim">' + items.length + ' 件</span>') +
+        '<span class="badge dim">' + (save ? items.length + ' 件' : '未载入') + '</span>') +
       '<div class="panel-card">' +
       '<div class="card-head" style="margin-bottom:8px"><div class="tabs" style="margin:0">' + tabs + '</div>' +
-      '<div class="head-right"><button type="button" id="btnAllFullDur" class="btn ghost mini" title="把本类全部装备耐久设为 100%（可在改动明细里逐项撤销）">耐久全满</button>' +
+      '<div class="head-right"><button type="button" id="btnAllFullDur" class="btn ghost mini"' + (!save ? ' disabled' : '') + ' title="把本类全部装备耐久设为 100%（可在改动明细里逐项撤销）">耐久全满</button>' +
       '<div class="view-toggle"><button type="button" class="seg ' + (state.equipCols === 1 ? 'active' : '') + '" data-cols="1">单列</button>' +
       '<button type="button" class="seg ' + (state.equipCols === 2 ? 'active' : '') + '" data-cols="2">双列</button></div></div></div>' +
       '<div class="equip-grid cols-' + state.equipCols + '">' + cards + '</div>' +
@@ -1062,15 +1140,17 @@
 
   /* ================= 05 坐标瞬移（实验） ================= */
   function renderTeleport() {
-    var pos = save.getPosition();
-    var map = save.getMap();
-    var mapType = save.getMapType();
-    var can = !!pos && mapType === 'MainField';
+    var pos = save ? save.getPosition() : null;
+    var map = save ? save.getMap() : '';
+    var mapType = save ? save.getMapType() : '';
+    var can = !!save && !!pos && mapType === 'MainField';
     var grid = pos ? BotWSave.guessMapGrid(pos.x, pos.z) : '—';
     var disabled = (!can || !state.teleportEnabled) ? ' disabled' : '';
-    var warning = can
-      ? '<div class="warn-box">改的是存档坐标，导出后读档才会生效，不是游戏运行中的瞬间移动。坐标错误可能掉入虚空/水中，改前先备份。</div>'
-      : '<div class="warn-box">当前存档不在大地图（' + esc(mapType || '未知') + '），坐标瞬移暂不支持。请先回到大地图再保存。</div>';
+    var warning = !save
+      ? '<div class="warn-box">载入存档后可用；改的是存档坐标，导出后读档才会生效，不是游戏运行中的瞬间移动。</div>'
+      : (can
+        ? '<div class="warn-box">改的是存档坐标，导出后读档才会生效，不是游戏运行中的瞬间移动。坐标错误可能掉入虚空/水中，改前先备份。</div>'
+        : '<div class="warn-box">当前存档不在大地图（' + esc(mapType || '未知') + '），坐标瞬移暂不支持。请先回到大地图再保存。</div>');
 
     $('moduleView').innerHTML =
       moduleHead('05', '坐标瞬移', '实验模块：先只改 X/Y/Z；测试通过后再决定是否保留。',
@@ -1311,26 +1391,41 @@
     $('railScrim').onclick = closeRail;
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeRail(); });
 
-    var dz = $('dropzone');
-    dz.addEventListener('click', function () { $('fileInput').click(); });
-    ['dragover', 'dragenter'].forEach(function (ev) {
-      dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.add('drag'); });
-    });
-    ['dragleave', 'drop'].forEach(function (ev) {
-      dz.addEventListener(ev, function (e) { e.preventDefault(); dz.classList.remove('drag'); });
-    });
-    dz.addEventListener('drop', function (e) {
-      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-      if (f) loadFile(f);
-    });
+    var banner = $('loadBanner');
+    if (banner) {
+      banner.addEventListener('click', function (e) {
+        if (e.target && e.target.closest('button')) return;
+        $('fileInput').click();
+      });
+    }
+    var mainEl = $('main');
+    if (mainEl) {
+      ['dragover', 'dragenter'].forEach(function (ev) {
+        mainEl.addEventListener(ev, function (e) {
+          e.preventDefault();
+          if (banner) banner.classList.add('drag');
+        });
+      });
+      ['dragleave', 'drop'].forEach(function (ev) {
+        mainEl.addEventListener(ev, function (e) {
+          e.preventDefault();
+          if (ev === 'drop' || !e.relatedTarget || !mainEl.contains(e.relatedTarget)) {
+            if (banner) banner.classList.remove('drag');
+          }
+        });
+      });
+      mainEl.addEventListener('drop', function (e) {
+        var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) loadFile(f);
+      });
+    }
     document.addEventListener('dragover', function (e) { e.preventDefault(); });
     document.addEventListener('drop', function (e) { e.preventDefault(); });
   }
 
   function init() {
     bindShell();
-    renderNav();
-    updateDirty();
+    renderAll();
   }
 
   window.BOTW_EDITOR = {
@@ -1341,7 +1436,7 @@
     downloadModified: downloadModified,
     downloadBackup: downloadBackup,
     reset: resetChanges,
-    setModule: function (id) { if (save) { state.module = id; renderNav(); renderModule(); } }
+    setModule: function (id) { state.module = id; renderNav(); renderModule(); }
   };
 
   init();
