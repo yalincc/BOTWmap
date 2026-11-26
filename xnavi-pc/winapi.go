@@ -35,6 +35,7 @@ var (
 	pReadProcessMemory         = k32.NewProc("ReadProcessMemory")
 	pVirtualQueryEx            = k32.NewProc("VirtualQueryEx")
 	pQueryFullProcessImageName = k32.NewProc("QueryFullProcessImageNameW")
+	pCreateMutexW              = k32.NewProc("CreateMutexW")
 )
 
 type processEntry32W struct {
@@ -181,6 +182,24 @@ func findProcessPIDByQuery(want string) uint32 {
 		}
 	}
 	return 0
+}
+
+var singleInstanceMutex syscall.Handle
+
+func acquireSingleInstance(name string) bool {
+	p, err := syscall.UTF16PtrFromString(name)
+	if err != nil {
+		return true
+	}
+	h, _, e := pCreateMutexW.Call(0, 1, uintptr(unsafe.Pointer(p)))
+	if h == 0 {
+		return true
+	}
+	if e == syscall.Errno(183) { // ERROR_ALREADY_EXISTS
+		return false
+	}
+	singleInstanceMutex = syscall.Handle(h)
+	return true
 }
 
 func openProcessRO(pid uint32) syscall.Handle {

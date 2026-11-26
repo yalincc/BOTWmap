@@ -68,7 +68,7 @@ const LIVE = (() => {
     map.live = {
       mx: null, my: null, gx: 0, gy: 0, gz: 0,
       online: false, verified: false,
-      heading: null, lastMx: null, lastMy: null,
+      heading: null, camFacing: null, lastMx: null, lastMy: null,
       trail: [], tgt: null, tdist: null, counts: null, progGen: '',
     };
     map.liveDone = new Set();
@@ -209,17 +209,84 @@ const LIVE = (() => {
   /* ---------- 轮询退避（V1.6.5）：定位器（xnavi live）未开时 600ms 轮询会刷屏
      ERR_CONNECTION_REFUSED——连续失败 3 次即停，转入 30s 兜底探测，恢复后自动重启轮询 ---------- */
   let pollTimer = null, probeTimer = null, progressTimer = null, failCnt = 0;
+  const POLL_MS = LIVE_MIRROR ? 200 : 80;
+  const smooth = {
+    rafId: 0,
+    hasTarget: false,
+    firstFixPending: false,
+    targetMx: 0,
+    targetMy: 0,
+    targetHeading: null,
+    targetCamFacing: null
+  };
+
+  function lerpAngle(cur, target, alpha) {
+    let diff = ((target - cur + 540) % 360) - 180;
+    return ((cur + diff * alpha) % 360 + 360) % 360;
+  }
+
+  function stopAnimLoop() {
+    if (smooth.rafId) {
+      cancelAnimationFrame(smooth.rafId);
+      smooth.rafId = 0;
+    }
+    smooth.hasTarget = false;
+  }
+
+  function startAnimLoop() {
+    if (smooth.rafId) return;
+    function frame() {
+      smooth.rafId = 0;
+      const L = map && map.live;
+      if (!L || !L.online || !smooth.hasTarget) return;
+
+      const dx = smooth.targetMx - (L.mx != null ? L.mx : smooth.targetMx);
+      const dy = smooth.targetMy - (L.my != null ? L.my : smooth.targetMy);
+      let dh = 0;
+      if (typeof smooth.targetHeading === 'number') {
+        if (typeof L.heading !== 'number') L.heading = smooth.targetHeading;
+        dh = ((smooth.targetHeading - L.heading + 540) % 360) - 180;
+      }
+      let dc = 0;
+      if (typeof smooth.targetCamFacing === 'number') {
+        if (typeof L.camFacing !== 'number') L.camFacing = smooth.targetCamFacing;
+        dc = ((smooth.targetCamFacing - L.camFacing + 540) % 360) - 180;
+      }
+
+      const settled = Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05 && Math.abs(dh) < 0.2 && Math.abs(dc) < 0.2;
+      if (!settled || smooth.firstFixPending) {
+        const alpha = 0.28;
+        L.mx = (L.mx != null ? L.mx : smooth.targetMx) + dx * alpha;
+        L.my = (L.my != null ? L.my : smooth.targetMy) + dy * alpha;
+        if (typeof smooth.targetHeading === 'number') {
+          L.heading = lerpAngle(L.heading, smooth.targetHeading, alpha);
+        }
+        if (typeof smooth.targetCamFacing === 'number') {
+          L.camFacing = lerpAngle(L.camFacing, smooth.targetCamFacing, alpha);
+        }
+        if (follow) {
+          centerOnPlayer(smooth.firstFixPending ? { pull: true } : null);
+        }
+        smooth.firstFixPending = false;
+        map.draw();
+      }
+      smooth.rafId = requestAnimationFrame(frame);
+    }
+    smooth.rafId = requestAnimationFrame(frame);
+  }
+
   function startPolling() {
     if (pollTimer) return;
     failCnt = 0;
     stopProbing();
-    pollTimer = setInterval(poll, 600);
+    pollTimer = setInterval(poll, POLL_MS);
     if (!progressTimer) progressTimer = setInterval(loadProgress, 20000);
     requestWakeLock();
   }
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+    stopAnimLoop();
     releaseWakeLock();
     startProbing();
   }
@@ -250,30 +317,38 @@ const LIVE = (() => {
     if (L.online) {
       // 朝向：若服务提供 heading 优先；否则由连续位移推算运动朝向，静止平滑保持
       if (typeof p.heading === 'number' && !isNaN(p.heading)) {
-        L.heading = p.heading;
+        smooth.targetHeading = p.heading;
       } else if (L.lastMx != null && L.lastMy != null) {
         const dx = p.mx - L.lastMx;
         const dy = p.my - L.lastMy;
         const d = Math.hypot(dx, dy);
         // 位移有效判断：0.8px ~ 120px（约 0.4m ~ 60m 走动/奔跑/风弹，排除原地静止微抖与传送）
         if (d >= 0.8 && d <= 120) {
-          const targetAngle = Math.atan2(dy, dx) * 180 / Math.PI;
-          if (L.heading == null) {
-            L.heading = targetAngle;
-          } else {
-            // 最短角度差平滑转向，避免 ±180° 时反向大转圈
-            let diff = (targetAngle - L.heading + 180) % 360 - 180;
-            if (diff < -180) diff += 360;
-            L.heading = (L.heading + diff * 0.45) % 360;
-          }
+          smooth.targetHeading = Math.atan2(dy, dx) * 180 / Math.PI;
         }
+      }
+      if (typeof p.camFacing === 'number' && !isNaN(p.camFacing)) {
+        smooth.targetCamFacing = p.camFacing;
       }
       L.lastMx = p.mx;
       L.lastMy = p.my;
 
       /* V1.7.2：首次定位成功记为一次「拉近」机会（之后跟随只平移，不再干预用户缩放） */
       const firstFix = (L.mx == null);
-      L.mx = p.mx; L.my = p.my;
+      const jumpDist = firstFix ? 0 : Math.hypot(p.mx - L.mx, p.my - L.my);
+      if (firstFix || jumpDist > 150) {
+        // 首次定位或传送大跳变：直接落位，不拖影
+        L.mx = p.mx;
+        L.my = p.my;
+        if (typeof smooth.targetHeading === 'number') L.heading = smooth.targetHeading;
+        if (typeof smooth.targetCamFacing === 'number') L.camFacing = smooth.targetCamFacing;
+        if (firstFix) smooth.firstFixPending = true;
+      }
+      smooth.targetMx = p.mx;
+      smooth.targetMy = p.my;
+      smooth.hasTarget = true;
+      startAnimLoop();
+
       L.gx = p.gx; L.gy = p.gy; L.gz = p.gz;
       L.verified = !!p.verified;
       // 目标变更后 1.8s 内忽略服务端滞后一帧的旧 target 回显，防刚点导航即被旧目标打断重播
@@ -289,7 +364,7 @@ const LIVE = (() => {
         lastPosKey = key;
         L.trail.push([p.mx, p.my]);
         if (L.trail.length > 600) L.trail.shift();
-        if (follow) { centerOnPlayer(firstFix ? { pull: true } : null); }
+        if (follow && jumpDist > 150) { centerOnPlayer(null); }
       }
       syncConfig();
       // 进度代次变化（游戏内保存 → 存档更新）→ 立即重新拉取收集进度
@@ -299,10 +374,14 @@ const LIVE = (() => {
       }
     } else {
       lastPosKey = null;
+      stopAnimLoop();
       if (failCnt >= 5) {
         L.heading = null;
+        L.camFacing = null;
         L.lastMx = null;
         L.lastMy = null;
+        smooth.targetHeading = null;
+        smooth.targetCamFacing = null;
       }
     }
     updateStatus();
@@ -310,6 +389,7 @@ const LIVE = (() => {
     const dk = (L.online ? '1' : '0') + (L.verified ? 'v' : '') +
                (L.mx != null ? Math.round(L.mx / 2) + ':' + Math.round(L.my / 2) : '') +
                (L.heading != null ? 'h' + Math.round(L.heading / 4) : '') +
+               (L.camFacing != null ? 'c' + Math.round(L.camFacing / 3) : '') +
                (L.tgt ? 't' : '') + (L.tdist != null ? Math.round(L.tdist / 10) : '');
     if (dk !== lastDrawKey) {
       lastDrawKey = dk;
@@ -1167,7 +1247,28 @@ const LIVE = (() => {
     const rad = L.verified ? 8 : 6;
     const radDot = L.verified ? 7 : 5;
 
-    // 玩家位置：有朝向（运动推算或服务提供）画角色箭头，无朝向/初始静止态画圆点
+    // 玩家位置：先画相机/朝向视野扇形（若有），再画角色箭头/圆点
+    const fovAngle = (typeof L.camFacing === 'number') ? L.camFacing : L.heading;
+    if (typeof fovAngle === 'number') {
+      const fovRad = 82;
+      const halfCone = 38 * Math.PI / 180;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(fovAngle * Math.PI / 180);
+      const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, fovRad);
+      grad.addColorStop(0, 'rgba(255, 251, 230, 0.56)');
+      grad.addColorStop(0.45, 'rgba(255, 248, 214, 0.28)');
+      grad.addColorStop(0.85, 'rgba(255, 248, 214, 0.08)');
+      grad.addColorStop(1, 'rgba(255, 248, 214, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, fovRad, -halfCone, halfCone);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
     ctx.save();
     if (typeof L.heading === 'number') {
       ctx.translate(px, py);

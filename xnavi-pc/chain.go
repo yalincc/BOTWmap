@@ -388,3 +388,129 @@ func latestPlaceAnchor(exePath string) ([3]float32, bool) {
 	}
 	return out, false
 }
+
+// ---- 相机（视野方向）静态链自动发现 ----
+
+const (
+	camPosOffDefault = uintptr(0x2A0)
+	camRotOffDefault = uintptr(0x270)
+)
+
+func ortho3x4OK(r0, r1, r2 [3]float32) bool {
+	rows := [3][3]float32{r0, r1, r2}
+	for i := 0; i < 3; i++ {
+		for j := 0; j < 3; j++ {
+			if rows[i][j] != rows[i][j] {
+				return false
+			}
+		}
+		n := math.Sqrt(float64(rows[i][0]*rows[i][0] + rows[i][1]*rows[i][1] + rows[i][2]*rows[i][2]))
+		if math.Abs(n-1.0) >= 0.05 {
+			return false
+		}
+	}
+	for i := 0; i < 3; i++ {
+		for j := i + 1; j < 3; j++ {
+			dot := rows[i][0]*rows[j][0] + rows[i][1]*rows[j][1] + rows[i][2]*rows[j][2]
+			if math.Abs(float64(dot)) >= 0.08 {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func hasMat3x4InBuf(b []byte) bool {
+	if len(b) < 48 {
+		return false
+	}
+	n := len(b) / 4
+	fl := make([]float32, n)
+	for i := range fl {
+		fl[i] = math.Float32frombits(binary.LittleEndian.Uint32(b[i*4:]))
+	}
+	for i := 0; i+12 <= len(fl); i++ {
+		if ortho3x4OK(
+			[3]float32{fl[i], fl[i+1], fl[i+2]},
+			[3]float32{fl[i+4], fl[i+5], fl[i+6]},
+			[3]float32{fl[i+8], fl[i+9], fl[i+10]},
+		) {
+			return true
+		}
+	}
+	return false
+}
+
+// tripleRawAt 读 12 字节坐标（不走大世界原点过滤，供相机神庙内/外通用）。
+func (l *locator) tripleRawAt(addr uintptr) ([3]float32, bool) {
+	b, ok := l.readSmall(addr, 12)
+	if !ok {
+		return [3]float32{}, false
+	}
+	x := math.Float32frombits(binary.LittleEndian.Uint32(b[0:4]))
+	y := math.Float32frombits(binary.LittleEndian.Uint32(b[4:8]))
+	z := math.Float32frombits(binary.LittleEndian.Uint32(b[8:12]))
+	if x != x || y != y || z != z || x < -7000 || x > 7000 || z < -7000 || z > 7000 || y < -600 || y > 5000 {
+		return [3]float32{}, false
+	}
+	return [3]float32{x, y, z}, true
+}
+
+// resolveCameraByStaticSlots 依据玩家当前位置，在静态区出站指针目标中定位唯一的相机对象。
+func (l *locator) resolveCameraByStaticSlots(playerPos [3]float32) (slotOff, obj, posOff uintptr, ok bool) {
+	regs := enumRegions(l.h, chainGuestBase, chainGuestBase+staticScanSpan)
+	if len(regs) == 0 {
+		return 0, 0, 0, false
+	}
+	refs := make(map[uintptr]uintptr, 1<<17)
+	for _, r := range regs {
+		if r.protect != pageReadWrite {
+			continue
+		}
+		for off := uintptr(0); off < r.size; off += scanChunk {
+			n := uintptr(scanChunk)
+			if off+n > r.size {
+				n = r.size - off
+			}
+			buf, rok := readProcess(l.h, r.base+off, int(n))
+			if !rok {
+				continue
+			}
+			for i := 0; i+8 <= len(buf); i += 8 {
+				v := uintptr(binary.LittleEndian.Uint64(buf[i:]))
+				if v < chainGuestBase || v >= chainGuestLimit {
+					continue
+				}
+				if _, exists := refs[v]; !exists {
+					refs[v] = r.base + off + uintptr(i) - chainGuestBase
+				}
+			}
+		}
+	}
+
+	type camHit struct {
+		slotOff uintptr
+		obj     uintptr
+		posOff  uintptr
+	}
+	var hits []camHit
+	for tgt, sOff := range refs {
+		// 快速路径：优先试已知相机偏移 +0x2A0 及其前方的 3x4 矩阵 (+0x270)
+		if cpos, cok := l.tripleRawAt(tgt + camPosOffDefault); cok {
+			d := dist3(cpos, playerPos)
+			if d >= 0.6 && d <= 16.0 {
+				if mbuf, mok := readProcess(l.h, tgt+camRotOffDefault, 48); mok && hasMat3x4InBuf(mbuf) {
+					hits = append(hits, camHit{slotOff: sOff, obj: tgt, posOff: camPosOffDefault})
+					if len(hits) > 1 {
+						return 0, 0, 0, false
+					}
+					continue
+				}
+			}
+		}
+	}
+	if len(hits) == 1 {
+		return hits[0].slotOff, hits[0].obj, hits[0].posOff, true
+	}
+	return 0, 0, 0, false
+}

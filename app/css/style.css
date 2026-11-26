@@ -292,21 +292,79 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .lrow.on:hover { background: rgba(242,201,76,.12); }
 .lrow.on .lname, .lrow.on .lprog { color: var(--gold); }
 
-/* ---------- 缁熻 ---------- */
-/* 探索度按钮（v1.1.9 弹卡查看） */
+/* ---------- 探索度折叠面板（TOTKmap 风格） ---------- */
 .collapsible-head {
-  display: flex; align-items: center; gap: 4px; width: 100%;
-  background: none; border: none; border-top: 1px solid var(--border);
-  color: var(--gold); font-size: 14px; font-weight: 700;
-  cursor: pointer; padding: 10px 14px 4px;
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: rgba(255,255,255,.04);
+  border: none;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: var(--gold); font-size: 14px; font-weight: 600;
+  cursor: pointer; padding: 9px 14px;
+  text-align: left;
+  transition: background .15s, color .15s;
 }
-.collapsible-head:hover { color: var(--gold-lite); }
+.collapsible-head:hover { background: rgba(242,201,76,.09); color: var(--gold-lite); }
+#statsCollapse.collapsed .collapsible-head { border-bottom-color: transparent; }
+.stats-arrow {
+  display: inline-block; flex: 0 0 auto;
+  width: 0; height: 0;
+  border-left: 4.5px solid transparent;
+  border-right: 4.5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform .18s ease;
+}
+#statsCollapse.collapsed .stats-arrow { transform: rotate(-90deg); }
 
 /* 探索度面板（v1.2.1 内嵌侧栏底部，可展开收起；面板自身滚动避免截断） */
 #statsCollapse .stats-body {
   padding: 8px 14px 10px;
   max-height: 42vh; overflow-y: auto;
-  border-top: 1px solid var(--border);
+}
+.prog-group + .prog-group { margin-top: 8px; }
+.prog-group-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 14px; font-weight: 700; line-height: 1.3;
+  color: var(--gold);
+  background: rgba(255,255,255,.055);
+  border-radius: 4px;
+  padding: 3px 8px;
+  margin: 0 -8px 5px;
+}
+.prog-group-title .pgt-name { flex: none; }
+.prog-group-title .pgt-pct {
+  flex: none; font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,.85); font-variant-numeric: tabular-nums;
+}
+.prog-group-title.done .pgt-pct { color: #7dffa0; }
+.prog-grid {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+  gap: 2px 0;
+}
+.prog-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding-right: 10px;
+  font-size: 13px; line-height: 1.55; min-width: 0;
+}
+.prog-row.col2 {
+  border-left: 1px solid rgba(255,255,255,.14);
+  padding-left: 10px; padding-right: 0;
+}
+.prog-row .pr-name {
+  color: #c9d4c9;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.prog-row .pr-val {
+  flex: none; font-size: 12px; color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+.prog-row.done .pr-val { color: #7dffa0; font-weight: 600; }
+.prog-row.pending .pr-name,
+.prog-row.pending .pr-val { color: rgba(255,255,255,.35); }
+#btnSaveLoad.synced {
+  border-color: rgba(125,255,160,.45);
+  color: #7dffa0;
 }
 .stats h4 { font-size: 12px; color: var(--gold); margin-bottom: 8px; letter-spacing: 1px; }
 
@@ -325,13 +383,13 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .stat-note b { color: #ffd166; font-weight: 600; }
 .stat-note .warn { color: #ff9b66; }
 /* 存档上传入口 */
-.save-upload { position: relative; flex: 0 0 auto; padding: 0 14px 8px; border-top: 1px solid var(--border); }
-.save-upload .su-row { display: flex; gap: 6px; align-items: center; }
-.save-upload button { flex: 1; padding: 6px 8px; font-size: 11.5px; color: var(--gold-lite);
+.save-upload { position: relative; flex: 0 0 auto; padding: 9px 14px; border-top: 1px solid var(--border); }
+.save-upload .su-row { display: flex; gap: 7px; align-items: center; }
+.save-upload button { flex: 1; padding: 8px 10px; font-size: 12.5px; color: var(--gold-lite);
   background: rgba(242,201,76,.10); border: 1px dashed rgba(242,201,76,.4); border-radius: 6px; cursor: pointer; }
 .save-upload button:hover { background: rgba(61,106,60,.32); }
-.su-help { flex: 0 0 auto; width: 18px; height: 18px; line-height: 16px; text-align: center;
-  font-size: 11px; font-weight: 700; color: var(--gold); border: 1px solid rgba(242,201,76,.4);
+.su-help { flex: 0 0 auto; width: 22px; height: 22px; line-height: 20px; text-align: center;
+  font-size: 12px; font-weight: 700; color: var(--gold); border: 1px solid rgba(242,201,76,.4);
   border-radius: 50%; cursor: help; user-select: none; }
 .su-help:hover, .su-help:focus { background: rgba(61,106,60,.32); outline: none; }
 .su-tip { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 30;
@@ -350,8 +408,8 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 .side-foot a:hover { color: var(--gold); }
 /* 存档区：清空旧探索度按钮（v1.4.2）：圆形扫把，样式与 ? 帮助一致，置于行尾 */
 .save-upload .su-clear-wrap { position: relative; flex: 0 0 auto; }
-.save-upload .su-clear { display: block; width: 18px; height: 18px; padding: 0; line-height: 16px; text-align: center;
-  font-size: 11px; font-weight: 700; color: var(--gold); background: transparent;
+.save-upload .su-clear { display: block; width: 22px; height: 22px; padding: 0; line-height: 20px; text-align: center;
+  font-size: 12px; font-weight: 700; color: var(--gold); background: transparent;
   border: 1px solid rgba(242,201,76,.4); border-radius: 50%; cursor: pointer; user-select: none; }
 .save-upload .su-clear:hover { background: rgba(192,57,43,.32); border-color: rgba(192,57,43,.6); }
 .su-clear-tip { position: absolute; bottom: calc(100% + 6px); right: 0; white-space: nowrap;
@@ -361,8 +419,8 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
 /* 存档区：修改存档入口（V1.7.2）。由整行按钮收为 18px 圆形图标，与「?」同排；
    悬停显示气泡（纯 CSS，无需 JS）。 */
 .save-upload .su-edit-wrap { position: relative; flex: 0 0 auto; display: flex; }
-.save-upload .su-edit { display: block; width: 18px; height: 18px; padding: 0;
-  font-size: 11px; line-height: 16px; text-align: center; color: var(--gold);
+.save-upload .su-edit { display: block; width: 22px; height: 22px; padding: 0;
+  font-size: 12px; line-height: 20px; text-align: center; color: var(--gold);
   background: transparent; border: 1px solid rgba(242,201,76,.4); border-radius: 50%;
   cursor: pointer; user-select: none; }
 .save-upload .su-edit:hover, .save-upload .su-edit:focus { background: rgba(242,201,76,.22);

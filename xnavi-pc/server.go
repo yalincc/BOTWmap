@@ -20,6 +20,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -292,6 +293,9 @@ func (s *apiServer) handlePos(w http.ResponseWriter, r *http.Request) {
 		"target":   t,
 		"config":   c,
 		"lanUrl":   lanURL,
+	}
+	if st.HasCam {
+		payload["camFacing"] = math.Round(st.CamFacing*10) / 10
 	}
 	if ok, _, gen := saves.snapshot(); ok {
 		payload["progressGen"] = gen

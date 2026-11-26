@@ -108,6 +108,7 @@ const UI = (() => {
   /* ---------- 探索度（v1.2.1 内嵌折叠面板）：点击展开/收起完整统计，面板自身滚动不截断 ---------- */
   let syncStatsToggle = null;
   function initStatsCollapse() {
+    const wrap = $('statsCollapse');
     const toggle = $('statsToggle');
     const panel = $('statsPanel');
     if (!toggle || !panel) return;
@@ -116,8 +117,11 @@ const UI = (() => {
     try { if (localStorage.getItem(KEY) === '0') open = false; } catch (e) {}
     const apply = () => {
       panel.classList.toggle('hidden', !open);
-      const title = (window.I18N && window.I18N.t) ? I18N.t('stats.title', '探索度').replace(/^[▤\s]+/, '') : '探索度';
-      toggle.textContent = (open ? '▾ ' : '▸ ') + title;
+      if (wrap) wrap.classList.toggle('collapsed', !open);
+      const title = (window.I18N && window.I18N.t) ? I18N.t('stats.title', '探索度').replace(/^[▤\s▾▸]+/, '') : '探索度';
+      const titleEl = toggle.querySelector('.stats-title-txt');
+      if (titleEl) titleEl.textContent = title;
+      else toggle.textContent = (open ? '▾ ' : '▸ ') + title;
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     };
     syncStatsToggle = apply;
@@ -665,20 +669,49 @@ const UI = (() => {
     '岩石巨人': 'Stone Talus',
     '莫尔德拉吉克': 'Molduga'
   };
+  function syncSaveButton(synced) {
+    const btn = document.getElementById('btnSaveLoad');
+    if (!btn) return;
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
+    btn.classList.toggle('synced', !!synced);
+    if (synced) {
+      btn.textContent = isEn ? '✓ Save Synced · Reload' : '✓ 存档已同步 · 重新加载';
+    } else if (window.I18N && typeof window.I18N.t === 'function') {
+      btn.textContent = window.I18N.t('save.loadBtn');
+    } else {
+      btn.textContent = '📂 加载存档';
+    }
+  }
+
   function renderStats() {
     const isEn = window.I18N && window.I18N.getLang() === 'en';
     const lc = map.live && map.live.counts;
     const synced = !!(lc || window.__saveCounts || window.__saveUploaded);
+    syncSaveButton(synced);
     let html = '';
-    if (synced) html += `<div class="stat-sync">${isEn ? 'Save Progress Synced ✓' : '存档已同步 ✓'}</div>`;
 
-    /* V1.6.4 改版：分组双列纯数字网格；排版对齐侧栏（行=村庄行 12px/数值 11px，
-       组标题=设施地点标题样式，第二列加竖分割线） */
-    const grid = rows => `<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 0">${rows}</div>`;
-    const label = t => `<div style="font-size:13px;font-weight:500;color:rgba(255,255,255,.92);margin:8px 0 4px">${t}</div>`;
-    const row = (n, d, t, col2) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12px;line-height:1.6;` +
-      (col2 ? 'border-left:1px solid rgba(255,255,255,.14);padding-left:10px;' : '') +
-      `"><span style="color:rgba(255,255,255,.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span><span style="flex:none;font-size:11px;color:rgba(255,255,255,.85)">` + d + '/' + t + `</span></div>`;
+    /* TOTKmap V2.6.0 风格：分组双列纯数字网格，字号对齐上方大分类标题(14px)与分类行(13px) */
+    const groupHtml = (title, items) => {
+      if (!items.length) return '';
+      let sumD = 0, sumT = 0;
+      items.forEach(it => {
+        if (it[1] != null && it[2]) { sumD += Number(it[1]) || 0; sumT += Number(it[2]) || 0; }
+      });
+      const pctStr = sumT > 0 ? Math.floor(sumD / sumT * 100) + '%' : '';
+      const isDone = sumT > 0 && sumD >= sumT;
+      const rows = items.map(([n, d, t], i) => {
+        const col2 = i % 2 === 1 ? ' col2' : '';
+        if (d == null) {
+          return `<div class="prog-row pending${col2}"><span class="pr-name" title="${esc(n)}">${esc(n)}</span><span class="pr-val">${isEn ? 'Pending' : '待接'}</span></div>`;
+        }
+        const done = Number(d) || 0, total = Number(t) || 0;
+        const rowDone = total > 0 && done >= total ? ' done' : '';
+        return `<div class="prog-row${rowDone}${col2}"><span class="pr-name" title="${esc(n)}">${esc(n)}</span><span class="pr-val">${done}/${total}</span></div>`;
+      }).join('');
+      return `<div class="prog-group">` +
+        `<div class="prog-group-title${isDone ? ' done' : ''}"><span class="pgt-name">${title}</span>${pctStr ? `<span class="pgt-pct">${pctStr}</span>` : ''}</div>` +
+        `<div class="prog-grid">${rows}</div></div>`;
+    };
 
     /* —— 探索（存档优先，本地标点兜底）—— */
     const exp = [];
@@ -697,7 +730,7 @@ const UI = (() => {
     const finalDone = mSaved('memory_final') != null ? mSaved('memory_final') : m.final[0];
     if (m.photo[1] || photoDone) exp.push([isEn ? 'Captured Memories' : '照片记忆', photoDone, 12]);
     if (m.final[1] || finalDone) exp.push([isEn ? 'Final Memory' : '最终回忆', finalDone, 1]);
-    html += label(isEn ? 'Exploration' : '探索') + grid(exp.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
+    html += groupHtml(isEn ? 'Exploration' : '探索', exp);
 
     /* —— 任务（4 类；QuestData/QuestDone 由任务板块提供）—— */
     const QD = window.QuestDone, QDD = window.QuestData;
@@ -712,7 +745,7 @@ const UI = (() => {
         QDD.QUESTS.forEach(q => { if (QDD.inRow(cat, q)) { t++; if (QD.isDone(q.key)) d++; } });
         return t ? [name, d, t] : null;
       }).filter(Boolean);
-      if (qrows.length) html += label(isEn ? 'Quests' : '任务') + grid(qrows.map((r, i) => row(r[0], r[1], r[2], i % 2 === 1)).join(''));
+      if (qrows.length) html += groupHtml(isEn ? 'Quests' : '任务', qrows);
     }
 
     /* —— 收集 / 讨伐（随存档同步出现；localStorage 展示缓存兜底）—— */
@@ -724,12 +757,9 @@ const UI = (() => {
       if (sc.pb != null) col.push([isEn ? 'Compendium · Equipment' : '图鉴·装备', sc.pb, sc.pbTotal]);
       if (sc.pbMat != null) col.push([isEn ? 'Compendium · Materials' : '图鉴·材料', sc.pbMat, 112]);
       if (sc.pbEnemy != null) col.push([isEn ? 'Compendium · Monsters' : '图鉴·怪物', sc.pbEnemy, sc.pbEnemyTotal || 84]);
-      html += label(isEn ? 'Collection' : '收集') + grid(col.map(([n, d, t], i) => {
-        if (d == null) return `<div style="display:flex;justify-content:space-between;font-size:12px;` + (i % 2 === 1 ? 'border-left:1px solid rgba(255,255,255,.14);padding-left:10px;' : '') + `"><span style="color:rgba(255,255,255,.35)">` + n + `</span><span style="color:rgba(255,255,255,.35)">` + (isEn ? 'Pending' : '待接') + `</span></div>`;
-        return row(n, d, t, i % 2 === 1);
-      }).join(''));
+      html += groupHtml(isEn ? 'Collection' : '收集', col);
       if (sc.enemy && sc.enemy.length) {
-        html += label(isEn ? 'Subjugation' : '讨伐') + grid(sc.enemy.map((e, i) => row(isEn ? (BOSS_NAME_EN[e.name] || e.en || e.name) : e.name, e.done, e.total, i % 2 === 1)).join(''));
+        html += groupHtml(isEn ? 'Subjugation' : '讨伐', sc.enemy.map(e => [isEn ? (BOSS_NAME_EN[e.name] || e.en || e.name) : e.name, e.done, e.total]));
       }
     }
     $('statsPanel').innerHTML = html;
@@ -1993,8 +2023,6 @@ const UI = (() => {
     if (window.I18N && typeof window.I18N.updateDOM === 'function') {
       window.I18N.updateDOM();
     }
-    const btn = document.getElementById('btnSaveLoad');
-    if (btn && window.I18N) btn.textContent = window.I18N.t('save.loadBtn');
     if (typeof syncStatsToggle === 'function') syncStatsToggle();
     if (typeof syncSettingsFn === 'function') syncSettingsFn();
     updateLayerList();

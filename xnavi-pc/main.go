@@ -28,7 +28,7 @@ import (
 )
 
 // CoreVersion 遵循发布版本号（与模拟器版一致）。
-const CoreVersion = "v3.3.2"
+const CoreVersion = "v3.3.3"
 
 var (
 	loc         *locator
@@ -38,12 +38,15 @@ var (
 	noOpen      bool
 	portBase    = 8766
 	manualPID   uint32
+	multiInst   bool
 )
 
 func main() {
 	certDir := "certs"
 	for _, a := range os.Args[1:] {
 		switch {
+		case a == "--multi":
+			multiInst = true
 		case a == "--tls":
 			tlsMode = true
 		case strings.HasPrefix(a, "--tls-cert-dir="):
@@ -84,6 +87,12 @@ func main() {
 	fmt.Println("  xnavi-pc · 旷野之息 PC 移植版 定位导航")
 	fmt.Println("  只读内存 / 不修改游戏 / 不改存档")
 	fmt.Println("==============================================")
+
+	if !multiInst && !acquireSingleInstance("Local\\xnavi-core-v3") {
+		fmt.Println("  !! 已有 xnavi / xnavi-pc 实例正在运行，本实例退出；")
+		fmt.Println("  !! 请先关闭旧实例再重启（若需强制多开可加 --multi 参数）。")
+		return
+	}
 
 	loc = newLocator("savagewind.exe")
 	go saves.loop()
@@ -150,7 +159,7 @@ func printHelp() {
 func locateLoop() {
 	for {
 		loc.tick()
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 
@@ -379,6 +388,7 @@ func listenOwnedPorts(base int, tlsCfg *tls.Config, h http.Handler) (owned []int
 		} else {
 			go http.Serve(ln, h)
 		}
+		break
 	}
 	return owned, skipped
 }

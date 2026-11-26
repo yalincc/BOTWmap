@@ -58,12 +58,18 @@ func readLocateModeConfig() string {
 func main() {
 	enableLogTimestamps()
 	primaryPort = 8766 // 实际主端口由 listenOwnedPorts 回填（8766 被占时顺延）
-	// 单实例锁：防多开（2026-10-08 真机事故——孤儿 core 占 8766 端口，
-	// 新 core HTTP 绑定失败 + 每次重启重新 auto 探测 → 表现为平台"换来换去"）。
-	// 已有实例（含残留）时本实例直接退出，提示用户先关旧实例。
-	if !acquireSingleInstance("Local\\xnavi-core-v3") {
-		fmt.Println("  !! 已有 xnavi-core 实例在运行（可能是残留进程），本实例退出；")
-		fmt.Println("  !! 请先关闭旧实例（任务管理器结束 xnavi-core.exe），再点开始定位")
+	multiInst := false
+	for _, a := range os.Args[1:] {
+		if a == "--multi" {
+			multiInst = true
+			break
+		}
+	}
+	// 单实例锁：防多开（与 xnavi-pc 共用同一互斥锁，避免双开抢端口/轮询）。
+	// 已有实例（含残留）时本实例直接退出，提示用户先关旧实例（--multi 可跳过）。
+	if !multiInst && !acquireSingleInstance("Local\\xnavi-core-v3") {
+		fmt.Println("  !! 已有 xnavi 实例在运行（可能是残留进程），本实例退出；")
+		fmt.Println("  !! 请先关闭旧实例（任务管理器结束 xnavi-core.exe / xnavi-pc.exe），再点开始定位")
 		return
 	}
 	port := 8766
@@ -79,6 +85,8 @@ func main() {
 		switch {
 		case a == "--no-open":
 			autoOpen = false
+		case a == "--multi":
+			// 已在 main 开头处理
 		case a == "--no-save":
 			useSave = false
 		case a == "--dump":
@@ -536,6 +544,7 @@ func listenOwnedPorts(base int, tlsCfg *tls.Config) (owned []int, skipped []int)
 		} else {
 			go http.Serve(ln, hdl)
 		}
+		break
 	}
 	return owned, skipped
 }

@@ -32,19 +32,21 @@ import (
 )
 
 type locatorState struct {
-	OK       bool
-	Verified bool
-	GX       float32 // X 东
-	GY       float32 // alt 高
-	GZ       float32 // Z 南+
-	MX       float32 // 地图像素
-	MY       float32
-	Age      float64
-	Source   string
-	PID      uint32
-	Offset   uintptr // 当前静态槽 guest VA 偏移（诊断/展示用）
-	Rescans  int
-	Note     string
+	OK        bool
+	Verified  bool
+	GX        float32 // X 东
+	GY        float32 // alt 高
+	GZ        float32 // Z 南+
+	MX        float32 // 地图像素
+	MY        float32
+	CamFacing float64 // 相机视野角度（度，BOTWmap 屏幕坐标系：0=东/+X, 90=南/+Z）
+	HasCam    bool
+	Age       float64
+	Source    string
+	PID       uint32
+	Offset    uintptr // 当前静态槽 guest VA 偏移（诊断/展示用）
+	Rescans   int
+	Note      string
 }
 
 type locator struct {
@@ -62,6 +64,14 @@ type locator struct {
 	hasLock bool
 	cache   *chainCache
 	fp      string // 游戏构建指纹
+
+	// 相机锁（独立于玩家锁，失败不影响玩家位置输出）
+	camSlotOff  uintptr
+	camObj      uintptr
+	camPosOff   uintptr
+	hasCamLock  bool
+	lastCamScan time.Time
+	camFail     int
 
 	// 失败与重扫节奏
 	fail      int
@@ -184,6 +194,7 @@ func (l *locator) markOffline(note string) {
 	changed := l.st.Note != note
 	l.st.OK = false
 	l.st.Verified = false
+	l.st.HasCam = false
 	l.st.Note = note
 	l.st.Source = ""
 	l.mu.Unlock()
@@ -193,12 +204,60 @@ func (l *locator) markOffline(note string) {
 	}
 }
 
+func (l *locator) sampleCamFacing(pos [3]float32) (float64, bool) {
+	if !l.hasCamLock {
+		if time.Since(l.lastCamScan) >= 3*time.Second {
+			l.lastCamScan = time.Now()
+			if sOff, obj, pOff, ok := l.resolveCameraByStaticSlots(pos); ok {
+				l.camSlotOff = sOff
+				l.camObj = obj
+				l.camPosOff = pOff
+				l.hasCamLock = true
+				l.camFail = 0
+				fmt.Printf("  [cam] 相机命中：槽 0x%X 对象 0x%X (+0x%X)\n", sOff, obj, pOff)
+			}
+		}
+	}
+	if !l.hasCamLock {
+		return 0, false
+	}
+	cpos, ok := l.tripleRawAt(l.camObj + l.camPosOff)
+	if !ok {
+		l.camFail++
+		if l.camFail >= 5 {
+			l.hasCamLock = false
+			l.camObj = 0
+			l.camSlotOff = 0
+			l.camFail = 0
+		}
+		return 0, false
+	}
+	l.camFail = 0
+	dx := float64(pos[0] - cpos[0])
+	dz := float64(pos[2] - cpos[2])
+	if dx*dx+dz*dz < 0.04 {
+		return 0, false
+	}
+	return math.Atan2(dz, dx) * 180.0 / math.Pi, true
+}
+
 func (l *locator) updateState(pos [3]float32, source string, verified bool) {
+	var camFacing float64
+	var hasCam bool
+	if source == "chain" {
+		camFacing, hasCam = l.sampleCamFacing(pos)
+	}
 	l.mu.Lock()
 	l.st.OK = true
 	l.st.Verified = verified
 	l.st.GX, l.st.GY, l.st.GZ = pos[0], pos[1], pos[2]
 	l.st.MX, l.st.MY = 2*pos[0]+12000, 2*pos[2]+10000
+	if hasCam {
+		l.st.CamFacing = camFacing
+		l.st.HasCam = true
+	} else if source != "chain" {
+		l.st.HasCam = false
+	}
 	l.st.Age = float64(time.Now().UnixNano()) / 1e9
 	l.st.Source = source
 	l.st.Offset = l.lock.SlotOff
@@ -315,6 +374,10 @@ func (l *locator) dropLock(why string) {
 	l.fail = 0
 	l.deepFails = 0
 	l.freezeSince = time.Time{}
+	l.hasCamLock = false
+	l.camObj = 0
+	l.camSlotOff = 0
+	l.camFail = 0
 }
 
 // tick 每拍调用一次（200ms）。
