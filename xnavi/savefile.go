@@ -32,10 +32,11 @@ var validSaveVersions = []uint32{0x24E2, 0x24EE, 0x2588, 0x29C0, 0x2A46, 0x3EF8,
 
 // SaveAnchor 一条存档的解析结果：内存三元组 = (X east, Y altitude, Z south+)。
 type SaveAnchor struct {
-	Path     string
-	Playtime uint32
-	Koroks   uint32
-	Pos      [3]float32 // (X, alt, Z) 内存序
+	WarpMarker [3]float32
+	Path       string
+	Playtime   uint32
+	Koroks     uint32
+	Pos        [3]float32 // (X, alt, Z) 内存序
 }
 
 // detectEndian 按头部版本字段判定：返回 true=小端（Switch），false=大端（Wii U/Cemu）。
@@ -75,6 +76,16 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 		o += 8
 	}
 
+	var marker [3]float32
+	const warpPosHash = 0x51f28649 // WarpDLC_DestPos, vector3f, default (0,0,0)
+	for i := 0x0C; i+24 <= len(data); i += 8 {
+		if u32(data[i:]) == warpPosHash && u32(data[i+8:]) == warpPosHash && u32(data[i+16:]) == warpPosHash {
+			for j := range marker {
+				marker[j] = math.Float32frombits(u32(data[i+4+j*8:]))
+			}
+			break
+		}
+	}
 	var pos [3]float32
 	hasPos := false
 	for i := 0x0C; i+24 <= len(data); i += 8 {
@@ -92,17 +103,31 @@ func parseGameData(path string) (map[uint32]uint32, *SaveAnchor) {
 		return entries, nil
 	}
 	return entries, &SaveAnchor{
-		Path:     path,
-		Playtime: entries[playtimeHash],
-		Koroks:   entries[korokCounterHash],
-		Pos:      pos,
+		WarpMarker: marker,
+		Path:       path,
+		Playtime:   entries[playtimeHash],
+		Koroks:     entries[korokCounterHash],
+		Pos:        pos,
 	}
 }
+
+// foundSave 记录一个命中的存档文件。
+// realPath 用于打开/统计文件；logicalPath 保留链接目录名——Eden「同步存档到
+// Ryujinx」会把标题存档目录替换成指向 Ryujinx 便携存储的符号链接，此时真实
+// 路径不含标题 ID，只有逻辑路径（链接名）才带 01007EF00011E000，供过滤用。
+type foundSave struct {
+	realPath    string
+	logicalPath string
+}
+
+// findSaveFilesMaxDepth 递归深度上限：防符号链接成环（链接指向祖先目录等）。
+const findSaveFilesMaxDepth = 12
 
 // findSaveFiles 在根目录下递归找当前游戏存档文件（不区分大小写）。
 // 支持 root 直接指向单个 .sav 文件。
 // 文件名清单来自游戏适配层（game.SaveFileNames），BOTW 为 game_data.sav。
-func findSaveFiles(root string, names []string) []string {
+// 目录符号链接会被解析后跟随（Eden「同步存档到 Ryujinx」功能即以链接实现）。
+func findSaveFiles(root string, names []string) []foundSave {
 	if root == "" {
 		return nil
 	}
@@ -113,32 +138,53 @@ func findSaveFiles(root string, names []string) []string {
 	if !fi.IsDir() {
 		for _, n := range names {
 			if strings.EqualFold(fi.Name(), n) {
-				return []string{root}
+				return []foundSave{{root, root}}
 			}
 		}
 		return nil
 	}
-	var out []string
-	filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	var out []foundSave
+	var walk func(realDir, logicalDir string, depth int)
+	walk = func(realDir, logicalDir string, depth int) {
+		if depth > findSaveFilesMaxDepth {
+			return
 		}
-		if !d.IsDir() {
+		entries, err := os.ReadDir(realDir)
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			real := filepath.Join(realDir, e.Name())
+			logical := filepath.Join(logicalDir, e.Name())
+			isDir := e.IsDir()
+			if !isDir && e.Type()&os.ModeSymlink != 0 {
+				// 符号链接：Stat 解析目标，指向目录则跟随（深度+2 计入防环预算）。
+				if fi, err := os.Stat(real); err == nil && fi.IsDir() {
+					walk(real, logical, depth+2)
+				}
+				continue
+			}
+			if isDir {
+				walk(real, logical, depth+1)
+				continue
+			}
 			for _, n := range names {
-				if strings.EqualFold(d.Name(), n) {
-					out = append(out, p)
+				if strings.EqualFold(e.Name(), n) {
+					out = append(out, foundSave{real, logical})
 					break
 				}
 			}
 		}
-		return nil
-	})
+	}
+	walk(root, root, 0)
 	return out
 }
 
 // allSaveFiles 按优先级探测当前平台的存档候选根目录（首个命中优先）。
 // 平台手动路径（--<平台>-save-dir，GUI 设置）由各平台 SaveRoots 最优先返回；
 // Eden 存档根可能混入其他 Switch 游戏存档（同目录多个 title），按 BOTW 标题 ID 过滤。
+// 过滤针对逻辑路径：跟随「同步存档到 Ryujinx」链接后，真实路径不含标题 ID，
+// 标题 ID 只在链接名（逻辑路径）上。返回真实路径供打开/统计。
 func allSaveFiles(p Platform) []string {
 	names := currentGame.SaveFileNames()
 	for _, root := range p.SaveRoots() {
@@ -147,9 +193,9 @@ func allSaveFiles(p Platform) []string {
 		}
 		files := findSaveFiles(root, names)
 		if p.Name() == "Eden" {
-			var ef []string
+			var ef []foundSave
 			for _, f := range files {
-				if strings.Contains(strings.ToUpper(f), botwTitleID) {
+				if strings.Contains(strings.ToUpper(f.logicalPath), botwTitleID) {
 					ef = append(ef, f)
 				}
 			}
@@ -159,9 +205,9 @@ func allSaveFiles(p Platform) []string {
 			seen := map[string]bool{}
 			var uniq []string
 			for _, f := range files {
-				if !seen[f] {
-					seen[f] = true
-					uniq = append(uniq, f)
+				if !seen[f.realPath] {
+					seen[f.realPath] = true
+					uniq = append(uniq, f.realPath)
 				}
 			}
 			sort.Strings(uniq)

@@ -10,10 +10,71 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestWarpArrivalNames(t *testing.T) {
+	var none [3]float32
+	for _, tc := range []struct {
+		pos, marker [3]float32
+		want        string
+	}{
+		{[3]float32{3779.74, 356, 2111.07}, none, "哈特诺古代研究所"},
+		{[3]float32{4507.4, 351.42, -3146.3}, none, "阿卡莱古代研究所"},
+		{[3]float32{2468.44, 993.31, -2540.13}, none, "神兽瓦·鲁达尼亚"},
+		{[3]float32{2468.44, 980, -2540.13}, none, "未识别落点"},
+		{[3]float32{-4022.127, 301.091, -3711.697}, none, "未识别落点"}, // Dungeon118 map icon
+		{[3]float32{123, 321, -999}, [3]float32{123, 320, -999}, "传送标注器（存档位置）"},
+		{[3]float32{3779.74, 356, 2111.07}, [3]float32{3779.74, 356, 2111.07}, "落点重叠"},
+		{none, none, "未识别落点"},
+	} {
+		if got := botwArrivalName(tc.pos, tc.marker); got != tc.want {
+			t.Errorf("%v: got %q, want %q", tc.pos, got, tc.want)
+		}
+	}
+	for _, point := range warpPoints {
+		if got := botwArrivalName(point.pos, none); got != point.name {
+			t.Errorf("%v: %s != %s", point.pos, got, point.name)
+		}
+	}
+}
+
+func TestWarpSaveVector(t *testing.T) {
+	for _, order := range []binary.ByteOrder{binary.LittleEndian, binary.BigEndian} {
+		data := make([]byte, 12)
+		order.PutUint32(data, 0x471E)
+		for _, hash := range []uint32{playerPositionHash, 0x51f28649} {
+			for _, v := range [3]float32{-321, 450, 987} {
+				var pair [8]byte
+				order.PutUint32(pair[:], hash)
+				order.PutUint32(pair[4:], math.Float32bits(v))
+				data = append(data, pair[:]...)
+			}
+		}
+		path := filepath.Join(t.TempDir(), "fixture.bin")
+		for _, complete := range []bool{true, false} {
+			if !complete {
+				data = data[:len(data)-1]
+			}
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, a := parseGameData(path)
+			want := [3]float32{}
+			if complete {
+				want = [3]float32{-321, 450, 987}
+			}
+			if a == nil || a.WarpMarker != want {
+				t.Fatalf("%v complete=%v: %v", order, complete, a)
+			}
+		}
+	}
+}
 
 func f32(v float32) []byte {
 	b := make([]byte, 4)
@@ -448,7 +509,7 @@ func TestProcessAnchoredSaveResolution(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := findSaveFiles(singleSave, []string{"game_data.sav"})
-	if len(found) != 1 || found[0] != singleSave {
+	if len(found) != 1 || found[0].realPath != singleSave {
 		t.Fatalf("findSaveFiles single file mismatch: got %v", found)
 	}
 
@@ -515,5 +576,50 @@ func TestSaveDownloadEndpoint(t *testing.T) {
 	}
 	if len(rr.Body.Bytes()) != len(saveBytes) {
 		t.Fatalf("expected %d bytes, got %d", len(saveBytes), len(rr.Body.Bytes()))
+	}
+}
+
+// Eden「同步存档到 Ryujinx」：标题存档目录被替换为指向 Ryujinx 便携存储的
+// 符号链接（junction）。存档扫描必须跟随链接找到 game_data.sav，且逻辑路径
+// 保留标题 ID 链接名（真实路径在 Ryujinx 目录下，不含标题 ID）。
+func TestFindSaveFilesFollowsSymlinkedTitleDir(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "eden-nand")                  // Eden 存档根
+	target := filepath.Join(base, "ryujinx-portable", "save") // Ryujinx 便携存储在 Eden 根之外
+	if err := os.MkdirAll(filepath.Join(target, "0", "0"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	save := filepath.Join(target, "0", "0", "game_data.sav")
+	if err := os.WriteFile(save, makeSave(t, true), 0644); err != nil {
+		t.Fatal(err)
+	}
+	titleDir := filepath.Join(root, "0000000000000000", "21EF5E6B0F84C8BE4E570F086B825BFA", botwTitleID)
+	if err := os.MkdirAll(filepath.Dir(titleDir), 0755); err != nil {
+		t.Fatal(err)
+	}
+	linked := false
+	if err := os.Symlink(target, titleDir); err == nil {
+		linked = true
+	} else if runtime.GOOS == "windows" {
+		// 无特权时用 junction 替代（两者都作为符号链接被扫描跟随）
+		out, err := exec.Command("cmd", "/c", "mklink", "/J", titleDir, target).CombinedOutput()
+		if err == nil {
+			linked = true
+		} else {
+			t.Logf("junction create failed: %v: %s", err, out)
+		}
+	}
+	if !linked {
+		t.Skip("cannot create symlink/junction in this environment")
+	}
+	found := findSaveFiles(root, []string{"game_data.sav"})
+	if len(found) != 1 {
+		t.Fatalf("expected 1 save through symlink, got %d: %v", len(found), found)
+	}
+	if !strings.Contains(strings.ToUpper(found[0].logicalPath), botwTitleID) {
+		t.Fatalf("logical path must keep the title-id link name: %q", found[0].logicalPath)
+	}
+	if fi, err := os.Stat(found[0].realPath); err != nil || fi.IsDir() {
+		t.Fatalf("realPath should be the save file: %q (%v)", found[0].realPath, err)
 	}
 }

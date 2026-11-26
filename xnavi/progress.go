@@ -36,6 +36,7 @@ type ProgressPoint struct {
 }
 
 type progressWatcher struct {
+	warpMarker [3]float32
 	mu         sync.RWMutex
 	ok         bool
 	refs       []ProgressPoint
@@ -147,7 +148,11 @@ func (w *progressWatcher) refresh() {
 		return
 	}
 	primary := anchors[0]
-	entries, _ := parseGameData(primary.Path)
+	entries, snapshot := parseGameData(primary.Path)
+	w.warpMarker = [3]float32{}
+	if snapshot != nil {
+		w.warpMarker = snapshot.WarpMarker
+	}
 	if entries == nil {
 		if !w.init {
 			logInfo("parse save failed: %s", primary.Path)
