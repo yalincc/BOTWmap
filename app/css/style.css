@@ -252,14 +252,25 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   font-size: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
 }
 .st-fold:hover { border-color: var(--gold-dim); color: var(--text); }
-.st-group { margin: 14px 0; }
-/* V1.6.6 第二轮：字号整体放大（老大反馈"根本看不清"），开关名加粗提亮 */
-.st-label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-.st-options { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.st-group { margin: 11px 0; }
+.st-inline { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.st-inline .st-label { margin-bottom: 0; white-space: nowrap; }
+/* V1.8.0 视觉层级：标题比选项按钮更醒目、更大，按钮紧凑易点 */
+.st-label { font-size: 14px; font-weight: 700; color: var(--gold-lite); margin-bottom: 6px; letter-spacing: .2px; }
+.st-options { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .st-opt {
-  padding: 7px 16px; min-height: 34px; border-radius: 7px; border: 1px solid var(--border);
-  background: #0f1a12; color: var(--text); font-size: 13.5px; cursor: pointer;
+  padding: 5px 11px; min-height: 28px; border-radius: 6px; border: 1px solid var(--border);
+  background: #0f1a12; color: var(--text); font-size: 12.5px; cursor: pointer;
 }
+.st-name-list { gap: 8px; }
+.st-name-item { display: inline-flex; align-items: center; gap: 4px; }
+.st-zoom-sel {
+  height: 28px; padding: 0 6px; border-radius: 6px;
+  border: 1px solid var(--border); background: #0f1a12; color: var(--gold-lite);
+  font-size: 12px; cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.st-zoom-sel:hover:not(:disabled) { border-color: var(--gold-dim); }
+.st-zoom-sel:disabled { opacity: .38; cursor: default; }
 .st-opt:hover { border-color: var(--gold-dim); }
 .st-opt.sel { border-color: var(--gold); color: var(--gold); background: rgba(242,201,76,.12); font-weight: 600; }
 /* 「清除」这类一次性动作按钮：与状态按钮区分，不参与选中态 */
@@ -899,6 +910,7 @@ body.sidebar-collapsed #sideCollapse { left: 0; }
   cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .tk-icon-btn:hover { background: rgba(255,255,255,.1); color: #fff; border-color: rgba(255,255,255,.45); }
+.tk-icon-btn:disabled { opacity: .32; cursor: default; pointer-events: none; }
 .tk-grip-acts .tk-nav { width: 22px; height: 22px; font-size: 13px; }
 .tk-close:hover { background: rgba(255,255,255,.1); color: #fff; }
 
@@ -1371,11 +1383,16 @@ html[lang="en"] .st-opt {
 }
 .adv-sec:last-child { margin-bottom: 0; }
 .adv-sec-title {
-  font-size: 13px; font-weight: 700; color: var(--gold-lite);
-  margin-bottom: 8px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 0 0 6px; margin-bottom: 8px;
+  border: none; border-bottom: 1px solid rgba(255, 255, 255, .07);
+  background: transparent; cursor: pointer; text-align: left;
+  font-size: 13.5px; font-weight: 700; color: var(--gold-lite);
 }
+.adv-sec-title:hover { color: var(--gold); }
+.adv-sec-tri { font-size: 12px; color: var(--text-dim); transition: transform .15s; }
+.adv-sec.collapsed .adv-sec-title { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.adv-sec.collapsed .adv-sec-body { display: none; }
 .adv-item { margin-bottom: 8px; }
 .adv-item:last-child { margin-bottom: 0; }
 .adv-item-label {

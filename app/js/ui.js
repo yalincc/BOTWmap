@@ -774,16 +774,16 @@ const UI = (() => {
       ver: 'v1.8.0',
       date: '2026-11-27',
       zh: [
-        '新增 60fps 平滑插值跟随与 80ms 高频轮询，地图跟随更丝滑',
-        '新增玩家视野扇形锥（PC 移植版支持右摇杆相机视角实时转动）',
-        '探索度面板改版为分组双列网格，同步状态并入「加载存档」按钮',
-        '存档修改器支持直接进入界面浏览全部模块，随时拖入或换档'
+        '新增 60Hz 游戏同步视野和定位，可在新增「高级设置」里设置',
+        '新增「名称显示」（探索收集 / 宝箱装备 / 任务名称 / 地区名称）与独立缩放阈值',
+        '新增宝箱卡片自动收集模式',
+        '优化图标显示逻辑、页面UI和存档修改页'
       ],
       en: [
-        '60fps smooth follow interpolation with 80ms live polling',
-        'Player FOV cone on map (real-time camera yaw on Savage Wind PC)',
-        'Two-column Exploration summary grid with synced status on Load Save button',
-        'Save Editor opens directly without blocking dropzone'
+        'Added 60Hz live follow & player FOV cone, configurable in Advanced Settings',
+        'Added Name Display filters (Explore / Chests & Gear / Quests / Regions) with zoom thresholds',
+        'Added Auto Collect mode to Chest cards',
+        'Improved map icon display, UI layout, and Save Editor workflow'
       ]
     },
     {
@@ -903,6 +903,17 @@ const UI = (() => {
         });
       });
     }
+    // 宝箱板块（V1.8.0）：1,312 个宝箱（含 N-/D-/M- 编号）并入搜索
+    if (window.__chestSearch) {
+      window.__chestSearch.forEach(t => {
+        searchIndex.push({
+          chest: t.entry, chestCode: t.code, chestSub: t.sub,
+          cat: 'chest_' + t.sub, name: t.name, searchName: t.searchName, en: t.en,
+          catCn: t.catCn, catEn: t.catEn,
+          px: t.px || null, region: ''
+        });
+      });
+    }
     // 供 quest.js 在移除旧任务标点后重建索引（防御性保留）
     window._rebuildSearch = buildSearchIndex;
     const input = $('searchInput');
@@ -929,9 +940,20 @@ const UI = (() => {
     if (!q) { hideResults(); return; }
     const ql = q.toLowerCase();
     const cleanNum = ql.startsWith('#') ? ql.slice(1).trim() : null;
+    // 支持纯数字宝箱编号（如 0987 / 987）精准直达
+    const chestCodeMatch = /^(\d{1,4})$/.exec(q);
+    let exactChestCode = null;
+    if (chestCodeMatch) {
+      exactChestCode = chestCodeMatch[1].padStart(4, '0');
+    }
     const hits = [];
+    if (exactChestCode) {
+      const exactIt = searchIndex.find(it => it.chestCode === exactChestCode);
+      if (exactIt) hits.push(exactIt);
+    }
     for (const it of searchIndex) {
       if (hits.length >= 40) break;
+      if (exactChestCode && it.chestCode === exactChestCode) continue;
       const nm = (it.name || '').toLowerCase();
       const snm = (it.searchName || '').toLowerCase();
       const en = (it.en || '').toLowerCase();
@@ -948,15 +970,39 @@ const UI = (() => {
       box.innerHTML = '<div class="sr-item"><span class="sr-meta">' + (isEn ? 'No results' : '无结果') + '</span></div>';
     } else {
       box.innerHTML = hits.map(h => {
-        const displayName = isEn ? (h.en || h.searchName || h.name) : (h.searchName || h.name);
+        const displayName = h.chest
+          ? (h.chestCode + ' ' + (isEn ? (h.en || h.name) : h.name))
+          : (isEn ? (h.en || h.searchName || h.name) : (h.searchName || h.name));
         const catMeta = isEn ? (h.catEn || h.catCn) : h.catCn;
         const regionMeta = h.region ? (' · ' + esc(h.region)) : '';
+        const isDoneItem = h.chest
+          ? !!(window.ChestPanel && window.ChestPanel.isDone && window.ChestPanel.isDone(h.px))
+          : (h.mat || h.quest || h.equip ? false : map._mkDone(h.mk));
+        const dataAttr = h.mat ? ('data-mat="' + h.mat.id + '"')
+          : h.quest ? ('data-quest="' + h.quest.key + '"')
+          : h.equip ? ('data-equip="' + h.equip.id + '"')
+          : h.chest ? ('data-chest="' + esc(h.chestCode) + '"')
+          : ('data-id="' + h.id + '"');
         return `
-        <div class="sr-item ${h.mat ? '' : h.quest ? '' : h.equip ? '' : (map._mkDone(h.mk) ? 'done' : '')}" ${h.mat ? 'data-mat="' + h.mat.id + '"' : h.quest ? 'data-quest="' + h.quest.key + '"' : h.equip ? 'data-equip="' + h.equip.id + '"' : 'data-id="' + h.id + '"'}>
+        <div class="sr-item ${isDoneItem ? 'done' : ''}" ${dataAttr}>
           <span class="sr-name">${esc(displayName)}</span>
           <span class="sr-meta">${catMeta}${regionMeta}</span>
         </div>`;
       }).join('');
+      // 宝箱命中（V1.8.0）：自动开启对应宝箱子图层 → 定位脉冲 → 打开宝箱卡
+      box.querySelectorAll('.sr-item[data-chest]').forEach(el => {
+        el.addEventListener('click', () => {
+          const entry = window.ChestPanel && window.ChestPanel.findByCode && window.ChestPanel.findByCode(el.dataset.chest);
+          if (entry && window.ChestPanel) {
+            if (window.ChestPanel.ensureSubOn) window.ChestPanel.ensureSubOn(entry.sub);
+            if (window.ChestPanel.locate) window.ChestPanel.locate(entry.pt);
+            if (window.SpotMark) window.SpotMark.set(entry.pt);
+            window.ChestPanel.openCard(entry);
+          }
+          hideResults();
+          $('searchInput').blur();
+        });
+      });
       // 任务命中（V1.6.0）：打开任务卡 + 定位 + 确保对应分类勾选可见
       box.querySelectorAll('.sr-item[data-quest]').forEach(el => {
         el.addEventListener('click', () => {
@@ -1252,18 +1298,55 @@ const UI = (() => {
       $('cardName').textContent = mkName;
     }
     $('cardEn').textContent = isEn ? (mk.cn || '') : (mk.en || '');
-    /* Boss head 控件：‹ › 翻同类 Boss（跳转视角并选卡） */
+    /* Boss / 克洛格 head 控件：‹ › 按顺序翻页（跳转视角 + 脉冲 + 选卡） */
     const headActs = $('cardHeadActs') || document.querySelector('#infoCard .card-head');
     if (headActs) {
       headActs.querySelectorAll('.card-nav').forEach(el => el.remove());
+      let mkSib = null, mkIdx = -1, loopNav = true;
       if (isBoss) {
-        const mkSib = bossSib, mkIdx = bossIdx;
+        mkSib = bossSib; mkIdx = bossIdx; loopNav = true;
+      } else if (mk.cat === 'seed') {
+        if (!map._korokSeq) {
+          map._korokSeq = map.data.markers
+            .filter(x => x.cat === 'seed')
+            .sort((a, b) => {
+              const na = Number(a.extra && a.extra.korok_no) || Number(String(a.id).replace(/\D/g, '')) || 0;
+              const nb = Number(b.extra && b.extra.korok_no) || Number(String(b.id).replace(/\D/g, '')) || 0;
+              return na - nb;
+            });
+        }
+        mkSib = map._korokSeq;
+        mkIdx = mkSib.indexOf(mk);
+        loopNav = false;
+      }
+      if (mkSib && mkSib.length > 1 && mkIdx >= 0) {
+        const jumpTo = (target) => {
+          if (!target) return;
+          const vy = (window.CardLayout && window.CardLayout.isMobile()) ? map.h * 0.35 : map.h / 2;
+          map.view.x = map.w / 2 - target.px[0] * map.view.scale;
+          map.view.y = vy - target.px[1] * map.view.scale;
+          map.draw();
+          if (map.pulseAt) map.pulseAt(target.px[0], target.px[1]);
+          map._onSelect({ marker: target });
+        };
         const mkPrev = document.createElement('button');
+        mkPrev.type = 'button';
         mkPrev.className = 'card-nav tk-icon-btn tk-nav'; mkPrev.textContent = '‹'; mkPrev.title = (window.I18N ? window.I18N.t('card.prev', '上一个') : '上一个') + ' ' + catName;
-        mkPrev.onclick = (e) => { e.stopPropagation(); const t = mkSib[(mkIdx - 1 + mkSib.length) % mkSib.length]; map.view.x = map.w / 2 - t.px[0] * map.view.scale; map.view.y = map.h / 2 - t.px[1] * map.view.scale; map.draw(); map._onSelect({ marker: t }); };
+        if (!loopNav && mkIdx <= 0) mkPrev.disabled = true;
+        mkPrev.onclick = (e) => {
+          e.stopPropagation();
+          if (!loopNav && mkIdx <= 0) return;
+          jumpTo(mkSib[(mkIdx - 1 + mkSib.length) % mkSib.length]);
+        };
         const mkNext = document.createElement('button');
+        mkNext.type = 'button';
         mkNext.className = 'card-nav tk-icon-btn tk-nav'; mkNext.textContent = '›'; mkNext.title = (window.I18N ? window.I18N.t('card.next', '下一个') : '下一个') + ' ' + catName;
-        mkNext.onclick = (e) => { e.stopPropagation(); const t = mkSib[(mkIdx + 1) % mkSib.length]; map.view.x = map.w / 2 - t.px[0] * map.view.scale; map.view.y = map.h / 2 - t.px[1] * map.view.scale; map.draw(); map._onSelect({ marker: t }); };
+        if (!loopNav && mkIdx >= mkSib.length - 1) mkNext.disabled = true;
+        mkNext.onclick = (e) => {
+          e.stopPropagation();
+          if (!loopNav && mkIdx >= mkSib.length - 1) return;
+          jumpTo(mkSib[(mkIdx + 1) % mkSib.length]);
+        };
         headActs.insertBefore(mkPrev, $('cardClose'));
         headActs.insertBefore(mkNext, $('cardClose'));
       }
@@ -1272,7 +1355,13 @@ const UI = (() => {
     if (copyBtn) {
       copyBtn.onclick = (e) => {
         e.stopPropagation();
-        const txt = (isBoss ? '#' + (bossIdx + 1) + ' ' : '') + mkName;
+        let txt;
+        if (mk.cat === 'seed') {
+          const kNo = mk.extra && mk.extra.korok_no ? String(mk.extra.korok_no) : String(mk.id).replace(/\D/g, '');
+          txt = (isEn ? 'Korok' : '克洛格') + (kNo ? (' No.' + kNo.padStart(3, '0')) : '');
+        } else {
+          txt = (isBoss ? '#' + (bossIdx + 1) + ' ' : '') + mkName;
+        }
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(txt);
           toast((window.I18N ? window.I18N.t('toast.copied', '已复制：') : '已复制：') + txt);
@@ -1761,8 +1850,14 @@ const UI = (() => {
         }
       }
     } catch (e) {}
-    // V1.6.6：显示设置统一走 window.BOTW_SETTINGS（旧 key 已在那里迁移过）
+    // V1.6.6 / V1.8.0：显示设置统一走 window.BOTW_SETTINGS（旧 key 已在那里迁移过）
     map.showRegions = !!window.BOTW_SETTINGS.s.regionShow;
+    map.showIconNames = window.BOTW_SETTINGS.s.iconNames !== false;
+    map.showChestEquipNames = window.BOTW_SETTINGS.s.chestEquipNames !== false;
+    map.showTaskNames = !!window.BOTW_SETTINGS.s.taskNames;
+    map.iconNameMinPct = window.BOTW_SETTINGS.s.iconNameMinPct || 1600;
+    map.chestEquipNameMinPct = window.BOTW_SETTINGS.s.chestEquipNameMinPct || 1600;
+    map.taskNameMinPct = window.BOTW_SETTINGS.s.taskNameMinPct || 2000;
     // 同步行状态与图层计数
     document.querySelectorAll('#layerList .lrow[data-cat]').forEach(r => r.classList.toggle('on', map.enabled.has(r.dataset.cat)));
     document.querySelectorAll('#layerList .mat-item').forEach(r => r.classList.toggle('on', map.matIds.has(+r.dataset.matid)));
@@ -1827,51 +1922,43 @@ const UI = (() => {
       if (e.key === 'Escape' && !box.classList.contains('hidden')) closeBox();
     });
 
-    const syncStyle = () => {
-      const st = map.regionStyle;
-      const setOpt = (sel, v) => {
-        document.querySelectorAll(`#${sel} .st-opt`).forEach(b => b.classList.toggle('sel', b.dataset.v === v));
-      };
-      // 地名显示
-      setOpt('stShowOptions', map.showRegions ? 'show' : 'hide');
-      // 文字颜色
-      const txHex = rgbToHex(st.tx);
-      if (txHex === rgbToHex(DEFAULT_STYLE.tx)) setOpt('stTxOptions', 'default');
-      else if (txHex === '#000000') setOpt('stTxOptions', '#000000');
-      else if (txHex === '#ffffff') setOpt('stTxOptions', '#ffffff');
-      else { setOpt('stTxOptions', '__custom'); $('stTxColor').value = txHex; }
-      // 底色
-      const bgHex = rgbToHex(st.bg);
-      if (bgHex === rgbToHex(DEFAULT_STYLE.bg)) setOpt('stBgOptions', 'default');
-      else if (bgHex === '#000000') setOpt('stBgOptions', '#000000');
-      else if (bgHex === '#ffffff') setOpt('stBgOptions', '#ffffff');
-      else { setOpt('stBgOptions', '__custom'); $('stBgColor').value = bgHex; }
-      // 大小
-      let sz = 'medium';
-      for (const k in FONT_SIZES) if (Math.abs(FONT_SIZES[k] - (st.fsz || 1)) < 0.01) sz = k;
-      setOpt('stSizeOptions', sz);
-      // 透明度
-      $('stTxAlpha').value = Math.round(st.txA * 100);
-      $('stTxAlphaV').textContent = Math.round(st.txA * 100) + '%';
-      $('stBgAlpha').value = Math.round(st.bgA * 100);
-      $('stBgAlphaV').textContent = Math.round(st.bgA * 100) + '%';
-      // 描边
-      const scHex = st.sc ? rgbToHex(st.sc) : '';
-      if (!st.sw || st.sw <= 0 || !scHex) setOpt('stStrokeOptions', 'none');
-      else if (scHex === '#000000') setOpt('stStrokeOptions', '#000000');
-      else if (scHex === '#ffffff') setOpt('stStrokeOptions', '#ffffff');
-      else { setOpt('stStrokeOptions', '__custom'); $('stStrokeColor').value = scHex; }
-      $('stStrokeWidth').value = st.sw || 0;
-      $('stStrokeWidthV').textContent = (st.sw || 0) % 1 === 0 ? (st.sw || 0) : (st.sw || 0).toFixed(1);
+    // 供「更多高级设置」弹窗复用（地名文字样式已移入高级设置折叠分组）
+    window.__botwRegionStyleApi = {
+      DEFAULT_STYLE: DEFAULT_STYLE,
+      FONT_SIZES: FONT_SIZES,
+      saveStyle: saveStyle,
+      hexToRgb: hexToRgb,
+      rgbToHex: rgbToHex,
     };
-    function applyStyle(fn) {
-      fn(map.regionStyle);
-      saveStyle();
-      map.draw();
-      syncStyle();
-    }
 
-    /* ---------- V1.6.6 行为开关：已完成标记 / 龙轨迹 / 小岩石人 / 折叠样式 ---------- */
+    const syncStyle = () => {
+      // 名称显示四项（探索收集 + 下拉 / 宝箱装备 + 下拉 / 任务名称 + 下拉 / 地区名称）
+      const pIcon = $('stPillIconNames');
+      if (pIcon) pIcon.classList.toggle('sel', !!map.showIconNames);
+      const sIcon = $('stIconZoom');
+      if (sIcon) {
+        sIcon.value = String(map.iconNameMinPct || 1600);
+        sIcon.disabled = !map.showIconNames;
+      }
+      const pCE = $('stPillChestEquipNames');
+      if (pCE) pCE.classList.toggle('sel', !!map.showChestEquipNames);
+      const sCE = $('stChestEquipZoom');
+      if (sCE) {
+        sCE.value = String(map.chestEquipNameMinPct || 1600);
+        sCE.disabled = !map.showChestEquipNames;
+      }
+      const pTask = $('stPillTaskNames');
+      if (pTask) pTask.classList.toggle('sel', !!map.showTaskNames);
+      const sTask = $('stTaskZoom');
+      if (sTask) {
+        sTask.value = String(map.taskNameMinPct || 2000);
+        sTask.disabled = !map.showTaskNames;
+      }
+      const pReg = $('stPillRegionNames');
+      if (pReg) pReg.classList.toggle('sel', !!map.showRegions);
+    };
+
+    /* ---------- V1.8.0 行为开关（单行紧凑排版） ---------- */
     const S = window.BOTW_SETTINGS;
     const HIDE_CAT_DEF = [
       ['shrine', '神庙'], ['seed', '克洛格'], ['memory', '回忆'], ['chest', '宝箱'],
@@ -1885,13 +1972,16 @@ const UI = (() => {
       syncSettingsFn = syncSettings;
       setOptBtn('stLang', window.I18N ? window.I18N.getLang() : 'zh');
       setOptBtn('stDoneMode', S.s.doneMode);
-      setOptBtn('stDragonPath', S.s.dragonPath ? 'show' : 'hide');
-      // 移动轨迹：缺键时按「显示」处理（保持原行为，老用户不会突然不画）
-      setOptBtn('stLiveTrail', S.s.liveTrail === false ? 'hide' : 'show');
+      const exDragon = $('stExDragon');
+      if (exDragon) exDragon.classList.toggle('sel', !!S.s.dragonPath);
+      const exTrail = $('stExTrail');
+      if (exTrail) exTrail.classList.toggle('sel', S.s.liveTrail !== false);
       const dlcOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().quest || window.EnemyTiers.dlcState().dlc2));
-      setOptBtn('stDlcQuest', dlcOn ? 'show' : 'hide');
+      const exDlc = $('stExDlcQuest');
+      if (exDlc) exDlc.classList.toggle('sel', dlcOn);
       const masterOn = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().hardmode || window.EnemyTiers.dlcState().master));
-      setOptBtn('stMasterMode', masterOn ? 'show' : 'hide');
+      const exMaster = $('stExMasterMode');
+      if (exMaster) exMaster.classList.toggle('sel', masterOn);
       $('stHideCats').classList.toggle('hidden', S.s.doneMode !== 'hide');
       if (chipsWrap) {
         chipsWrap.querySelectorAll('.st-chip').forEach(c => {
@@ -1901,6 +1991,7 @@ const UI = (() => {
           }
         });
       }
+      syncStyle();
     }
     // 类目 chips
     const chipsWrap = $('stHideChips');
@@ -1931,22 +2022,20 @@ const UI = (() => {
         S.save(); map.draw(); syncSettings();
       });
     });
-    // 龙飞行轨迹（V1.6.6 从图层面板敌人组移到设置）
-    document.querySelectorAll('#stDragonPath .st-opt').forEach(b => {
+    // V1.8.0 附加显示（合并龙轨迹 / 移动轨迹 / 清轨迹 / DLC2怪 / 大师模式怪）
+    document.querySelectorAll('#stExtraDisplay .st-opt').forEach(b => {
       b.addEventListener('click', () => {
-        S.s.dragonPath = b.dataset.v === 'show';
-        S.save(); map.draw(); syncSettings();
-      });
-    });
-    // 玩家移动轨迹：显示 / 隐藏 / 清除（V1.7.2）
-    document.querySelectorAll('#stLiveTrail .st-opt').forEach(b => {
-      b.addEventListener('click', () => {
-        const v = b.dataset.v;
-        if (v === 'clear') {
-          // 「清除」是一次性动作：清空已记录的轨迹点，并把显示状态复位为「显示」
+        const k = b.dataset.k;
+        if (k === 'dragonPath') {
+          S.s.dragonPath = !S.s.dragonPath;
+          S.save(); map.draw(); syncSettings();
+        } else if (k === 'liveTrail') {
+          S.s.liveTrail = (S.s.liveTrail === false);
+          S.save(); map.draw(); syncSettings();
+        } else if (k === 'clearTrail') {
           let n = 0;
           try { if (typeof LIVE !== 'undefined' && LIVE.clearTrail) n = LIVE.clearTrail(); } catch (e) {}
-          if (!n && map && map.live && Array.isArray(map.live.trail)) {   // 兜底：live.js 未就绪时直接清
+          if (!n && map && map.live && Array.isArray(map.live.trail)) {
             n = map.live.trail.length;
             map.live.trail.length = 0;
             map.draw();
@@ -1956,98 +2045,95 @@ const UI = (() => {
           UI.toast(window.I18N
             ? window.I18N.t('toast.trailCleared', '轨迹已清除') + (n > 0 ? '（' + n + '）' : '')
             : '轨迹已清除');
-          return;
+        } else if (k === 'dlcQuest') {
+          const cur = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().quest || window.EnemyTiers.dlcState().dlc2));
+          if (window.EnemyTiers && window.EnemyTiers.setDlc) window.EnemyTiers.setDlc('quest', !cur);
+          map.draw(); syncSettings();
+        } else if (k === 'masterMode') {
+          const cur = !!(window.EnemyTiers && window.EnemyTiers.dlcState && (window.EnemyTiers.dlcState().hardmode || window.EnemyTiers.dlcState().master));
+          if (window.EnemyTiers && window.EnemyTiers.setDlc) window.EnemyTiers.setDlc('hardmode', !cur);
+          map.draw(); syncSettings();
         }
-        S.s.liveTrail = (v === 'show');
-        S.save(); map.draw(); syncSettings();
       });
     });
-    // DLC2 任务怪（一击剑）
-    document.querySelectorAll('#stDlcQuest .st-opt').forEach(b => {
-      b.addEventListener('click', () => {
-        const show = b.dataset.v === 'show';
-        if (window.EnemyTiers && window.EnemyTiers.setDlc) {
-          window.EnemyTiers.setDlc('quest', show);
-        }
-        map.draw();
-        syncSettings();
-      });
-    });
-    // 大师模式专属怪（空中八爪怪等）
-    document.querySelectorAll('#stMasterMode .st-opt').forEach(b => {
-      b.addEventListener('click', () => {
-        const show = b.dataset.v === 'show';
-        if (window.EnemyTiers && window.EnemyTiers.setDlc) {
-          window.EnemyTiers.setDlc('hardmode', show);
-        }
-        map.draw();
-        syncSettings();
-      });
-    });
-    // V1.6.6 第二轮：小岩石人开关移除 —— 它属于敌人大类，跟随敌人图层勾选即可
-    // 地名文字样式折叠
-    const styleBody = $('stStyleBody');
-    $('stStyleToggle').addEventListener('click', () => {
-      const open = styleBody.classList.contains('hidden');
-      styleBody.classList.toggle('hidden', !open);
-      $('stStyleTri').textContent = open ? '▾' : '▸';
-    });
-    // 图层面板「隐藏标记」按钮 → 直接打开设置面板（V1.6.6 第二轮：替代原左侧栏提醒条）
+    // 图层面板「隐藏标记」按钮 → 直接打开设置面板
     const btnHideMark = $('btnHideMark');
     if (btnHideMark) btnHideMark.addEventListener('click', () => {
       box.classList.remove('hidden'); syncStyle(); syncSettings();
     });
     syncSettings();
-    // 地名显示开关（V1.6.6：持久化统一走 window.BOTW_SETTINGS）
-    document.querySelectorAll('#stShowOptions .st-opt').forEach(b => {
+    // V1.8.0 名称显示 4 项独立点击开关（探索收集 / 宝箱装备 / 任务名称 / 地区名称）
+    document.querySelectorAll('#stMapDisplay .st-opt').forEach(b => {
       b.addEventListener('click', () => {
-        map.showRegions = b.dataset.v === 'show';
-        S.s.regionShow = map.showRegions;
+        const k = b.dataset.k;
+        if (k === 'iconNames') {
+          map.showIconNames = !map.showIconNames;
+          S.s.iconNames = map.showIconNames;
+        } else if (k === 'chestEquipNames') {
+          map.showChestEquipNames = !map.showChestEquipNames;
+          S.s.chestEquipNames = map.showChestEquipNames;
+        } else if (k === 'regionShow') {
+          map.showRegions = !map.showRegions;
+          S.s.regionShow = map.showRegions;
+        } else if (k === 'taskNames') {
+          map.showTaskNames = !map.showTaskNames;
+          S.s.taskNames = map.showTaskNames;
+        }
         S.save();
         map.draw();
         syncStyle();
       });
     });
-    // V1.6.6 第二轮：克洛格轨迹开关移除 —— 跟随「克洛格」图层勾选，勾了就画轨迹（老大拍板方案 A）
-    // V1.4.3b：龙轨迹开关移除（改由图层面板「龙」分类勾选控制）
-    // 文字颜色
-    document.querySelectorAll('#stTxOptions .st-opt[data-v]').forEach(b => {
-      if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.tx = DEFAULT_STYLE.tx.slice(); }));
-      else b.addEventListener('click', () => applyStyle(st => { const c = hexToRgb(b.dataset.v); if (c) st.tx = c; }));
-    });
-    $('stTxColor').addEventListener('input', e => applyStyle(st => { const c = hexToRgb(e.target.value); if (c) st.tx = c; }));
-    // 文字大小
-    document.querySelectorAll('#stSizeOptions .st-opt').forEach(b => {
-      b.addEventListener('click', () => applyStyle(st => { st.fsz = FONT_SIZES[b.dataset.v] || 1; }));
-    });
-    // 底色
-    document.querySelectorAll('#stBgOptions .st-opt[data-v]').forEach(b => {
-      if (b.dataset.v === 'default') b.addEventListener('click', () => applyStyle(st => { st.bg = DEFAULT_STYLE.bg.slice(); }));
-      else b.addEventListener('click', () => applyStyle(st => { const c = hexToRgb(b.dataset.v); if (c) st.bg = c; }));
-    });
-    $('stBgColor').addEventListener('input', e => applyStyle(st => { const c = hexToRgb(e.target.value); if (c) st.bg = c; }));
-    // 文字/底色透明度
-    $('stTxAlpha').addEventListener('input', e => applyStyle(st => { st.txA = Math.min(1, Math.max(0, e.target.value / 100)); }));
-    $('stBgAlpha').addEventListener('input', e => applyStyle(st => { st.bgA = Math.min(1, Math.max(0, e.target.value / 100)); }));
-    // 描边颜色
-    document.querySelectorAll('#stStrokeOptions .st-opt[data-v]').forEach(b => {
-      if (b.dataset.v === 'none') b.addEventListener('click', () => applyStyle(st => { st.sw = 0; }));
-      else b.addEventListener('click', () => applyStyle(st => { const c = hexToRgb(b.dataset.v); if (c) { st.sc = c; st.sw = st.sw || 2; } }));
-    });
-    $('stStrokeColor').addEventListener('input', e => applyStyle(st => { const c = hexToRgb(e.target.value); if (c) { st.sc = c; st.sw = st.sw || 2; } }));
-    // 描边粗细
-    $('stStrokeWidth').addEventListener('input', e => applyStyle(st => { st.sw = Math.max(0, Math.min(6, parseFloat(e.target.value) || 0)); }));
+    // V1.8.0 探索收集 / 宝箱装备 / 任务名称各自独立缩放下拉阈值
+    const sIconZoom = $('stIconZoom');
+    if (sIconZoom) {
+      sIconZoom.addEventListener('change', () => {
+        const pct = parseInt(sIconZoom.value, 10) || 1600;
+        map.iconNameMinPct = pct;
+        S.s.iconNameMinPct = pct;
+        S.save();
+        map.draw();
+      });
+    }
+    const sCEZoom = $('stChestEquipZoom');
+    if (sCEZoom) {
+      sCEZoom.addEventListener('change', () => {
+        const pct = parseInt(sCEZoom.value, 10) || 1600;
+        map.chestEquipNameMinPct = pct;
+        S.s.chestEquipNameMinPct = pct;
+        S.save();
+        map.draw();
+      });
+    }
+    const sTaskZoom = $('stTaskZoom');
+    if (sTaskZoom) {
+      sTaskZoom.addEventListener('change', () => {
+        const pct = parseInt(sTaskZoom.value, 10) || 2000;
+        map.taskNameMinPct = pct;
+        S.s.taskNameMinPct = pct;
+        S.save();
+        map.draw();
+      });
+    }
     // 恢复默认
     $('stReset').addEventListener('click', () => {
       map.regionStyle = Object.assign({}, DEFAULT_STYLE);
       S.s.doneMode = S.D.doneMode;
       S.s.hideCats = Object.assign({}, S.D.hideCats);
-      S.s.dragonPath = true; S.s.regionShow = true;
+      S.s.dragonPath = true; S.s.liveTrail = true; S.s.regionShow = true;
+      S.s.iconNames = true; S.s.chestEquipNames = true; S.s.taskNames = false;
+      S.s.iconNameMinPct = 1600; S.s.chestEquipNameMinPct = 1600; S.s.taskNameMinPct = 2000;
       if (window.EnemyTiers && window.EnemyTiers.setDlc) {
         window.EnemyTiers.setDlc('quest', false);
         window.EnemyTiers.setDlc('hardmode', false);
       }
       map.showRegions = true;
+      map.showIconNames = true;
+      map.showChestEquipNames = true;
+      map.showTaskNames = false;
+      map.iconNameMinPct = 1600;
+      map.chestEquipNameMinPct = 1600;
+      map.taskNameMinPct = 2000;
       if (window.I18N) window.I18N.setLang('zh');
       S.save(); saveStyle(); map.draw(); syncStyle(); syncSettings();
       chipsWrap.querySelectorAll('.st-chip').forEach(c => {

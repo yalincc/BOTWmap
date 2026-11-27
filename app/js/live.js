@@ -65,6 +65,7 @@ const LIVE = (() => {
   function init(m) {
     map = m;
     m.data.categories.forEach(c => { if (c.cn) CAT_CN[c.key] = c.cn; });
+    CAT_CN.chest = '宝箱';
     map.live = {
       mx: null, my: null, gx: 0, gy: 0, gz: 0,
       online: false, verified: false,
@@ -884,8 +885,24 @@ const LIVE = (() => {
     ].join('\n');
   }
 
+  function isItemDone(mk) {
+    if (!mk) return true;
+    if (mk.cat === 'chest') {
+      return !!(window.ChestPanel && window.ChestPanel.isDone && mk.px && window.ChestPanel.isDone(mk.px));
+    }
+    return map._mkDone(mk);
+  }
   function collectPool(cat) {
     const out = [];
+    if (cat === 'chest') {
+      const list = (window.ChestPanel && window.ChestPanel.collectItems) ? window.ChestPanel.collectItems() : [];
+      for (const mk of list) {
+        if (isItemDone(mk)) continue;
+        if (mode && mode.done && mode.done.has(mk.id)) continue;
+        out.push(mk);
+      }
+      return out;
+    }
     for (const mk of map.markers) {
       if (mk.cat !== cat) continue;
       if (cat === 'memory' && !isPhotoMemory(mk)) continue;  // EX / 英杰 / 大师剑不进自动队列
@@ -910,9 +927,15 @@ const LIVE = (() => {
     return best;
   }
   function collectCounts(cat) {
-    // 回忆按照片 13 个现算（存档逐点已同步到标记）；克洛格用服务返回的 900 总数
+    // 回忆按照片 13 个现算（存档逐点已同步到标记）；克洛格用服务返回的 900 总数；宝箱按当前已勾选子类现算
     const c = map.live.counts || {};
     if (cat === 'seed' && c.korok) return c.korok;
+    if (cat === 'chest') {
+      const list = (window.ChestPanel && window.ChestPanel.collectItems) ? window.ChestPanel.collectItems() : [];
+      let d = 0;
+      for (const mk of list) { if (isItemDone(mk)) d++; }
+      return [d, list.length];
+    }
     let t = 0, d = 0;
     for (const mk of map.markers) {
       if (mk.cat !== cat) continue;
@@ -924,6 +947,24 @@ const LIVE = (() => {
   }
   let _idMap = null;
   function byId(id) {
+    if (!id) return null;
+    if (typeof id === 'string' && id.startsWith('chest:')) {
+      const code = id.slice(6);
+      const e = window.ChestPanel && window.ChestPanel.findByCode && window.ChestPanel.findByCode(code);
+      if (e) {
+        const it = e.item || {};
+        return {
+          id: 'chest:' + e.code,
+          code: e.code,
+          name: it.contentCn || it.en || it.content || '宝箱',
+          en: it.en || '',
+          px: [e.pt[0], e.pt[1]],
+          cat: 'chest',
+          entry: e
+        };
+      }
+      return null;
+    }
     if (!_idMap) { _idMap = new Map(); map.markers.forEach(mk => _idMap.set(mk.id, mk)); }
     return _idMap.get(id) || null;
   }
@@ -943,14 +984,14 @@ const LIVE = (() => {
     if (!pool.length) { UI.toast('🎉 ' + (CAT_CN[cat] || cat) + '已全部收集完成'); return; }
     const near = nearestIn(pool);
     let first = null;
-    if (cat === 'seed' && mk && !map._mkDone(mk)) first = mk;      // 克洛格：点哪个导航哪个
-    if (!first) first = near;                                      // 回忆：最近的未收集
+    if ((cat === 'seed' || cat === 'chest') && mk && !isItemDone(mk)) first = mk;  // 克洛格 / 宝箱：点哪个导航哪个
+    if (!first) first = near;                                                      // 回忆：最近的未收集
     mode = {
       cat,
       arrivedMem: false,        // 回忆模式：到达提示只弹一次
       done: new Set(),          // 本会话已确认完成的标点（防存档同步抹回后队列原地打转）
       /* 手动点选的标点若不是最近的 → 原地 30m 内保护它，不被就近切走 */
-      pin: (cat === 'seed' && near && first.id !== near.id && map.live.mx != null)
+      pin: ((cat === 'seed' || cat === 'chest') && near && first.id !== near.id && map.live.mx != null)
         ? { x: map.live.mx, y: map.live.my } : null,
     };
     navTgt = null;   // 进入收集模式：手动导航目标让位于自动队列
@@ -960,6 +1001,7 @@ const LIVE = (() => {
     feedVoice('start_auto', first);
     navFollow(first);    // 卡片伴随切到这颗（呀哈哈且在 50m 内会立即弹）
     renderCollectBar();
+    if (window.ChestPanel && window.ChestPanel.syncCollectBtn) window.ChestPanel.syncCollectBtn();
     map.draw();
   }
   function stopCollectMode() {
@@ -969,6 +1011,7 @@ const LIVE = (() => {
     resetCard();                      // 显式「结束」→ 收卡并停止跟随（导航线保留）
     renderCollectBar();               // 隐藏横幅
     if (UI && UI.syncCollectBtn) UI.syncCollectBtn();
+    if (window.ChestPanel && window.ChestPanel.syncCollectBtn) window.ChestPanel.syncCollectBtn();
   }
   function isModeActive(cat) { return !!(mode && mode.cat === cat); }
 
@@ -1070,7 +1113,7 @@ const LIVE = (() => {
       stopCollectMode();
       return;
     }
-    const wasDone = !!(prev && map._mkDone(prev));
+    const wasDone = !!(prev && isItemDone(prev));
     const next = nearestIn(pool);
     if (!next) return;
     const d = distM(next);
@@ -1106,7 +1149,7 @@ const LIVE = (() => {
 
     /* 当前目标以本地 curId 为准（服务端 /pos 的目标回显有一帧滞后，不能拿来判完成） */
     const cur = byId(curId);
-    if (!cur || map._mkDone(cur)) {
+    if (!cur || isItemDone(cur)) {
       /* 本会话记住这颗已完成：存档同步每 20s 重建完成集合会把手动勾的抹掉，
          抹掉后它又成了最近点，队列会原地打转（Bug 1 的根因） */
       if (cur) mode.done.add(cur.id);
@@ -1115,6 +1158,7 @@ const LIVE = (() => {
     }
 
     const SEED = mode.cat === 'seed';
+    const DYNAMIC_NEAR = SEED || mode.cat === 'chest';
     const d = distM(cur);
 
     // 1) 手动保护释放：走 / 传出 30m 后恢复动态就近
@@ -1123,8 +1167,8 @@ const LIVE = (() => {
       if (moved >= PIN_RELEASE) mode.pin = null;
     }
 
-    // 2) 就近切点（呀哈哈专属）：出现比当前目标近 15m 以上的未完成点 → 切过去
-    if (SEED && !mode.pin && L.mx != null) {
+    // 2) 就近切点（呀哈哈 / 宝箱）：出现比当前目标近 15m 以上的未完成点 → 切过去
+    if (DYNAMIC_NEAR && !mode.pin && L.mx != null) {
       const best = nearestIn(pool);
       if (best && best.id !== curId) {
         const db = distM(best);
@@ -1140,7 +1184,7 @@ const LIVE = (() => {
       }
     }
 
-    // 3) 回忆：只保留原「到达提示」（呀哈哈的弹收卡已在 tickCard 里）
+    // 3) 回忆 / 宝箱：到达提示（呀哈哈的弹收卡已在 tickCard 里）
     if (!SEED) {
       if (d <= ARRIVE_M_MEM) {
         if (!mode.arrivedMem) { mode.arrivedMem = true; UI.toast('已到达：' + mkLabel(cur) + ' · 收集后自动前往下一个'); }

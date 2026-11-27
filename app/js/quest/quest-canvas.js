@@ -64,6 +64,20 @@
         }
         if (done) global.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
         ctx.restore();
+        if (map.registerIconBox) map.registerIconBox(sx, sy, size / 2, size / 2);
+        var zoomOk = map.isTaskLabelZoomOk ? map.isTaskLabelZoomOk() : (scale >= 0.45);
+        if (map.showTaskNames && zoomOk && !done && j === 0 && map.registerLabel) {
+          var qName = global.I18N ? global.I18N.nameOf(q) : (q.name || q.en || '');
+          if (qName) {
+            map.registerLabel({
+              text: qName,
+              sx: sx, sy: sy,
+              halfW: size / 2, halfH: size / 2,
+              priority: 5, done: false,
+              color: '#ffe59e', isTask: true
+            });
+          }
+        }
       }
     }
     if (global.QuestFlow) global.QuestFlow.paintNodes(ctx);   /* 流程连线序号节点（画在图标之上） */

@@ -261,11 +261,23 @@ window.BOTW_ADV = (function () {
   }
 
   function resetToDefault() {
-    if (JSON.stringify(state) === JSON.stringify(DEFAULT_ADV)) return;
+    const rsApi = window.__botwRegionStyleApi;
+    const m = window.__botwMap;
+    const regionChanged = !!(rsApi && m && m.regionStyle && JSON.stringify(m.regionStyle) !== JSON.stringify(rsApi.DEFAULT_STYLE));
+    if (JSON.stringify(state) === JSON.stringify(DEFAULT_ADV) && !regionChanged) return;
     const prevDpr = state.mobileDprCap;
     pushUndo();
     state = clone(DEFAULT_ADV);
     getCustomImage();
+    if (rsApi && m) {
+      m.regionStyle = Object.assign({}, rsApi.DEFAULT_STYLE, {
+        tx: rsApi.DEFAULT_STYLE.tx.slice(),
+        bg: rsApi.DEFAULT_STYLE.bg.slice(),
+        sc: rsApi.DEFAULT_STYLE.sc ? rsApi.DEFAULT_STYLE.sc.slice() : [63, 48, 16]
+      });
+      rsApi.saveStyle();
+      if (m.draw) m.draw();
+    }
     applyChange(prevDpr !== state.mobileDprCap);
     if (window.UI && window.UI.toast) window.UI.toast('高级设置已恢复默认（可点击撤销还原）');
   }
@@ -399,7 +411,52 @@ window.BOTW_ADV = (function () {
         ? `${isMobileDevice() ? '手机端' : 'PC端'} · 屏幕约 ${measuredHz}Hz`
         : `${isMobileDevice() ? '手机端' : 'PC端'}`;
     }
+    syncRegionStyleUI();
     updateUndoBtn();
+  }
+
+  function syncRegionStyleUI() {
+    if (!modalEl) return;
+    const m = window.__botwMap;
+    const api = window.__botwRegionStyleApi;
+    if (!m || !m.regionStyle || !api) return;
+    const st = m.regionStyle;
+    const txHex = api.rgbToHex(st.tx);
+    const defTxHex = api.rgbToHex(api.DEFAULT_STYLE.tx);
+    const txVal = (txHex === defTxHex) ? 'default' : (txHex === '#000000' || txHex === '#ffffff' ? txHex : '__custom');
+    setGroupActive('advRegTx', txVal);
+    const txIn = modalEl.querySelector('#advRegTxColor');
+    if (txIn) txIn.value = txHex;
+    setRange('advRegTxAlpha', Math.round((st.txA != null ? st.txA : 1) * 100), v => v + '%');
+
+    let sz = 'medium';
+    for (const k in api.FONT_SIZES) if (Math.abs(api.FONT_SIZES[k] - (st.fsz || 1)) < 0.01) sz = k;
+    setGroupActive('advRegSize', sz);
+
+    const scHex = st.sc ? api.rgbToHex(st.sc) : '';
+    const scVal = (!st.sw || st.sw <= 0 || !scHex) ? 'none' : (scHex === '#000000' || scHex === '#ffffff' ? scHex : '__custom');
+    setGroupActive('advRegStroke', scVal);
+    const scIn = modalEl.querySelector('#advRegStrokeColor');
+    if (scIn && scHex) scIn.value = scHex;
+    setRange('advRegStrokeW', st.sw || 0, v => (Number(v) % 1 === 0 ? String(Number(v)) : Number(v).toFixed(1)));
+
+    const bgHex = api.rgbToHex(st.bg);
+    const defBgHex = api.rgbToHex(api.DEFAULT_STYLE.bg);
+    const bgVal = (bgHex === defBgHex) ? 'default' : (bgHex === '#000000' || bgHex === '#ffffff' ? bgHex : '__custom');
+    setGroupActive('advRegBg', bgVal);
+    const bgIn = modalEl.querySelector('#advRegBgColor');
+    if (bgIn) bgIn.value = bgHex;
+    setRange('advRegBgAlpha', Math.round((st.bgA || 0) * 100), v => v + '%');
+  }
+
+  function applyRegionStyle(fn) {
+    const m = window.__botwMap;
+    const api = window.__botwRegionStyleApi;
+    if (!m || !m.regionStyle || !api) return;
+    fn(m.regionStyle, api);
+    api.saveStyle();
+    if (m.draw) m.draw();
+    syncRegionStyleUI();
   }
 
   function buildModalHTML() {
@@ -418,9 +475,10 @@ window.BOTW_ADV = (function () {
         </div>
 
         <div class="adv-body">
-          <!-- 1. 刷新率与清晰度 -->
+          <!-- 1. 刷新率与清晰度（打开时默认展开） -->
           <div class="adv-sec">
-            <div class="adv-sec-title">刷新率与画质</div>
+            <button type="button" class="adv-sec-title"><span>刷新率与画质</span><span class="adv-sec-tri">▾</span></button>
+            <div class="adv-sec-body">
             <div class="adv-item">
               <div class="adv-item-label">PC地图刷新率 <span class="adv-def">默认 60Hz</span></div>
               <div class="adv-opts" id="advPcFps">
@@ -449,11 +507,13 @@ window.BOTW_ADV = (function () {
                 <button type="button" class="st-opt" data-v="0">原生</button>
               </div>
             </div>
+            </div>
           </div>
 
-          <!-- 2. 视野设置 -->
-          <div class="adv-sec">
-            <div class="adv-sec-title">视野设置</div>
+          <!-- 2. 视野设置（默认折叠） -->
+          <div class="adv-sec collapsed">
+            <button type="button" class="adv-sec-title"><span>视野设置</span><span class="adv-sec-tri">▸</span></button>
+            <div class="adv-sec-body">
             <div class="adv-row-inline">
               <span class="adv-rl">视野显示</span>
               <div class="adv-opts adv-opts-inline" id="advFovShow">
@@ -496,11 +556,13 @@ window.BOTW_ADV = (function () {
                 <label class="st-opt st-picker"><span>自选</span><input type="color" id="advFovColor" value="#fff8d6"></label>
               </div>
             </div>
+            </div>
           </div>
 
-          <!-- 3. 导航箭头 -->
-          <div class="adv-sec">
-            <div class="adv-sec-title">导航箭头</div>
+          <!-- 3. 导航箭头（默认折叠） -->
+          <div class="adv-sec collapsed">
+            <button type="button" class="adv-sec-title"><span>导航箭头</span><span class="adv-sec-tri">▸</span></button>
+            <div class="adv-sec-body">
             <div class="adv-row-inline">
               <span class="adv-rl">图标样式</span>
               <div class="adv-opts adv-opts-inline" id="advArrowShape">
@@ -548,6 +610,64 @@ window.BOTW_ADV = (function () {
               <span class="adv-rl">阴影范围</span>
               <input type="range" id="advArrowShadowBlur" min="0" max="24" step="1" value="10">
               <span id="advArrowShadowBlurV" class="st-sval">10px</span>
+            </div>
+            </div>
+          </div>
+
+          <!-- 4. 地名文字样式（从主设置迁入，默认折叠） -->
+          <div class="adv-sec collapsed">
+            <button type="button" class="adv-sec-title"><span>地名文字样式</span><span class="adv-sec-tri">▸</span></button>
+            <div class="adv-sec-body">
+            <div class="adv-row-inline">
+              <span class="adv-rl">文字颜色</span>
+              <div class="adv-opts adv-opts-inline" id="advRegTx">
+                <button type="button" class="st-opt" data-v="default">金褐</button>
+                <button type="button" class="st-opt" data-v="#000000">黑</button>
+                <button type="button" class="st-opt" data-v="#ffffff">白</button>
+                <label class="st-opt st-picker"><span>自选</span><input type="color" id="advRegTxColor" value="#bfae68"></label>
+              </div>
+            </div>
+            <div class="st-row adv-slider-row">
+              <span class="adv-rl">文字透明</span>
+              <input type="range" id="advRegTxAlpha" min="0" max="100" step="1" value="100">
+              <span id="advRegTxAlphaV" class="st-sval">100%</span>
+            </div>
+            <div class="adv-row-inline">
+              <span class="adv-rl">文字大小</span>
+              <div class="adv-opts adv-opts-inline" id="advRegSize">
+                <button type="button" class="st-opt" data-v="small">小</button>
+                <button type="button" class="st-opt" data-v="medium">中</button>
+                <button type="button" class="st-opt" data-v="large">大</button>
+              </div>
+            </div>
+            <div class="adv-row-inline">
+              <span class="adv-rl">文字描边</span>
+              <div class="adv-opts adv-opts-inline" id="advRegStroke">
+                <button type="button" class="st-opt" data-v="none">无</button>
+                <button type="button" class="st-opt" data-v="#000000">黑</button>
+                <button type="button" class="st-opt" data-v="#ffffff">白</button>
+                <label class="st-opt st-picker"><span>自选</span><input type="color" id="advRegStrokeColor" value="#3f3010"></label>
+              </div>
+            </div>
+            <div class="st-row adv-slider-row">
+              <span class="adv-rl">描边粗细</span>
+              <input type="range" id="advRegStrokeW" min="0" max="6" step="0.5" value="3">
+              <span id="advRegStrokeWV" class="st-sval">3</span>
+            </div>
+            <div class="adv-row-inline">
+              <span class="adv-rl">地名底色</span>
+              <div class="adv-opts adv-opts-inline" id="advRegBg">
+                <button type="button" class="st-opt" data-v="default">无底</button>
+                <button type="button" class="st-opt" data-v="#000000">黑</button>
+                <button type="button" class="st-opt" data-v="#ffffff">白</button>
+                <label class="st-opt st-picker"><span>自选</span><input type="color" id="advRegBgColor" value="#000000"></label>
+              </div>
+            </div>
+            <div class="st-row adv-slider-row">
+              <span class="adv-rl">底色透明</span>
+              <input type="range" id="advRegBgAlpha" min="0" max="100" step="1" value="0">
+              <span id="advRegBgAlphaV" class="st-sval">0%</span>
+            </div>
             </div>
           </div>
         </div>
@@ -659,6 +779,17 @@ window.BOTW_ADV = (function () {
     modalEl.querySelector('#advUndo').addEventListener('click', undo);
     modalEl.querySelector('#advReset').addEventListener('click', resetToDefault);
 
+    // 折叠/展开各大分类区块
+    modalEl.querySelectorAll('.adv-sec-title').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sec = btn.closest('.adv-sec');
+        if (!sec) return;
+        const collapsed = sec.classList.toggle('collapsed');
+        const tri = btn.querySelector('.adv-sec-tri');
+        if (tri) tri.textContent = collapsed ? '▸' : '▾';
+      });
+    });
+
     bindGroup('advPcFps', v => { state.pcFps = Number(v); });
     bindGroup('advMobFps', v => { state.mobileFps = Number(v); });
     bindGroup('advMobDpr', v => { state.mobileDprCap = Number(v); }, true);
@@ -698,6 +829,41 @@ window.BOTW_ADV = (function () {
         applyChange(false);
       });
     }
+
+    // 地名文字样式事件绑定（复用 ui.js 持久化接口）
+    modalEl.querySelectorAll('#advRegTx .st-opt[data-v]').forEach(b => {
+      b.addEventListener('click', () => applyRegionStyle((st, api) => {
+        if (b.dataset.v === 'default') st.tx = api.DEFAULT_STYLE.tx.slice();
+        else { const c = api.hexToRgb(b.dataset.v); if (c) st.tx = c; }
+      }));
+    });
+    const rTxC = modalEl.querySelector('#advRegTxColor');
+    if (rTxC) rTxC.addEventListener('input', () => applyRegionStyle((st, api) => { const c = api.hexToRgb(rTxC.value); if (c) st.tx = c; }));
+    const rTxA = modalEl.querySelector('#advRegTxAlpha');
+    if (rTxA) rTxA.addEventListener('input', () => applyRegionStyle(st => { st.txA = Math.min(1, Math.max(0, Number(rTxA.value) / 100)); }));
+    modalEl.querySelectorAll('#advRegSize .st-opt[data-v]').forEach(b => {
+      b.addEventListener('click', () => applyRegionStyle((st, api) => { st.fsz = api.FONT_SIZES[b.dataset.v] || 1; }));
+    });
+    modalEl.querySelectorAll('#advRegStroke .st-opt[data-v]').forEach(b => {
+      b.addEventListener('click', () => applyRegionStyle((st, api) => {
+        if (b.dataset.v === 'none') st.sw = 0;
+        else { const c = api.hexToRgb(b.dataset.v); if (c) { st.sc = c; st.sw = st.sw || 2; } }
+      }));
+    });
+    const rScC = modalEl.querySelector('#advRegStrokeColor');
+    if (rScC) rScC.addEventListener('input', () => applyRegionStyle((st, api) => { const c = api.hexToRgb(rScC.value); if (c) { st.sc = c; st.sw = st.sw || 2; } }));
+    const rScW = modalEl.querySelector('#advRegStrokeW');
+    if (rScW) rScW.addEventListener('input', () => applyRegionStyle(st => { st.sw = Math.max(0, Math.min(6, parseFloat(rScW.value) || 0)); }));
+    modalEl.querySelectorAll('#advRegBg .st-opt[data-v]').forEach(b => {
+      b.addEventListener('click', () => applyRegionStyle((st, api) => {
+        if (b.dataset.v === 'default') st.bg = api.DEFAULT_STYLE.bg.slice();
+        else { const c = api.hexToRgb(b.dataset.v); if (c) st.bg = c; }
+      }));
+    });
+    const rBgC = modalEl.querySelector('#advRegBgColor');
+    if (rBgC) rBgC.addEventListener('input', () => applyRegionStyle((st, api) => { const c = api.hexToRgb(rBgC.value); if (c) st.bg = c; }));
+    const rBgA = modalEl.querySelector('#advRegBgAlpha');
+    if (rBgA) rBgA.addEventListener('input', () => applyRegionStyle(st => { st.bgA = Math.min(1, Math.max(0, Number(rBgA.value) / 100)); }));
   }
 
   function open() {

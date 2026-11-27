@@ -87,6 +87,12 @@ const DEFAULT_SETTINGS = {
   // （老用户 localStorage 里没有这个键，走默认值；设成隐藏会让老用户轨迹突然消失）
   liveTrail: true,
   regionShow: true,
+  iconNames: true,
+  chestEquipNames: true,
+  taskNames: false,
+  iconNameMinPct: 1600,
+  chestEquipNameMinPct: 1600,
+  taskNameMinPct: 2000,
 };
 window.BOTW_SETTINGS = {
   D: DEFAULT_SETTINGS,   // 「恢复默认」用
@@ -168,7 +174,15 @@ class BotwMap {
     this._regionScale = 0.05;  // 全图适配 scale（fit 时更新），用于地名分级切换
     // 地名标签样式（v1.3.1：无底块 + 金褐实色字 #bfae68 + 深褐描边 #3f3010 + 暖褐投影，贴合游戏地图；详见 地名规范.md）
     this.regionStyle = { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
-    this.showRegions = true;   // 地名显示开关（设置弹层可切换，持久化到 localStorage）
+    this.showRegions = true;         // 地区名称显示开关
+    this.showIconNames = true;       // 探索收集（基础图标）名称显示开关
+    this.showChestEquipNames = true; // 宝箱装备名称显示开关
+    this.showTaskNames = false;      // 任务名称显示开关
+    this.iconNameMinPct = 1600;      // 探索收集名称显示最低缩放（默认 1600%）
+    this.chestEquipNameMinPct = 1600;// 宝箱装备名称显示最低缩放（默认 1600%）
+    this.taskNameMinPct = 2000;      // 任务名称显示最低缩放（默认 2000%）
+    this._placedBoxes = [];    // 帧级碰撞避让盒（图标 → 地名 → 标点/任务文字）
+    this._labelQueue = [];     // 帧级待绘标签队列
     // 克洛格轨迹（v1.1.4）：数据源 korok_paths.js（97 条多点轨迹，应用像素坐标）；开关默认开
     this.KOROK_PATHS = (typeof KOROK_PATHS !== 'undefined' && KOROK_PATHS.items) ? KOROK_PATHS.items : [];
     this._pathById = new Map();
@@ -424,7 +438,7 @@ class BotwMap {
     if (!this.w) return;
     const s = Math.min(this.w / this.MW, this.h / this.MH);
     this.minScale = s * 0.85;
-    this.maxScale = 1; // 统一最大缩放：手机与电脑都能放到最高清瓦片(z7)，缩放级数一致
+    this.maxScale = 1.5; // V1.8.0：最大缩放放宽至 1.5x（z7 瓦片平滑超分），方便查看密集点位与避让标签
     this._regionScale = s;   // 全图适配 scale（地名分级切换基准）
     this.view.scale = Math.min(Math.max(s, this.minScale), this.maxScale);
     this.view.x = (this.w - this.MW * this.view.scale) / 2;
@@ -526,10 +540,12 @@ class BotwMap {
 
     // 视口内标记只算一次，供线层（克洛格轨迹）与图标层共用
     const vis = this._visibleMarkers();
+    // V1.8.0 三步同帧避让容器：Step 1 图标占位 → Step 2 地名避让图标 → Step 3 标点/任务文字四方向避让
+    this._placedBoxes = [];
+    this._labelQueue = [];
 
     /* —— 底层 —— */
     this._stage('tiles', c => this._drawTiles(c));
-    this._stage('regions', c => this._drawRegions(c));
 
     /* —— 线层：静态折线画在图标之下 —— */
     this._stage('korokPaths', c => this._drawKorokPaths(c, vis));
@@ -538,13 +554,43 @@ class BotwMap {
     this._stage('measure', c => this._drawMeasure(c));
     this._stage('materials', c => this._drawMaterials(c)); // 材料层（下层：不遮挡神庙/塔等主标记）
 
-    /* —— 图标层 —— */
+    /* —— Step 1：全部图标层（绘制图标 + 登记包围盒 + 收集标签） —— */
     this._stage('markers', c => this._drawMarkers(c, vis));
     // v1.4.0：移除材料选中白色描边环（原 _drawMatSel）；选中材料仅图标略微放大作为点击反馈
     this._stage('custom', c => this._drawCustom(c));
-    // V1.6.0 外部图层：任务 / 装备 / 宝箱 / 营地 / 自定义标记（各自注册，独立隔离）
+    // V1.6.0 外部图层：任务 / 装备 / 宝箱 / 营地（各自注册，独立隔离）
     const exts = this._extDraw;
     for (let i = 0; i < exts.length; i++) this._stage('ext' + i, exts[i]);
+
+    /* —— Step 2：地名避让图标 —— */
+    this._stage('regions', c => this._drawRegions(c));
+
+    /* —— Step 3：标点/任务文字四方向避让 —— */
+    this._stage('labels', c => this._drawLabels(c));
+  }
+
+  /* 帧级避让辅助：登记图标屏幕包围盒（供主图层与外部图层调用） */
+  registerIconBox(sx, sy, halfW, halfH) {
+    if (!this._placedBoxes) return;
+    const hw = (halfW || 12) + 2;
+    const hh = (halfH || 12) + 2;
+    this._placedBoxes.push([sx - hw, sy - hh, sx + hw, sy + hh]);
+  }
+
+  /* 帧级避让辅助：收集待绘制的标点/任务标签 */
+  registerLabel(item) {
+    if (!this._labelQueue || !item || !item.text) return;
+    this._labelQueue.push(item);
+  }
+
+  _boxOverlaps(x1, y1, x2, y2) {
+    const boxes = this._placedBoxes;
+    if (!boxes) return false;
+    for (let i = 0; i < boxes.length; i++) {
+      const b = boxes[i];
+      if (x1 < b[2] && x2 > b[0] && y1 < b[3] && y2 > b[1]) return true;
+    }
+    return false;
   }
 
   _drawDynamicOverlay() {
@@ -709,10 +755,25 @@ class BotwMap {
   }
 
   /* 右下角缩放百分比：全图适配 = 100%，放大 2 倍 = 200% */
+  currentZoomPct() {
+    return Math.round(this.view.scale / (this._regionScale || 0.05) * 100);
+  }
+  isIconLabelZoomOk() {
+    return this.currentZoomPct() >= (this.iconNameMinPct || 1600);
+  }
+  isChestEquipLabelZoomOk() {
+    return this.currentZoomPct() >= (this.chestEquipNameMinPct || 1600);
+  }
+  isTaskLabelZoomOk() {
+    return this.currentZoomPct() >= (this.taskNameMinPct || 2000);
+  }
+  isLabelZoomOk() {
+    return this.isIconLabelZoomOk();
+  }
   _updateZoomPct() {
     const el = document.getElementById('zoomPct');
     if (!el) return;
-    el.textContent = Math.round(this.view.scale / (this._regionScale || 0.05) * 100) + '%';
+    el.textContent = this.currentZoomPct() + '%';
   }
 
   /* ---------- 地形/区域名（模仿游戏内地图：半透明底深字；字号随缩放放大，随缩放分级切换；高层出现后低层弱化保留） ---------- */
@@ -725,12 +786,13 @@ class BotwMap {
     const showR2 = view.scale >= g1;
     const showR3 = view.scale >= g2;                 // r3：4x 起显（弱化保留）
     const showR4 = view.scale >= g3 && z >= 6;       // r4：8x 且瓦片至少 z6（确保最细地名在清晰瓦片上）
-    const showR5 = view.scale >= this.maxScale * 0.95 && z >= 7; // r5（城堡内部房间）：缩放到最大且最高清瓦片才显示
+    const showR5 = view.scale >= 0.95 && z >= 7; // r5（城堡内部房间）：达到 z7 原倍即显示，不因 maxScale=1.5 抬高门槛
     const st = this.regionStyle || { bg: [0, 0, 0], bgA: 0, tx: [191, 174, 104], txA: 1, fsz: 1, sc: [63, 48, 16], sw: 3 };
     const fsz = st.fsz || 1;
     const kMax = { r1: 1.0, r2: 1.2, r3: 1.3, r4: 1.4, r5: 1.5 }; // Canvas 小字号(<17px)会被 Chrome GDI 替换成宋体，收紧 kMax 让 fs 稳定在 17-20px
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    const isEn = window.I18N && window.I18N.getLang() === 'en';
     for (const rg of this.regions) {
       const lv = rg.lv;
       if (lv === 'r1' && showR2) continue;                          // 大区：全图~放大2x
@@ -738,7 +800,7 @@ class BotwMap {
       if (lv === 'r3' && !showR3) continue;                         // 细地名：4x 起显，之后弱化保留
       if (lv === 'r4' && !showR4) continue;                         // 更细地名：8x 之后
       if (lv === 'r5' && !showR5) continue;                         // 城堡内部房间：最大缩放才显示
-      const [sx, sy] = this.m2s(rg.px);
+      let [sx, sy] = this.m2s(rg.px);
       if (sx < -140 || sy < -140 || sx > w + 140 || sy > h + 140) continue;
       const base = lv === 'r1' ? 20 : lv === 'r2' ? 15 : lv === 'r3' ? 14 : lv === 'r4' ? 13 : 12;  // 层级字号：整体上调确保 fs>=17px 避免 Canvas 字体 fallback 到宋体
       const k = Math.min(view.scale / f, kMax[lv] || 2.2);
@@ -747,15 +809,35 @@ class BotwMap {
       let alpha = 1;
       if (lv === 'r3' && showR4) alpha = 0.8;
       if (lv === 'r4' && showR5) alpha = 0.75;
-      const isEn = window.I18N && window.I18N.getLang() === 'en';
       const text = isEn ? (rg.en || rg.name_en || rg.n || rg.name || '') : (rg.n || rg.name || rg.en || '');
+      if (!text) continue;
       ctx.font = '700 ' + fs + 'px "Microsoft YaHei", sans-serif';
+      const tw = ctx.measureText(text).width;
+      const bw = tw + 8;
+      const bh = fs + 4;
+      // Step 2：r3/r4/r5 细地名避让已绘制的图标与其他地名（尝试原位 → 下移 → 上移）；r1/r2 大区名始终保留
+      if (lv !== 'r1' && lv !== 'r2' && this._placedBoxes) {
+        const offsets = [0, bh * 0.9, -bh * 0.9];
+        let placed = false;
+        for (let oi = 0; oi < offsets.length; oi++) {
+          const cy = sy + offsets[oi];
+          const x1 = sx - bw / 2, y1 = cy - bh / 2, x2 = sx + bw / 2, y2 = cy + bh / 2;
+          if (!this._boxOverlaps(x1, y1, x2, y2)) {
+            sy = cy;
+            this._placedBoxes.push([x1, y1, x2, y2]);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) continue;
+      } else if (this._placedBoxes) {
+        this._placedBoxes.push([sx - bw / 2, sy - bh / 2, sx + bw / 2, sy + bh / 2]);
+      }
       if (st.bgA > 0) {
-        const tw = ctx.measureText(text).width;
         const padX = fs * 0.55, padY = fs * 0.28;
-        const bw = tw + padX * 2, bh = fs + padY * 2;
+        const rbw = tw + padX * 2, rbh = fs + padY * 2;
         ctx.fillStyle = `rgba(${st.bg[0]},${st.bg[1]},${st.bg[2]},${st.bgA * alpha})`;
-        this._roundRect(ctx, sx - bw / 2, sy - bh / 2, bw, bh, 4);
+        this._roundRect(ctx, sx - rbw / 2, sy - rbh / 2, rbw, rbh, 4);
         ctx.fill();
       }
       const sw = st.sw || 0;
@@ -845,9 +927,16 @@ class BotwMap {
     /* V1.7.2 架构改造：克洛格轨迹 / 龙飞行轨迹已上移到 draw() 的「线层」，
        先于所有图标绘制 —— 线不再压在图标上，也不受本层异常影响 */
 
-    const labelList = [];
     const scale = this.view.scale;
+    const LABEL_PRI = {
+      tower: 1, beast: 1,
+      shrine: 2, lab: 2, village: 2, stable: 2,
+      memory: 3, fountain: 3, settlement: 3, inn: 3, store: 3, armor: 3, dye: 3, jewelry: 3, statue: 3,
+      lynel: 4, hinox: 4, talus: 4, molduga: 4, guardian: 4,
+      seed: 6
+    };
     let drawn = 0;
+    let labels = 0;
     for (const mk of vis) {
       const cfg = CAT_CFG[mk.cat] || CAT_CFG.sidequest;
       const [sx, sy] = this.m2s(mk.px);
@@ -855,31 +944,98 @@ class BotwMap {
       const size = this._markerScreenSize(mk);
       const done = this._mkDone(mk);
       this._glyph(ctx, mk, sx, sy, size, done);
+      this.registerIconBox(sx, sy, size / 2, size / 2);
       drawn++;
-      // 标签
-      if (scale >= cfg.lz && mk.cat !== 'treasure') {
-        labelList.push({ mk, sx, sy, size });
+      // 收集标点文字（交由 Step 3 统一做四方向避让，遵循图标名字独立缩放阈值）
+      if (this.showIconNames && this.isIconLabelZoomOk() && mk.cat !== 'treasure') {
+        const label = mk.cat === 'seed'
+          ? ('No.' + (mk.extra?.korok_no || mk.id.replace(/\D/g, '')))
+          : (window.I18N ? window.I18N.nameOf(mk) : mk.name);
+        if (label) {
+          this.registerLabel({
+            text: label,
+            sx, sy,
+            halfW: size / 2,
+            halfH: size / 2,
+            priority: LABEL_PRI[mk.cat] || 5,
+            done,
+            color: done ? 'rgba(180,195,180,.82)' : (mk.cat === 'shrine' ? '#eafffb' : '#ffffff')
+          });
+          labels++;
+        }
       }
     }
-    this.lastStats = { drawn, labels: labelList.length, visible: vis.length };
-    // 标签绘制
-    for (const { mk, sx, sy, size } of labelList) {
-      const done = this._mkDone(mk);
-      const label = mk.cat === 'seed' ? 'No.' + (mk.extra?.korok_no || mk.id.replace(/\D/g, '')) : mk.name;
-      if (!label) continue;
-      const fs = Math.min(Math.max(9, 11 * scale), 15);
-      ctx.font = `600 ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      const ly = sy - size / 2 - 3;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(8,12,8,.85)';
-      ctx.strokeText(label, sx, ly);
-      ctx.fillStyle = done ? 'rgba(180,195,180,.75)' : (mk.cat === 'shrine' ? '#eafffb' : '#ffffff');
-      ctx.fillText(label, sx, ly);
-    }
+    this.lastStats = { drawn, labels, visible: vis.length };
     /* V1.7.2 小修2：移除悬停高亮圈（V1.0 时代装饰，白圈紧贴图标视觉似黄圈，与现 UI 不协调；
        悬停反馈保留：顶部名称条 + 点击卡片，功能不受影响） */
+  }
+
+  /* ---------- Step 3：标点/任务文字四方向避让（下 → 上 → 右 → 左） ---------- */
+  _drawLabels(ctx) {
+    const queue = this._labelQueue;
+    if (!queue || !queue.length) return;
+    queue.sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+      return (a.sy - b.sy) || (a.sx - b.sx);
+    });
+    const scale = this.view.scale;
+    const fs = Math.min(Math.max(10, Math.round(11 * Math.min(scale, 1.25))), 13);
+    const fs2 = Math.max(9, fs - 1);
+    const font1 = `600 ${fs}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    const font2 = `600 ${fs2}px "PingFang SC","Microsoft YaHei",sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(8,12,10,.86)';
+
+    for (let i = 0; i < queue.length; i++) {
+      const it = queue[i];
+      const line1 = String(it.text || '');
+      const line2 = it.text2 ? String(it.text2) : '';
+      if (!line1) continue;
+      ctx.font = font1;
+      const w1 = ctx.measureText(line1).width;
+      let w2 = 0;
+      if (line2) {
+        ctx.font = font2;
+        w2 = ctx.measureText(line2).width;
+      }
+      const bw = Math.max(w1, w2) + 8;
+      const bh = line2 ? (fs + fs2 + 5) : (fs + 3);
+      const hw = it.halfW || 14;
+      const hh = it.halfH || 14;
+      // 四方向尝试：下 → 上 → 右 → 左
+      const cands = [
+        { tx: it.sx,          ty: it.sy + hh + 3,      align: 'center', bx1: it.sx - bw / 2,      by1: it.sy + hh + 2 },
+        { tx: it.sx,          ty: it.sy - hh - 3 - bh, align: 'center', bx1: it.sx - bw / 2,      by1: it.sy - hh - 4 - bh },
+        { tx: it.sx + hw + 5, ty: it.sy - bh / 2,      align: 'left',   bx1: it.sx + hw + 2,      by1: it.sy - bh / 2 - 1 },
+        { tx: it.sx - hw - 5, ty: it.sy - bh / 2,      align: 'right',  bx1: it.sx - hw - 2 - bw, by1: it.sy - bh / 2 - 1 }
+      ];
+      let chosen = null;
+      for (let ci = 0; ci < cands.length; ci++) {
+        const cd = cands[ci];
+        const x1 = cd.bx1, y1 = cd.by1, x2 = x1 + bw, y2 = y1 + bh;
+        if (!this._boxOverlaps(x1, y1, x2, y2)) {
+          chosen = cd;
+          this._placedBoxes.push([x1, y1, x2, y2]);
+          break;
+        }
+      }
+      if (!chosen) continue;
+      ctx.textAlign = chosen.align;
+      ctx.font = font1;
+      ctx.strokeText(line1, chosen.tx, chosen.ty);
+      ctx.fillStyle = it.color || (it.isTask ? '#ffe59e' : (it.done ? 'rgba(180,205,185,.85)' : '#ffffff'));
+      ctx.fillText(line1, chosen.tx, chosen.ty);
+      if (line2) {
+        const ly2 = chosen.ty + fs + 2;
+        ctx.font = font2;
+        ctx.strokeText(line2, chosen.tx, ly2);
+        ctx.fillStyle = it.done ? 'rgba(160,195,170,.75)' : 'rgba(215,238,222,.92)';
+        ctx.fillText(line2, chosen.tx, ly2);
+      }
+    }
   }
 
   /* ---------- 克洛格轨迹（v1.1.4）：黄色折线 + 起点小圆环 ---------- */
@@ -1164,20 +1320,16 @@ class BotwMap {
       ctx.restore();
       return;
     }
-    if (done) ctx.globalAlpha = .45;
+    if (done) ctx.globalAlpha = .65;
     if (img && img.complete && img.naturalWidth > 0) {
       let iw = cfg.isz ? cfg.isz[0] : size;
       let ih = cfg.isz ? cfg.isz[1] : size;
       if (_e) { iw = ih = _e.px; }   // 敌人分级尺寸
       ctx.drawImage(img, x - iw / 2, y - ih / 2, iw, ih);
       ctx.restore();
-      if (done) {
-        // 完成标记：绿色小对勾
-        ctx.strokeStyle = '#7dffa0';
-        ctx.lineWidth = Math.max(1.5, size * .16);
-        ctx.beginPath();
-        ctx.moveTo(x - size * .22, y); ctx.lineTo(x - size * .05, y + size * .18); ctx.lineTo(x + size * .26, y - size * .16);
-        ctx.stroke();
+      if (done && window.CardLayout && window.CardLayout.doneCheck) {
+        // V1.8.0 全站统一完成标记：0.65 透明 + 右上角绿圆白勾徽章
+        window.CardLayout.doneCheck(ctx, x + iw / 2 - 5, y - ih / 2 + 5, 7);
       }
       return;
     }
@@ -1355,13 +1507,8 @@ class BotwMap {
       }
     }
     ctx.restore();
-    if (done) {
-      // 完成标记：绿色小对勾
-      ctx.strokeStyle = '#7dffa0';
-      ctx.lineWidth = Math.max(1.5, size * .16);
-      ctx.beginPath();
-      ctx.moveTo(x - size * .22, y); ctx.lineTo(x - size * .05, y + size * .18); ctx.lineTo(x + size * .26, y - size * .16);
-      ctx.stroke();
+    if (done && window.CardLayout && window.CardLayout.doneCheck) {
+      window.CardLayout.doneCheck(ctx, x + size / 2 - 5, y - size / 2 + 5, 7);
     }
   }
 
@@ -1983,10 +2130,13 @@ class BotwMap {
         kind: isEn ? 'Equipment' : '装备',
         name: (window.I18N ? window.I18N.nameOf(ex.equip) : (isEn ? (ex.equip.en || ex.equip.name || '') : (ex.equip.name || ex.equip.en || '')))
       };
-      if (ex.type === 'chest' && ex.item) return {
-        kind: isEn ? 'Chest' : '宝箱',
-        name: isEn ? (ex.item.en || ex.item.contentCn || ex.item.content || '') : (ex.item.contentCn || ex.item.en || ex.item.content || '')
-      };
+      if (ex.type === 'chest' && ex.item) {
+        const chName = isEn ? (ex.item.en || ex.item.contentCn || ex.item.content || '') : (ex.item.contentCn || ex.item.en || ex.item.content || '');
+        return {
+          kind: isEn ? 'Chest' : '宝箱',
+          name: chName
+        };
+      }
       if (ex.type === 'camp' && (ex.camp || ex._name)) return {
         kind: isEn ? 'Camp' : '营地',
         name: isEn ? (ex._name_en || (ex.camp && ex.camp.name_en) || ex._name) : ex._name

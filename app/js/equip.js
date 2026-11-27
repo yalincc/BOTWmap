@@ -289,6 +289,19 @@
           else drawSword(ctx, sx, sy, size, color);
           if (pDone) window.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
           ctx.restore();
+          if (map.registerIconBox) map.registerIconBox(sx, sy, size / 2, size / 2);
+          var eqZoomOk = map.isChestEquipLabelZoomOk ? map.isChestEquipLabelZoomOk() : (scale >= 0.75);
+          if (map.showChestEquipNames && eqZoomOk && map.registerLabel) {
+            var eqName = window.I18N ? window.I18N.nameOf(it) : (it.name || it.en || '');
+            if (eqName) {
+              map.registerLabel({
+                text: eqName,
+                sx: sx, sy: sy,
+                halfW: size / 2, halfH: size / 2,
+                priority: 6, done: pDone
+              });
+            }
+          }
         }
       }
     }

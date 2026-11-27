@@ -130,22 +130,66 @@
     PutRupee_Red: '红卢比 (20)'
   };
 
-  /* 三子分组：过滤天然互斥（自检断言两两零重叠） */
+  /* 三子分组：过滤天然互斥（自检断言两两零重叠）+ V1.8.0 稳定编号体系（N-0001 / D-001 / M-001） */
   var normalList = [], dlcList = [], hardList = [];
   CHESTS.forEach(function (it) {
     (it.pts || []).forEach(function (p) {
       var t = p[2] || '';
-      if (t.indexOf('_Aoc') >= 0 || t.indexOf('_Collabo') >= 0) dlcList.push({ item: it, pt: p, hard: false });
-      else normalList.push({ item: it, pt: p, hard: false });
+      if (t.indexOf('_Aoc') >= 0 || t.indexOf('_Collabo') >= 0) dlcList.push({ item: it, pt: p, hard: false, sub: 'dlc' });
+      else normalList.push({ item: it, pt: p, hard: false, sub: 'normal' });
     });
     (it.hardPts || []).forEach(function (p) {
-      hardList.push({ item: it, pt: p, hard: true });
+      hardList.push({ item: it, pt: p, hard: true, sub: 'hard' });
     });
   });
   var SUB = { normal: normalList, dlc: dlcList, hard: hardList };
   var SUB_ORDER = ['normal', 'dlc', 'hard'];
   var SUB_NAME = { normal: '普通宝箱', dlc: 'DLC 宝箱', hard: '大师模式宝箱' };
   var SUB_COLOR = { normal: '#f4b942', dlc: '#8a5cf6', hard: '#c084d9' };
+  var CHEST_BY_CODE = {};
+  var CHEST_BY_PT = {};
+  var CHEST_SEARCH = [];
+  var globalSeq = 0;
+  SUB_ORDER.forEach(function (sub) {
+    var list = SUB[sub];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      globalSeq++;
+      var numStr = String(globalSeq);
+      while (numStr.length < 4) numStr = '0' + numStr;
+      e.seqIdx = i;
+      e.code = numStr;
+      CHEST_BY_CODE[numStr] = e;
+      var pk = Math.round(e.pt[0]) + ',' + Math.round(e.pt[1]) + (e.hard ? ':h' : '');
+      CHEST_BY_PT[pk] = e;
+      var cname = e.item.contentCn || CN_FALLBACK[e.item.content] || e.item.en || e.item.content || '';
+      CHEST_SEARCH.push({
+        code: e.code,
+        sub: sub,
+        entry: e,
+        name: cname,
+        en: e.item.en || '',
+        searchName: e.code + ' ' + cname,
+        catCn: SUB_NAME[sub],
+        catEn: sub === 'hard' ? 'Master Mode Chest' : (sub === 'dlc' ? 'DLC Chest' : 'Normal Chest'),
+        px: e.pt
+      });
+    }
+  });
+  window.__chestSearch = CHEST_SEARCH;
+  function findEntry(entry) {
+    if (!entry) return null;
+    if (entry.code) {
+      var c = String(entry.code).replace(/\D/g, '');
+      while (c.length > 0 && c.length < 4) c = '0' + c;
+      if (CHEST_BY_CODE[c]) return CHEST_BY_CODE[c];
+    }
+    if (entry.pt) {
+      var pk = Math.round(entry.pt[0]) + ',' + Math.round(entry.pt[1]) + (entry.hard ? ':h' : '');
+      if (CHEST_BY_PT[pk]) return CHEST_BY_PT[pk];
+    }
+    return entry;
+  }
 
   /* 内容物 → DLC 归属（徽章依据）：
      DLC1 = 幻影171 / 魔吉拉172头 / 米多娜173头 / 汀空174 / 克洛格面具176头 / 传送标记器；
@@ -250,10 +294,63 @@
     drawExt();
   }
 
+  function ensureSubOn(sub) {
+    if (!sub || cLayers[sub]) return;
+    cLayers[sub] = true;
+    try { localStorage.setItem(K_LAYERS, JSON.stringify(cLayers)); } catch (e) {}
+    var r = document.querySelector('#layerList .lrow[data-cat="chest_' + sub + '"]');
+    if (r) r.classList.add('on');
+    if (window.__syncLayerBtns) window.__syncLayerBtns();
+    drawExt();
+  }
+
   window.ChestPanel = {
     setAll: setAllChest,
+    ensureSubOn: ensureSubOn,
     isInGround: isChestInGround,
     isOn: function (sub) { return !!cLayers[sub]; },
+    codeOf: function (p, hard) {
+      if (!p) return '';
+      var pk = Math.round(p[0]) + ',' + Math.round(p[1]) + (hard ? ':h' : '');
+      var e = CHEST_BY_PT[pk] || CHEST_BY_PT[Math.round(p[0]) + ',' + Math.round(p[1])];
+      return e ? e.code : '';
+    },
+    findByCode: function (code) {
+      if (!code) return null;
+      var c = String(code).replace(/\D/g, '');
+      while (c.length > 0 && c.length < 4) c = '0' + c;
+      return CHEST_BY_CODE[c] || null;
+    },
+    collectItems: function () {
+      var out = [];
+      SUB_ORDER.forEach(function (sub) {
+        if (!cLayers[sub]) return;
+        var list = SUB[sub];
+        for (var i = 0; i < list.length; i++) {
+          var e = list[i];
+          out.push({
+            id: 'chest:' + e.code,
+            code: e.code,
+            name: cnName(e.item),
+            en: e.item.en || '',
+            px: [e.pt[0], e.pt[1]],
+            cat: 'chest',
+            entry: e
+          });
+        }
+      });
+      return out;
+    },
+    syncCollectBtn: function () {
+      var cb = document.getElementById('chCollect');
+      if (!cb) return;
+      var active = !!(typeof LIVE !== 'undefined' && LIVE.isModeActive && LIVE.isModeActive('chest'));
+      var tCol = window.I18N ? window.I18N.t('card.collect', '收集') : '收集';
+      var tStop = window.I18N ? window.I18N.t('card.collectStop', '停止收集') : '停止收集';
+      cb.textContent = active ? tStop : tCol;
+      cb.classList.toggle('on', active);
+    },
+    locate: locate,
     isDone: function (p) { if (!p) return false; var kk = ptKey(p); return chestDone.has(kk) || saveDone.has(kk); },
     toggleDone: function (p) {
       if (!p) return null;
@@ -385,6 +482,19 @@
         }
         if (isDone) window.CardLayout.doneCheck(ctx, sx + size / 2 - 5, sy - size / 2 + 5, 7);
         ctx.restore();
+        if (map.registerIconBox) map.registerIconBox(sx, sy, size / 2, size / 2);
+        var zoomOk = map.isChestEquipLabelZoomOk ? map.isChestEquipLabelZoomOk() : (scale >= 0.75);
+        if (map.showChestEquipNames && zoomOk && map.registerLabel) {
+          var lblName = isEnLang() ? (entry.item.en || entry.item.contentCn || entry.item.content || '') : cnName(entry.item);
+          if (lblName) {
+            map.registerLabel({
+              text: lblName,
+              sx: sx, sy: sy,
+              halfW: size / 2, halfH: size / 2,
+              priority: 6, done: isDone
+            });
+          }
+        }
       }
     });
   }
@@ -409,7 +519,7 @@
         }
       }
     });
-    return best ? { type: 'chest', item: best.item, pt: best.pt, hard: best.hard, _r: best.item, _p: best.pt } : null;
+    return best ? { type: 'chest', item: best.item, pt: best.pt, hard: best.hard, sub: best.sub, code: best.code, seqIdx: best.seqIdx, _r: best.item, _p: best.pt } : null;
   }
 
   /* 定位：飞到该宝箱点 */
@@ -442,20 +552,24 @@
   var pv = { mode: 'hidden', ref: null };
   var previewNow = false;
 
-  function openCard(entry) {
+  function openCard(entry, opts) {
     var card = document.getElementById('chestCard');
     var body = document.getElementById('chestCardBody');
+    entry = findEntry(entry);
     if (!card || !body || !entry) return;
-    card.dataset.manual = '';   /* V1.6.1 调整i：新卡 → 清除手动态，重新避让 */
+    var keepPos = !!(opts && opts.keepPos);
+    if (!keepPos) card.dataset.manual = '';   /* V1.6.1 调整i：新卡 → 清除手动态，重新避让 */
     pv.mode = 'fixed'; pv.ref = entry;   /* 点击路径默认固定态（onHoverExt 随后覆盖为 preview） */
     var it = entry.item, p = entry.pt;
     lastOpen = Date.now();
 
-    /* 互斥：开宝箱卡时关任务卡 / 装备卡 */
+    /* 互斥：开宝箱卡时关任务卡 / 装备卡 / 信息卡 */
     var qc = document.getElementById('questCard');
     if (qc) qc.classList.add('hidden');
     var ec = document.getElementById('equipCard');
     if (ec) ec.classList.add('hidden');
+    var ic = document.getElementById('infoCard');
+    if (ic) ic.classList.add('hidden');
 
     var isEn = (window.I18N && window.I18N.getLang() === 'en');
     var attr = attrOf(it.content);
@@ -484,12 +598,23 @@
     var chipName = entry.hard
       ? (isEn ? 'Master Mode Chest' : '大师模式宝箱')
       : (isEn ? 'Chest' : '宝箱');
+    var codeHtml = entry.code
+      ? '<span class="q-badge-hard" style="background:rgba(242,201,76,.14);border-color:rgba(242,201,76,.45);color:#f2c94c;font-family:monospace">' + esc(entry.code) + '</span>'
+      : '';
+    var subList = (entry.sub && SUB[entry.sub]) ? SUB[entry.sub] : null;
+    var hasSeq = !!(subList && subList.length > 1 && typeof entry.seqIdx === 'number');
+    var tPrev = window.I18N ? window.I18N.t('card.prev', '上一个') : '上一个';
+    var tNext = window.I18N ? window.I18N.t('card.next', '下一个') : '下一个';
+    var tCopy = window.I18N ? window.I18N.t('card.copy', '[复制]') : '[复制]';
+    var tCopyTitle = window.I18N ? window.I18N.t('card.copy.title', '复制名称') : '复制名称';
     var h = '';
     h += '<div class="tk-grip">';
     h += '<span class="tk-chip ' + (entry.hard ? 'tk-chip-mini' : 'tk-chip-main') + '">' + chipName + '</span>';
+    if (codeHtml) h += codeHtml;
     if (badgeHtml) h += badgeHtml;
-    /* V1.6.2：去掉复制图标（宝箱只有 3 个名字，无需复制） */
     h += '<span class="tk-grip-acts">' +
+      (hasSeq ? '<button type="button" class="card-nav tk-icon-btn tk-nav" id="chPrev" title="' + esc(tPrev) + '"' + (entry.seqIdx <= 0 ? ' disabled' : '') + '>‹</button>' +
+                '<button type="button" class="card-nav tk-icon-btn tk-nav" id="chNext" title="' + esc(tNext) + '"' + (entry.seqIdx >= subList.length - 1 ? ' disabled' : '') + '>›</button>' : '') +
       '<button type="button" class="tk-close" id="chCardClose" title="' + (window.I18N ? window.I18N.t('side.close', '关闭') : '关闭') + '">×</button></span>';
     h += '</div>';
 
@@ -497,6 +622,7 @@
     var subTitle = isEn ? (it.contentCn || CN_FALLBACK[it.content] || '') : (it.en || '');
 
     h += '<div class="tk-title-row"><h3 class="tk-name">' + esc(mainTitle) + '</h3>' +
+      '<button type="button" class="tk-copy" id="chCopyBtn" title="' + esc(tCopyTitle) + '">' + esc(tCopy) + '</button>' +
       (done ? '<span class="tk-done-tick" title="' + (window.I18N ? window.I18N.t('card.saveDone', '已完成') : '已完成') + '">✓</span>' : '') + '</div>';
     if (subTitle && subTitle !== mainTitle) h += '<div class="qcard-en">' + esc(subTitle) + '</div>';
 
@@ -529,15 +655,18 @@
     h += '<div class="tk-kv"><span class="tk-k">' + tCount + '</span><span class="tk-v">' +
       countVal + '</span></div>';
 
-    var tLocate = window.I18N ? window.I18N.t('card.locate', '定位') : '定位';
     var tNav = window.I18N ? window.I18N.t('card.nav', '导航') : '导航';
     var tNavStop = window.I18N ? window.I18N.t('card.navStop', '停止导航') : '停止导航';
+    var tCol = window.I18N ? window.I18N.t('card.collect', '收集') : '收集';
+    var tColStop = window.I18N ? window.I18N.t('card.collectStop', '停止收集') : '停止收集';
     var isNav = !!(typeof LIVE !== 'undefined' && LIVE.isSameTarget && LIVE.isSameTarget(p));
+    var isColOn = !!(typeof LIVE !== 'undefined' && LIVE.isModeActive && LIVE.isModeActive('chest'));
     var doneBtnText = done
       ? (window.I18N ? window.I18N.t('card.undone', '取消完成') : '取消完成')
       : (window.I18N ? window.I18N.t('card.done', '标记完成') : '标记完成');
-    h += '<div class="tk-actions"><button type="button" class="btn act" id="chLocate">' + tLocate + '</button>' +
+    h += '<div class="tk-actions">' +
       '<button type="button" class="btn act" id="chNav">' + (isNav ? tNavStop : tNav) + '</button>' +
+      '<button type="button" class="btn act' + (isColOn ? ' on' : '') + '" id="chCollect">' + (isColOn ? tColStop : tCol) + '</button>' +
       '<button type="button" class="btn done' + (done ? ' is-done' : '') + '" id="chDone">' + doneBtnText + '</button></div>';
 
     body.innerHTML = h;
@@ -549,6 +678,32 @@
       card.classList.add('hidden');
       pv.mode = 'hidden'; pv.ref = null; previewNow = false;
     });
+    var cpBtn = document.getElementById('chCopyBtn');
+    if (cpBtn) cpBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var prefix = isEn ? 'Chest' : '宝箱';
+      var txt = entry.code ? (prefix + ' ' + entry.code) : (prefix + ' ' + mainTitle);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt);
+        if (typeof UI !== 'undefined' && UI.toast) {
+          UI.toast((window.I18N ? window.I18N.t('toast.copied', '已复制：') : '已复制：') + txt);
+        }
+      }
+    });
+    function stepChest(delta) {
+      if (!hasSeq) return;
+      var ni = entry.seqIdx + delta;
+      if (ni < 0 || ni >= subList.length) return;
+      var target = subList[ni];
+      ensureSubOn(target.sub);
+      locate(target.pt);
+      if (window.SpotMark) window.SpotMark.set(target.pt);
+      openCard(target, { keepPos: true });
+    }
+    var prevBtn = document.getElementById('chPrev');
+    if (prevBtn) prevBtn.addEventListener('click', function (e) { e.stopPropagation(); stepChest(-1); });
+    var nextBtn = document.getElementById('chNext');
+    if (nextBtn) nextBtn.addEventListener('click', function (e) { e.stopPropagation(); stepChest(1); });
     /* 标记完成（V1.6.2）：宝箱级完成态，与装备完成态共享同一存储 */
     var dn = document.getElementById('chDone');
     if (dn) dn.addEventListener('click', function (e) {
@@ -557,28 +712,41 @@
       if (st.done && typeof LIVE !== 'undefined' && LIVE.isSameTarget && LIVE.clearNav && LIVE.isSameTarget(p)) {
         LIVE.clearNav();
       }
-      openCard({ item: it, pt: p, hard: entry.hard });
+      openCard(entry, { keepPos: true });
       if (map) map.draw();
       if (typeof UI !== 'undefined' && UI.toast) {
         var toastName = isEn ? (it.en || it.contentCn || it.content) : cnName(it);
         UI.toast(st.done ? (isEn ? 'Marked complete: ' + toastName : '已标记完成：' + toastName) : (isEn ? 'Marked incomplete: ' + toastName : '已取消完成：' + toastName));
       }
     });
-    var lf = document.getElementById('chLocate');
-    if (lf) lf.addEventListener('click', function (e) {
-      e.stopPropagation();
-      locate(p);
-      if (window.SpotMark) window.SpotMark.set(p);   /* V1.6.2：红点脉冲 */
-      positionCard();
-    });
     var nv = document.getElementById('chNav');
     if (nv) nv.addEventListener('click', function (e) {
       e.stopPropagation();
       if (typeof LIVE !== 'undefined' && LIVE.toggleNav) {
         var navName = isEn ? (it.en || it.contentCn || it.content || 'Chest') : cnName(it);
-        LIVE.toggleNav({ id: 'chest:' + Math.round(p[0]) + ',' + Math.round(p[1]), name: navName, px: [p[0], p[1]], cat: 'chest' });
+        LIVE.toggleNav({ id: 'chest:' + (entry.code || (Math.round(p[0]) + ',' + Math.round(p[1]))), name: navName, px: [p[0], p[1]], cat: 'chest' });
         nv.textContent = (LIVE.isSameTarget && LIVE.isSameTarget(p)) ? tNavStop : tNav;
       }
+    });
+    var cb = document.getElementById('chCollect');
+    if (cb) cb.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (typeof LIVE === 'undefined') return;
+      if (LIVE.isModeActive && LIVE.isModeActive('chest')) {
+        LIVE.stopCollectMode();
+      } else if (LIVE.startCollectMode) {
+        var navName = isEn ? (it.en || it.contentCn || it.content || 'Chest') : cnName(it);
+        LIVE.startCollectMode('chest', {
+          id: 'chest:' + (entry.code || (Math.round(p[0]) + ',' + Math.round(p[1]))),
+          code: entry.code || '',
+          name: navName,
+          en: it.en || '',
+          px: [p[0], p[1]],
+          cat: 'chest',
+          entry: entry
+        });
+      }
+      if (window.ChestPanel && window.ChestPanel.syncCollectBtn) window.ChestPanel.syncCollectBtn();
     });
     positionCard();
   }
@@ -651,7 +819,7 @@
     var orig = map._onSelect;
     var wrapped = function (sel) {
       if (sel && sel.ext && sel.ext.type === 'chest') {
-        openCard({ item: sel.ext.item, pt: sel.ext.pt, hard: sel.ext.hard });
+        openCard(sel.ext);
         return;
       }
       orig.call(map, sel);
@@ -674,6 +842,7 @@
         }
       } catch (e) {}
       injectChestGroup();
+      if (window._rebuildSearch) window._rebuildSearch();
       map._extDraw.push(paint);
       map.extHits.push(hit);
       if (map.extHoverHooks) map.extHoverHooks.push(onHoverExt);  /* V1.6.1 调整5：hover 预览 */

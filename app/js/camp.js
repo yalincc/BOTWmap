@@ -259,6 +259,7 @@
           ctx.stroke();
         }
         ctx.restore();
+        if (map.registerIconBox) map.registerIconBox(sx, sy - size / 2, size / 2, size / 2);
       }
     });
   }
