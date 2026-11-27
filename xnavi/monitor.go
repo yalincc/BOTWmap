@@ -114,8 +114,10 @@ func statusLoop() {
 		age := state.age
 		state.mu.RUnlock()
 
-		// 真实连接断流检测：曾连上过但超过 15s 无 /pos 心跳时记一次事件
-		if ts := lastWebHitUnix.Load(); ts > 0 && time.Now().Unix()-ts > 15 {
+		// 真实连接断流检测：仅在游戏运行时监测 15s 心跳；游戏关闭后静默复位，不刷屏断开提示
+		if !ok {
+			webConnState.Store(0)
+		} else if ts := lastWebHitUnix.Load(); ts > 0 && time.Now().Unix()-ts > 15 {
 			if webConnState.CompareAndSwap(2, 0) {
 				logInfo("disconnected (timeout 15s)")
 			}

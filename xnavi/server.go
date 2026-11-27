@@ -226,6 +226,10 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/botw/?follow=1&game=botw", http.StatusFound)
 			return
 		}
+		// HTML 走 304 协商缓存（不重复下大文件，同时保证手机 WebView / 浏览器立即拿到新版 ?v= 入口）
+		if path == "/botw" || path == "/botw/" || strings.HasSuffix(path, ".html") {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		fs.ServeHTTP(w, r)
 		return
 	}
@@ -379,18 +383,8 @@ func applySaveOverride(platName, path string) {
 }
 
 func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
-	lastWebHitUnix.Store(time.Now().Unix()) // 诊断：任意 /pos 命中即视为"网页端在用"
-	orig := r.Header.Get("Origin")
-	if orig == "" {
-		orig = "direct"
-	}
-	lastWebOrigMu.Lock()
-	lastWebOrigin = orig
-	lastWebOrigMu.Unlock()
-	if webConnState.Swap(2) != 2 {
-		logInfo("connected (origin=%s)", orig)
-	}
 	state.mu.RLock()
+	gameOK := state.ok
 	payload := map[string]any{
 		"ok":       state.ok,
 		"app":      "xnavi", // 身份指纹（PLAN-PORT-FAILOVER）：网页据此认出本服务，跳过占用端口的无关程序
@@ -408,6 +402,19 @@ func (s *server) handlePos(w http.ResponseWriter, r *http.Request) {
 		"source":   state.source,
 	}
 	state.mu.RUnlock()
+	if gameOK {
+		lastWebHitUnix.Store(time.Now().Unix())
+		orig := r.Header.Get("Origin")
+		if orig == "" {
+			orig = "direct"
+		}
+		lastWebOrigMu.Lock()
+		lastWebOrigin = orig
+		lastWebOrigMu.Unlock()
+		if webConnState.Swap(2) != 2 {
+			logInfo("connected (origin=%s)", orig)
+		}
+	}
 	targetMu.Lock()
 	payload["target"] = target
 	targetMu.Unlock()

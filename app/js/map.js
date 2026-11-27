@@ -154,9 +154,14 @@ class BotwMap {
     // V1.6.1 调整g：定位脉冲光圈（pulseAt 触发，RAF 驱动自停）
     this._pulses = [];
     this._pulseRAF = 0;
+    // V1.8.1：静态底图离屏缓存（动静分离：60Hz 导航跟随/拖拽平移复用缓存，单帧仅 1 次 drawImage + 动态层）
+    this._staticCache = null;
+    this._lastZoomPctScale = null;
 
     this.view = { x: 0, y: 0, scale: 0.3 };
-    this.dpr = window.devicePixelRatio || 1;
+    this.dpr = (window.BOTW_ADV && window.BOTW_ADV.getEffectiveDpr)
+      ? window.BOTW_ADV.getEffectiveDpr()
+      : (window.devicePixelRatio || 1);
     this.loaded = false;
     this._viewApplied = false; // 是否已应用外部（分享链接）视图
     this.regions = (typeof BOTW_REGIONS !== 'undefined') ? BOTW_REGIONS : []; // 主要地形/区域名
@@ -389,6 +394,9 @@ class BotwMap {
 
   /* ---------- 视口 ---------- */
   _resize() {
+    this.dpr = (window.BOTW_ADV && window.BOTW_ADV.getEffectiveDpr)
+      ? window.BOTW_ADV.getEffectiveDpr()
+      : (window.devicePixelRatio || 1);
     const r = this.canvas.getBoundingClientRect();
     this.w = r.width; this.h = r.height;
     this.canvas.width = Math.round(r.width * this.dpr);
@@ -505,7 +513,11 @@ class BotwMap {
     }
   }
 
-  draw() {
+  _invalidateStatic() {
+    if (this._staticCache) this._staticCache.dirty = true;
+  }
+
+  _drawStaticContent() {
     const ctx = this.ctx;
     const { w, h } = this;
     ctx.clearRect(0, 0, w, h);
@@ -519,11 +531,9 @@ class BotwMap {
     this._stage('tiles', c => this._drawTiles(c));
     this._stage('regions', c => this._drawRegions(c));
 
-    /* —— 线层：所有折线/引导线画在图标之下，不遮挡图标 —— */
+    /* —— 线层：静态折线画在图标之下 —— */
     this._stage('korokPaths', c => this._drawKorokPaths(c, vis));
     this._stage('dragonPaths', c => this._drawDragonPaths(c));
-    // live 线（玩家轨迹 + 导航引导线）：新版拆出 _drawLiveRoutes；旧 live.js 无此方法时跳过
-    if (typeof this._drawLiveRoutes === 'function') this._stage('liveRoutes', c => this._drawLiveRoutes(c));
 
     this._stage('measure', c => this._drawMeasure(c));
     this._stage('materials', c => this._drawMaterials(c)); // 材料层（下层：不遮挡神庙/塔等主标记）
@@ -535,7 +545,11 @@ class BotwMap {
     // V1.6.0 外部图层：任务 / 装备 / 宝箱 / 营地 / 自定义标记（各自注册，独立隔离）
     const exts = this._extDraw;
     for (let i = 0; i < exts.length; i++) this._stage('ext' + i, exts[i]);
+  }
 
+  _drawDynamicOverlay() {
+    // 线层（玩家轨迹 + 导航引导线）：新版拆出 _drawLiveRoutes
+    if (typeof this._drawLiveRoutes === 'function') this._stage('liveRoutes', c => this._drawLiveRoutes(c));
     /* —— 顶层：玩家位置永远压在所有图标之上 —— */
     if (typeof this._drawLivePlayer === 'function') {
       this._stage('livePlayer', c => this._drawLivePlayer(c));
@@ -545,7 +559,84 @@ class BotwMap {
     }
     // V1.6.1 调整g：定位脉冲光圈（标记之上、UI 之下）
     this._stage('pulses', c => this._drawPulses(c));
-    this._stage('zoomPct', () => this._updateZoomPct());
+    if (this._lastZoomPctScale !== this.view.scale) {
+      this._lastZoomPctScale = this.view.scale;
+      this._stage('zoomPct', () => this._updateZoomPct());
+    }
+  }
+
+  _ensureStaticCache() {
+    const pad = (this.w < 700) ? 64 : 128;
+    const { w, h, dpr } = this;
+    if (!w || !h) return null;
+    let sc = this._staticCache;
+    if (!sc) {
+      const c = document.createElement('canvas');
+      sc = { canvas: c, ctx: c.getContext('2d'), w: 0, h: 0, dpr: 0, pad, vx: 0, vy: 0, scale: 0, dirty: true };
+      this._staticCache = sc;
+    }
+    const valid = !sc.dirty &&
+      sc.w === w && sc.h === h && sc.dpr === dpr &&
+      sc.scale === this.view.scale &&
+      Math.abs(this.view.x - sc.vx) <= sc.pad &&
+      Math.abs(this.view.y - sc.vy) <= sc.pad;
+    if (valid) return sc;
+
+    const cw = Math.round((w + pad * 2) * dpr);
+    const ch = Math.round((h + pad * 2) * dpr);
+    if (sc.canvas.width !== cw || sc.canvas.height !== ch) {
+      sc.canvas.width = cw;
+      sc.canvas.height = ch;
+    }
+    sc.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const prevCtx = this.ctx;
+    const prevW = this.w, prevH = this.h;
+    const prevVX = this.view.x, prevVY = this.view.y;
+    try {
+      this.ctx = sc.ctx;
+      this.w = w + pad * 2;
+      this.h = h + pad * 2;
+      this.view.x = prevVX + pad;
+      this.view.y = prevVY + pad;
+      this._drawStaticContent();
+    } finally {
+      this.ctx = prevCtx;
+      this.w = prevW;
+      this.h = prevH;
+      this.view.x = prevVX;
+      this.view.y = prevVY;
+    }
+    sc.w = w; sc.h = h; sc.dpr = dpr; sc.pad = pad;
+    sc.vx = prevVX; sc.vy = prevVY; sc.scale = this.view.scale;
+    sc.dirty = false;
+    return sc;
+  }
+
+  draw(opts) {
+    if (!this.w || !this.h) return;
+    if (opts && opts.dynamicOnly) {
+      const sc = this._ensureStaticCache();
+      if (sc) {
+        const ctx = this.ctx;
+        ctx.clearRect(0, 0, this.w, this.h);
+        ctx.fillStyle = '#10150f';
+        ctx.fillRect(0, 0, this.w, this.h);
+        const ox = this.view.x - sc.vx - sc.pad;
+        const oy = this.view.y - sc.vy - sc.pad;
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'low';
+        ctx.drawImage(sc.canvas, 0, 0, sc.canvas.width, sc.canvas.height, ox, oy, this.w + sc.pad * 2, this.h + sc.pad * 2);
+        ctx.restore();
+        this._drawDynamicOverlay();
+        return;
+      }
+    }
+    // 全量重绘路径（缩放/开关图层/瓦片加载/完成态变化等）：直绘主画布并置静态缓存失效
+    this._invalidateStatic();
+    this._drawStaticContent();
+    this._drawDynamicOverlay();
   }
 
   /* V1.6.1 卡片避让统一内核：定位光圈改由 CardLayout 提层到 DOM（z-index 940），
@@ -562,7 +653,7 @@ class BotwMap {
     this._pulseRAF = requestAnimationFrame(function () {
       var now = performance.now();
       self._pulses = self._pulses.filter(function (pl) { return now - pl.t0 < pl.dur; });
-      self.draw();
+      self.draw({ dynamicOnly: true });
       if (self._pulses.length) self._pulseStep();
       else self._pulseRAF = 0;
     });
@@ -1470,7 +1561,7 @@ class BotwMap {
         this.view.x += dx; this.view.y += dy;
         tLast = [pt.x, pt.y];
         this._onViewChange && this._onViewChange();
-        this.draw();
+        this.draw({ dynamicOnly: true });
       }
     }, { passive: false });
 
@@ -1541,7 +1632,7 @@ class BotwMap {
         lastX = e.clientX; lastY = e.clientY;
         this._updateHoverName(sx, sy, true);
         this._fireHoverExt(null);
-        this.draw();
+        this.draw({ dynamicOnly: true });
       } else {
         // 如果鼠标在侧栏、卡片、弹窗等 UI 层上方，不触发地图点位悬停，防止遮挡阅读
         if (e.target !== cv) {

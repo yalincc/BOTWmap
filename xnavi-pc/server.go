@@ -177,6 +177,10 @@ func (s *apiServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/botw/?follow=1&game=botw", http.StatusFound)
 			return
 		}
+		// HTML 走 304 协商缓存（不重复下大文件，同时保证手机 WebView / 浏览器立即拿到新版 ?v= 入口）
+		if path == "/botw" || path == "/botw/" || strings.HasSuffix(path, ".html") {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		fs.ServeHTTP(w, r)
 		return
 	}
@@ -256,18 +260,21 @@ func (s *apiServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *apiServer) handlePos(w http.ResponseWriter, r *http.Request) {
-	lastWebHitUnix.Store(time.Now().Unix())
-	orig := r.Header.Get("Origin")
-	if orig == "" {
-		orig = "direct"
-	}
-	lastWebOrigMu.Lock()
-	lastWebOrigin = orig
-	lastWebOrigMu.Unlock()
-	if webConnState.Swap(2) != 2 {
-		fmt.Printf("  [web] connected (origin=%s)\n", orig)
-	}
 	st := loc.snapshot()
+	// 仅在游戏已运行并锁定定位时维护网页连接状态，避免游戏关闭后网页 30s 静默探测反复触发 15s 断开刷屏
+	if st.OK {
+		lastWebHitUnix.Store(time.Now().Unix())
+		orig := r.Header.Get("Origin")
+		if orig == "" {
+			orig = "direct"
+		}
+		lastWebOrigMu.Lock()
+		lastWebOrigin = orig
+		lastWebOrigMu.Unlock()
+		if webConnState.Swap(2) != 2 {
+			fmt.Printf("  [web] connected (origin=%s)\n", orig)
+		}
+	}
 	targetMu.Lock()
 	t := curTarget
 	targetMu.Unlock()

@@ -147,7 +147,7 @@ const LIVE = (() => {
     if (wakeLock) { try { wakeLock.release(); } catch (e) {} wakeLock = null; }
   }
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && pollTimer) requestWakeLock();
+    if (!document.hidden && pollingActive) requestWakeLock();
   });
 
   /* ---------- 端口发现（v3.2.2，PLAN-PORT-FAILOVER） ----------
@@ -191,12 +191,12 @@ const LIVE = (() => {
     return false;
   }
   function probeNow() {
-    if (pollTimer) return;                      // 在线轮询中无需探测
+    if (pollingActive) return;                  // 在线轮询中无需探测
     const now = Date.now();
     if (now - lastProbeAt < 2000) return;       // 事件节流 2s
     lastProbeAt = now;
     discoverLiveAPI().then(found => {
-      if (found && !pollTimer) { stopProbing(); startPolling(); loadProgress(); }
+      if (found && !pollingActive) { stopProbing(); startPolling(); loadProgress(); }
     });
   }
   function startProbing() {
@@ -208,12 +208,22 @@ const LIVE = (() => {
 
   /* ---------- 轮询退避（V1.6.5）：定位器（xnavi live）未开时 600ms 轮询会刷屏
      ERR_CONNECTION_REFUSED——连续失败 3 次即停，转入 30s 兜底探测，恢复后自动重启轮询 ---------- */
-  let pollTimer = null, probeTimer = null, progressTimer = null, failCnt = 0;
-  const POLL_MS = LIVE_MIRROR ? 200 : 80;
+  let pollTimer = null, pollingActive = false, probeTimer = null, progressTimer = null, failCnt = 0;
+  // V1.8.1：PC 与手机局域网镜像统一 80ms 串行轮询 + 可配置刷新率上限（默认 60Hz，与屏幕/游戏 120~360Hz 解耦）
+  const POLL_MS = 80;
+  const SMOOTH_RATE = 20;      // 时间无关指数平滑速率（60Hz 下等价于旧 alpha≈0.28）
+  function getMinFrameMs() {
+    const cap = (window.BOTW_ADV && typeof window.BOTW_ADV.getFpsCap === 'function')
+      ? window.BOTW_ADV.getFpsCap()
+      : 60;
+    return cap > 0 ? Math.max(0, (1000 / cap) - 1.2) : 0;
+  }
   const smooth = {
     rafId: 0,
     hasTarget: false,
     firstFixPending: false,
+    lastDrawAt: 0,
+    lastStepAt: 0,
     targetMx: 0,
     targetMy: 0,
     targetHeading: null,
@@ -231,14 +241,23 @@ const LIVE = (() => {
       smooth.rafId = 0;
     }
     smooth.hasTarget = false;
+    smooth.lastDrawAt = 0;
+    smooth.lastStepAt = 0;
   }
 
   function startAnimLoop() {
     if (smooth.rafId) return;
-    function frame() {
+    function frame(now) {
       smooth.rafId = 0;
       const L = map && map.live;
       if (!L || !L.online || !smooth.hasTarget) return;
+
+      // 刷新率上限节流（默认 60Hz，可在「更多高级设置」调整至 30/60/90/120/跟随显示器）
+      const minFrameMs = getMinFrameMs();
+      if (minFrameMs > 0 && smooth.lastDrawAt && (now - smooth.lastDrawAt) < minFrameMs && !smooth.firstFixPending) {
+        smooth.rafId = requestAnimationFrame(frame);
+        return;
+      }
 
       const dx = smooth.targetMx - (L.mx != null ? L.mx : smooth.targetMx);
       const dy = smooth.targetMy - (L.my != null ? L.my : smooth.targetMy);
@@ -254,37 +273,66 @@ const LIVE = (() => {
       }
 
       const settled = Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05 && Math.abs(dh) < 0.2 && Math.abs(dc) < 0.2;
-      if (!settled || smooth.firstFixPending) {
-        const alpha = 0.28;
-        L.mx = (L.mx != null ? L.mx : smooth.targetMx) + dx * alpha;
-        L.my = (L.my != null ? L.my : smooth.targetMy) + dy * alpha;
-        if (typeof smooth.targetHeading === 'number') {
-          L.heading = lerpAngle(L.heading, smooth.targetHeading, alpha);
-        }
-        if (typeof smooth.targetCamFacing === 'number') {
-          L.camFacing = lerpAngle(L.camFacing, smooth.targetCamFacing, alpha);
-        }
-        if (follow) {
-          centerOnPlayer(smooth.firstFixPending ? { pull: true } : null);
-        }
-        smooth.firstFixPending = false;
-        map.draw();
+      if (settled && !smooth.firstFixPending) {
+        // 精准落位并自动休眠（静止时 0 CPU/GPU，等下次 /pos 变化再唤醒）
+        L.mx = smooth.targetMx;
+        L.my = smooth.targetMy;
+        if (typeof smooth.targetHeading === 'number') L.heading = smooth.targetHeading;
+        if (typeof smooth.targetCamFacing === 'number') L.camFacing = smooth.targetCamFacing;
+        smooth.lastStepAt = 0;
+        return;
       }
+
+      const dt = smooth.lastStepAt ? Math.min(0.1, Math.max(0.008, (now - smooth.lastStepAt) / 1000)) : (1 / 60);
+      smooth.lastStepAt = now;
+      smooth.lastDrawAt = now;
+      const alpha = 1 - Math.exp(-SMOOTH_RATE * dt);
+
+      L.mx = (L.mx != null ? L.mx : smooth.targetMx) + dx * alpha;
+      L.my = (L.my != null ? L.my : smooth.targetMy) + dy * alpha;
+      if (typeof smooth.targetHeading === 'number') {
+        L.heading = lerpAngle(L.heading, smooth.targetHeading, alpha);
+      }
+      if (typeof smooth.targetCamFacing === 'number') {
+        L.camFacing = lerpAngle(L.camFacing, smooth.targetCamFacing, alpha);
+      }
+      if (follow) {
+        centerOnPlayer(smooth.firstFixPending ? { pull: true } : null);
+      }
+      smooth.firstFixPending = false;
+      map.draw({ dynamicOnly: true });
+
       smooth.rafId = requestAnimationFrame(frame);
     }
     smooth.rafId = requestAnimationFrame(frame);
   }
 
+  function scheduleNextPoll(delay) {
+    if (!pollingActive) return;
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(runPoll, delay);
+  }
+  async function runPoll() {
+    pollTimer = null;
+    if (!pollingActive) return;
+    const t0 = performance.now();
+    await poll();
+    if (!pollingActive) return;
+    const elapsed = performance.now() - t0;
+    scheduleNextPoll(Math.max(0, POLL_MS - elapsed));
+  }
   function startPolling() {
-    if (pollTimer) return;
+    if (pollingActive) return;
+    pollingActive = true;
     failCnt = 0;
     stopProbing();
-    pollTimer = setInterval(poll, POLL_MS);
+    scheduleNextPoll(0);
     if (!progressTimer) progressTimer = setInterval(loadProgress, 20000);
     requestWakeLock();
   }
   function stopPolling() {
-    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    pollingActive = false;
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
     if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
     stopAnimLoop();
     releaseWakeLock();
@@ -303,7 +351,7 @@ const LIVE = (() => {
     const online = !!(p && p.ok);
     if (!online) {
       failCnt++;
-      if (failCnt >= 3 && pollTimer) stopPolling();
+      if (failCnt >= 3 && pollingActive) stopPolling();
     } else {
       failCnt = 0;
       markLiveKnown();
@@ -347,7 +395,14 @@ const LIVE = (() => {
       smooth.targetMx = p.mx;
       smooth.targetMy = p.my;
       smooth.hasTarget = true;
-      startAnimLoop();
+      const needPos = L.mx == null || Math.abs(smooth.targetMx - L.mx) >= 0.05 || Math.abs(smooth.targetMy - L.my) >= 0.05;
+      const needH = typeof smooth.targetHeading === 'number' &&
+        (typeof L.heading !== 'number' || Math.abs(((smooth.targetHeading - L.heading + 540) % 360) - 180) >= 0.2);
+      const needC = typeof smooth.targetCamFacing === 'number' &&
+        (typeof L.camFacing !== 'number' || Math.abs(((smooth.targetCamFacing - L.camFacing + 540) % 360) - 180) >= 0.2);
+      if (smooth.firstFixPending || needPos || needH || needC) {
+        startAnimLoop();
+      }
 
       L.gx = p.gx; L.gy = p.gy; L.gz = p.gz;
       L.verified = !!p.verified;
@@ -393,7 +448,7 @@ const LIVE = (() => {
                (L.tgt ? 't' : '') + (L.tdist != null ? Math.round(L.tdist / 10) : '');
     if (dk !== lastDrawKey) {
       lastDrawKey = dk;
-      map.draw();
+      map.draw({ dynamicOnly: true });
     }
   }
 
@@ -1244,64 +1299,72 @@ const LIVE = (() => {
     if (px < -40 || py < -40 || px > w + 40 || py > h + 40) return;
 
     // 玩家点半径（箭头 / 圆点各一套，均在函数作用域顶层声明，供距离文字复用）
-    const rad = L.verified ? 8 : 6;
+    let rad = L.verified ? 8 : 6;
     const radDot = L.verified ? 7 : 5;
 
-    // 玩家位置：先画相机/朝向视野扇形（若有），再画角色箭头/圆点
+    // 玩家位置：优先走高级设置统一渲染器（视野扇形 + 自定义箭头/阴影），缺失时回退内置逻辑
     const fovAngle = (typeof L.camFacing === 'number') ? L.camFacing : L.heading;
-    if (typeof fovAngle === 'number') {
-      const fovRad = 82;
-      const halfCone = 38 * Math.PI / 180;
+    if (window.BOTW_ADV && typeof window.BOTW_ADV.drawPlayer === 'function') {
+      rad = window.BOTW_ADV.drawPlayer(ctx, px, py, {
+        verified: !!L.verified,
+        heading: L.heading,
+        fovAngle: fovAngle,
+      }) || rad;
+    } else {
+      if (typeof fovAngle === 'number') {
+        const fovRad = 82;
+        const halfCone = 38 * Math.PI / 180;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(fovAngle * Math.PI / 180);
+        const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, fovRad);
+        grad.addColorStop(0, 'rgba(255, 251, 230, 0.56)');
+        grad.addColorStop(0.45, 'rgba(255, 248, 214, 0.28)');
+        grad.addColorStop(0.85, 'rgba(255, 248, 214, 0.08)');
+        grad.addColorStop(1, 'rgba(255, 248, 214, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, fovRad, -halfCone, halfCone);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
       ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(fovAngle * Math.PI / 180);
-      const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, fovRad);
-      grad.addColorStop(0, 'rgba(255, 251, 230, 0.56)');
-      grad.addColorStop(0.45, 'rgba(255, 248, 214, 0.28)');
-      grad.addColorStop(0.85, 'rgba(255, 248, 214, 0.08)');
-      grad.addColorStop(1, 'rgba(255, 248, 214, 0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, fovRad, -halfCone, halfCone);
-      ctx.closePath();
-      ctx.fill();
+      if (typeof L.heading === 'number') {
+        ctx.translate(px, py);
+        ctx.rotate(L.heading * Math.PI / 180);
+        ctx.shadowColor = 'rgba(255,50,50,.85)';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(rad * 1.5, 0);                 // 前方尖端（指向运动/朝向方向）
+        ctx.lineTo(-rad * 0.9, rad * 0.85);        // 右翼
+        ctx.lineTo(-rad * 0.4, 0);                 // 尾部内凹
+        ctx.lineTo(-rad * 0.9, -rad * 0.85);       // 左翼
+        ctx.closePath();
+        ctx.fillStyle = '#ff3b3b';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      } else {
+        ctx.shadowColor = 'rgba(255,60,60,.85)';
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#ff3b3b';
+        ctx.beginPath();
+        ctx.arc(px, py, radDot, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(px, py, radDot + 2.5, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     }
-
-    ctx.save();
-    if (typeof L.heading === 'number') {
-      ctx.translate(px, py);
-      ctx.rotate(L.heading * Math.PI / 180);
-      ctx.shadowColor = 'rgba(255,50,50,.85)';
-      ctx.shadowBlur = 10;
-      ctx.beginPath();
-      ctx.moveTo(rad * 1.5, 0);                 // 前方尖端（指向运动/朝向方向）
-      ctx.lineTo(-rad * 0.9, rad * 0.85);        // 右翼
-      ctx.lineTo(-rad * 0.4, 0);                 // 尾部内凹
-      ctx.lineTo(-rad * 0.9, -rad * 0.85);       // 左翼
-      ctx.closePath();
-      ctx.fillStyle = '#ff3b3b';
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 1.8;
-      ctx.strokeStyle = '#ffffff';
-      ctx.stroke();
-    } else {
-      ctx.shadowColor = 'rgba(255,60,60,.85)';
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = '#ff3b3b';
-      ctx.beginPath();
-      ctx.arc(px, py, radDot, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(px, py, radDot + 2.5, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
 
     // 目标距离
     if (L.tgt && L.tdist != null) {

@@ -179,7 +179,11 @@ func watchLoop() {
 // ---- status.json（运行时健康快照，GUI/诊断可读；发布包禁带） ----
 func statusLoop() {
 	for {
-		if ts := lastWebHitUnix.Load(); ts > 0 && time.Now().Unix()-ts > 15 {
+		st := loc.snapshot()
+		if !st.OK {
+			// 游戏未运行/已关闭：静默复位网页连接状态，不反复提示 15s 超时断开
+			webConnState.Store(0)
+		} else if ts := lastWebHitUnix.Load(); ts > 0 && time.Now().Unix()-ts > 15 {
 			if webConnState.CompareAndSwap(2, 0) {
 				fmt.Println("  [web] disconnected (timeout 15s)")
 			}

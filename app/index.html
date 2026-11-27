@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>旷野之息 互动地图 · 简体中文多图层版</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 6h4l3 3H9l-3-3zm10 0h10v4l-4 2-3-4-3 2V6zM5 10h5l3 3H8l-3-3zm7 4h4l3 3h-4l-3-3zm7 4h4l3 3h-4l-3-3z' fill='%23f2c94c' opacity='.9'/></svg>">
-<link rel="stylesheet" href="css/style.css?v=73&b=20261127">
+<link rel="stylesheet" href="css/style.css?v=75&b=20261127">
 <style>
 /* P4c：营地行图标用图钉 PNG（camp_pin）；卡片内武器清单可点（链装备卡） */
 .cp-wlink{cursor:pointer;}
@@ -350,9 +350,13 @@
         </div>
       </div>
       <div class="st-foot">
+        <button id="btnAdvSettings" class="mini adv-entry-btn" type="button">更多高级设置</button>
         <button id="stReset" class="mini" data-i18n="settings.reset">恢复默认设置</button>
       </div>
     </div>
+
+    <!-- 高级设置独立弹窗（由 js/adv-settings.js 渲染与管理） -->
+    <div id="advModal" class="adv-overlay hidden"></div>
 
     <!-- 信息卡片（V1.6.5 卡片系统重构） -->
     <div id="infoCard" class="fd-card hidden">
@@ -447,7 +451,8 @@
 <script src="js/dragon_paths.js?v=3&b=1641016"></script>
 <script src="js/supercluster.min.js"></script>
 <script src="js/regions.js?v=rn6&b=1641016"></script>
-<script src="js/map.js?v=54&b=20261107"></script>
+<script src="js/adv-settings.js?v=3&b=20261127"></script>
+<script src="js/map.js?v=56&b=20261127"></script>
 <script src="js/card-layout.js?v=8&b=1641016"></script>
 <script src="js/spot-mark.js?v=1&b=1641016"></script>
 <script src="js/ui.js?v=86&b=20261127"></script>
@@ -455,7 +460,7 @@
 <script src="js/korok_paths.js?v=1&b=20261122"></script>
 <script src="data/marker_heights.js?v=1&b=20261122"></script>
 <script src="voice/voice-nav.js?v=5&b=20261122"></script>
-<script src="js/live.js?v=34&b=20261127"></script>
+<script src="js/live.js?v=36&b=20261127"></script>
 <script src="data/quest_save.js?v=2&b=1641016"></script>
 <!-- P4b：武器收集查找表（IsGet_Weapon 190 条，save_upload.js 反查；其余大表按需加载） -->
 <script src="data/weapon_collect_save.js?v=2&b=1641016"></script>
